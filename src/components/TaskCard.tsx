@@ -8,7 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Flag } from 'lucide-react';
+import { Calendar, Flag, Package } from 'lucide-react';
+import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 
 interface TaskCardProps {
   task: any;
@@ -23,6 +24,7 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [materialsOpen, setMaterialsOpen] = useState(false);
 
   const isAssignedToMe = task.assigned_to_user_id === userId;
   const isUnassigned = !task.assigned_to_user_id;
@@ -111,6 +113,13 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
                 Needs Materials
               </Badge>
             )}
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMaterialsOpen(true); }}
+              className="ml-auto text-muted-foreground hover:text-foreground"
+              aria-label="Materials"
+            >
+              <Package className="h-4 w-4" />
+            </button>
           </div>
         </Link>
 
@@ -145,6 +154,13 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
           </div>
         )}
       </Card>
+
+      <TaskMaterialsSheet
+        taskId={task.id}
+        open={materialsOpen}
+        onOpenChange={setMaterialsOpen}
+        onMaterialsChange={onUpdate}
+      />
 
       <AlertDialog open={dibsConfirmOpen} onOpenChange={setDibsConfirmOpen}>
         <AlertDialogContent>
