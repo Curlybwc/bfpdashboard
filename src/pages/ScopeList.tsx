@@ -38,8 +38,8 @@ const ScopeList = () => {
     if (!user) return;
     const { data: scope, error } = await supabase.from('scopes').insert({ name: name || null, address, created_by: user.id }).select().single();
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    // Add creator as editor
-    await supabase.from('scope_members').insert({ scope_id: scope.id, user_id: user.id, role: 'editor' });
+    // Add creator as manager
+    await supabase.from('scope_members').insert({ scope_id: scope.id, user_id: user.id, role: 'manager' });
     setName(''); setAddress(''); setOpen(false);
     fetchScopes();
   };
