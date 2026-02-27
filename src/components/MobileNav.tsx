@@ -1,10 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
-import { FolderKanban, ClipboardList, LogOut } from 'lucide-react';
+import { FolderKanban, ClipboardList, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
 
 const MobileNav = () => {
   const location = useLocation();
   const { signOut } = useAuth();
+  const { isAdmin } = useAdmin();
   
   const links = [
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
@@ -29,6 +31,17 @@ const MobileNav = () => {
             </Link>
           );
         })}
+        {isAdmin && (
+          <Link
+            to="/admin"
+            className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors ${
+              location.pathname.startsWith('/admin') ? 'text-primary font-medium' : 'text-muted-foreground'
+            }`}
+          >
+            <Shield className="h-5 w-5" />
+            Admin
+          </Link>
+        )}
         <button
           onClick={signOut}
           className="flex flex-col items-center gap-0.5 px-3 py-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
