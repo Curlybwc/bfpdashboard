@@ -7,6 +7,8 @@ import PageHeader from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import CostLibrary from '@/components/CostLibrary';
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -62,31 +64,42 @@ const AdminPanel = () => {
     <div className="pb-20">
       <PageHeader title="Admin Panel" backTo="/projects" />
       <div className="p-4">
-        <h2 className="text-sm font-medium text-muted-foreground mb-3">
-          User Management ({profiles.length})
-        </h2>
-        <div className="space-y-2">
-          {profiles.map((profile) => (
-            <Card key={profile.id} className="p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm truncate">
-                    {profile.full_name || 'Unnamed User'}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Admin</span>
-                  <Switch
-                    checked={profile.is_admin}
-                    onCheckedChange={() => toggleAdmin(profile.id, profile.is_admin)}
-                    disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
-                  />
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <Tabs defaultValue="users">
+          <TabsList>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
+          </TabsList>
+          <TabsContent value="users">
+            <h2 className="text-sm font-medium text-muted-foreground mb-3">
+              User Management ({profiles.length})
+            </h2>
+            <div className="space-y-2">
+              {profiles.map((profile) => (
+                <Card key={profile.id} className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">
+                        {profile.full_name || 'Unnamed User'}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Admin</span>
+                      <Switch
+                        checked={profile.is_admin}
+                        onCheckedChange={() => toggleAdmin(profile.id, profile.is_admin)}
+                        disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
+                      />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+          <TabsContent value="cost-library">
+            <CostLibrary />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
