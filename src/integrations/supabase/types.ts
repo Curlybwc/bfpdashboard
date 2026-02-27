@@ -284,6 +284,9 @@ export type Database = {
         Row: {
           actual_total_cost: number | null
           assigned_to_user_id: string | null
+          claimed_at: string | null
+          claimed_by_user_id: string | null
+          completed_at: string | null
           created_at: string
           created_by: string
           due_date: string | null
@@ -295,6 +298,8 @@ export type Database = {
           room_area: string | null
           source_scope_item_id: string | null
           stage: Database["public"]["Enums"]["task_stage"]
+          started_at: string | null
+          started_by_user_id: string | null
           task: string
           trade: string | null
           updated_at: string
@@ -302,6 +307,9 @@ export type Database = {
         Insert: {
           actual_total_cost?: number | null
           assigned_to_user_id?: string | null
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          completed_at?: string | null
           created_at?: string
           created_by: string
           due_date?: string | null
@@ -313,6 +321,8 @@ export type Database = {
           room_area?: string | null
           source_scope_item_id?: string | null
           stage?: Database["public"]["Enums"]["task_stage"]
+          started_at?: string | null
+          started_by_user_id?: string | null
           task: string
           trade?: string | null
           updated_at?: string
@@ -320,6 +330,9 @@ export type Database = {
         Update: {
           actual_total_cost?: number | null
           assigned_to_user_id?: string | null
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          completed_at?: string | null
           created_at?: string
           created_by?: string
           due_date?: string | null
@@ -331,11 +344,20 @@ export type Database = {
           room_area?: string | null
           source_scope_item_id?: string | null
           stage?: Database["public"]["Enums"]["task_stage"]
+          started_at?: string | null
+          started_by_user_id?: string | null
           task?: string
           trade?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_claimed_by_user_id_fkey"
+            columns: ["claimed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_project_id_fkey"
             columns: ["project_id"]
@@ -348,6 +370,13 @@ export type Database = {
             columns: ["source_scope_item_id"]
             isOneToOne: false
             referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_started_by_user_id_fkey"
+            columns: ["started_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

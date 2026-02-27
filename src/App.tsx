@@ -13,6 +13,7 @@ import TaskDetail from "./pages/TaskDetail";
 import ScopeList from "./pages/ScopeList";
 import ScopeDetail from "./pages/ScopeDetail";
 import AdminPanel from "./pages/AdminPanel";
+import Today from "./pages/Today";
 import NotFound from "./pages/NotFound";
 import MobileNav from "./components/MobileNav";
 
@@ -26,7 +27,7 @@ const AppRoutes = () => {
   useEffect(() => {
     if (loading) return;
     if (user && (location.pathname === '/login' || location.pathname === '/')) {
-      navigate('/projects', { replace: true });
+      navigate('/today', { replace: true });
     }
     if (!user && location.pathname !== '/login' && location.pathname !== '/') {
       navigate('/login', { replace: true });
@@ -44,6 +45,7 @@ const AppRoutes = () => {
         <Route path="/login" element={<Login />} />
         {user && (
           <>
+            <Route path="/today" element={<Today />} />
             <Route path="/projects" element={<ProjectList />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
