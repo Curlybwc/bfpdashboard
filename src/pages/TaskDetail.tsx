@@ -13,7 +13,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { TASK_STAGES, TASK_PRIORITIES, MATERIALS_OPTIONS, type TaskStage, type TaskPriority, type MaterialsStatus } from '@/lib/supabase-types';
+import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
+import { Package } from 'lucide-react';
+import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -24,12 +26,13 @@ const TaskDetail = () => {
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
+  const [materialsOpen, setMaterialsOpen] = useState(false);
 
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
   const [priority, setPriority] = useState<TaskPriority>('2 – This Week');
-  const [materials, setMaterials] = useState<MaterialsStatus>('No');
+  // materials_on_site is now derived, not manually editable
   const [roomArea, setRoomArea] = useState('');
   const [trade, setTrade] = useState('');
   const [notes, setNotes] = useState('');
@@ -45,7 +48,7 @@ const TaskDetail = () => {
       task: taskText,
       stage,
       priority,
-      materials_on_site: materials,
+      // materials_on_site is derived from task_materials, not saved here
       room_area: roomArea || null,
       trade: trade || null,
       notes: notes || null,
@@ -65,7 +68,7 @@ const TaskDetail = () => {
         setTaskText(data.task);
         setStage(data.stage);
         setPriority(data.priority);
-        setMaterials(data.materials_on_site);
+        // materials_on_site is derived, no state needed
         setRoomArea(data.room_area || '');
         setTrade(data.trade || '');
         setNotes(data.notes || '');
@@ -149,6 +152,9 @@ const TaskDetail = () => {
           {isAssignedToMe && task.stage === 'In Progress' && (
             <Button onClick={handleComplete} disabled={actionLoading}>Complete</Button>
           )}
+          <Button variant="outline" size="icon" onClick={() => setMaterialsOpen(true)}>
+            <Package className="h-4 w-4" />
+          </Button>
         </div>
         <div className="space-y-2">
           <Label>Task</Label>
@@ -177,12 +183,7 @@ const TaskDetail = () => {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label>Materials On Site</Label>
-            <Select value={materials} onValueChange={(v) => setMaterials(v as MaterialsStatus)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MATERIALS_OPTIONS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">{task.materials_on_site}</p>
           </div>
           <div className="space-y-2">
             <Label>Due Date</Label>
@@ -211,6 +212,13 @@ const TaskDetail = () => {
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
+
+      <TaskMaterialsSheet
+        taskId={taskId!}
+        open={materialsOpen}
+        onOpenChange={setMaterialsOpen}
+        onMaterialsChange={fetchTask}
+      />
 
       <AlertDialog open={dibsConfirmOpen} onOpenChange={setDibsConfirmOpen}>
         <AlertDialogContent>

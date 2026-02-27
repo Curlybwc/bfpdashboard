@@ -294,6 +294,47 @@ export type Database = {
           },
         ]
       }
+      task_materials: {
+        Row: {
+          created_at: string
+          delivered: boolean
+          id: string
+          name: string
+          purchased: boolean
+          quantity: number | null
+          task_id: string
+          unit: string | null
+        }
+        Insert: {
+          created_at?: string
+          delivered?: boolean
+          id?: string
+          name: string
+          purchased?: boolean
+          quantity?: number | null
+          task_id: string
+          unit?: string | null
+        }
+        Update: {
+          created_at?: string
+          delivered?: boolean
+          id?: string
+          name?: string
+          purchased?: boolean
+          quantity?: number | null
+          task_id?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_materials_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           actual_total_cost: number | null
