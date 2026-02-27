@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, ArrowRightLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import ScopeMembers from '@/components/ScopeMembers';
 import { PRICING_STATUSES, type PricingStatus } from '@/lib/supabase-types';
 
 const ScopeDetail = () => {
@@ -222,6 +223,7 @@ const ScopeDetail = () => {
             ))
           )}
         </div>
+        <ScopeMembers scopeId={id!} />
       </div>
     </div>
   );

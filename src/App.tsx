@@ -12,6 +12,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import TaskDetail from "./pages/TaskDetail";
 import ScopeList from "./pages/ScopeList";
 import ScopeDetail from "./pages/ScopeDetail";
+import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import MobileNav from "./components/MobileNav";
 
@@ -48,6 +49,7 @@ const AppRoutes = () => {
             <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
             <Route path="/scopes" element={<ScopeList />} />
             <Route path="/scopes/:id" element={<ScopeDetail />} />
+            <Route path="/admin" element={<AdminPanel />} />
           </>
         )}
         <Route path="*" element={<NotFound />} />

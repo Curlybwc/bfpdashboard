@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, MATERIALS_OPTIONS, type TaskStage, type TaskPriority, type MaterialsStatus } from '@/lib/supabase-types';
 import { Link } from 'react-router-dom';
 
@@ -160,6 +161,7 @@ const ProjectDetail = () => {
             ))
           )}
         </div>
+        <ProjectMembers projectId={id!} />
       </div>
     </div>
   );
