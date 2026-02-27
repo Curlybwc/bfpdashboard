@@ -2,8 +2,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import ProjectList from "./pages/ProjectList";
@@ -18,6 +19,18 @@ const queryClient = new QueryClient();
 
 const AppRoutes = () => {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (loading) return;
+    if (user && (location.pathname === '/login' || location.pathname === '/')) {
+      navigate('/projects', { replace: true });
+    }
+    if (!user && location.pathname !== '/login' && location.pathname !== '/') {
+      navigate('/login', { replace: true });
+    }
+  }, [user, loading, location.pathname, navigate]);
 
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,12 +10,20 @@ import { useToast } from '@/hooks/use-toast';
 import { HardHat } from 'lucide-react';
 
 const Login = () => {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/projects', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +47,8 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         toast({ title: 'Login failed', description: error.message, variant: 'destructive' });
+      } else {
+        navigate('/projects', { replace: true });
       }
     }
     setLoading(false);
