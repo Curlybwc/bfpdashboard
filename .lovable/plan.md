@@ -1,43 +1,27 @@
 
 
-## Cost Library Tab — Implementation Plan
+## Plan Update: Remove Materials Prompt from Phase 2A
 
-**No SQL migration needed.** RLS policies already exist on `cost_items` (admin-only INSERT/UPDATE/DELETE, authenticated SELECT).
+**No code changes needed.** The current `TaskDetail.tsx` already treats `materials_on_site` as a simple editable Select field with no confirmation dialog. The materials prompt was only described in the Phase 2A plan but was never implemented in code.
 
-### Files Created
+### What changes
 
-**`src/components/CostLibrary.tsx`**
-- Self-contained component for the Cost Library tab
-- State: `costItems[]`, `search`, `editingId`, `showAddDialog`
-- Fetches `cost_items` ordered by `name` ASC
-- Client-side search filter on `name`
-- Renders a table with columns: name, unit_type, piece_length_ft (if not null), default_total_cost, active (Switch toggle)
-- Inline edit mode per row: editable name, unit_type (Select dropdown: each/sqft/lf/piece), piece_length_ft (Input), default_total_cost (Input), save/cancel buttons
-- Delete button per row with confirmation (AlertDialog)
-- "Add Cost Item" button opens a Dialog with form fields: name (required), unit_type (Select), piece_length_ft (optional Input), default_total_cost (required Input), active (Switch, default true)
-- All mutations via `supabase.from('cost_items').update/delete/insert`
+**Plan clarification only:**
+- Remove item "6️⃣ Materials Prompt" from Phase 2A scope
+- In `TaskDetail.tsx` (Step 7 of the plan): no materials confirmation dialog will be added — the existing simple Select dropdown for `materials_on_site` stays as-is
+- In `TaskCard.tsx`: no purchased-material logic — only the "Needs Materials" badge and Start button gating remain
 
-### Files Modified
+### Updated Phase 2A scope
 
-**`src/pages/AdminPanel.tsx`**
-- Wrap existing User Management content and new Cost Library in `Tabs` component
-- Tab 1: "Users" — existing user management content (unchanged logic)
-- Tab 2: "Cost Library" — renders `<CostLibrary />`
-- Import `Tabs, TabsList, TabsTrigger, TabsContent` and `CostLibrary`
+1. Database migration (5 lifecycle columns)
+2. `TaskCard.tsx` — with Dibs/Start/Complete buttons, "Needs Materials" badge
+3. `Today.tsx` — 3 sections (In Progress, Assigned, Available)
+4. `StatusBadge.tsx` — color updates
+5. `App.tsx` — add `/today` route
+6. `MobileNav.tsx` — add Today tab
+7. `TaskDetail.tsx` — add Dibs/Start/Complete buttons only; `materials_on_site` remains a plain editable field, no modal
 
-### Component Structure
-```text
-AdminPanel
-├── PageHeader
-└── Tabs
-    ├── TabsTrigger "Users"
-    ├── TabsTrigger "Cost Library"
-    ├── TabsContent "users"
-    │   └── (existing profiles list + admin toggles)
-    └── TabsContent "cost-library"
-        └── CostLibrary
-            ├── Search Input
-            ├── Add Cost Item Button → Dialog
-            └── Table (name, unit_type, piece_length_ft, default_total_cost, active, actions)
-```
+### Deferred to Phase 2C
+- Materials purchased confirmation modal ("Are materials now on site for this task?")
+- Any purchased-material logic tied to the Materials tab
 
