@@ -2,9 +2,9 @@
 
 ## Admin System Implementation Plan
 
-### Step 1: Database Migration — Update `handle_new_user()` + RLS for admin toggle
+### Step 1: Database Migration
 
-**SQL migration:**
+Execute a single migration with safe `DROP POLICY IF EXISTS` guards for the UPDATE policies, plus the `handle_new_user()` update and profiles RLS changes:
 
 ```sql
 -- 1. Update handle_new_user to bootstrap first user as admin
@@ -24,75 +24,74 @@ BEGIN
 END;
 $$;
 
--- 2. Allow admins to view all profiles (needed for user management)
+-- 2. Allow admins to view all profiles
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile" ON public.profiles
   FOR SELECT TO authenticated
   USING (auth.uid() = id OR is_admin(auth.uid()));
 
--- 3. Allow admins to update any profile (for toggling is_admin)
+-- 3. Allow admins to update any profile
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE TO authenticated
   USING (auth.uid() = id OR is_admin(auth.uid()));
 
--- 4. Allow admins to update project_members roles
+-- 4. Allow admins/managers to update project_members roles
+DROP POLICY IF EXISTS "Update project members" ON public.project_members;
 CREATE POLICY "Update project members" ON public.project_members
   FOR UPDATE TO authenticated
-  USING (is_admin(auth.uid()) OR get_project_role(auth.uid(), project_id) = 'manager');
+  USING (
+    is_admin(auth.uid())
+    OR get_project_role(auth.uid(), project_id) = 'manager'
+  );
 
--- 5. Allow admins to update scope_members roles
+-- 5. Allow admins/managers to update scope_members roles
+DROP POLICY IF EXISTS "Update scope members" ON public.scope_members;
 CREATE POLICY "Update scope members" ON public.scope_members
   FOR UPDATE TO authenticated
-  USING (is_admin(auth.uid()) OR get_scope_role(auth.uid(), scope_id) = 'manager');
+  USING (
+    is_admin(auth.uid())
+    OR get_scope_role(auth.uid(), scope_id) = 'manager'
+  );
 ```
 
 ### Step 2: Create `src/hooks/useAdmin.tsx`
 
-A hook that reads the current user's `is_admin` from `profiles` and exposes it. Caches the result.
-
-```typescript
-// Returns { isAdmin: boolean, loading: boolean }
-// Fetches profiles.is_admin for auth.uid()
-```
+Returns `{ isAdmin: boolean, loading: boolean }`. Queries `profiles.is_admin` for the current user via `useAuth().user.id`.
 
 ### Step 3: Create `src/pages/AdminPanel.tsx`
 
-- Route: `/admin`
-- Guard: redirects to `/projects` if not admin
-- User Management tab:
-  - Fetches all profiles (admin can see all via updated RLS)
-  - Shows full_name, id, is_admin status
-  - Toggle switch for is_admin (calls `supabase.from('profiles').update({ is_admin }).eq('id', userId)`)
-  - Prevents removing last admin (check count of admins before toggling off)
-  - Note: `auth.users.email` is not accessible from client. Display user ID and full_name. If email is needed, we can add an edge function later.
+- Guarded route — redirects to `/projects` if not admin
+- Lists all profiles with `full_name`, `id`, `is_admin` toggle
+- Toggle calls `supabase.from('profiles').update({ is_admin }).eq('id', userId)`
+- Prevents removing last admin by counting admins before toggling off
 
-### Step 4: Update `src/pages/ProjectDetail.tsx` — Add Members Section
+### Step 4: Create `src/components/ProjectMembers.tsx`
 
-Below the task list, add a "Members" section visible to admins and managers:
-- Fetches `project_members` joined with `profiles` for the project
-- Shows each member's full_name, role
-- Dropdown to change role (contractor/manager/read_only)
-- "Add Member" dialog: select from all profiles (admin-only or manager) and assign role
-- Uses the new UPDATE policy on project_members
+- Fetches `project_members` joined with `profiles` for a given project
+- Shows each member's `full_name` and role
+- Dropdown to change role (`contractor` / `manager` / `read_only`)
+- "Add Member" dialog to select from all profiles and assign role
 
-### Step 5: Update `src/pages/ScopeDetail.tsx` — Add Members Section
+### Step 5: Create `src/components/ScopeMembers.tsx`
 
-Same pattern as project members:
-- Fetches `scope_members` joined with `profiles`
-- Shows full_name, role
-- Dropdown to change role (viewer/editor/manager)
-- "Add Member" dialog
+Same pattern — fetches `scope_members` joined with `profiles`, role dropdown (`viewer` / `editor` / `manager`), add member dialog.
 
-### Step 6: Update `src/App.tsx` — Add `/admin` route
+### Step 6: Update `src/pages/ProjectDetail.tsx`
 
-```tsx
-<Route path="/admin" element={<AdminPanel />} />
-```
+Add `<ProjectMembers projectId={id} />` below the task list.
 
-### Step 7: Update `src/components/MobileNav.tsx` — Conditional Admin link
+### Step 7: Update `src/pages/ScopeDetail.tsx`
 
-Add a Shield icon link to `/admin` that only renders when `useAdmin().isAdmin` is true.
+Add `<ScopeMembers scopeId={id} />` below the scope items list.
+
+### Step 8: Update `src/App.tsx`
+
+Add route: `<Route path="/admin" element={<AdminPanel />} />`
+
+### Step 9: Update `src/components/MobileNav.tsx`
+
+Add conditional `Shield` icon link to `/admin` when `useAdmin().isAdmin` is true.
 
 ### Files Created
 - `src/hooks/useAdmin.tsx`
@@ -101,13 +100,8 @@ Add a Shield icon link to `/admin` that only renders when `useAdmin().isAdmin` i
 - `src/components/ScopeMembers.tsx`
 
 ### Files Modified
-- `src/App.tsx` — add admin route
-- `src/components/MobileNav.tsx` — add conditional admin nav link
-- `src/pages/ProjectDetail.tsx` — add ProjectMembers component
-- `src/pages/ScopeDetail.tsx` — add ScopeMembers component
-
-### What is NOT modified
-- Task logic — untouched
-- Existing RLS on tasks, projects, scopes, scope_items, cost_items — untouched
-- Existing INSERT policies on project_members, scope_members — untouched
+- `src/App.tsx`
+- `src/components/MobileNav.tsx`
+- `src/pages/ProjectDetail.tsx`
+- `src/pages/ScopeDetail.tsx`
 
