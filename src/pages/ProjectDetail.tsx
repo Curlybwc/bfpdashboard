@@ -17,6 +17,12 @@ import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, MATERIALS_OPTIONS, type TaskStage, type TaskPriority, type MaterialsStatus } from '@/lib/supabase-types';
 import { Link } from 'react-router-dom';
 
+interface ProjectMember {
+  user_id: string;
+  role: string;
+  profiles: { full_name: string | null } | null;
+}
+
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -31,15 +37,18 @@ const ProjectDetail = () => {
   const [roomArea, setRoomArea] = useState('');
   const [trade, setTrade] = useState('');
   const [notes, setNotes] = useState('');
-
+  const [assignedTo, setAssignedTo] = useState('unassigned');
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const fetchData = async () => {
     if (!id) return;
-    const [{ data: proj }, { data: t }] = await Promise.all([
+    const [{ data: proj }, { data: t }, { data: members }] = await Promise.all([
       supabase.from('projects').select('*').eq('id', id).single(),
       supabase.from('tasks').select('*').eq('project_id', id).order('created_at', { ascending: false }),
+      supabase.from('project_members').select('user_id, role, profiles(full_name)').eq('project_id', id),
     ]);
     if (proj) setProject(proj);
     if (t) setTasks(t);
+    if (members) setProjectMembers(members as unknown as ProjectMember[]);
   };
 
   useEffect(() => { fetchData(); }, [id]);
@@ -57,10 +66,11 @@ const ProjectDetail = () => {
       trade: trade || null,
       notes: notes || null,
       created_by: user.id,
+      assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
     });
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     setTaskName(''); setStage('Ready'); setPriority('2 – This Week'); setMaterials('No');
-    setRoomArea(''); setTrade(''); setNotes('');
+    setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
     setOpen(false);
     fetchData();
   };
@@ -122,6 +132,20 @@ const ProjectDetail = () => {
                 <div className="space-y-2">
                   <Label>Room / Area</Label>
                   <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Assigned To</Label>
+                  <Select value={assignedTo} onValueChange={setAssignedTo}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {projectMembers.map((m) => (
+                        <SelectItem key={m.user_id} value={m.user_id}>
+                          {m.profiles?.full_name || 'Unnamed'} ({m.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Notes</Label>
