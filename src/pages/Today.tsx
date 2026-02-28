@@ -145,6 +145,7 @@ const Today = () => {
               isAdmin={isAdmin}
               onUpdate={fetchTasks}
               parentTitle={t.parent_task_id ? parentTitles[t.parent_task_id] : undefined}
+              context="today"
             />
           ))}
         </div>
