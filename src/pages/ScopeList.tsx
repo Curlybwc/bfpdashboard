@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,9 @@ import type { ScopeStatus } from '@/lib/supabase-types';
 
 const ScopeList = () => {
   const { user } = useAuth();
+  const { isAdmin, canManageProjects } = useAdmin();
   const { toast } = useToast();
+  const canCreate = isAdmin || canManageProjects;
   const [scopes, setScopes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -60,6 +63,7 @@ const ScopeList = () => {
               <option value="Archived">Archived</option>
               <option value="all">All</option>
             </select>
+            {canCreate && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button size="sm"><Plus className="h-4 w-4 mr-1" />New</Button>
@@ -79,6 +83,7 @@ const ScopeList = () => {
                 </form>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         }
       />

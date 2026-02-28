@@ -93,18 +93,21 @@ export type Database = {
       }
       profiles: {
         Row: {
+          can_manage_projects: boolean
           created_at: string
           full_name: string | null
           id: string
           is_admin: boolean
         }
         Insert: {
+          can_manage_projects?: boolean
           created_at?: string
           full_name?: string | null
           id: string
           is_admin?: boolean
         }
         Update: {
+          can_manage_projects?: boolean
           created_at?: string
           full_name?: string | null
           id?: string
@@ -520,6 +523,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
       get_project_role: {
         Args: { _project_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["project_member_role"]

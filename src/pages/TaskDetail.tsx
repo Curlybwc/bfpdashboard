@@ -75,7 +75,7 @@ const TaskDetail = () => {
     const oldStage = task.stage;
     const newAssignedTo = assignedTo === 'unassigned' ? null : assignedTo;
 
-    const { error } = await supabase.from('tasks').update({
+    const updatePayload: any = {
       task: taskText,
       stage,
       priority,
@@ -83,9 +83,13 @@ const TaskDetail = () => {
       trade: trade || null,
       notes: notes || null,
       due_date: dueDate || null,
-      actual_total_cost: actualCost ? parseFloat(actualCost) : null,
       assigned_to_user_id: newAssignedTo,
-    }).eq('id', taskId);
+    };
+    if (isAdmin) {
+      updatePayload.actual_total_cost = actualCost ? parseFloat(actualCost) : null;
+    }
+
+    const { error } = await supabase.from('tasks').update(updatePayload).eq('id', taskId);
 
     // Stage sync: if moving FROM Done and has parent, revert parent
     if (!error && oldStage === 'Done' && stage !== 'Done' && task.parent_task_id) {
@@ -335,7 +339,8 @@ const TaskDetail = () => {
         </div>
         <div className="space-y-2">
           <Label>Actual Total Cost</Label>
-          <Input type="number" value={actualCost} onChange={(e) => setActualCost(e.target.value)} placeholder="$" />
+          <Input type="number" value={actualCost} onChange={(e) => setActualCost(e.target.value)} placeholder="$" disabled={!isAdmin} />
+          {!isAdmin && <p className="text-xs text-muted-foreground">Only admins can edit this field.</p>}
         </div>
         <div className="space-y-2">
           <Label>Notes</Label>
