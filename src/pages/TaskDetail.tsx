@@ -152,8 +152,9 @@ const TaskDetail = () => {
           {isAssignedToMe && task.stage === 'In Progress' && (
             <Button onClick={handleComplete} disabled={actionLoading}>Complete</Button>
           )}
-          <Button variant="outline" size="icon" onClick={() => setMaterialsOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setMaterialsOpen(true)}>
             <Package className="h-4 w-4" />
+            Materials
           </Button>
         </div>
         <div className="space-y-2">
