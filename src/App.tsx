@@ -13,6 +13,7 @@ import ProjectWalkthrough from "./pages/ProjectWalkthrough";
 import TaskDetail from "./pages/TaskDetail";
 import ScopeList from "./pages/ScopeList";
 import ScopeDetail from "./pages/ScopeDetail";
+import ScopeWalkthrough from "./pages/ScopeWalkthrough";
 import AdminPanel from "./pages/AdminPanel";
 import Today from "./pages/Today";
 import NotFound from "./pages/NotFound";
@@ -53,6 +54,7 @@ const AppRoutes = () => {
             <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
             <Route path="/scopes" element={<ScopeList />} />
             <Route path="/scopes/:id" element={<ScopeDetail />} />
+            <Route path="/scopes/:id/walkthrough" element={<ScopeWalkthrough />} />
             <Route path="/admin" element={<AdminPanel />} />
           </>
         )}
