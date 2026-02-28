@@ -17,7 +17,7 @@ const Today = () => {
   const [available, setAvailable] = useState<any[]>([]);
   const [needsReview, setNeedsReview] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [projectNames, setProjectNames] = useState<Record<string, string>>({});
+  const [projectMap, setProjectMap] = useState<Record<string, { name: string; address?: string }>>({});
   const [parentTitles, setParentTitles] = useState<Record<string, string>>({});
   const [isManager, setIsManager] = useState(false);
 
@@ -101,11 +101,11 @@ const Today = () => {
     if (projectIds.length > 0) {
       const { data: projects } = await supabase
         .from('projects')
-        .select('id, name')
+        .select('id, name, address')
         .in('id', projectIds);
-      const names: Record<string, string> = {};
-      (projects || []).forEach(p => { names[p.id] = p.name; });
-      setProjectNames(names);
+      const map: Record<string, { name: string; address?: string }> = {};
+      (projects || []).forEach(p => { map[p.id] = { name: p.name, address: p.address ?? undefined }; });
+      setProjectMap(map);
     }
 
     // Batch fetch parent titles (no N+1)
@@ -140,7 +140,8 @@ const Today = () => {
             <TaskCard
               key={t.id}
               task={t}
-              projectName={projectNames[t.project_id] || ''}
+              projectName={projectMap[t.project_id]?.name || ''}
+              projectAddress={projectMap[t.project_id]?.address}
               userId={user!.id}
               isAdmin={isAdmin}
               onUpdate={fetchTasks}

@@ -26,13 +26,14 @@ interface TaskCardProps {
   onToggle?: () => void;
   allChildrenDone?: boolean;
   context?: 'today' | 'project';
+  projectAddress?: string;
 }
 
 const TaskCard = ({
   task, projectName, userId, isAdmin, onUpdate,
   showProjectName = true, isChild = false, parentTitle,
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
-  context = 'project',
+  context = 'project', projectAddress,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
@@ -160,6 +161,9 @@ const TaskCard = ({
           </div>
           {showProjectName && (
             <p className="text-xs text-muted-foreground mt-0.5">{projectName}</p>
+          )}
+          {projectAddress && (
+            <p className="text-xs text-muted-foreground truncate">{projectAddress}</p>
           )}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <StatusBadge status={task.stage} />
