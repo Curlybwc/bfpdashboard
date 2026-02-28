@@ -11,10 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus } from 'lucide-react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { Plus, ChevronDown, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
-import { TASK_STAGES, TASK_PRIORITIES, MATERIALS_OPTIONS, type TaskStage, type TaskPriority, type MaterialsStatus } from '@/lib/supabase-types';
+import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
 import { Link } from 'react-router-dom';
 
 interface ProjectMember {
@@ -33,12 +34,15 @@ const ProjectDetail = () => {
   const [taskName, setTaskName] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
   const [priority, setPriority] = useState<TaskPriority>('2 – This Week');
-  const [materials, setMaterials] = useState<MaterialsStatus>('No');
   const [roomArea, setRoomArea] = useState('');
   const [trade, setTrade] = useState('');
   const [notes, setNotes] = useState('');
   const [assignedTo, setAssignedTo] = useState('unassigned');
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  const [pendingMaterials, setPendingMaterials] = useState<{ name: string; quantity: string; unit: string }[]>([]);
+  const [matName, setMatName] = useState('');
+  const [matQty, setMatQty] = useState('');
+  const [matUnit, setMatUnit] = useState('');
   const fetchData = async () => {
     if (!id) return;
     const [{ data: proj }, { data: t }, { data: members }] = await Promise.all([
@@ -56,21 +60,34 @@ const ProjectDetail = () => {
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !id) return;
-    const { error } = await supabase.from('tasks').insert({
+    const { data, error } = await supabase.from('tasks').insert({
       project_id: id,
       task: taskName,
       stage,
       priority,
-      materials_on_site: materials,
+      materials_on_site: 'No' as const,
       room_area: roomArea || null,
       trade: trade || null,
       notes: notes || null,
       created_by: user.id,
       assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
-    });
+    }).select('id').single();
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    setTaskName(''); setStage('Ready'); setPriority('2 – This Week'); setMaterials('No');
+    if (data && pendingMaterials.length > 0) {
+      await supabase.from('task_materials').insert(
+        pendingMaterials.map(m => ({
+          task_id: data.id,
+          name: m.name,
+          quantity: m.quantity ? parseFloat(m.quantity) : null,
+          unit: m.unit || null,
+          purchased: false,
+          delivered: false,
+        }))
+      );
+    }
+    setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
     setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
+    setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
     setOpen(false);
     fetchData();
   };
@@ -116,22 +133,13 @@ const ProjectDetail = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Materials On Site</Label>
-                    <Select value={materials} onValueChange={(v) => setMaterials(v as MaterialsStatus)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {MATERIALS_OPTIONS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
                     <Label>Trade</Label>
                     <Input value={trade} onChange={(e) => setTrade(e.target.value)} />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Room / Area</Label>
-                  <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} />
+                  <div className="space-y-2">
+                    <Label>Room / Area</Label>
+                    <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Assigned To</Label>
@@ -151,6 +159,66 @@ const ProjectDetail = () => {
                   <Label>Notes</Label>
                   <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
                 </div>
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
+                    <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
+                    📦 Add Materials ({pendingMaterials.length})
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2 space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Name *"
+                        value={matName}
+                        onChange={(e) => setMatName(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Input
+                        placeholder="Qty"
+                        type="number"
+                        value={matQty}
+                        onChange={(e) => setMatQty(e.target.value)}
+                        className="w-16"
+                      />
+                      <Input
+                        placeholder="Unit"
+                        value={matUnit}
+                        onChange={(e) => setMatUnit(e.target.value)}
+                        className="w-16"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={!matName.trim()}
+                      onClick={() => {
+                        setPendingMaterials(prev => [...prev, { name: matName.trim(), quantity: matQty, unit: matUnit.trim() }]);
+                        setMatName(''); setMatQty(''); setMatUnit('');
+                      }}
+                    >
+                      Add Material
+                    </Button>
+                    {pendingMaterials.length > 0 && (
+                      <div className="space-y-1">
+                        {pendingMaterials.map((m, i) => (
+                          <div key={i} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
+                            <span className="truncate">
+                              {m.name}{m.quantity ? ` × ${m.quantity}` : ''}{m.unit ? ` ${m.unit}` : ''}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setPendingMaterials(prev => prev.filter((_, j) => j !== i))}
+                              className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
                 <Button type="submit" className="w-full">Create Task</Button>
               </form>
             </DialogContent>
