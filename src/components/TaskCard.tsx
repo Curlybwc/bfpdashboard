@@ -115,10 +115,11 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
             )}
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMaterialsOpen(true); }}
-              className="ml-auto text-muted-foreground hover:text-foreground"
+              className="ml-auto inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               aria-label="Materials"
             >
-              <Package className="h-4 w-4" />
+              <Package className="h-3.5 w-3.5" />
+              Materials
             </button>
           </div>
         </Link>
