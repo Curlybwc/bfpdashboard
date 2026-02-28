@@ -15,8 +15,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
-import { Package, Trash2 } from 'lucide-react';
+import { Package, Trash2, Zap, CheckCircle2 } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
+import { Card } from '@/components/ui/card';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -34,6 +35,8 @@ const TaskDetail = () => {
   const [children, setChildren] = useState<any[]>([]);
   const [cascadeAssign, setCascadeAssign] = useState(false);
   const [projectMembers, setProjectMembers] = useState<{ user_id: string; role: string; profiles: { full_name: string | null } | null }[]>([]);
+  const [fieldCapture, setFieldCapture] = useState<any>(null);
+  const [markingReviewed, setMarkingReviewed] = useState(false);
 
   // Editable fields
   const [taskText, setTaskText] = useState('');
@@ -47,6 +50,23 @@ const TaskDetail = () => {
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
 
   useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
+
+  // Fetch field capture when task loads
+  useEffect(() => {
+    if (!task?.field_capture_id) { setFieldCapture(null); return; }
+    supabase.from('field_captures').select('*').eq('id', task.field_capture_id).single().then(({ data }) => {
+      setFieldCapture(data);
+    });
+  }, [task?.field_capture_id]);
+
+  const handleMarkReviewed = async () => {
+    if (!taskId) return;
+    setMarkingReviewed(true);
+    await supabase.from('tasks').update({ needs_manager_review: false }).eq('id', taskId);
+    setMarkingReviewed(false);
+    toast({ title: 'Marked as reviewed' });
+    fetchTask();
+  };
 
   const handleSave = async () => {
     if (!taskId || !task) return;
@@ -321,6 +341,24 @@ const TaskDetail = () => {
           <Label>Notes</Label>
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </div>
+
+        {/* Field Capture Panel */}
+        {fieldCapture && (
+          <Card className="p-3 space-y-2 border-dashed">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Zap className="h-4 w-4" />
+              Created via Field Mode
+            </div>
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap">{fieldCapture.raw_text}</p>
+          </Card>
+        )}
+
+        {task.needs_manager_review && (isAdmin || projectRole === 'manager') && (
+          <Button variant="outline" className="w-full" onClick={handleMarkReviewed} disabled={markingReviewed}>
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            {markingReviewed ? 'Marking...' : 'Mark Reviewed'}
+          </Button>
+        )}
 
         {hasChildren && (
           <div className="space-y-1">

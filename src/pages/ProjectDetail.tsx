@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Plus, ChevronDown, X, Mic } from 'lucide-react';
+import { Plus, ChevronDown, X, Mic, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
@@ -143,6 +143,9 @@ const ProjectDetail = () => {
         actions={
           canCreateTask ? (
             <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
+                <Zap className="h-4 w-4 mr-1" />Field Mode
+              </Button>
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
                 <Mic className="h-4 w-4 mr-1" />Walkthrough
               </Button>

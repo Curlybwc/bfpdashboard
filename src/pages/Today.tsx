@@ -1,19 +1,25 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
+import { Button } from '@/components/ui/button';
+import { Zap } from 'lucide-react';
 
 const Today = () => {
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
+  const navigate = useNavigate();
   const [inProgress, setInProgress] = useState<any[]>([]);
   const [assigned, setAssigned] = useState<any[]>([]);
   const [available, setAvailable] = useState<any[]>([]);
+  const [needsReview, setNeedsReview] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectNames, setProjectNames] = useState<Record<string, string>>({});
   const [parentTitles, setParentTitles] = useState<Record<string, string>>({});
+  const [isManager, setIsManager] = useState(false);
 
   const fetchTasks = useCallback(async () => {
     if (!user) return;
@@ -25,6 +31,20 @@ const Today = () => {
       .eq('user_id', user.id);
 
     const memberProjectIds = (memberships || []).map(m => m.project_id);
+
+    // Check if user is manager on any project
+    const managerOnAny = (memberships || []).length > 0;
+    let hasManagerRole = false;
+    if (managerOnAny) {
+      const { data: managerCheck } = await supabase
+        .from('project_members')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'manager')
+        .limit(1);
+      hasManagerRole = (managerCheck || []).length > 0;
+    }
+    setIsManager(hasManagerRole);
 
     const [ipRes, assignedRes, availRes] = await Promise.all([
       supabase
@@ -56,10 +76,25 @@ const Today = () => {
         .limit(20),
     ]);
 
-    const allTasks = [...(ipRes.data || []), ...(assignedRes.data || []), ...(availRes.data || [])];
     setInProgress(ipRes.data || []);
     setAssigned(assignedRes.data || []);
     setAvailable(availRes.data || []);
+
+    // Fetch needs_manager_review tasks (for admins and managers)
+    let reviewTasks: any[] = [];
+    if (isAdmin || hasManagerRole) {
+      const { data: reviewRes } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('needs_manager_review', true)
+        .in('project_id', memberProjectIds.length > 0 ? memberProjectIds : ['00000000-0000-0000-0000-000000000000'])
+        .order('created_at', { ascending: false })
+        .limit(30);
+      reviewTasks = reviewRes || [];
+    }
+    setNeedsReview(reviewTasks);
+
+    const allTasks = [...(ipRes.data || []), ...(assignedRes.data || []), ...(availRes.data || []), ...reviewTasks];
 
     // Fetch project names
     const projectIds = [...new Set(allTasks.map(t => t.project_id))];
@@ -119,8 +154,18 @@ const Today = () => {
 
   return (
     <div className="pb-20">
-      <PageHeader title="Today" />
+      <PageHeader
+        title="Today"
+        actions={
+          <Button size="sm" variant="outline" onClick={() => navigate('/today/field-mode')}>
+            <Zap className="h-4 w-4 mr-1" />Field Mode
+          </Button>
+        }
+      />
       <div className="p-4">
+        {(isAdmin || isManager) && needsReview.length > 0 && (
+          <Section title="Needs Review" tasks={needsReview} emptyText="" />
+        )}
         <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
         <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />
         <Section title="Available" tasks={available} emptyText="No tasks available for dibs." />

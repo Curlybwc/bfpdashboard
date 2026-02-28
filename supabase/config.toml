@@ -2,3 +2,9 @@ project_id = "fuwjacbhgkgibdvjwryr"
 
 [functions.walkthrough_parse_tasks]
 verify_jwt = false
+
+[functions.field_mode_parse]
+verify_jwt = false
+
+[functions.field_mode_submit]
+verify_jwt = false

@@ -16,6 +16,8 @@ import ScopeDetail from "./pages/ScopeDetail";
 import ScopeWalkthrough from "./pages/ScopeWalkthrough";
 import AdminPanel from "./pages/AdminPanel";
 import Today from "./pages/Today";
+import FieldModeCapture from "./pages/FieldModeCapture";
+import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
 import MobileNav from "./components/MobileNav";
 
@@ -48,8 +50,12 @@ const AppRoutes = () => {
         {user && (
           <>
             <Route path="/today" element={<Today />} />
+            <Route path="/today/field-mode" element={<FieldModeCapture />} />
+            <Route path="/today/field-mode/preview" element={<FieldModePreview />} />
             <Route path="/projects" element={<ProjectList />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/projects/:id/field-mode" element={<FieldModeCapture />} />
+            <Route path="/projects/:id/field-mode/preview" element={<FieldModePreview />} />
             <Route path="/projects/:id/walkthrough" element={<ProjectWalkthrough />} />
             <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
             <Route path="/scopes" element={<ScopeList />} />
