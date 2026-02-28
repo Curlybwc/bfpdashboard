@@ -54,6 +54,18 @@ const AdminPanel = () => {
     fetchProfiles();
   };
 
+  const toggleField = async (profileId: string, field: 'can_manage_projects', currentValue: boolean) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ [field]: !currentValue })
+      .eq('id', profileId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    fetchProfiles();
+  };
+
   if (adminLoading) {
     return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
   }
@@ -83,13 +95,22 @@ const AdminPanel = () => {
                       </p>
                       <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Admin</span>
-                      <Switch
-                        checked={profile.is_admin}
-                        onCheckedChange={() => toggleAdmin(profile.id, profile.is_admin)}
-                        disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
-                      />
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground">Manager</span>
+                        <Switch
+                          checked={profile.can_manage_projects}
+                          onCheckedChange={() => toggleField(profile.id, 'can_manage_projects', profile.can_manage_projects)}
+                        />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground">Admin</span>
+                        <Switch
+                          checked={profile.is_admin}
+                          onCheckedChange={() => toggleAdmin(profile.id, profile.is_admin)}
+                          disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
+                        />
+                      </div>
                     </div>
                   </div>
                 </Card>

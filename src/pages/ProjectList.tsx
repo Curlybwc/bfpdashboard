@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 
 const ProjectList = () => {
   const { user } = useAuth();
+  const { isAdmin, canManageProjects } = useAdmin();
   const { toast } = useToast();
+  const canCreate = isAdmin || canManageProjects;
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -45,6 +48,7 @@ const ProjectList = () => {
       <PageHeader
         title="Projects"
         actions={
+          canCreate ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" />New</Button>
@@ -64,6 +68,7 @@ const ProjectList = () => {
               </form>
             </DialogContent>
           </Dialog>
+          ) : undefined
         }
       />
       <div className="p-4 space-y-3">
