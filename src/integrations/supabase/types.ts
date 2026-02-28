@@ -47,6 +47,50 @@ export type Database = {
         }
         Relationships: []
       }
+      field_captures: {
+        Row: {
+          ai_output: Json | null
+          created_at: string
+          created_by: string
+          error: string | null
+          id: string
+          include_materials: boolean
+          parse_status: string
+          project_id: string
+          raw_text: string
+        }
+        Insert: {
+          ai_output?: Json | null
+          created_at?: string
+          created_by: string
+          error?: string | null
+          id?: string
+          include_materials?: boolean
+          parse_status?: string
+          project_id: string
+          raw_text: string
+        }
+        Update: {
+          ai_output?: Json | null
+          created_at?: string
+          created_by?: string
+          error?: string | null
+          id?: string
+          include_materials?: boolean
+          parse_status?: string
+          project_id?: string
+          raw_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_captures_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -357,8 +401,10 @@ export type Database = {
           created_at: string
           created_by: string
           due_date: string | null
+          field_capture_id: string | null
           id: string
           materials_on_site: Database["public"]["Enums"]["materials_status"]
+          needs_manager_review: boolean
           notes: string | null
           parent_task_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
@@ -381,8 +427,10 @@ export type Database = {
           created_at?: string
           created_by: string
           due_date?: string | null
+          field_capture_id?: string | null
           id?: string
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
+          needs_manager_review?: boolean
           notes?: string | null
           parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
@@ -405,8 +453,10 @@ export type Database = {
           created_at?: string
           created_by?: string
           due_date?: string | null
+          field_capture_id?: string | null
           id?: string
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
+          needs_manager_review?: boolean
           notes?: string | null
           parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
@@ -426,6 +476,13 @@ export type Database = {
             columns: ["claimed_by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_field_capture_id_fkey"
+            columns: ["field_capture_id"]
+            isOneToOne: false
+            referencedRelation: "field_captures"
             referencedColumns: ["id"]
           },
           {
