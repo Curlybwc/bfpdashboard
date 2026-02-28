@@ -78,7 +78,7 @@ const ProjectWalkthrough = () => {
         body: {
           project_id: id,
           input_text: inputText,
-          current_date: new Date().toISOString().split('T')[0],
+          current_date: new Date().toLocaleDateString('en-CA'),
         },
       });
 

@@ -148,9 +148,15 @@ RULES:
 - Infer trade only if obvious (e.g. "plumber", "electrician").
 - Extract room_area if mentioned (e.g. "kitchen", "master bath").
 - Infer priority from urgency words: "ASAP"/"now"/"urgent" = "1 – Now", "this week" = "2 – This Week", "soon" = "3 – Soon", "when time"/"whenever" = "4 – When Time", "later"/"eventually" = "5 – Later". Default null.
-- Infer due_date: "today" = ${current_date || new Date().toISOString().split("T")[0]}, "tomorrow" = next day, weekday names = next upcoming, explicit dates = parse to YYYY-MM-DD. Otherwise null.
+- Infer due_date: "today" = ${current_date}, "tomorrow" = next day after ${current_date}, weekday names = next upcoming from ${current_date}, explicit dates = parse to YYYY-MM-DD. Otherwise null.
 - One task per natural work package. Do not over-split.
 - Each material needs at minimum a "name" string.
+
+MATERIAL TASK RULE:
+- If materials are mentioned in the context of another task, attach them to that task's materials array. Do NOT create a standalone task for picking up, grabbing, or getting materials.
+- Do NOT create tasks like "Pick up materials", "Grab drywall", "Get paint", "Buy supplies".
+- Only create a material-acquisition task if the user explicitly indicates it is a separate work assignment (e.g. "Send Andrew to Home Depot to restock supplies").
+- If materials are mentioned without clear linkage to a specific task, attach them to the nearest/most relevant task rather than creating a new one.
 
 PROJECT MEMBERS (for assignment matching):
 ${JSON.stringify(memberList)}
