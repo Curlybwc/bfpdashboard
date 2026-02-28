@@ -19,6 +19,7 @@ const Today = () => {
   const [loading, setLoading] = useState(true);
   const [projectMap, setProjectMap] = useState<Record<string, { name: string; address?: string }>>({});
   const [parentTitles, setParentTitles] = useState<Record<string, string>>({});
+  const [assigneeMap, setAssigneeMap] = useState<Record<string, string>>({});
   const [isManager, setIsManager] = useState(false);
 
   const fetchTasks = useCallback(async () => {
@@ -122,6 +123,22 @@ const Today = () => {
       setParentTitles({});
     }
 
+    // Batch fetch assignee names (exclude current user)
+    const assigneeIds = [...new Set(
+      allTasks.map(t => t.assigned_to_user_id).filter((id): id is string => !!id && id !== user!.id)
+    )];
+    if (assigneeIds.length > 0) {
+      const { data: assignees } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', assigneeIds);
+      const aMap: Record<string, string> = {};
+      (assignees || []).forEach(a => { aMap[a.id] = a.full_name || 'Unknown'; });
+      setAssigneeMap(aMap);
+    } else {
+      setAssigneeMap({});
+    }
+
     setLoading(false);
   }, [user]);
 
@@ -142,6 +159,7 @@ const Today = () => {
               task={t}
               projectName={projectMap[t.project_id]?.name || ''}
               projectAddress={projectMap[t.project_id]?.address}
+              assigneeName={t.assigned_to_user_id && t.assigned_to_user_id !== user!.id ? assigneeMap[t.assigned_to_user_id] : undefined}
               userId={user!.id}
               isAdmin={isAdmin}
               onUpdate={fetchTasks}
