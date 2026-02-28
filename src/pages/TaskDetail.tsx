@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
 import { Package, Trash2 } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
@@ -30,37 +31,61 @@ const TaskDetail = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [projectRole, setProjectRole] = useState<string | null>(null);
+  const [children, setChildren] = useState<any[]>([]);
+  const [cascadeAssign, setCascadeAssign] = useState(false);
+  const [projectMembers, setProjectMembers] = useState<{ user_id: string; role: string; profiles: { full_name: string | null } | null }[]>([]);
 
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
   const [priority, setPriority] = useState<TaskPriority>('2 – This Week');
-  // materials_on_site is now derived, not manually editable
   const [roomArea, setRoomArea] = useState('');
   const [trade, setTrade] = useState('');
   const [notes, setNotes] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [actualCost, setActualCost] = useState('');
+  const [assignedTo, setAssignedTo] = useState<string>('unassigned');
 
-  useEffect(() => { fetchTask(); fetchProjectRole(); }, [taskId]);
+  useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
 
   const handleSave = async () => {
-    if (!taskId) return;
+    if (!taskId || !task) return;
     setSaving(true);
+
+    const oldStage = task.stage;
+    const newAssignedTo = assignedTo === 'unassigned' ? null : assignedTo;
+
     const { error } = await supabase.from('tasks').update({
       task: taskText,
       stage,
       priority,
-      // materials_on_site is derived from task_materials, not saved here
       room_area: roomArea || null,
       trade: trade || null,
       notes: notes || null,
       due_date: dueDate || null,
       actual_total_cost: actualCost ? parseFloat(actualCost) : null,
+      assigned_to_user_id: newAssignedTo,
     }).eq('id', taskId);
+
+    // Stage sync: if moving FROM Done and has parent, revert parent
+    if (!error && oldStage === 'Done' && stage !== 'Done' && task.parent_task_id) {
+      const { data: parent } = await supabase.from('tasks').select('id, stage').eq('id', task.parent_task_id).single();
+      if (parent && parent.stage === 'Done') {
+        await supabase.from('tasks').update({ stage: 'In Progress' }).eq('id', task.parent_task_id);
+      }
+    }
+
+    // Assignment cascade
+    if (!error && cascadeAssign && children.length > 0) {
+      await supabase.from('tasks').update({
+        assigned_to_user_id: newAssignedTo,
+      }).in('id', children.map(c => c.id));
+    }
+
     setSaving(false);
+    setCascadeAssign(false);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
-    else { toast({ title: 'Saved' }); }
+    else { toast({ title: 'Saved' }); fetchTask(); fetchChildren(); }
   };
 
   const fetchTask = () => {
@@ -71,14 +96,26 @@ const TaskDetail = () => {
         setTaskText(data.task);
         setStage(data.stage);
         setPriority(data.priority);
-        // materials_on_site is derived, no state needed
         setRoomArea(data.room_area || '');
         setTrade(data.trade || '');
         setNotes(data.notes || '');
         setDueDate(data.due_date || '');
         setActualCost(data.actual_total_cost?.toString() || '');
+        setAssignedTo(data.assigned_to_user_id || 'unassigned');
       }
     });
+  };
+
+  const fetchChildren = async () => {
+    if (!taskId) return;
+    const { data } = await supabase.from('tasks').select('id, task, stage, assigned_to_user_id').eq('parent_task_id', taskId);
+    setChildren(data || []);
+  };
+
+  const fetchMembers = async () => {
+    if (!projectId) return;
+    const { data } = await supabase.from('project_members').select('user_id, role, profiles(full_name)').eq('project_id', projectId);
+    if (data) setProjectMembers(data as any);
   };
 
   const fetchProjectRole = async () => {
@@ -88,6 +125,8 @@ const TaskDetail = () => {
   };
 
   const canDelete = isAdmin || projectRole === 'manager';
+  const hasChildren = children.length > 0;
+  const allChildrenDone = hasChildren && children.every(c => c.stage === 'Done');
 
   const handleDelete = async () => {
     if (!taskId) return;
@@ -141,9 +180,28 @@ const TaskDetail = () => {
       stage: 'Done',
       completed_at: new Date().toISOString(),
     }).eq('id', taskId);
+
+    // If child task, check siblings for auto-completing parent
+    if (task?.parent_task_id) {
+      const { data: siblings } = await supabase
+        .from('tasks')
+        .select('id, stage')
+        .eq('parent_task_id', task.parent_task_id)
+        .neq('id', taskId);
+      const allSiblingsDone = (siblings || []).every(s => s.stage === 'Done');
+      if (allSiblingsDone) {
+        await supabase.from('tasks').update({
+          stage: 'Done',
+          completed_at: new Date().toISOString(),
+        }).eq('id', task.parent_task_id);
+      }
+    }
+
     setActionLoading(false);
     fetchTask();
   };
+
+  const canComplete = hasChildren ? allChildrenDone : true;
 
   if (!task) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
@@ -169,7 +227,16 @@ const TaskDetail = () => {
             )
           )}
           {isAssignedToMe && task.stage === 'In Progress' && (
-            <Button onClick={handleComplete} disabled={actionLoading}>Complete</Button>
+            canComplete ? (
+              <Button onClick={handleComplete} disabled={actionLoading}>Complete</Button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span><Button disabled>Complete</Button></span>
+                </TooltipTrigger>
+                <TooltipContent>All subtasks must be completed first.</TooltipContent>
+              </Tooltip>
+            )
           )}
           <Button variant="outline" size="sm" onClick={() => setMaterialsOpen(true)}>
             <Package className="h-4 w-4" />
@@ -221,6 +288,32 @@ const TaskDetail = () => {
           </div>
         </div>
         <div className="space-y-2">
+          <Label>Assigned To</Label>
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              {projectMembers.map((m) => (
+                <SelectItem key={m.user_id} value={m.user_id}>
+                  {m.profiles?.full_name || 'Unnamed'} ({m.role})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {hasChildren && (
+            <div className="flex items-center gap-2 mt-1">
+              <Checkbox
+                id="cascade-assign"
+                checked={cascadeAssign}
+                onCheckedChange={(v) => setCascadeAssign(!!v)}
+              />
+              <label htmlFor="cascade-assign" className="text-sm text-muted-foreground">
+                {assignedTo === 'unassigned' ? 'Also unassign subtasks' : 'Also assign subtasks to this user'}
+              </label>
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
           <Label>Actual Total Cost</Label>
           <Input type="number" value={actualCost} onChange={(e) => setActualCost(e.target.value)} placeholder="$" />
         </div>
@@ -228,6 +321,19 @@ const TaskDetail = () => {
           <Label>Notes</Label>
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </div>
+
+        {hasChildren && (
+          <div className="space-y-1">
+            <Label>Subtasks ({children.length})</Label>
+            {children.map(c => (
+              <div key={c.id} className="text-sm border rounded px-3 py-2 flex justify-between">
+                <span className="truncate">{c.task}</span>
+                <StatusBadge status={c.stage} />
+              </div>
+            ))}
+          </div>
+        )}
+
         <Button onClick={handleSave} disabled={saving} className="w-full">
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>

@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Flag, Package } from 'lucide-react';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 
 interface TaskCardProps {
@@ -18,9 +18,19 @@ interface TaskCardProps {
   isAdmin: boolean;
   onUpdate: () => void;
   showProjectName?: boolean;
+  isChild?: boolean;
+  parentTitle?: string;
+  childCount?: number;
+  expanded?: boolean;
+  onToggle?: () => void;
+  allChildrenDone?: boolean;
 }
 
-const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectName = true }: TaskCardProps) => {
+const TaskCard = ({
+  task, projectName, userId, isAdmin, onUpdate,
+  showProjectName = true, isChild = false, parentTitle,
+  childCount = 0, expanded = false, onToggle, allChildrenDone = true,
+}: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -43,10 +53,11 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
   const showStart = isAssignedToMe && task.stage === 'Ready';
   const showComplete = isAssignedToMe && task.stage === 'In Progress';
   const showNeedsMaterials = !materialsReady && materialCount > 0;
+  const hasChildren = childCount > 0;
+  const canComplete = hasChildren ? allChildrenDone : true;
 
   const handleDibs = async (force = false) => {
     if (!force && !isAdmin) {
-      // Check dibs limit: count Ready + materials_on_site = Yes assigned to user
       const { count } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
@@ -91,17 +102,48 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
       stage: 'Done',
       completed_at: new Date().toISOString(),
     }).eq('id', task.id);
-    setLoading(false);
 
+    if (!error && task.parent_task_id) {
+      // Check if all siblings are now Done
+      const { data: siblings } = await supabase
+        .from('tasks')
+        .select('id, stage')
+        .eq('parent_task_id', task.parent_task_id)
+        .neq('id', task.id);
+
+      const allSiblingsDone = (siblings || []).every(s => s.stage === 'Done');
+      if (allSiblingsDone) {
+        await supabase.from('tasks').update({
+          stage: 'Done',
+          completed_at: new Date().toISOString(),
+        }).eq('id', task.parent_task_id);
+      }
+    }
+
+    setLoading(false);
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
     else onUpdate();
   };
 
   return (
     <>
-      <Card className="p-3">
+      <Card className={`p-3 ${isChild ? 'ml-6' : ''}`}>
         <Link to={`/projects/${task.project_id}/tasks/${task.id}`} className="block">
-          <p className="font-medium text-sm truncate">{task.task}</p>
+          {parentTitle && (
+            <p className="text-xs text-muted-foreground mb-0.5">{parentTitle} →</p>
+          )}
+          <div className="flex items-center gap-1">
+            {hasChildren && onToggle && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(); }}
+                className="shrink-0 p-0.5 rounded hover:bg-accent transition-colors"
+                aria-label={expanded ? 'Collapse' : 'Expand'}
+              >
+                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+            )}
+            <p className={`font-medium truncate ${isChild ? 'text-xs' : 'text-sm'}`}>{task.task}</p>
+          </div>
           {showProjectName && (
             <p className="text-xs text-muted-foreground mt-0.5">{projectName}</p>
           )}
@@ -162,9 +204,20 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
               )
             )}
             {showComplete && (
-              <Button size="sm" onClick={handleComplete} disabled={loading}>
-                Complete
-              </Button>
+              canComplete ? (
+                <Button size="sm" onClick={handleComplete} disabled={loading}>
+                  Complete
+                </Button>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button size="sm" disabled>Complete</Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>All subtasks must be completed first.</TooltipContent>
+                </Tooltip>
+              )
             )}
           </div>
         )}

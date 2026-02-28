@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, ArrowRightLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ScopeMembers from '@/components/ScopeMembers';
-import { PRICING_STATUSES, type PricingStatus } from '@/lib/supabase-types';
+import { PRICING_STATUSES, SCOPE_ITEM_STATUSES, type PricingStatus, type ScopeItemStatus } from '@/lib/supabase-types';
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +33,7 @@ const ScopeDetail = () => {
   const [unit, setUnit] = useState('');
   const [phaseKey, setPhaseKey] = useState('');
   const [pricingStatus, setPricingStatus] = useState<PricingStatus>('Needs Pricing');
+  const [itemStatus, setItemStatus] = useState<ScopeItemStatus>('Not Checked');
   const [itemNotes, setItemNotes] = useState('');
 
   const fetchData = async () => {
@@ -57,13 +58,21 @@ const ScopeDetail = () => {
       unit: unit || null,
       phase_key: phaseKey || null,
       pricing_status: pricingStatus,
+      status: itemStatus,
       notes: itemNotes || null,
     });
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    setDesc(''); setQty(''); setUnit(''); setPhaseKey(''); setPricingStatus('Needs Pricing'); setItemNotes('');
+    setDesc(''); setQty(''); setUnit(''); setPhaseKey(''); setPricingStatus('Needs Pricing'); setItemStatus('Not Checked'); setItemNotes('');
     setOpen(false);
     fetchData();
   };
+
+  // Filter items for conversion
+  const convertibleItems = items.filter(item =>
+    ['Repair', 'Replace'].includes(item.status) ||
+    (item.qty && item.qty > 0) ||
+    (item.computed_total && item.computed_total > 0)
+  );
 
   const handleConvert = async () => {
     if (!id || !user || !scope) return;
@@ -82,19 +91,30 @@ const ScopeDetail = () => {
       return;
     }
 
-    // 2. Add creator as manager
+    // 2. Check for missing estimates
+    const hasMissingEstimates = convertibleItems.some(item => !item.computed_total || item.computed_total === 0);
+    if (hasMissingEstimates) {
+      await supabase.from('projects').update({ has_missing_estimates: true }).eq('id', project.id);
+    }
+
+    // 3. Add creator as manager
     await supabase.from('project_members').insert({ project_id: project.id, user_id: user.id, role: 'manager' });
 
-    // 3. Update scope
+    // 4. Compute snapshot across ALL items (not just convertible)
+    const estimatedTotalSnapshot = items.reduce((sum, item) => sum + (item.computed_total ?? 0), 0);
+
+    // 5. Update scope
     await supabase.from('scopes').update({
       status: 'Converted',
       converted_project_id: project.id,
       baseline_locked_at: new Date().toISOString(),
+      estimated_total_snapshot: estimatedTotalSnapshot,
+      converted_at: new Date().toISOString(),
     }).eq('id', id);
 
-    // 4. Create tasks from scope items
-    if (items.length > 0) {
-      const taskInserts = items.map((item) => ({
+    // 6. Create tasks from convertible scope items only
+    if (convertibleItems.length > 0) {
+      const taskInserts = convertibleItems.map((item) => ({
         project_id: project.id,
         task: item.description,
         source_scope_item_id: item.id,
@@ -161,6 +181,15 @@ const ScopeDetail = () => {
                         </div>
                       </div>
                       <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select value={itemStatus} onValueChange={(v) => setItemStatus(v as ScopeItemStatus)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {SCOPE_ITEM_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
                         <Label>Notes</Label>
                         <Textarea value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} rows={2} />
                       </div>
@@ -170,7 +199,7 @@ const ScopeDetail = () => {
                 </Dialog>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button size="sm" disabled={items.length === 0}>
+                    <Button size="sm" disabled={convertibleItems.length === 0}>
                       <ArrowRightLeft className="h-4 w-4 mr-1" />Convert
                     </Button>
                   </AlertDialogTrigger>
@@ -178,7 +207,7 @@ const ScopeDetail = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Convert Scope to Project?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will create a new project with {items.length} task(s) from scope items. The scope will be locked.
+                        This will create a new project with {convertibleItems.length} task(s) from {items.length} scope items. Items marked OK or Not Checked will be skipped. The scope will be locked.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -214,7 +243,8 @@ const ScopeDetail = () => {
                     <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                       {item.qty && <span>{item.qty} {item.unit}</span>}
                       {item.phase_key && <span>• Phase: {item.phase_key}</span>}
-                      {item.computed_total && <span>• ${item.computed_total}</span>}
+                      {item.computed_total != null && <span>• ${item.computed_total}</span>}
+                      {item.status && item.status !== 'Not Checked' && <span>• {item.status}</span>}
                     </div>
                   </div>
                   <StatusBadge status={item.pricing_status} />

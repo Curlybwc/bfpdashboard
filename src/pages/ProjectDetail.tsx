@@ -47,6 +47,8 @@ const ProjectDetail = () => {
   const [matQty, setMatQty] = useState('');
   const [matUnit, setMatUnit] = useState('');
   const [projectRole, setProjectRole] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
   const fetchData = async () => {
     if (!id) return;
     const [{ data: proj }, { data: t }, { data: members }] = await Promise.all([
@@ -101,6 +103,35 @@ const ProjectDetail = () => {
     setOpen(false);
     fetchData();
   };
+
+  // Build tree structure
+  const rootTasks = tasks.filter(t => !t.parent_task_id);
+  const childrenMap: Record<string, any[]> = {};
+  tasks.forEach(t => {
+    if (t.parent_task_id) {
+      if (!childrenMap[t.parent_task_id]) childrenMap[t.parent_task_id] = [];
+      childrenMap[t.parent_task_id].push(t);
+    }
+  });
+
+  const toggleExpanded = (taskId: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  // Cost rollup
+  const getTaskActual = (t: any): number => {
+    const children = childrenMap[t.id];
+    if (children && children.length > 0) {
+      return children.reduce((sum: number, c: any) => sum + (c.actual_total_cost ?? 0), 0);
+    }
+    return t.actual_total_cost ?? 0;
+  };
+  const projectTotalActual = rootTasks.reduce((sum, t) => sum + getTaskActual(t), 0);
 
   if (!project) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
@@ -246,22 +277,47 @@ const ProjectDetail = () => {
         <div className="flex items-center gap-2 mb-4">
           <StatusBadge status={project.status} />
           {project.address && <span className="text-sm text-muted-foreground">{project.address}</span>}
+          {projectTotalActual > 0 && (
+            <span className="ml-auto text-sm font-medium">Actual: ${projectTotalActual.toFixed(2)}</span>
+          )}
         </div>
         <div className="space-y-2">
-           {tasks.length === 0 ? (
+           {rootTasks.length === 0 ? (
              <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
            ) : (
-             tasks.map((t) => (
-               <TaskCard
-                 key={t.id}
-                 task={t}
-                 projectName={project.name}
-                 userId={user?.id ?? ''}
-                 isAdmin={isAdmin}
-                 onUpdate={fetchData}
-                 showProjectName={false}
-               />
-             ))
+             rootTasks.map((t) => {
+               const children = childrenMap[t.id] || [];
+               const isExpanded = expandedIds.has(t.id);
+               const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+               return (
+                 <div key={t.id}>
+                   <TaskCard
+                     task={t}
+                     projectName={project.name}
+                     userId={user?.id ?? ''}
+                     isAdmin={isAdmin}
+                     onUpdate={fetchData}
+                     showProjectName={false}
+                     childCount={children.length}
+                     expanded={isExpanded}
+                     onToggle={() => toggleExpanded(t.id)}
+                     allChildrenDone={allChildrenDone}
+                   />
+                   {isExpanded && children.map((child: any) => (
+                     <TaskCard
+                       key={child.id}
+                       task={child}
+                       projectName={project.name}
+                       userId={user?.id ?? ''}
+                       isAdmin={isAdmin}
+                       onUpdate={fetchData}
+                       showProjectName={false}
+                       isChild
+                     />
+                   ))}
+                 </div>
+               );
+             })
            )}
         </div>
         <ProjectMembers projectId={id!} />
