@@ -1,4 +1,5 @@
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/StatusBadge';
@@ -24,12 +25,14 @@ interface TaskCardProps {
   expanded?: boolean;
   onToggle?: () => void;
   allChildrenDone?: boolean;
+  context?: 'today' | 'project';
 }
 
 const TaskCard = ({
   task, projectName, userId, isAdmin, onUpdate,
   showProjectName = true, isChild = false, parentTitle,
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
+  context = 'project',
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
@@ -125,9 +128,20 @@ const TaskCard = ({
     else onUpdate();
   };
 
+  const priorityBorderClass =
+    context === 'today'
+      ? {
+          '1 – Now': 'border-l-4 border-red-500',
+          '2 – This Week': 'border-l-4 border-orange-500',
+          '3 – Soon': 'border-l-4 border-yellow-500',
+          '4 – When Time': 'border-l-4 border-blue-500',
+          '5 – Later': 'border-l-4 border-gray-300',
+        }[task.priority as string] ?? ''
+      : '';
+
   return (
     <>
-      <Card className={`p-3 ${isChild ? 'ml-6' : ''}`}>
+      <Card className={cn('p-3', isChild && 'ml-6', priorityBorderClass)}>
         <Link to={`/projects/${task.project_id}/tasks/${task.id}`} className="block">
           {parentTitle && (
             <p className="text-xs text-muted-foreground mb-0.5">{parentTitle} →</p>
@@ -142,7 +156,7 @@ const TaskCard = ({
                 {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
             )}
-            <p className={`font-medium truncate ${isChild ? 'text-xs' : 'text-sm'}`}>{task.task}</p>
+            <p className={`truncate ${context === 'today' && !isChild ? 'text-base font-semibold' : `font-medium ${isChild ? 'text-xs' : 'text-sm'}`}`}>{task.task}</p>
           </div>
           {showProjectName && (
             <p className="text-xs text-muted-foreground mt-0.5">{projectName}</p>
