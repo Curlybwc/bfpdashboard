@@ -45,6 +45,7 @@ const ProjectDetail = () => {
   const [matName, setMatName] = useState('');
   const [matQty, setMatQty] = useState('');
   const [matUnit, setMatUnit] = useState('');
+  const [projectRole, setProjectRole] = useState<string | null>(null);
   const fetchData = async () => {
     if (!id) return;
     const [{ data: proj }, { data: t }, { data: members }] = await Promise.all([
@@ -54,8 +55,14 @@ const ProjectDetail = () => {
     ]);
     if (proj) setProject(proj);
     if (t) setTasks(t);
-    if (members) setProjectMembers(members as unknown as ProjectMember[]);
+    if (members) {
+      setProjectMembers(members as unknown as ProjectMember[]);
+      const myRole = (members as unknown as ProjectMember[]).find(m => m.user_id === user?.id);
+      setProjectRole(myRole?.role ?? null);
+    }
   };
+
+  const canCreateTask = isAdmin || projectRole === 'manager' || projectRole === 'contractor';
 
   useEffect(() => { fetchData(); }, [id]);
 
@@ -102,6 +109,7 @@ const ProjectDetail = () => {
         title={project.name}
         backTo="/projects"
         actions={
+          canCreateTask ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" />Task</Button>
@@ -225,6 +233,7 @@ const ProjectDetail = () => {
               </form>
             </DialogContent>
           </Dialog>
+          ) : undefined
         }
       />
       <div className="p-4">

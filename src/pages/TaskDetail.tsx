@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
@@ -14,11 +14,12 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
-import { Package } from 'lucide-react';
+import { Package, Trash2 } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
@@ -26,7 +27,9 @@ const TaskDetail = () => {
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
+  const [projectRole, setProjectRole] = useState<string | null>(null);
 
   // Editable fields
   const [taskText, setTaskText] = useState('');
@@ -39,7 +42,7 @@ const TaskDetail = () => {
   const [dueDate, setDueDate] = useState('');
   const [actualCost, setActualCost] = useState('');
 
-  useEffect(() => { fetchTask(); }, [taskId]);
+  useEffect(() => { fetchTask(); fetchProjectRole(); }, [taskId]);
 
   const handleSave = async () => {
     if (!taskId) return;
@@ -76,6 +79,22 @@ const TaskDetail = () => {
         setActualCost(data.actual_total_cost?.toString() || '');
       }
     });
+  };
+
+  const fetchProjectRole = async () => {
+    if (!user || !projectId) return;
+    const { data } = await supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', user.id).maybeSingle();
+    setProjectRole(data?.role ?? null);
+  };
+
+  const canDelete = isAdmin || projectRole === 'manager';
+
+  const handleDelete = async () => {
+    if (!taskId) return;
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Task deleted' });
+    navigate(`/projects/${projectId}`, { replace: true });
   };
 
   const isAssignedToMe = user && task?.assigned_to_user_id === user.id;
@@ -212,6 +231,11 @@ const TaskDetail = () => {
         <Button onClick={handleSave} disabled={saving} className="w-full">
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
+        {canDelete && (
+          <Button variant="destructive" className="w-full" onClick={() => setDeleteConfirmOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-1" />Delete Task
+          </Button>
+        )}
       </div>
 
       <TaskMaterialsSheet
@@ -234,6 +258,19 @@ const TaskDetail = () => {
             <AlertDialogAction onClick={() => { setDibsConfirmOpen(false); handleDibs(true); }}>
               Claim Anyway
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
