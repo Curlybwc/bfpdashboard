@@ -1,30 +1,54 @@
 
 
-## Phase 2C Enhancement — Inline Materials in Task Creation
+## Phase 2D — Walkthrough Mode (Full Implementation with Hardening)
 
-### Changes to `src/pages/ProjectDetail.tsx`
+The walkthrough feature does not exist yet. This plan implements it from scratch with all hardening requirements built in.
 
-**1. Add state and imports**
-- Import `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` from `@/components/ui/collapsible`
-- Import `ChevronDown`, `X` from `lucide-react`
-- Add `pendingMaterials` state: `{ name: string; quantity: string; unit: string }[]`
-- Add `matName`, `matQty`, `matUnit` state for the inline add form
+---
 
-**2. Remove manual `materials_on_site` Select**
-- The Materials On Site dropdown (lines 118-126) is now derived, not manually set. Remove it.
-- Remove `materials` state and its reset. The task will be inserted with `materials_on_site: 'No'` (default).
+### 1. Edge Function: `supabase/functions/walkthrough_parse_tasks/index.ts`
 
-**3. Add collapsible materials section after Notes field (line 153)**
-- Collapsible section titled "📦 Add Materials" with chevron indicator
-- When expanded: name input (required), quantity input, unit input, Add button
-- On Add: push to `pendingMaterials[]`, clear inputs
-- Below inputs: list of pending materials with name/qty/unit and X remove button
+**No `verify_jwt = false` in config.toml** -- leave default JWT verification enabled.
 
-**4. Update `handleCreateTask` (lines 56-76)**
-- Change insert to use `.insert(...).select()` to capture the returned `task.id`
-- Set `materials_on_site` to `'No'` always (derived)
-- After successful insert, if `pendingMaterials.length > 0`:
-  - Insert all materials into `task_materials` with `task_id`, `purchased: false`, `delivered: false`
-  - Run derivation: since all are undelivered, result is `materials_on_site = 'No'` (already set, but keeps logic consistent)
-- Clear `pendingMaterials` on reset
+Function logic:
+- Extract JWT from Authorization header, call `supabase.auth.getUser()` to get user ID
+- Query `project_members` to verify caller is a member or admin -- reject with 403 if not
+- Fetch project members with `profiles(full_name)` for LLM name-matching context
+- Call Lovable AI (`google/gemini-2.5-flash`) with system prompt containing LLM rules (create only, JSON output, date inference, material extraction, assignment matching)
+- **Strict JSON validation** on LLM response:
+  - `JSON.parse()` -- on failure return 400 `{ error: "Invalid AI response format" }`
+  - Validate `draft_tasks` is array, each has non-empty `task` string -- on failure return 400 `{ error: "Malformed draft_tasks structure" }`
+  - Strip unexpected properties from each draft (allowlist: task, room_area, trade, priority, due_date, assigned_to_user_id, assigned_to_display, materials, notes)
+  - Coerce invalid `materials` to empty array; ensure each material has `name` string
+- Return `{ draft_tasks, warnings }`
+
+### 2. New Page: `src/pages/ProjectWalkthrough.tsx`
+
+- Route param: `id` from `/projects/:id/walkthrough`
+- Fetch project members for assignment dropdown
+- Large textarea + "Parse Tasks" button → calls edge function via `supabase.functions.invoke()`
+- **Warnings display**: If `warnings.length > 0`, render Alert box above draft cards listing each warning
+- Editable draft cards with checkbox for approval:
+  - task, room_area, trade, priority (Select), due_date (date Input), assigned_to (Select from members), notes, materials list (add/remove)
+- "Create Selected Tasks" button
+- **Safe insert flow**: Sequential per-draft insertion
+  - `.insert({...}).select('id').single()` to get task ID
+  - Insert materials with that task_id
+  - On any insert error: stop, show toast, do not continue
+
+### 3. Route: `src/App.tsx`
+
+Add `<Route path="/projects/:id/walkthrough" element={<ProjectWalkthrough />} />` inside the authenticated routes block.
+
+### 4. Button: `src/pages/ProjectDetail.tsx`
+
+Add "Walkthrough" button next to "+ Task" in the header actions area, visible when `canCreateTask` is true. Navigates to `/projects/${id}/walkthrough`.
+
+### Files Created
+- `supabase/functions/walkthrough_parse_tasks/index.ts`
+- `src/pages/ProjectWalkthrough.tsx`
+
+### Files Modified
+- `src/App.tsx` (add route)
+- `src/pages/ProjectDetail.tsx` (add Walkthrough button)
 
