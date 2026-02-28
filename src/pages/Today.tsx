@@ -13,12 +13,12 @@ const Today = () => {
   const [available, setAvailable] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectNames, setProjectNames] = useState<Record<string, string>>({});
+  const [parentTitles, setParentTitles] = useState<Record<string, string>>({});
 
   const fetchTasks = useCallback(async () => {
     if (!user) return;
     setLoading(true);
 
-    // Fetch user's project memberships
     const { data: memberships } = await supabase
       .from('project_members')
       .select('project_id')
@@ -26,9 +26,7 @@ const Today = () => {
 
     const memberProjectIds = (memberships || []).map(m => m.project_id);
 
-    // Fetch all three sections in parallel
     const [ipRes, assignedRes, availRes] = await Promise.all([
-      // Section 1: In Progress
       supabase
         .from('tasks')
         .select('*')
@@ -37,7 +35,6 @@ const Today = () => {
         .order('due_date', { ascending: true, nullsFirst: false })
         .order('priority', { ascending: true })
         .order('created_at', { ascending: true }),
-      // Section 2: Assigned (Ready)
       supabase
         .from('tasks')
         .select('*')
@@ -46,7 +43,6 @@ const Today = () => {
         .order('due_date', { ascending: true, nullsFirst: false })
         .order('priority', { ascending: true })
         .order('created_at', { ascending: true }),
-      // Section 3: Available (Dibs)
       supabase
         .from('tasks')
         .select('*')
@@ -65,7 +61,7 @@ const Today = () => {
     setAssigned(assignedRes.data || []);
     setAvailable(availRes.data || []);
 
-    // Fetch project names for all unique project_ids
+    // Fetch project names
     const projectIds = [...new Set(allTasks.map(t => t.project_id))];
     if (projectIds.length > 0) {
       const { data: projects } = await supabase
@@ -75,6 +71,20 @@ const Today = () => {
       const names: Record<string, string> = {};
       (projects || []).forEach(p => { names[p.id] = p.name; });
       setProjectNames(names);
+    }
+
+    // Batch fetch parent titles (no N+1)
+    const parentIds = [...new Set(allTasks.map(t => t.parent_task_id).filter(Boolean))];
+    if (parentIds.length > 0) {
+      const { data: parents } = await supabase
+        .from('tasks')
+        .select('id, task')
+        .in('id', parentIds);
+      const titles: Record<string, string> = {};
+      (parents || []).forEach(p => { titles[p.id] = p.task; });
+      setParentTitles(titles);
+    } else {
+      setParentTitles({});
     }
 
     setLoading(false);
@@ -99,6 +109,7 @@ const Today = () => {
               userId={user!.id}
               isAdmin={isAdmin}
               onUpdate={fetchTasks}
+              parentTitle={t.parent_task_id ? parentTitles[t.parent_task_id] : undefined}
             />
           ))}
         </div>

@@ -15,3 +15,6 @@ export const MATERIALS_OPTIONS: MaterialsStatus[] = ['Yes', 'Partial', 'No'];
 export const PROJECT_STATUSES: ProjectStatus[] = ['active', 'paused', 'complete'];
 export const SCOPE_STATUSES: ScopeStatus[] = ['Draft', 'Converted', 'Archived'];
 export const PRICING_STATUSES: PricingStatus[] = ['Priced', 'Needs Pricing'];
+
+export type ScopeItemStatus = 'Not Checked' | 'OK' | 'Repair' | 'Replace' | 'Needs Review';
+export const SCOPE_ITEM_STATUSES: ScopeItemStatus[] = ['Not Checked', 'OK', 'Repair', 'Replace', 'Needs Review'];

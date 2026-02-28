@@ -111,6 +111,7 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
+          has_missing_estimates: boolean
           id: string
           name: string
           scope_id: string | null
@@ -120,6 +121,7 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
+          has_missing_estimates?: boolean
           id?: string
           name: string
           scope_id?: string | null
@@ -129,6 +131,7 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
+          has_missing_estimates?: boolean
           id?: string
           name?: string
           scope_id?: string | null
@@ -158,6 +161,7 @@ export type Database = {
           pricing_status: Database["public"]["Enums"]["pricing_status"]
           qty: number | null
           scope_id: string
+          status: string
           unit: string | null
           unit_cost_override: number | null
           updated_at: string
@@ -174,6 +178,7 @@ export type Database = {
           pricing_status?: Database["public"]["Enums"]["pricing_status"]
           qty?: number | null
           scope_id: string
+          status?: string
           unit?: string | null
           unit_cost_override?: number | null
           updated_at?: string
@@ -190,6 +195,7 @@ export type Database = {
           pricing_status?: Database["public"]["Enums"]["pricing_status"]
           qty?: number | null
           scope_id?: string
+          status?: string
           unit?: string | null
           unit_cost_override?: number | null
           updated_at?: string
@@ -254,9 +260,11 @@ export type Database = {
         Row: {
           address: string
           baseline_locked_at: string | null
+          converted_at: string | null
           converted_project_id: string | null
           created_at: string
           created_by: string
+          estimated_total_snapshot: number | null
           id: string
           name: string | null
           status: Database["public"]["Enums"]["scope_status"]
@@ -265,9 +273,11 @@ export type Database = {
         Insert: {
           address: string
           baseline_locked_at?: string | null
+          converted_at?: string | null
           converted_project_id?: string | null
           created_at?: string
           created_by: string
+          estimated_total_snapshot?: number | null
           id?: string
           name?: string | null
           status?: Database["public"]["Enums"]["scope_status"]
@@ -276,9 +286,11 @@ export type Database = {
         Update: {
           address?: string
           baseline_locked_at?: string | null
+          converted_at?: string | null
           converted_project_id?: string | null
           created_at?: string
           created_by?: string
+          estimated_total_snapshot?: number | null
           id?: string
           name?: string | null
           status?: Database["public"]["Enums"]["scope_status"]
@@ -348,6 +360,7 @@ export type Database = {
           id: string
           materials_on_site: Database["public"]["Enums"]["materials_status"]
           notes: string | null
+          parent_task_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string
           room_area: string | null
@@ -371,6 +384,7 @@ export type Database = {
           id?: string
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           notes?: string | null
+          parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id: string
           room_area?: string | null
@@ -394,6 +408,7 @@ export type Database = {
           id?: string
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           notes?: string | null
+          parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string
           room_area?: string | null
@@ -411,6 +426,13 @@ export type Database = {
             columns: ["claimed_by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {
