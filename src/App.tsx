@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
+import ProjectWalkthrough from "./pages/ProjectWalkthrough";
 import TaskDetail from "./pages/TaskDetail";
 import ScopeList from "./pages/ScopeList";
 import ScopeDetail from "./pages/ScopeDetail";
@@ -48,6 +49,7 @@ const AppRoutes = () => {
             <Route path="/today" element={<Today />} />
             <Route path="/projects" element={<ProjectList />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/projects/:id/walkthrough" element={<ProjectWalkthrough />} />
             <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
             <Route path="/scopes" element={<ScopeList />} />
             <Route path="/scopes/:id" element={<ScopeDetail />} />

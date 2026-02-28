@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import PageHeader from '@/components/PageHeader';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Plus, ChevronDown, X } from 'lucide-react';
+import { Plus, ChevronDown, X, Mic } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
@@ -27,6 +27,7 @@ interface ProjectMember {
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const { isAdmin } = useAdmin();
@@ -110,7 +111,11 @@ const ProjectDetail = () => {
         backTo="/projects"
         actions={
           canCreateTask ? (
-          <Dialog open={open} onOpenChange={setOpen}>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
+                <Mic className="h-4 w-4 mr-1" />Walkthrough
+              </Button>
+              <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" />Task</Button>
             </DialogTrigger>
@@ -233,6 +238,7 @@ const ProjectDetail = () => {
               </form>
             </DialogContent>
           </Dialog>
+            </div>
           ) : undefined
         }
       />
