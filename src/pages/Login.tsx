@@ -21,7 +21,7 @@ const Login = () => {
 
   useEffect(() => {
     if (!authLoading && user) {
-      navigate('/projects', { replace: true });
+      navigate('/today', { replace: true });
     }
   }, [user, authLoading, navigate]);
 
@@ -48,7 +48,7 @@ const Login = () => {
       if (error) {
         toast({ title: 'Login failed', description: error.message, variant: 'destructive' });
       } else {
-        navigate('/projects', { replace: true });
+        navigate('/today', { replace: true });
       }
     }
     setLoading(false);
