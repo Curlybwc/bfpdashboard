@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -64,6 +64,14 @@ const ProjectDetail = () => {
       setProjectRole(myRole?.role ?? null);
     }
   };
+
+  const assigneeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    projectMembers.forEach(m => {
+      map[m.user_id] = m.profiles?.full_name || 'Unnamed';
+    });
+    return map;
+  }, [projectMembers]);
 
   const canCreateTask = isAdmin || projectRole === 'manager' || projectRole === 'contractor';
 
@@ -294,29 +302,31 @@ const ProjectDetail = () => {
                const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
                return (
                  <div key={t.id}>
-                   <TaskCard
-                     task={t}
-                     projectName={project.name}
-                     userId={user?.id ?? ''}
-                     isAdmin={isAdmin}
-                     onUpdate={fetchData}
-                     showProjectName={false}
-                     childCount={children.length}
-                     expanded={isExpanded}
-                     onToggle={() => toggleExpanded(t.id)}
-                     allChildrenDone={allChildrenDone}
-                   />
+                    <TaskCard
+                      task={t}
+                      projectName={project.name}
+                      userId={user?.id ?? ''}
+                      isAdmin={isAdmin}
+                      onUpdate={fetchData}
+                      showProjectName={false}
+                      childCount={children.length}
+                      expanded={isExpanded}
+                      onToggle={() => toggleExpanded(t.id)}
+                      allChildrenDone={allChildrenDone}
+                      assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined}
+                    />
                    {isExpanded && children.map((child: any) => (
-                     <TaskCard
-                       key={child.id}
-                       task={child}
-                       projectName={project.name}
-                       userId={user?.id ?? ''}
-                       isAdmin={isAdmin}
-                       onUpdate={fetchData}
-                       showProjectName={false}
-                       isChild
-                     />
+                      <TaskCard
+                        key={child.id}
+                        task={child}
+                        projectName={project.name}
+                        userId={user?.id ?? ''}
+                        isAdmin={isAdmin}
+                        onUpdate={fetchData}
+                        showProjectName={false}
+                        isChild
+                        assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined}
+                      />
                    ))}
                  </div>
                );

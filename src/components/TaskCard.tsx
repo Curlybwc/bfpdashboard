@@ -166,7 +166,7 @@ const TaskCard = ({
           {projectAddress && (
             <p className="text-xs text-muted-foreground truncate">{projectAddress}</p>
           )}
-          {context === 'today' && assigneeName && (
+          {assigneeName && (
             <p className="text-xs text-muted-foreground">Assigned to {assigneeName}</p>
           )}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
