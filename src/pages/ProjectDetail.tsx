@@ -16,7 +16,8 @@ import { Plus, ChevronDown, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
-import { Link } from 'react-router-dom';
+import TaskCard from '@/components/TaskCard';
+import { useAdmin } from '@/hooks/useAdmin';
 
 interface ProjectMember {
   user_id: string;
@@ -28,6 +29,7 @@ const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isAdmin } = useAdmin();
   const [project, setProject] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
@@ -231,27 +233,21 @@ const ProjectDetail = () => {
           {project.address && <span className="text-sm text-muted-foreground">{project.address}</span>}
         </div>
         <div className="space-y-2">
-          {tasks.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
-          ) : (
-            tasks.map((t) => (
-              <Link key={t.id} to={`/projects/${id}/tasks/${t.id}`}>
-                <Card className="p-3 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{t.task}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <StatusBadge status={t.stage} />
-                        <span className="text-xs text-muted-foreground">{t.priority}</span>
-                        {t.trade && <span className="text-xs text-muted-foreground">• {t.trade}</span>}
-                      </div>
-                    </div>
-                    <StatusBadge status={t.materials_on_site} />
-                  </div>
-                </Card>
-              </Link>
-            ))
-          )}
+           {tasks.length === 0 ? (
+             <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
+           ) : (
+             tasks.map((t) => (
+               <TaskCard
+                 key={t.id}
+                 task={t}
+                 projectName={project.name}
+                 userId={user?.id ?? ''}
+                 isAdmin={isAdmin}
+                 onUpdate={fetchData}
+                 showProjectName={false}
+               />
+             ))
+           )}
         </div>
         <ProjectMembers projectId={id!} />
       </div>
