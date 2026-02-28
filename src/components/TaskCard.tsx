@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Flag, Package } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
@@ -25,6 +25,15 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
+  const [materialCount, setMaterialCount] = useState(0);
+
+  useEffect(() => {
+    supabase
+      .from('task_materials')
+      .select('id', { count: 'exact', head: true })
+      .eq('task_id', task.id)
+      .then(({ count }) => setMaterialCount(count ?? 0));
+  }, [task.id, materialsOpen]);
 
   const isAssignedToMe = task.assigned_to_user_id === userId;
   const isUnassigned = !task.assigned_to_user_id;
@@ -33,7 +42,7 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
   const showDibs = isUnassigned && task.stage === 'Ready';
   const showStart = isAssignedToMe && task.stage === 'Ready';
   const showComplete = isAssignedToMe && task.stage === 'In Progress';
-  const showNeedsMaterials = isAssignedToMe && task.stage === 'Ready' && !materialsReady;
+  const showNeedsMaterials = !materialsReady && materialCount > 0;
 
   const handleDibs = async (force = false) => {
     if (!force && !isAdmin) {
@@ -106,6 +115,11 @@ const TaskCard = ({ task, projectName, userId, isAdmin, onUpdate, showProjectNam
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                 <Calendar className="h-3 w-3" />
                 {task.due_date}
+              </span>
+            )}
+            {materialCount > 0 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                📦 {materialCount}
               </span>
             )}
             {showNeedsMaterials && (
