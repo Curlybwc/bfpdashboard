@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, ArrowRightLeft } from 'lucide-react';
+import { Plus, ArrowRightLeft, ClipboardList } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ScopeMembers from '@/components/ScopeMembers';
 import { PRICING_STATUSES, SCOPE_ITEM_STATUSES, type PricingStatus, type ScopeItemStatus } from '@/lib/supabase-types';
@@ -144,6 +144,9 @@ const ScopeDetail = () => {
           <div className="flex items-center gap-2">
             {isDraft && (
               <>
+                <Button size="sm" variant="outline" onClick={() => navigate(`/scopes/${id}/walkthrough`)}>
+                  <ClipboardList className="h-4 w-4 mr-1" />Walkthrough
+                </Button>
                 <Dialog open={open} onOpenChange={setOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" />Item</Button>
