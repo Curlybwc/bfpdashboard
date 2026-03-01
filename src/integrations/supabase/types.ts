@@ -366,6 +366,7 @@ export type Database = {
           quantity: number | null
           sku: string | null
           task_id: string
+          tool_type_id: string | null
           unit: string | null
           vendor_url: string | null
         }
@@ -381,6 +382,7 @@ export type Database = {
           quantity?: number | null
           sku?: string | null
           task_id: string
+          tool_type_id?: string | null
           unit?: string | null
           vendor_url?: string | null
         }
@@ -396,6 +398,7 @@ export type Database = {
           quantity?: number | null
           sku?: string | null
           task_id?: string
+          tool_type_id?: string | null
           unit?: string | null
           vendor_url?: string | null
         }
@@ -405,6 +408,13 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_materials_tool_type_id_fkey"
+            columns: ["tool_type_id"]
+            isOneToOne: false
+            referencedRelation: "tool_types"
             referencedColumns: ["id"]
           },
         ]
@@ -532,6 +542,85 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tool_stock: {
+        Row: {
+          id: string
+          location_type: string
+          project_id: string | null
+          qty: number
+          tool_type_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          location_type: string
+          project_id?: string | null
+          qty?: number
+          tool_type_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          location_type?: string
+          project_id?: string | null
+          qty?: number
+          tool_type_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_stock_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_stock_tool_type_id_fkey"
+            columns: ["tool_type_id"]
+            isOneToOne: false
+            referencedRelation: "tool_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_stock_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tool_types: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sku: string | null
+          vendor_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sku?: string | null
+          vendor_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sku?: string | null
+          vendor_url?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {

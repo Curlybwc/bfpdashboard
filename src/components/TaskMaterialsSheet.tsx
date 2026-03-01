@@ -25,6 +25,7 @@ interface TaskMaterial {
   provided_by: string;
   confirmed_on_site: boolean;
   created_at: string;
+  tool_type_id: string | null;
 }
 
 interface TaskMaterialsSheetProps {
@@ -277,9 +278,15 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
         ) : (
           <>
             <div className="flex flex-col items-center gap-0.5">
-              <Switch checked={m.confirmed_on_site} onCheckedChange={(c) => handleConfirmedOnSiteToggle(m, c)} />
+              <Switch
+                checked={m.confirmed_on_site}
+                onCheckedChange={(c) => handleConfirmedOnSiteToggle(m, c)}
+                disabled={m.provided_by === 'company' && !!m.tool_type_id}
+              />
               <span className="text-[10px] text-muted-foreground leading-tight text-center max-w-[100px]">
-                {m.provided_by === 'company' ? 'Company Tool OnSite' : m.provided_by === 'contractor' ? 'Contractor Tool OnSite' : 'Tool OnSite'}
+                {m.provided_by === 'company'
+                  ? (m.tool_type_id ? 'Stock-based' : 'Company Tool OnSite')
+                  : m.provided_by === 'contractor' ? 'Contractor Tool OnSite' : 'Tool OnSite'}
               </span>
             </div>
             {m.provided_by !== 'contractor' && (

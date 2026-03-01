@@ -16,6 +16,7 @@ import ScopeList from "./pages/ScopeList";
 import ScopeDetail from "./pages/ScopeDetail";
 import ScopeWalkthrough from "./pages/ScopeWalkthrough";
 import AdminPanel from "./pages/AdminPanel";
+import ToolInventory from "./pages/ToolInventory";
 import Today from "./pages/Today";
 import FieldModeCapture from "./pages/FieldModeCapture";
 import FieldModePreview from "./pages/FieldModePreview";
@@ -64,6 +65,7 @@ const AppRoutes = () => {
             <Route path="/scopes/:id" element={<ScopeDetail />} />
             <Route path="/scopes/:id/walkthrough" element={<ScopeWalkthrough />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/admin/inventory/tools" element={<ToolInventory />} />
           </>
         )}
         <Route path="*" element={<NotFound />} />
