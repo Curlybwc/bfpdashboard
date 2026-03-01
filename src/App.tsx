@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import ProjectList from "./pages/ProjectList";
 import ProjectDetail from "./pages/ProjectDetail";
+import ProjectMaterials from "./pages/ProjectMaterials";
 import ProjectWalkthrough from "./pages/ProjectWalkthrough";
 import TaskDetail from "./pages/TaskDetail";
 import ScopeList from "./pages/ScopeList";
@@ -54,6 +55,7 @@ const AppRoutes = () => {
             <Route path="/today/field-mode/preview" element={<FieldModePreview />} />
             <Route path="/projects" element={<ProjectList />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/projects/:id/materials" element={<ProjectMaterials />} />
             <Route path="/projects/:id/field-mode" element={<FieldModeCapture />} />
             <Route path="/projects/:id/field-mode/preview" element={<FieldModePreview />} />
             <Route path="/projects/:id/walkthrough" element={<ProjectWalkthrough />} />

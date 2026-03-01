@@ -355,10 +355,13 @@ export type Database = {
       }
       task_materials: {
         Row: {
+          confirmed_on_site: boolean
           created_at: string
           delivered: boolean
           id: string
+          item_type: string
           name: string
+          provided_by: string
           purchased: boolean
           quantity: number | null
           sku: string | null
@@ -367,10 +370,13 @@ export type Database = {
           vendor_url: string | null
         }
         Insert: {
+          confirmed_on_site?: boolean
           created_at?: string
           delivered?: boolean
           id?: string
+          item_type?: string
           name: string
+          provided_by?: string
           purchased?: boolean
           quantity?: number | null
           sku?: string | null
@@ -379,10 +385,13 @@ export type Database = {
           vendor_url?: string | null
         }
         Update: {
+          confirmed_on_site?: boolean
           created_at?: string
           delivered?: boolean
           id?: string
+          item_type?: string
           name?: string
+          provided_by?: string
           purchased?: boolean
           quantity?: number | null
           sku?: string | null
