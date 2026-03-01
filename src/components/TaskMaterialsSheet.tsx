@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Pencil, ExternalLink, Copy, Link } from 'lucide-react';
 
 interface TaskMaterial {
   id: string;
@@ -16,6 +18,8 @@ interface TaskMaterial {
   unit: string | null;
   purchased: boolean;
   delivered: boolean;
+  sku: string | null;
+  vendor_url: string | null;
   created_at: string;
 }
 
@@ -24,6 +28,13 @@ interface TaskMaterialsSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onMaterialsChange: () => void;
+}
+
+function normalizeUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  return 'https://' + trimmed;
 }
 
 const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: TaskMaterialsSheetProps) => {
@@ -35,6 +46,18 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
   const [newName, setNewName] = useState('');
   const [newQty, setNewQty] = useState('');
   const [newUnit, setNewUnit] = useState('');
+  const [newSku, setNewSku] = useState('');
+  const [newVendorUrl, setNewVendorUrl] = useState('');
+
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editMaterial, setEditMaterial] = useState<TaskMaterial | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editQty, setEditQty] = useState('');
+  const [editUnit, setEditUnit] = useState('');
+  const [editSku, setEditSku] = useState('');
+  const [editVendorUrl, setEditVendorUrl] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
 
   const fetchMaterials = async () => {
     const { data, error } = await supabase
@@ -53,7 +76,6 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
     if (open) fetchMaterials();
   }, [open, taskId]);
 
-  // Derivation: only called after delivered changes
   const runDerivation = async () => {
     const { data } = await supabase
       .from('task_materials')
@@ -72,12 +94,9 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
 
   const handlePurchasedToggle = async (material: TaskMaterial, checked: boolean) => {
     if (checked) {
-      // Rule: purchased ON → just set purchased = true
       await supabase.from('task_materials').update({ purchased: true }).eq('id', material.id);
     } else {
-      // Rule A: purchased OFF → set purchased = false AND delivered = false
       await supabase.from('task_materials').update({ purchased: false, delivered: false }).eq('id', material.id);
-      // Delivered changed implicitly, run derivation
       await runDerivation();
     }
     await fetchMaterials();
@@ -85,10 +104,8 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
 
   const handleDeliveredToggle = async (material: TaskMaterial, checked: boolean) => {
     if (checked) {
-      // Rule B: delivered ON → set delivered = true, purchased = true
       await supabase.from('task_materials').update({ delivered: true, purchased: true }).eq('id', material.id);
     } else {
-      // delivered OFF → set delivered = false
       await supabase.from('task_materials').update({ delivered: false }).eq('id', material.id);
     }
     await runDerivation();
@@ -103,6 +120,8 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
       name: newName.trim(),
       quantity: newQty ? parseFloat(newQty) : null,
       unit: newUnit.trim() || null,
+      sku: newSku.trim() || null,
+      vendor_url: normalizeUrl(newVendorUrl),
     });
     setLoading(false);
     if (error) {
@@ -112,7 +131,55 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
     setNewName('');
     setNewQty('');
     setNewUnit('');
+    setNewSku('');
+    setNewVendorUrl('');
     await fetchMaterials();
+  };
+
+  const openEdit = (m: TaskMaterial) => {
+    setEditMaterial(m);
+    setEditName(m.name);
+    setEditQty(m.quantity?.toString() ?? '');
+    setEditUnit(m.unit ?? '');
+    setEditSku(m.sku ?? '');
+    setEditVendorUrl(m.vendor_url ?? '');
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editMaterial || !editName.trim()) return;
+    setEditLoading(true);
+    const { error } = await supabase.from('task_materials').update({
+      name: editName.trim(),
+      quantity: editQty ? parseFloat(editQty) : null,
+      unit: editUnit.trim() || null,
+      sku: editSku.trim() || null,
+      vendor_url: normalizeUrl(editVendorUrl),
+    }).eq('id', editMaterial.id);
+    setEditLoading(false);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setEditOpen(false);
+    await fetchMaterials();
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied!', description: `${label} copied to clipboard.` });
+    } catch {
+      toast({ title: 'Failed to copy', variant: 'destructive' });
+    }
+  };
+
+  const openVendorLink = (url: string | null) => {
+    if (!url || !url.trim()) {
+      toast({ title: 'No vendor link' });
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
   };
 
   return (
@@ -128,16 +195,63 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
           )}
           <div className="space-y-3">
             {materials.map((m) => (
-              <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{m.name}</p>
-                  {(m.quantity || m.unit) && (
-                    <p className="text-xs text-muted-foreground">
-                      {m.quantity}{m.unit ? ` ${m.unit}` : ''}
-                    </p>
-                  )}
+              <div key={m.id} className="rounded-lg border p-3 space-y-2">
+                {/* Row 1: Name + edit button */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{m.name}</p>
+                    {(m.quantity || m.unit) && (
+                      <p className="text-xs text-muted-foreground">
+                        {m.quantity}{m.unit ? ` ${m.unit}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => openEdit(m)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+
+                {/* Row 2: SKU + Vendor actions */}
+                {(m.sku || m.vendor_url) && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {m.sku && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[11px] px-2 gap-1"
+                        onClick={() => copyToClipboard(m.sku!, 'SKU')}
+                      >
+                        <Copy className="h-3 w-3" />
+                        SKU: {m.sku}
+                      </Button>
+                    )}
+                    {m.vendor_url && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-[11px] px-2 gap-1"
+                          onClick={() => openVendorLink(m.vendor_url)}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Open
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-[11px] px-2 gap-1"
+                          onClick={() => copyToClipboard(m.vendor_url!, 'Link')}
+                        >
+                          <Link className="h-3 w-3" />
+                          Copy
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Row 3: Toggles */}
+                <div className="flex items-center gap-3">
                   <div className="flex flex-col items-center gap-0.5">
                     <Switch
                       checked={m.purchased}
@@ -158,6 +272,7 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
           </div>
         </ScrollArea>
 
+        {/* Add Material Form */}
         <div className="px-4 pt-3 pb-1 border-t space-y-2">
           <Label className="text-xs font-medium text-muted-foreground">Add Material</Label>
           <div className="flex gap-2">
@@ -181,6 +296,20 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
               className="w-16"
             />
           </div>
+          <div className="flex gap-2">
+            <Input
+              placeholder="SKU (optional)"
+              value={newSku}
+              onChange={(e) => setNewSku(e.target.value)}
+              className="flex-1"
+            />
+            <Input
+              placeholder="Vendor URL (optional)"
+              value={newVendorUrl}
+              onChange={(e) => setNewVendorUrl(e.target.value)}
+              className="flex-1"
+            />
+          </div>
           <Button size="sm" onClick={handleAdd} disabled={loading || !newName.trim()} className="w-full">
             Add
           </Button>
@@ -192,6 +321,43 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>
+
+      {/* Edit Material Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Material</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs">Name</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Label className="text-xs">Qty</Label>
+                <Input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} />
+              </div>
+              <div className="flex-1">
+                <Label className="text-xs">Unit</Label>
+                <Input value={editUnit} onChange={(e) => setEditUnit(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">SKU</Label>
+              <Input value={editSku} onChange={(e) => setEditSku(e.target.value)} placeholder="e.g. HD-12345" />
+            </div>
+            <div>
+              <Label className="text-xs">Vendor URL</Label>
+              <Input value={editVendorUrl} onChange={(e) => setEditVendorUrl(e.target.value)} placeholder="e.g. homedepot.com/p/12345" />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleEditSave} disabled={editLoading || !editName.trim()}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Drawer>
   );
 };
