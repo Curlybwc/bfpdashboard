@@ -255,34 +255,53 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
       )}
 
       <div className="flex items-center gap-3">
-        <div className="flex flex-col items-center gap-0.5">
-          <Switch checked={m.purchased} onCheckedChange={(c) => handlePurchasedToggle(m, c)} />
-          <span className="text-[10px] text-muted-foreground">Bought</span>
-        </div>
-        <div className="flex flex-col items-center gap-0.5">
-          <Switch checked={m.delivered} onCheckedChange={(c) => handleDeliveredToggle(m, c)} />
-          <span className="text-[10px] text-muted-foreground">Delivered</span>
-        </div>
-        {m.item_type === 'tool' && (
+        {m.item_type !== 'tool' ? (
           <>
             <div className="flex flex-col items-center gap-0.5">
-              <Switch checked={m.confirmed_on_site} onCheckedChange={(c) => handleConfirmedOnSiteToggle(m, c)} />
-              <span className="text-[10px] text-muted-foreground">On Site</span>
+              <Switch checked={m.purchased} onCheckedChange={(c) => handlePurchasedToggle(m, c)} />
+              <span className="text-[10px] text-muted-foreground">Bought</span>
             </div>
-            <div className="flex flex-col gap-0.5 ml-auto">
-              <Select value={m.provided_by} onValueChange={(v) => handleProvidedByChange(m, v)}>
-                <SelectTrigger className="h-6 text-[11px] w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="company">Company</SelectItem>
-                  <SelectItem value="contractor">Contractor</SelectItem>
-                  <SelectItem value="either">Either</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="text-[10px] text-muted-foreground text-center">Provided by</span>
+            <div className="flex flex-col items-center gap-0.5">
+              <Switch checked={m.delivered} onCheckedChange={(c) => handleDeliveredToggle(m, c)} />
+              <span className="text-[10px] text-muted-foreground">Delivered</span>
             </div>
           </>
+        ) : m.provided_by === 'company' ? (
+          <>
+            <div className="flex flex-col items-center gap-0.5">
+              <Switch checked={m.purchased} onCheckedChange={(c) => handlePurchasedToggle(m, c)} />
+              <span className="text-[10px] text-muted-foreground">Bought</span>
+            </div>
+            <div className="flex flex-col items-center gap-0.5">
+              <Switch checked={m.delivered} onCheckedChange={(c) => handleDeliveredToggle(m, c)} />
+              <span className="text-[10px] text-muted-foreground leading-tight text-center max-w-[72px]">Company tool delivered</span>
+            </div>
+          </>
+        ) : m.provided_by === 'contractor' ? (
+          <div className="flex flex-col items-center gap-0.5">
+            <Switch checked={m.confirmed_on_site} onCheckedChange={(c) => handleConfirmedOnSiteToggle(m, c)} />
+            <span className="text-[10px] text-muted-foreground leading-tight text-center max-w-[120px]">Contractor-owned tool on site</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-0.5">
+            <Switch checked={m.confirmed_on_site} onCheckedChange={(c) => handleConfirmedOnSiteToggle(m, c)} />
+            <span className="text-[10px] text-muted-foreground leading-tight text-center max-w-[120px]">Tool on site (company or contractor)</span>
+          </div>
+        )}
+        {m.item_type === 'tool' && (
+          <div className="flex flex-col gap-0.5 ml-auto">
+            <Select value={m.provided_by} onValueChange={(v) => handleProvidedByChange(m, v)}>
+              <SelectTrigger className="h-6 text-[11px] w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="company">Company</SelectItem>
+                <SelectItem value="contractor">Contractor</SelectItem>
+                <SelectItem value="either">Either</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-[10px] text-muted-foreground text-center">Provided by</span>
+          </div>
         )}
       </div>
     </div>
