@@ -361,8 +361,10 @@ export type Database = {
           name: string
           purchased: boolean
           quantity: number | null
+          sku: string | null
           task_id: string
           unit: string | null
+          vendor_url: string | null
         }
         Insert: {
           created_at?: string
@@ -371,8 +373,10 @@ export type Database = {
           name: string
           purchased?: boolean
           quantity?: number | null
+          sku?: string | null
           task_id: string
           unit?: string | null
+          vendor_url?: string | null
         }
         Update: {
           created_at?: string
@@ -381,8 +385,10 @@ export type Database = {
           name?: string
           purchased?: boolean
           quantity?: number | null
+          sku?: string | null
           task_id?: string
           unit?: string | null
+          vendor_url?: string | null
         }
         Relationships: [
           {
