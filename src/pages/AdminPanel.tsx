@@ -9,6 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import CostLibrary from '@/components/CostLibrary';
+import { Wrench } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -77,10 +79,15 @@ const AdminPanel = () => {
       <PageHeader title="Admin Panel" backTo="/projects" />
       <div className="p-4">
         <Tabs defaultValue="users">
-          <TabsList>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-3">
+            <TabsList>
+              <TabsTrigger value="users">Users</TabsTrigger>
+              <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
+            </TabsList>
+            <Button size="sm" variant="outline" onClick={() => navigate('/admin/inventory/tools')}>
+              <Wrench className="h-4 w-4 mr-1" />Tool Inventory
+            </Button>
+          </div>
           <TabsContent value="users">
             <h2 className="text-sm font-medium text-muted-foreground mb-3">
               User Management ({profiles.length})
