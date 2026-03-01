@@ -9,8 +9,6 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import CostLibrary from '@/components/CostLibrary';
-import { Wrench } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -78,51 +76,14 @@ const AdminPanel = () => {
     <div className="pb-20">
       <PageHeader title="Admin Panel" backTo="/projects" />
       <div className="p-4">
-        <Tabs defaultValue="users">
-          <div className="flex items-center justify-between mb-3">
-            <TabsList>
-              <TabsTrigger value="users">Users</TabsTrigger>
-              <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
-            </TabsList>
-            <Button size="sm" variant="outline" onClick={() => navigate('/admin/inventory/tools')}>
-              <Wrench className="h-4 w-4 mr-1" />Tool Inventory
-            </Button>
-          </div>
+        <Tabs defaultValue="users" onValueChange={(v) => { if (v === 'tools') navigate('/admin/inventory/tools'); }}>
+          <TabsList className="mb-3">
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
+            <TabsTrigger value="tools">Tools</TabsTrigger>
+          </TabsList>
           <TabsContent value="users">
-            <h2 className="text-sm font-medium text-muted-foreground mb-3">
-              User Management ({profiles.length})
-            </h2>
-            <div className="space-y-2">
-              {profiles.map((profile) => (
-                <Card key={profile.id} className="p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">
-                        {profile.full_name || 'Unnamed User'}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">Manager</span>
-                        <Switch
-                          checked={profile.can_manage_projects}
-                          onCheckedChange={() => toggleField(profile.id, 'can_manage_projects', profile.can_manage_projects)}
-                        />
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">Admin</span>
-                        <Switch
-                          checked={profile.is_admin}
-                          onCheckedChange={() => toggleAdmin(profile.id, profile.is_admin)}
-                          disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+...
           </TabsContent>
           <TabsContent value="cost-library">
             <CostLibrary />
