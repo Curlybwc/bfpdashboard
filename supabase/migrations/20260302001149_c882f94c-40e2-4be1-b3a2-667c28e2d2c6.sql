@@ -1,0 +1,1 @@
+ALTER TABLE public.task_materials ADD COLUMN is_active boolean NOT NULL DEFAULT true;

@@ -359,6 +359,7 @@ export type Database = {
           created_at: string
           delivered: boolean
           id: string
+          is_active: boolean
           item_type: string
           name: string
           provided_by: string
@@ -375,6 +376,7 @@ export type Database = {
           created_at?: string
           delivered?: boolean
           id?: string
+          is_active?: boolean
           item_type?: string
           name: string
           provided_by?: string
@@ -391,6 +393,7 @@ export type Database = {
           created_at?: string
           delivered?: boolean
           id?: string
+          is_active?: boolean
           item_type?: string
           name?: string
           provided_by?: string
