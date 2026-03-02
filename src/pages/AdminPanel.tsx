@@ -83,7 +83,44 @@ const AdminPanel = () => {
             <TabsTrigger value="tools">Tools</TabsTrigger>
           </TabsList>
           <TabsContent value="users">
-...
+            <h2 className="text-sm font-medium text-muted-foreground mb-3">
+              User Management ({profiles.length})
+            </h2>
+            {profiles.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No users found.</p>
+            ) : (
+              <div className="space-y-2">
+                {profiles.map((profile) => (
+                  <Card key={profile.id} className="p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">
+                          {profile.full_name || 'Unnamed User'}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">Manager</span>
+                          <Switch
+                            checked={profile.can_manage_projects}
+                            onCheckedChange={() => toggleField(profile.id, 'can_manage_projects', profile.can_manage_projects)}
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">Admin</span>
+                          <Switch
+                            checked={profile.is_admin}
+                            onCheckedChange={() => toggleAdmin(profile.id, profile.is_admin)}
+                            disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="cost-library">
             <CostLibrary />
