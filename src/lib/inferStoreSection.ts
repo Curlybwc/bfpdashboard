@@ -12,15 +12,14 @@ const SECTION_KEYWORDS: Record<string, string[]> = {
   Garden: ['garden', 'landscape', 'mulch', 'soil', 'gravel', 'stone', 'paver', 'concrete', 'cement', 'rebar', 'fence', 'post', 'gate', 'deck', 'stair', 'railing', 'sod', 'seed', 'irrigation', 'sprinkler'],
 };
 
-export const STORE_SECTIONS = [
-  'Paint', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Lumber',
-  'Hardware', 'Flooring', 'Appliances', 'Cleaning', 'Garden', 'Misc',
-] as const;
-
-export function inferStoreSection(name: string): string {
+export function inferStoreSection(name: string, activeSections?: string[]): string {
   const lower = name.toLowerCase();
   for (const [section, keywords] of Object.entries(SECTION_KEYWORDS)) {
-    if (keywords.some(kw => lower.includes(kw))) return section;
+    if (keywords.some(kw => lower.includes(kw))) {
+      // If activeSections provided, verify this section is active
+      if (activeSections && !activeSections.includes(section)) return 'Misc';
+      return section;
+    }
   }
   return 'Misc';
 }
