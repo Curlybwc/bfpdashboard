@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Minus, Search, Archive, ExternalLink, Trash2 } from 'lucide-react';
+import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 
@@ -47,6 +48,7 @@ const ToolInventory = () => {
   const [stockMap, setStockMap] = useState<Record<string, StockRow[]>>({});
   const [projectMap, setProjectMap] = useState<Record<string, ProjectInfo>>({});
   const [search, setSearch] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ToolType | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
@@ -163,7 +165,8 @@ const ToolInventory = () => {
   };
 
   const filtered = toolTypes.filter(t => {
-    if (!search.trim()) return t.is_active;
+    if (!showInactive && !t.is_active) return false;
+    if (!search.trim()) return true;
     const q = search.toLowerCase();
     return t.name.toLowerCase().includes(q) || (t.sku && t.sku.toLowerCase().includes(q));
   });
@@ -222,14 +225,20 @@ const ToolInventory = () => {
           }
         />
         <div className="p-4 space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search tool types..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search tool types..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Switch checked={showInactive} onCheckedChange={setShowInactive} id="show-inactive" />
+              <Label htmlFor="show-inactive" className="text-xs text-muted-foreground whitespace-nowrap">Show inactive</Label>
+            </div>
           </div>
 
           {filtered.length === 0 && (
@@ -242,7 +251,10 @@ const ToolInventory = () => {
               <Card key={tool.id} className={`p-3 space-y-3 ${!tool.is_active ? 'opacity-60' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{tool.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium">{tool.name}</p>
+                      {!tool.is_active && <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Inactive</span>}
+                    </div>
                     {tool.sku && <p className="text-xs text-muted-foreground">SKU: {tool.sku}</p>}
                   </div>
                   <div className="flex gap-1">
@@ -259,7 +271,7 @@ const ToolInventory = () => {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleActive(tool)}>
-                          <Archive className="h-3.5 w-3.5" />
+                          {tool.is_active ? <Archive className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>{tool.is_active ? 'Deactivate' : 'Reactivate'}</TooltipContent>
