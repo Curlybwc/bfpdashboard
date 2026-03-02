@@ -9,7 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Pencil, ExternalLink, Copy, Link } from 'lucide-react';
+import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw } from 'lucide-react';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 
 interface TaskMaterial {
   id: string;
@@ -26,6 +27,7 @@ interface TaskMaterial {
   confirmed_on_site: boolean;
   created_at: string;
   tool_type_id: string | null;
+  is_active: boolean;
 }
 
 interface TaskMaterialsSheetProps {
@@ -67,6 +69,8 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
   const [editItemType, setEditItemType] = useState<string>('material');
   const [editProvidedBy, setEditProvidedBy] = useState<string>('either');
   const [editLoading, setEditLoading] = useState(false);
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<TaskMaterial | null>(null);
 
   const fetchMaterials = async () => {
     const { data, error } = await supabase
@@ -88,12 +92,13 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
   const runDerivation = async () => {
     const { data } = await supabase
       .from('task_materials')
-      .select('delivered, item_type, confirmed_on_site')
+      .select('delivered, item_type, confirmed_on_site, is_active')
       .eq('task_id', taskId);
 
-    const items = (data as unknown as Pick<TaskMaterial, 'delivered' | 'item_type' | 'confirmed_on_site'>[]) || [];
+    const allItems = (data as unknown as Pick<TaskMaterial, 'delivered' | 'item_type' | 'confirmed_on_site' | 'is_active'>[]) || [];
+    // Only active items count for derivation
+    const items = allItems.filter(i => i.is_active !== false);
     
-    // If zero items, don't change materials_on_site (preserve existing behavior)
     if (items.length === 0) {
       onMaterialsChange();
       return;
@@ -224,24 +229,46 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
     window.open(url, '_blank', 'noopener');
   };
 
-  const materialItems = materials.filter(m => m.item_type !== 'tool');
-  const toolItems = materials.filter(m => m.item_type === 'tool');
+  const handleRemove = async () => {
+    if (!removeTarget) return;
+    await supabase.from('task_materials').update({ is_active: false } as any).eq('id', removeTarget.id);
+    setRemoveTarget(null);
+    await runDerivation();
+    await fetchMaterials();
+  };
+
+  const handleRestore = async (m: TaskMaterial) => {
+    await supabase.from('task_materials').update({ is_active: true } as any).eq('id', m.id);
+    await runDerivation();
+    await fetchMaterials();
+  };
+
+  const activeItems = materials.filter(m => m.is_active !== false);
+  const removedItems = materials.filter(m => m.is_active === false);
+
+  const materialItems = activeItems.filter(m => m.item_type !== 'tool');
+  const toolItems = activeItems.filter(m => m.item_type === 'tool');
 
   const renderItemCard = (m: TaskMaterial) => (
     <div key={m.id} className="rounded-lg border p-3 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{m.name}</p>
-          {(m.quantity || m.unit) && (
-            <p className="text-xs text-muted-foreground">
-              {m.quantity}{m.unit ? ` ${m.unit}` : ''}
-            </p>
-          )}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{m.name}</p>
+            {(m.quantity || m.unit) && (
+              <p className="text-xs text-muted-foreground">
+                {m.quantity}{m.unit ? ` ${m.unit}` : ''}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-0.5 shrink-0">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(m)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setRemoveTarget(m)}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
-        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => openEdit(m)}>
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-      </div>
 
       {(m.sku || m.vendor_url) && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -324,8 +351,11 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
         </DrawerHeader>
 
         <ScrollArea className="px-4 flex-1 overflow-auto" style={{ maxHeight: '50vh' }}>
-          {materials.length === 0 && (
+          {activeItems.length === 0 && removedItems.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">No materials or tools added yet.</p>
+          )}
+          {activeItems.length === 0 && removedItems.length > 0 && !showRemoved && (
+            <p className="text-sm text-muted-foreground text-center py-4">All items removed. Toggle "Show removed" to see them.</p>
           )}
 
           {materialItems.length > 0 && (
@@ -339,6 +369,26 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">🔧 Tools</h3>
               {toolItems.map(renderItemCard)}
+            </div>
+          )}
+
+          {removedItems.length > 0 && (
+            <div className="pt-3 mt-3 border-t space-y-2">
+              <div className="flex items-center gap-2">
+                <Switch checked={showRemoved} onCheckedChange={setShowRemoved} id="show-removed" />
+                <Label htmlFor="show-removed" className="text-xs text-muted-foreground">Show removed ({removedItems.length})</Label>
+              </div>
+              {showRemoved && removedItems.map(m => (
+                <div key={m.id} className="rounded-lg border border-dashed p-3 opacity-60 flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm line-through">{m.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{m.item_type === 'tool' ? 'Tool' : 'Material'}{m.quantity ? ` · ${m.quantity}${m.unit ? ` ${m.unit}` : ''}` : ''}</p>
+                  </div>
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => handleRestore(m)}>
+                    <RotateCcw className="h-3 w-3" />Restore
+                  </Button>
+                </div>
+              ))}
             </div>
           )}
         </ScrollArea>
@@ -449,6 +499,23 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!removeTarget} onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes <strong>"{removeTarget?.name}"</strong> from this task's requirements and the project rollup. It will <strong>NOT</strong> affect inventory.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemove} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Drawer>
   );
 };

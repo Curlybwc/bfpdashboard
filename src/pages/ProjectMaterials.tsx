@@ -151,16 +151,18 @@ const ProjectMaterials = () => {
 
   useEffect(() => { fetchData(); }, [id]);
 
+  const activeItems = useMemo(() => rawItems.filter(i => (i as any).is_active !== false), [rawItems]);
+
   const filteredItems = useMemo(() => {
     switch (tab) {
       case 'not_purchased':
-        return rawItems.filter(i => !i.purchased);
+        return activeItems.filter(i => !i.purchased);
       case 'purchased_not_delivered':
-        return rawItems.filter(i => i.purchased && !i.delivered);
+        return activeItems.filter(i => i.purchased && !i.delivered);
       case 'delivered':
-        return rawItems.filter(i => i.delivered);
+        return activeItems.filter(i => i.delivered);
     }
-  }, [rawItems, tab]);
+  }, [activeItems, tab]);
 
   const aggregated = useMemo(() => {
     const groups: Record<string, AggregatedItem> = {};
