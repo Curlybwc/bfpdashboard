@@ -16,6 +16,7 @@ import ScopeList from "./pages/ScopeList";
 import ScopeDetail from "./pages/ScopeDetail";
 import ScopeWalkthrough from "./pages/ScopeWalkthrough";
 import AdminPanel from "./pages/AdminPanel";
+import AdminStoreSections from "./pages/AdminStoreSections";
 import ToolInventory from "./pages/ToolInventory";
 import MaterialInventory from "./pages/MaterialInventory";
 import Today from "./pages/Today";
@@ -68,6 +69,7 @@ const AppRoutes = () => {
             <Route path="/scopes/:id/walkthrough" element={<ScopeWalkthrough />} />
             <Route path="/shopping" element={<Shopping />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/admin/store-sections" element={<AdminStoreSections />} />
             <Route path="/admin/inventory/tools" element={<ToolInventory />} />
             <Route path="/admin/inventory/materials" element={<MaterialInventory />} />
           </>

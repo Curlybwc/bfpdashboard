@@ -79,10 +79,12 @@ const AdminPanel = () => {
         <Tabs defaultValue="users" onValueChange={(v) => {
           if (v === 'tools') navigate('/admin/inventory/tools');
           if (v === 'materials') navigate('/admin/inventory/materials');
+          if (v === 'sections') navigate('/admin/store-sections');
         }}>
           <TabsList className="mb-3">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
+            <TabsTrigger value="sections">Sections</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>
           </TabsList>

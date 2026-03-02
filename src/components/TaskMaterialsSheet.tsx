@@ -9,10 +9,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useStoreSections } from '@/hooks/useStoreSections';
 import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
-import { inferStoreSection, STORE_SECTIONS } from '@/lib/inferStoreSection';
+import { inferStoreSection } from '@/lib/inferStoreSection';
 
 interface TaskMaterial {
   id: string;
@@ -51,6 +52,8 @@ function normalizeUrl(raw: string): string | null {
 
 const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterialsChange }: TaskMaterialsSheetProps) => {
   const { toast } = useToast();
+  const { sections } = useStoreSections();
+  const activeNames = sections.map(s => s.name);
   const [materials, setMaterials] = useState<TaskMaterial[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -105,7 +108,6 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       .eq('task_id', taskId);
 
     const allItems = (data as unknown as Pick<TaskMaterial, 'delivered' | 'item_type' | 'confirmed_on_site' | 'is_active'>[]) || [];
-    // Only active items count for derivation
     const items = allItems.filter(i => i.is_active !== false);
     
     if (items.length === 0) {
@@ -147,10 +149,8 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
 
   const handleConfirmedOnSiteToggle = async (material: TaskMaterial, checked: boolean) => {
     if (checked && material.provided_by === 'company') {
-      // Auto-sync: company tool on site → also mark delivered+purchased
       await supabase.from('task_materials').update({ confirmed_on_site: true, delivered: true, purchased: true }).eq('id', material.id);
     } else if (!checked) {
-      // Only unset confirmed_on_site, preserve purchased/delivered history
       await supabase.from('task_materials').update({ confirmed_on_site: false }).eq('id', material.id);
     } else {
       await supabase.from('task_materials').update({ confirmed_on_site: checked }).eq('id', material.id);
@@ -167,7 +167,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const handleAdd = async () => {
     if (!newName.trim()) return;
     setLoading(true);
-    const autoSection = newStoreSection || inferStoreSection(newName.trim());
+    const autoSection = newStoreSection || inferStoreSection(newName.trim(), activeNames);
     const { error } = await supabase.from('task_materials').insert({
       task_id: taskId,
       name: newName.trim(),
@@ -207,12 +207,11 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const handleEditSave = async () => {
     if (!editMaterial || !editName.trim()) return;
     setEditLoading(true);
-    // Auto-fill store_section if name changed and not manually set
     const nameChanged = editName.trim() !== editMaterial.name;
     let section = editStoreSection;
     let sectionManual = editStoreSectionManual;
     if (nameChanged && !editStoreSectionManual) {
-      section = inferStoreSection(editName.trim());
+      section = inferStoreSection(editName.trim(), activeNames);
     }
     const { error } = await supabase.from('task_materials').update({
       name: editName.trim(),
@@ -269,8 +268,8 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const activeItems = materials.filter(m => m.is_active !== false);
   const removedItems = materials.filter(m => m.is_active === false);
 
-  const materialItems = activeItems.filter(m => m.item_type !== 'tool');
-  const toolItems = activeItems.filter(m => m.item_type === 'tool');
+  const materialItemsList = activeItems.filter(m => m.item_type !== 'tool');
+  const toolItemsList = activeItems.filter(m => m.item_type === 'tool');
 
   const renderItemCard = (m: TaskMaterial) => (
     <div key={m.id} className="rounded-lg border p-3 space-y-2">
@@ -387,17 +386,17 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             <p className="text-sm text-muted-foreground text-center py-4">All items removed. Toggle "Show removed" to see them.</p>
           )}
 
-          {materialItems.length > 0 && (
+          {materialItemsList.length > 0 && (
             <div className="space-y-2 mb-4">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Materials</h3>
-              {materialItems.map(renderItemCard)}
+              {materialItemsList.map(renderItemCard)}
             </div>
           )}
 
-          {toolItems.length > 0 && (
+          {toolItemsList.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">🔧 Tools</h3>
-              {toolItems.map(renderItemCard)}
+              {toolItemsList.map(renderItemCard)}
             </div>
           )}
 
@@ -463,7 +462,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__auto">Auto-detect section</SelectItem>
-              {STORE_SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {activeNames.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button size="sm" onClick={handleAdd} disabled={loading || !newName.trim()} className="w-full">
@@ -535,7 +534,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
               <div className="flex gap-1.5">
                 <Select value={editStoreSection || '__auto'} onValueChange={(v) => {
                   if (v === '__auto') {
-                    setEditStoreSection(inferStoreSection(editName));
+                    setEditStoreSection(inferStoreSection(editName, activeNames));
                     setEditStoreSectionManual(false);
                   } else {
                     setEditStoreSection(v);
@@ -545,12 +544,12 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
                   <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__auto">Auto-detect</SelectItem>
-                    {STORE_SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {activeNames.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 {editStoreSectionManual && (
                   <Button variant="ghost" size="sm" className="text-xs h-9" onClick={() => {
-                    setEditStoreSection(inferStoreSection(editName));
+                    setEditStoreSection(inferStoreSection(editName, activeNames));
                     setEditStoreSectionManual(false);
                   }}>Use auto</Button>
                 )}

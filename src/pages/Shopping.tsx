@@ -2,14 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useStoreSections } from '@/hooks/useStoreSections';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExternalLink, Copy, Search } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
-import { STORE_SECTIONS } from '@/lib/inferStoreSection';
 
 interface ShoppingItem {
   id: string;
@@ -47,10 +46,11 @@ interface AggCard {
   ids: string[];
 }
 
-const SECTION_ORDER = [...STORE_SECTIONS, 'Uncategorized'] as const;
-
-function sectionOf(s: string | null): string {
-  return s?.trim() || 'Uncategorized';
+function sectionOf(s: string | null, activeNames: string[]): string {
+  const trimmed = s?.trim();
+  if (!trimmed) return 'Uncategorized';
+  if (!activeNames.includes(trimmed)) return 'Uncategorized';
+  return trimmed;
 }
 
 function aggKey(i: ShoppingItem): string {
@@ -60,11 +60,15 @@ function aggKey(i: ShoppingItem): string {
 export default function Shopping() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { sections } = useStoreSections();
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<PurchaseTab>('not_purchased');
   const [sort, setSort] = useState<SortMode>('project');
   const [search, setSearch] = useState('');
+
+  const activeNames = useMemo(() => sections.map(s => s.name), [sections]);
+  const sectionOrder = useMemo(() => [...activeNames, 'Uncategorized'], [activeNames]);
 
   const fetchItems = async () => {
     setLoading(true);
@@ -141,7 +145,7 @@ export default function Shopping() {
           sku: i.sku,
           vendor_url: i.vendor_url,
           item_type: i.item_type,
-          store_section: sectionOf(i.store_section),
+          store_section: sectionOf(i.store_section, activeNames),
           project_id: i.project_id,
           project_label: i.project_address || i.project_name,
           tasks: [{ id: i.task_id, title: i.task_title, project_id: i.project_id }],
@@ -150,7 +154,7 @@ export default function Shopping() {
       }
     }
     return Array.from(map.values());
-  }, [filtered]);
+  }, [filtered, activeNames]);
 
   const bulkAction = async (ids: string[], action: 'purchased' | 'delivered') => {
     const update = action === 'delivered'
@@ -236,15 +240,13 @@ export default function Shopping() {
       arr.push(c);
       bySection.set(c.store_section, arr);
     }
-    // Sort by item name within sections for item mode
     if (sort === 'item') {
       for (const arr of bySection.values()) arr.sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    const orderedSections = SECTION_ORDER.filter(s => bySection.has(s));
-    // Add any unexpected sections
+    const orderedSections = sectionOrder.filter(s => bySection.has(s));
     for (const s of bySection.keys()) {
-      if (!orderedSections.includes(s as any)) orderedSections.push(s as any);
+      if (!orderedSections.includes(s)) orderedSections.push(s);
     }
 
     return (
