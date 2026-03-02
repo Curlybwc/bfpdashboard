@@ -76,11 +76,15 @@ const AdminPanel = () => {
     <div className="pb-20">
       <PageHeader title="Admin Panel" backTo="/projects" />
       <div className="p-4">
-        <Tabs defaultValue="users" onValueChange={(v) => { if (v === 'tools') navigate('/admin/inventory/tools'); }}>
+        <Tabs defaultValue="users" onValueChange={(v) => {
+          if (v === 'tools') navigate('/admin/inventory/tools');
+          if (v === 'materials') navigate('/admin/inventory/materials');
+        }}>
           <TabsList className="mb-3">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
+            <TabsTrigger value="materials">Materials</TabsTrigger>
           </TabsList>
           <TabsContent value="users">
             <h2 className="text-sm font-medium text-muted-foreground mb-3">

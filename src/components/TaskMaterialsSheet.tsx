@@ -9,8 +9,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw } from 'lucide-react';
+import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
+import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
 
 interface TaskMaterial {
   id: string;
@@ -32,6 +33,7 @@ interface TaskMaterial {
 
 interface TaskMaterialsSheetProps {
   taskId: string;
+  projectId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onMaterialsChange: () => void;
@@ -44,7 +46,7 @@ function normalizeUrl(raw: string): string | null {
   return 'https://' + trimmed;
 }
 
-const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: TaskMaterialsSheetProps) => {
+const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterialsChange }: TaskMaterialsSheetProps) => {
   const { toast } = useToast();
   const [materials, setMaterials] = useState<TaskMaterial[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,6 +73,7 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
   const [editLoading, setEditLoading] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<TaskMaterial | null>(null);
+  const [leftoverTarget, setLeftoverTarget] = useState<TaskMaterial | null>(null);
 
   const fetchMaterials = async () => {
     const { data, error } = await supabase
@@ -340,6 +343,12 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
           </div>
         )}
       </div>
+
+      {m.item_type === 'material' && (
+        <Button variant="outline" size="sm" className="h-6 text-[11px] px-2 gap-1" onClick={() => setLeftoverTarget(m)}>
+          <Package className="h-3 w-3" />Record leftover
+        </Button>
+      )}
     </div>
   );
 
@@ -516,6 +525,20 @@ const TaskMaterialsSheet = ({ taskId, open, onOpenChange, onMaterialsChange }: T
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {leftoverTarget && (
+        <RecordLeftoverSheet
+          open={!!leftoverTarget}
+          onOpenChange={(o) => { if (!o) setLeftoverTarget(null); }}
+          prefill={{
+            name: leftoverTarget.name,
+            unit: leftoverTarget.unit,
+            sku: leftoverTarget.sku,
+            vendor_url: leftoverTarget.vendor_url,
+          }}
+          projectId={projectId ?? null}
+        />
+      )}
     </Drawer>
   );
 };

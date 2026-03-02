@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ExternalLink, Copy, Link, ShoppingCart, Truck, ChevronDown, ChevronUp, Plus, Minus, ArrowRight, ArrowLeft, ArrowRightLeft } from 'lucide-react';
+import { ExternalLink, Copy, Link, ShoppingCart, Truck, ChevronDown, ChevronUp, Plus, Minus, ArrowRight, ArrowLeft, ArrowRightLeft, Package } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer';
+import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
 
 type Tab = 'not_purchased' | 'purchased_not_delivered' | 'delivered';
 
@@ -88,6 +89,7 @@ const ProjectMaterials = () => {
   const [transferQty, setTransferQty] = useState(1);
   const [allProjects, setAllProjects] = useState<{ id: string; name: string; address: string | null }[]>([]);
   const [projectSearch, setProjectSearch] = useState('');
+  const [leftoverTarget, setLeftoverTarget] = useState<AggregatedItem | null>(null);
 
   const fetchData = async () => {
     if (!id) return;
@@ -584,6 +586,12 @@ const ProjectMaterials = () => {
             </Button>
           </div>
         )}
+
+        {!isTool && (
+          <Button variant="outline" size="sm" className="h-6 text-[11px] px-2 gap-1 mt-1" onClick={() => setLeftoverTarget(item)}>
+            <Package className="h-3 w-3" />Record leftover
+          </Button>
+        )}
       </div>
     );
   };
@@ -697,6 +705,20 @@ const ProjectMaterials = () => {
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
+
+        {leftoverTarget && (
+          <RecordLeftoverSheet
+            open={!!leftoverTarget}
+            onOpenChange={(o) => { if (!o) setLeftoverTarget(null); }}
+            prefill={{
+              name: leftoverTarget.name,
+              unit: leftoverTarget.unit,
+              sku: leftoverTarget.sku,
+              vendor_url: leftoverTarget.vendor_url,
+            }}
+            projectId={id ?? null}
+          />
+        )}
       </div>
     </TooltipProvider>
   );
