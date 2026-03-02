@@ -426,6 +426,8 @@ export type Database = {
           purchased: boolean
           quantity: number | null
           sku: string | null
+          store_section: string | null
+          store_section_manual: boolean
           task_id: string
           tool_type_id: string | null
           unit: string | null
@@ -443,6 +445,8 @@ export type Database = {
           purchased?: boolean
           quantity?: number | null
           sku?: string | null
+          store_section?: string | null
+          store_section_manual?: boolean
           task_id: string
           tool_type_id?: string | null
           unit?: string | null
@@ -460,6 +464,8 @@ export type Database = {
           purchased?: boolean
           quantity?: number | null
           sku?: string | null
+          store_section?: string | null
+          store_section_manual?: boolean
           task_id?: string
           tool_type_id?: string | null
           unit?: string | null

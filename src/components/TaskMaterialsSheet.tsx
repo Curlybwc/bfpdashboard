@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
+import { inferStoreSection, STORE_SECTIONS } from '@/lib/inferStoreSection';
 
 interface TaskMaterial {
   id: string;
@@ -29,6 +30,8 @@ interface TaskMaterial {
   created_at: string;
   tool_type_id: string | null;
   is_active: boolean;
+  store_section: string | null;
+  store_section_manual: boolean;
 }
 
 interface TaskMaterialsSheetProps {
@@ -59,6 +62,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [newVendorUrl, setNewVendorUrl] = useState('');
   const [newItemType, setNewItemType] = useState<string>('material');
   const [newProvidedBy, setNewProvidedBy] = useState<string>('either');
+  const [newStoreSection, setNewStoreSection] = useState<string>('');
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
@@ -70,6 +74,8 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [editVendorUrl, setEditVendorUrl] = useState('');
   const [editItemType, setEditItemType] = useState<string>('material');
   const [editProvidedBy, setEditProvidedBy] = useState<string>('either');
+  const [editStoreSection, setEditStoreSection] = useState<string>('');
+  const [editStoreSectionManual, setEditStoreSectionManual] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<TaskMaterial | null>(null);
@@ -161,6 +167,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const handleAdd = async () => {
     if (!newName.trim()) return;
     setLoading(true);
+    const autoSection = newStoreSection || inferStoreSection(newName.trim());
     const { error } = await supabase.from('task_materials').insert({
       task_id: taskId,
       name: newName.trim(),
@@ -170,6 +177,8 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       vendor_url: normalizeUrl(newVendorUrl),
       item_type: newItemType,
       provided_by: newItemType === 'tool' ? newProvidedBy : 'either',
+      store_section: autoSection,
+      store_section_manual: !!newStoreSection,
     } as any);
     setLoading(false);
     if (error) {
@@ -177,7 +186,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       return;
     }
     setNewName(''); setNewQty(''); setNewUnit(''); setNewSku(''); setNewVendorUrl('');
-    setNewItemType('material'); setNewProvidedBy('either');
+    setNewItemType('material'); setNewProvidedBy('either'); setNewStoreSection('');
     await fetchMaterials();
   };
 
@@ -190,12 +199,21 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     setEditVendorUrl(m.vendor_url ?? '');
     setEditItemType(m.item_type ?? 'material');
     setEditProvidedBy(m.provided_by ?? 'either');
+    setEditStoreSection(m.store_section ?? '');
+    setEditStoreSectionManual(m.store_section_manual ?? false);
     setEditOpen(true);
   };
 
   const handleEditSave = async () => {
     if (!editMaterial || !editName.trim()) return;
     setEditLoading(true);
+    // Auto-fill store_section if name changed and not manually set
+    const nameChanged = editName.trim() !== editMaterial.name;
+    let section = editStoreSection;
+    let sectionManual = editStoreSectionManual;
+    if (nameChanged && !editStoreSectionManual) {
+      section = inferStoreSection(editName.trim());
+    }
     const { error } = await supabase.from('task_materials').update({
       name: editName.trim(),
       quantity: editQty ? parseFloat(editQty) : null,
@@ -204,6 +222,8 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       vendor_url: normalizeUrl(editVendorUrl),
       item_type: editItemType,
       provided_by: editItemType === 'tool' ? editProvidedBy : 'either',
+      store_section: section || null,
+      store_section_manual: sectionManual,
     } as any).eq('id', editMaterial.id);
     setEditLoading(false);
     if (error) {
@@ -437,6 +457,15 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             <Input placeholder="SKU (optional)" value={newSku} onChange={(e) => setNewSku(e.target.value)} className="flex-1" />
             <Input placeholder="Vendor URL (optional)" value={newVendorUrl} onChange={(e) => setNewVendorUrl(e.target.value)} className="flex-1" />
           </div>
+          <Select value={newStoreSection || '__auto'} onValueChange={(v) => setNewStoreSection(v === '__auto' ? '' : v)}>
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder="Store section (auto)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__auto">Auto-detect section</SelectItem>
+              {STORE_SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Button size="sm" onClick={handleAdd} disabled={loading || !newName.trim()} className="w-full">
             Add {newItemType === 'tool' ? 'Tool' : 'Material'}
           </Button>
@@ -500,6 +529,32 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             <div>
               <Label className="text-xs">Vendor URL</Label>
               <Input value={editVendorUrl} onChange={(e) => setEditVendorUrl(e.target.value)} placeholder="e.g. homedepot.com/p/12345" />
+            </div>
+            <div>
+              <Label className="text-xs">Store Section</Label>
+              <div className="flex gap-1.5">
+                <Select value={editStoreSection || '__auto'} onValueChange={(v) => {
+                  if (v === '__auto') {
+                    setEditStoreSection(inferStoreSection(editName));
+                    setEditStoreSectionManual(false);
+                  } else {
+                    setEditStoreSection(v);
+                    setEditStoreSectionManual(true);
+                  }
+                }}>
+                  <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__auto">Auto-detect</SelectItem>
+                    {STORE_SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {editStoreSectionManual && (
+                  <Button variant="ghost" size="sm" className="text-xs h-9" onClick={() => {
+                    setEditStoreSection(inferStoreSection(editName));
+                    setEditStoreSectionManual(false);
+                  }}>Use auto</Button>
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter className="gap-2">
