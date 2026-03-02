@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { ExternalLink, Copy, Link, ShoppingCart, Truck, ChevronDown, ChevronUp, Plus, Minus, ArrowRight, ArrowLeft } from 'lucide-react';
+import { ExternalLink, Copy, Link, ShoppingCart, Truck, ChevronDown, ChevronUp, Plus, Minus, ArrowRight, ArrowLeft, ArrowRightLeft } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer';
 
 type Tab = 'not_purchased' | 'purchased_not_delivered' | 'delivered';
 
@@ -79,6 +83,11 @@ const ProjectMaterials = () => {
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [shopStockMap, setShopStockMap] = useState<Record<string, number>>({});
   const [moveQty, setMoveQty] = useState<Record<string, number>>({});
+  const [transferOpen, setTransferOpen] = useState<string | null>(null); // tool_type_id
+  const [transferDestProject, setTransferDestProject] = useState<string>('');
+  const [transferQty, setTransferQty] = useState(1);
+  const [allProjects, setAllProjects] = useState<{ id: string; name: string; address: string | null }[]>([]);
+  const [projectSearch, setProjectSearch] = useState('');
 
   const fetchData = async () => {
     if (!id) return;
@@ -363,6 +372,44 @@ const ProjectMaterials = () => {
     }
   };
 
+  const openTransfer = async (toolTypeId: string) => {
+    setTransferOpen(toolTypeId);
+    setTransferDestProject('');
+    setTransferQty(1);
+    setProjectSearch('');
+    // Fetch projects if not loaded
+    if (allProjects.length === 0) {
+      const { data } = await supabase.from('projects').select('id, name, address').neq('id', id!).order('name');
+      if (data) setAllProjects(data as any[]);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!transferOpen || !transferDestProject || !id || !user) return;
+    const toolTypeId = transferOpen;
+    const srcQty = stockMap[toolTypeId] ?? 0;
+    if (transferQty <= 0 || srcQty < transferQty) {
+      toast({ title: 'Not enough stock at this project', variant: 'destructive' });
+      return;
+    }
+    setActionLoading(`transfer-${toolTypeId}`);
+    // Decrement source project
+    await upsertStock(toolTypeId, 'project', id, -transferQty);
+    // Increment destination project
+    await upsertStock(toolTypeId, 'project', transferDestProject, transferQty);
+
+    setTransferOpen(null);
+    await fetchData();
+    await syncToolGating(toolTypeId);
+    setActionLoading(null);
+  };
+
+  const filteredProjects = allProjects.filter(p => {
+    if (!projectSearch.trim()) return true;
+    const q = projectSearch.toLowerCase();
+    return p.name.toLowerCase().includes(q) || (p.address && p.address.toLowerCase().includes(q));
+  });
+
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -460,20 +507,44 @@ const ProjectMaterials = () => {
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
-              <Button
-                size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1"
-                disabled={actionLoading === `move-${item.tool_type_id}` || shopStock < mqty}
-                onClick={() => handleMoveStock(item.tool_type_id!, 'to_project')}
-              >
-                <ArrowRight className="h-3 w-3" />Shop → Here
-              </Button>
-              <Button
-                size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1"
-                disabled={actionLoading === `move-${item.tool_type_id}` || projStock < mqty}
-                onClick={() => handleMoveStock(item.tool_type_id!, 'to_shop')}
-              >
-                <ArrowLeft className="h-3 w-3" />Return
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1"
+                    disabled={actionLoading === `move-${item.tool_type_id}` || shopStock < mqty}
+                    onClick={() => handleMoveStock(item.tool_type_id!, 'to_project')}
+                  >
+                    <ArrowRight className="h-3 w-3" />Delivered to JobSite
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Move quantity from Shop stock to this project.</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1"
+                    disabled={actionLoading === `move-${item.tool_type_id}` || projStock < mqty}
+                    onClick={() => handleMoveStock(item.tool_type_id!, 'to_shop')}
+                  >
+                    <ArrowLeft className="h-3 w-3" />Returned to Shop
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Move quantity from this project back to Shop stock.</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm" variant="outline" className="h-7 text-xs gap-1 flex-1"
+                    disabled={actionLoading === `transfer-${item.tool_type_id}` || projStock <= 0}
+                    onClick={() => openTransfer(item.tool_type_id!)}
+                  >
+                    <ArrowRightLeft className="h-3 w-3" />Transfer to JobSite
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Transfer tools directly to another project.</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         )}
@@ -526,43 +597,108 @@ const ProjectMaterials = () => {
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="pb-20">
-      <PageHeader title={`${projectName} – Materials`} backTo={`/projects/${id}`} />
+    <TooltipProvider>
+      <div className="pb-20">
+        <PageHeader title={`${projectName} – Materials`} backTo={`/projects/${id}`} />
 
-      <div className="p-4 space-y-4">
-        <div className="flex rounded-lg border overflow-hidden">
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              className={`flex-1 text-xs font-medium py-2 px-1 transition-colors ${
-                tab === t.key ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-accent'
-              }`}
-              onClick={() => setTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="p-4 space-y-4">
+          <div className="flex rounded-lg border overflow-hidden">
+            {tabs.map(t => (
+              <button
+                key={t.key}
+                className={`flex-1 text-xs font-medium py-2 px-1 transition-colors ${
+                  tab === t.key ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-accent'
+                }`}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {aggregated.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8">No items in this tab.</p>
+          )}
+
+          {materialAggregated.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Materials ({materialAggregated.length})</h3>
+              {materialAggregated.map(renderCard)}
+            </div>
+          )}
+
+          {toolAggregated.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">🔧 Tools ({toolAggregated.length})</h3>
+              {toolAggregated.map(renderCard)}
+            </div>
+          )}
         </div>
 
-        {aggregated.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-8">No items in this tab.</p>
-        )}
-
-        {materialAggregated.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Materials ({materialAggregated.length})</h3>
-            {materialAggregated.map(renderCard)}
-          </div>
-        )}
-
-        {toolAggregated.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">🔧 Tools ({toolAggregated.length})</h3>
-            {toolAggregated.map(renderCard)}
-          </div>
-        )}
+        {/* Transfer to another JobSite drawer */}
+        <Drawer open={!!transferOpen} onOpenChange={(open) => { if (!open) setTransferOpen(null); }}>
+          <DrawerContent className="max-h-[70vh]">
+            <DrawerHeader>
+              <DrawerTitle>Transfer to another JobSite</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 space-y-4">
+              <div>
+                <Label className="text-xs mb-1 block">Destination Project</Label>
+                <Input
+                  placeholder="Search projects..."
+                  value={projectSearch}
+                  onChange={e => setProjectSearch(e.target.value)}
+                  className="mb-2"
+                />
+                <div className="max-h-40 overflow-auto border rounded-md">
+                  {filteredProjects.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-3">No projects found.</p>
+                  )}
+                  {filteredProjects.map(p => (
+                    <button
+                      key={p.id}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors ${
+                        transferDestProject === p.id ? 'bg-accent font-medium' : ''
+                      }`}
+                      onClick={() => setTransferDestProject(p.id)}
+                    >
+                      <span className="block truncate">{p.name}</span>
+                      {p.address && <span className="block text-muted-foreground truncate">{p.address}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">Quantity</Label>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setTransferQty(q => Math.max(1, q - 1))}>
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-8 text-center">{transferQty}</span>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setTransferQty(q => q + 1)}>
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    Available: {transferOpen ? (stockMap[transferOpen] ?? 0) : 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <DrawerFooter className="gap-2">
+              <Button
+                onClick={handleTransfer}
+                disabled={!transferDestProject || transferQty <= 0 || (transferOpen ? (stockMap[transferOpen] ?? 0) < transferQty : true)}
+              >
+                Transfer
+              </Button>
+              <DrawerClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 
