@@ -389,6 +389,7 @@ const TaskDetail = () => {
 
       <TaskMaterialsSheet
         taskId={taskId!}
+        projectId={projectId!}
         open={materialsOpen}
         onOpenChange={setMaterialsOpen}
         onMaterialsChange={fetchTask}

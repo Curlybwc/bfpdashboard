@@ -91,6 +91,66 @@ export type Database = {
           },
         ]
       }
+      material_inventory: {
+        Row: {
+          created_at: string
+          id: string
+          location_type: string
+          name: string
+          project_id: string | null
+          qty: number
+          sku: string | null
+          status: string
+          unit: string | null
+          updated_at: string
+          updated_by: string | null
+          vendor_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_type: string
+          name: string
+          project_id?: string | null
+          qty: number
+          sku?: string | null
+          status?: string
+          unit?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_type?: string
+          name?: string
+          project_id?: string | null
+          qty?: number
+          sku?: string | null
+          status?: string
+          unit?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vendor_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_inventory_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_inventory_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           can_manage_projects: boolean
