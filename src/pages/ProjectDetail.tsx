@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Plus, ChevronDown, X, Mic, Zap, Package } from 'lucide-react';
+import { Plus, ChevronDown, X, Mic, Zap, Package, Trash2, Loader2 } from 'lucide-react';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
@@ -48,6 +49,8 @@ const ProjectDetail = () => {
   const [matUnit, setMatUnit] = useState('');
   const [projectRole, setProjectRole] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchData = async () => {
     if (!id) return;
@@ -140,6 +143,20 @@ const ProjectDetail = () => {
     return t.actual_total_cost ?? 0;
   };
   const projectTotalActual = rootTasks.reduce((sum, t) => sum + getTaskActual(t), 0);
+
+  const handleDeleteProject = async () => {
+    if (!id) return;
+    setDeleting(true);
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+      setDeleting(false);
+      return;
+    }
+    setDeleteDialogOpen(false);
+    toast({ title: 'Project deleted' });
+    navigate('/projects');
+  };
 
   if (!project) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
@@ -283,10 +300,35 @@ const ProjectDetail = () => {
               </form>
             </DialogContent>
           </Dialog>
+              {isAdmin && (
+                <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+          ) : isAdmin ? (
+            <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
           ) : undefined
         }
       />
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(nextOpen) => { if (deleting) return; setDeleteDialogOpen(nextOpen); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete <strong>{project.name}</strong>{project.address ? ` (${project.address})` : ''}? This removes all tasks, materials, members, and field captures. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" disabled={deleting} onClick={handleDeleteProject}>
+              {deleting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Deleting…</> : 'Delete Project'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <StatusBadge status={project.status} />
