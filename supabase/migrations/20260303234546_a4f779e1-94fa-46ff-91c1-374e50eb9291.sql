@@ -1,0 +1,2 @@
+ALTER TABLE public.scopes DROP CONSTRAINT scopes_converted_project_id_fkey;
+ALTER TABLE public.scopes ADD CONSTRAINT scopes_converted_project_id_fkey FOREIGN KEY (converted_project_id) REFERENCES public.projects(id) ON DELETE SET NULL;
