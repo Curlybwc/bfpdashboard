@@ -51,8 +51,11 @@ const CostLibrary = () => {
 
   const saveEdit = async () => {
     if (!editingId) return;
+    const name = editForm.name ?? '';
+    const normalized_name = name.toLowerCase().trim().replace(/\s+/g, ' ');
     const { error } = await supabase.from('cost_items').update({
-      name: editForm.name,
+      name,
+      normalized_name,
       unit_type: editForm.unit_type,
       piece_length_ft: editForm.piece_length_ft === null ? null : editForm.piece_length_ft,
       default_total_cost: Number(editForm.default_total_cost),
@@ -76,8 +79,11 @@ const CostLibrary = () => {
 
   const addItem = async () => {
     if (!addForm.name.trim() || !addForm.default_total_cost) return;
+    const name = addForm.name.trim();
+    const normalized_name = name.toLowerCase().replace(/\s+/g, ' ');
     const { error } = await supabase.from('cost_items').insert({
-      name: addForm.name.trim(),
+      name,
+      normalized_name,
       unit_type: addForm.unit_type,
       piece_length_ft: addForm.piece_length_ft ? Number(addForm.piece_length_ft) : null,
       default_total_cost: Number(addForm.default_total_cost),

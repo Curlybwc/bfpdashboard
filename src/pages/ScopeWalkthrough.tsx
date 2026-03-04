@@ -12,50 +12,55 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react';
 
-interface ProposedUpdate {
-  scope_item_id: string;
-  description?: string;
-  status: string;
-  notes: string;
+function normalizeForLibrary(s: string): string {
+  return s.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-interface GeneratedItem {
+interface MatchedItem {
+  scope_item_id: string;
   description: string;
-  notes?: string | null;
-  qty?: number | null;
-  unit?: string | null;
-  phase_key?: string | null;
-  suggested_unit_cost?: number | null;
-  matched_cost_item_id?: string | null;
-  matched_cost_item_unit?: string | null;
-  matched_cost_item_unit_cost?: number | null;
+  current_status: string;
+  suggested_status: string;
+  suggested_notes: string | null;
+  suggested_qty: number | null;
+  suggested_unit: string | null;
+}
+
+interface NewItem {
+  description: string;
+  notes: string | null;
+  qty: number | null;
+  unit: string | null;
+  phase_key: string | null;
+  normalized_name: string;
+  matched_cost_item_id: string | null;
+  matched_cost_item_unit: string | null;
+  matched_cost_item_unit_cost: number | null;
 }
 
 interface ParseResult {
-  mode?: 'generate' | 'coverage';
-  generated_items?: GeneratedItem[];
-  proposed_updates: ProposedUpdate[];
-  not_addressed_items: { id: string; description: string }[];
+  matched: MatchedItem[];
+  new_items: NewItem[];
   needs_review_items: { id: string; description: string; reason: string }[];
+  not_addressed_items: { id: string; description: string }[];
   member_user_ids_to_add?: string[];
   member_display_names_to_add?: string[];
   member_warnings?: string[];
 }
 
-// Editable version of a generated item with UI state
-interface EditableItem extends GeneratedItem {
+interface EditableNewItem extends NewItem {
   selected: boolean;
   saveToLibrary: boolean;
   updateLibraryPrice: boolean;
+  editedDescription: string;
+  editedNotes: string;
   editedQty: string;
   editedUnit: string;
   editedUnitCost: string;
-  editedDescription: string;
-  editedNotes: string;
 }
 
-function normalizeForLibrary(s: string): string {
-  return s.toLowerCase().trim().replace(/\s+/g, ' ');
+interface EditableMatchedItem extends MatchedItem {
+  applyUpdate: boolean;
 }
 
 const ScopeWalkthrough = () => {
@@ -67,13 +72,13 @@ const ScopeWalkthrough = () => {
   const [text, setText] = useState('');
   const [blocks, setBlocks] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [applying, setApplying] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [scopeItemCount, setScopeItemCount] = useState<number | null>(null);
 
-  // Generate mode state
-  const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
-  const [creating, setCreating] = useState(false);
+  // Result state
+  const [editableNewItems, setEditableNewItems] = useState<EditableNewItem[]>([]);
+  const [editableMatched, setEditableMatched] = useState<EditableMatchedItem[]>([]);
+  const [committing, setCommitting] = useState(false);
   const [saveAllToLibrary, setSaveAllToLibrary] = useState(true);
 
   useEffect(() => {
@@ -83,7 +88,6 @@ const ScopeWalkthrough = () => {
     }
   }, [text]);
 
-  // Fetch scope item count on mount
   useEffect(() => {
     if (!id) return;
     supabase
@@ -101,7 +105,7 @@ const ScopeWalkthrough = () => {
     toast({ title: `Block ${blocks.length + 1} saved` });
   };
 
-  const handleReviewCoverage = async () => {
+  const handleReview = async () => {
     const allText = [...blocks, text.trim()].filter(Boolean).join('\n\n');
     if (!allText) {
       toast({ title: 'No text to review', variant: 'destructive' });
@@ -113,27 +117,32 @@ const ScopeWalkthrough = () => {
       const { data, error } = await supabase.functions.invoke('scope_walkthrough_parse', {
         body: { scope_id: id, walkthrough_text: allText },
       });
-
       if (error) throw error;
-      setParseResult(data);
 
-      // Initialize editable items for generate mode
-      if (data?.mode === 'generate' && data?.generated_items) {
-        setEditableItems(data.generated_items.map((item: GeneratedItem) => {
-          const unitCost = item.matched_cost_item_unit_cost ?? item.suggested_unit_cost ?? null;
-          return {
-            ...item,
-            selected: true,
-            saveToLibrary: true,
-            updateLibraryPrice: false,
-            editedDescription: item.description,
-            editedNotes: item.notes || '',
-            editedQty: item.qty != null ? String(item.qty) : '1',
-            editedUnit: item.unit || item.matched_cost_item_unit || '',
-            editedUnitCost: unitCost != null ? String(unitCost) : '',
-          };
-        }));
-      }
+      const result = data as ParseResult;
+      setParseResult(result);
+
+      // Initialize editable new items
+      setEditableNewItems((result.new_items || []).map(item => {
+        const unitCost = item.matched_cost_item_unit_cost ?? null;
+        return {
+          ...item,
+          selected: true,
+          saveToLibrary: true,
+          updateLibraryPrice: false,
+          editedDescription: item.description,
+          editedNotes: item.notes || '',
+          editedQty: item.qty != null ? String(item.qty) : '1',
+          editedUnit: item.unit || item.matched_cost_item_unit || '',
+          editedUnitCost: unitCost != null ? String(unitCost) : '',
+        };
+      }));
+
+      // Initialize matched items
+      setEditableMatched((result.matched || []).map(item => ({
+        ...item,
+        applyUpdate: true,
+      })));
     } catch (err: any) {
       toast({ title: 'Error parsing walkthrough', description: err.message, variant: 'destructive' });
     } finally {
@@ -141,36 +150,10 @@ const ScopeWalkthrough = () => {
     }
   };
 
-  const handleApplyUpdates = async () => {
-    if (!parseResult || !id) return;
-    setApplying(true);
-    try {
-      const { error } = await supabase.functions.invoke('scope_walkthrough_apply', {
-        body: {
-          scope_id: id,
-          approved_updates: parseResult.proposed_updates,
-        },
-      });
-
-      if (error) throw error;
-
-      // Auto-add scope members (conflict-ignore)
-      await autoAddMembers();
-
-      toast({ title: 'Updates applied successfully' });
-      navigate(`/scopes/${id}`);
-    } catch (err: any) {
-      toast({ title: 'Error applying updates', description: err.message, variant: 'destructive' });
-    } finally {
-      setApplying(false);
-    }
-  };
-
   const autoAddMembers = async () => {
     if (!parseResult || !id) return;
     const memberIds = parseResult.member_user_ids_to_add ?? [];
     if (memberIds.length === 0) return;
-
     try {
       const { data: existingMembers } = await supabase
         .from('scope_members')
@@ -195,69 +178,70 @@ const ScopeWalkthrough = () => {
     }
   };
 
-  const handleCreateItems = async () => {
-    if (!id) return;
-    const selected = editableItems.filter(item => item.selected);
-    if (selected.length === 0) {
-      toast({ title: 'No items selected', variant: 'destructive' });
-      return;
-    }
+  const handleCommit = async () => {
+    if (!id || !parseResult) return;
+    setCommitting(true);
 
-    setCreating(true);
     try {
-      // Step A: Library upserts for items with saveToLibrary
+      // 1) Apply matched item updates
+      const matchedToApply = editableMatched.filter(m => m.applyUpdate);
+      for (const m of matchedToApply) {
+        const updates: any = { status: m.suggested_status };
+        if (m.suggested_notes) updates.notes = m.suggested_notes;
+        if (m.suggested_qty != null) updates.qty = m.suggested_qty;
+        if (m.suggested_unit) updates.unit = m.suggested_unit;
+        await supabase.from('scope_items').update(updates).eq('id', m.scope_item_id);
+      }
+
+      // 2) Create new scope items
+      const selectedNew = editableNewItems.filter(item => item.selected);
       const costItemIdMap = new Map<number, string | null>();
 
-      for (let i = 0; i < editableItems.length; i++) {
-        const item = editableItems[i];
+      for (let i = 0; i < editableNewItems.length; i++) {
+        const item = editableNewItems[i];
         if (!item.selected) continue;
 
         let costItemId: string | null = item.matched_cost_item_id || null;
+        const norm = normalizeForLibrary(item.editedDescription);
 
         if (item.saveToLibrary) {
           if (costItemId && item.updateLibraryPrice) {
-            // Step B: Update library price
-            const updates: any = {};
             const unitCost = item.editedUnitCost ? parseFloat(item.editedUnitCost) : null;
-            if (unitCost != null) updates.default_total_cost = unitCost;
-            if (Object.keys(updates).length > 0) {
-              await supabase.from('cost_items').update(updates).eq('id', costItemId);
+            if (unitCost != null) {
+              await supabase.from('cost_items').update({ default_total_cost: unitCost }).eq('id', costItemId);
             }
           } else if (!costItemId) {
-            // Insert new cost_item
-            const norm = normalizeForLibrary(item.editedDescription);
-            const unitCost = item.editedUnitCost ? parseFloat(item.editedUnitCost) : 0;
-            // Map free-text unit to enum: each, sqft, lf, piece
-            const unitTypeMap: Record<string, string> = { sqft: 'sqft', 'sq ft': 'sqft', lf: 'lf', 'linear ft': 'lf', piece: 'piece', each: 'each' };
-            const unitType = unitTypeMap[item.editedUnit.toLowerCase()] || 'each';
-
-            const { data: inserted, error: insertErr } = await supabase
+            // Try to find by normalized_name first
+            const { data: existing } = await supabase
               .from('cost_items')
-              .upsert(
-                { name: item.editedDescription, normalized_name: norm, default_total_cost: unitCost, unit_type: unitType as any },
-                { onConflict: 'normalized_name', ignoreDuplicates: true }
-              )
               .select('id')
+              .eq('normalized_name', norm)
               .single();
 
-            if (!insertErr && inserted) {
-              costItemId = inserted.id;
+            if (existing) {
+              costItemId = existing.id;
             } else {
-              // If conflict (already exists), look it up
-              const { data: existing } = await supabase
+              const unitCost = item.editedUnitCost ? parseFloat(item.editedUnitCost) : 0;
+              const unitTypeMap: Record<string, string> = { sqft: 'sqft', 'sq ft': 'sqft', lf: 'lf', 'linear ft': 'lf', piece: 'piece', each: 'each' };
+              const unitType = unitTypeMap[item.editedUnit.toLowerCase()] || 'each';
+
+              const { data: inserted, error: insertErr } = await supabase
                 .from('cost_items')
+                .insert({ name: item.editedDescription, normalized_name: norm, default_total_cost: unitCost, unit_type: unitType as any })
                 .select('id')
-                .eq('normalized_name', norm)
                 .single();
-              if (existing) costItemId = existing.id;
+
+              if (!insertErr && inserted) {
+                costItemId = inserted.id;
+              }
             }
           }
         }
         costItemIdMap.set(i, costItemId);
       }
 
-      // Step C: Insert scope_items
-      const scopeItemInserts = editableItems
+      // Build scope_item inserts
+      const scopeItemInserts = editableNewItems
         .map((item, i) => {
           if (!item.selected) return null;
           const qty = item.editedQty ? parseFloat(item.editedQty) : null;
@@ -276,204 +260,55 @@ const ScopeWalkthrough = () => {
         })
         .filter(Boolean);
 
-      const { error: insertError } = await supabase.from('scope_items').insert(scopeItemInserts as any);
-      if (insertError) throw insertError;
+      if (scopeItemInserts.length > 0) {
+        const { error: insertError } = await supabase.from('scope_items').insert(scopeItemInserts as any);
+        if (insertError) throw insertError;
+      }
 
-      // Auto-add members
+      // 3) Auto-add members
       await autoAddMembers();
 
-      toast({ title: `Created ${scopeItemInserts.length} scope items` });
+      const totalActions = matchedToApply.length + scopeItemInserts.length;
+      toast({ title: `${totalActions} item${totalActions !== 1 ? 's' : ''} updated/created` });
       navigate(`/scopes/${id}`);
     } catch (err: any) {
-      toast({ title: 'Error creating items', description: err.message, variant: 'destructive' });
+      toast({ title: 'Error committing changes', description: err.message, variant: 'destructive' });
     } finally {
-      setCreating(false);
+      setCommitting(false);
     }
   };
 
-  const updateEditableItem = (index: number, updates: Partial<EditableItem>) => {
-    setEditableItems(prev => prev.map((item, i) => i === index ? { ...item, ...updates } : item));
+  const updateNewItem = (index: number, updates: Partial<EditableNewItem>) => {
+    setEditableNewItems(prev => prev.map((item, i) => i === index ? { ...item, ...updates } : item));
   };
 
-  const selectedCount = editableItems.filter(i => i.selected).length;
-
-  // Toggle save all to library
   const handleSaveAllToggle = (checked: boolean) => {
     setSaveAllToLibrary(checked);
-    setEditableItems(prev => prev.map(item => ({ ...item, saveToLibrary: checked })));
+    setEditableNewItems(prev => prev.map(item => ({ ...item, saveToLibrary: checked })));
   };
 
-  // GENERATE MODE RESULT SCREEN
-  if (parseResult?.mode === 'generate') {
-    const memberWarnings = parseResult.member_warnings ?? [];
+  const selectedNewCount = editableNewItems.filter(i => i.selected).length;
+  const matchedApplyCount = editableMatched.filter(m => m.applyUpdate).length;
+  const totalCommitCount = selectedNewCount + matchedApplyCount;
 
-    return (
-      <div className="pb-20">
-        <PageHeader
-          title="Generated Items"
-          backTo={`/scopes/${id}/walkthrough`}
-          actions={
-            <Button size="sm" variant="outline" onClick={() => { setParseResult(null); setEditableItems([]); }}>
-              <ArrowLeft className="h-4 w-4 mr-1" />Back
-            </Button>
-          }
-        />
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-muted-foreground">
-            This scope has no items yet. We generated items from your walkthrough. Edit and create below.
-          </p>
-
-          {/* Member warnings */}
-          {memberWarnings.length > 0 && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Assignment Warnings</AlertTitle>
-              <AlertDescription>
-                <ul className="list-disc pl-4 space-y-1">
-                  {memberWarnings.map((w, i) => <li key={i} className="text-sm">{w}</li>)}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Members to add */}
-          {(parseResult.member_user_ids_to_add?.length ?? 0) > 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Will add members: {(parseResult.member_display_names_to_add ?? []).join(', ')}</span>
-            </div>
-          )}
-
-          {/* Global toggles */}
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Save all to library</Label>
-            <Switch checked={saveAllToLibrary} onCheckedChange={handleSaveAllToggle} />
-          </div>
-
-          {/* Editable items */}
-          {editableItems.map((item, i) => {
-            const computedTotal = (item.editedQty ? parseFloat(item.editedQty) : 0) * (item.editedUnitCost ? parseFloat(item.editedUnitCost) : 0);
-            return (
-              <Card key={i} className={`p-3 space-y-2 ${item.selected ? 'ring-2 ring-primary' : 'opacity-60'}`}>
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    checked={item.selected}
-                    onCheckedChange={(c) => updateEditableItem(i, { selected: !!c })}
-                    className="mt-1"
-                  />
-                  <div className="flex-1 space-y-2">
-                    <Input
-                      value={item.editedDescription}
-                      onChange={e => updateEditableItem(i, { editedDescription: e.target.value })}
-                      placeholder="Description"
-                      className="text-sm font-medium"
-                    />
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Qty</Label>
-                        <Input
-                          type="number"
-                          value={item.editedQty}
-                          onChange={e => updateEditableItem(i, { editedQty: e.target.value })}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Unit</Label>
-                        <Input
-                          value={item.editedUnit}
-                          onChange={e => updateEditableItem(i, { editedUnit: e.target.value })}
-                          placeholder="sqft, lf..."
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">$/unit</Label>
-                        <Input
-                          type="number"
-                          value={item.editedUnitCost}
-                          onChange={e => updateEditableItem(i, { editedUnitCost: e.target.value })}
-                          placeholder="0.00"
-                          className="h-8 text-sm"
-                          step="0.01"
-                        />
-                      </div>
-                    </div>
-                    {computedTotal > 0 && (
-                      <p className="text-xs text-muted-foreground">Total: ${computedTotal.toFixed(2)}</p>
-                    )}
-                    {item.editedNotes !== '' && (
-                      <Input
-                        value={item.editedNotes}
-                        onChange={e => updateEditableItem(i, { editedNotes: e.target.value })}
-                        placeholder="Notes"
-                        className="h-8 text-xs"
-                      />
-                    )}
-                    {/* Library toggles */}
-                    <div className="flex items-center gap-4 text-xs">
-                      <label className="flex items-center gap-1.5">
-                        <Checkbox
-                          checked={item.saveToLibrary}
-                          onCheckedChange={(c) => updateEditableItem(i, { saveToLibrary: !!c })}
-                          className="h-3.5 w-3.5"
-                        />
-                        <span className="text-muted-foreground">Library</span>
-                      </label>
-                      {item.matched_cost_item_id && (
-                        <label className="flex items-center gap-1.5">
-                          <Checkbox
-                            checked={item.updateLibraryPrice}
-                            onCheckedChange={(c) => updateEditableItem(i, { updateLibraryPrice: !!c })}
-                            className="h-3.5 w-3.5"
-                          />
-                          <span className="text-muted-foreground">Update library price</span>
-                        </label>
-                      )}
-                      {item.matched_cost_item_id && (
-                        <span className="text-primary text-xs">✓ matched</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-
-          {editableItems.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">No items generated. Try more detailed walkthrough notes.</p>
-          )}
-
-          {editableItems.length > 0 && (
-            <div className="space-y-2">
-              <Button onClick={handleCreateItems} disabled={creating || selectedCount === 0} className="w-full">
-                {creating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating...</> : `Create ${selectedCount} Scope Item${selectedCount !== 1 ? 's' : ''}`}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // COVERAGE MODE RESULT SCREEN
+  // RESULTS SCREEN
   if (parseResult) {
     const memberWarnings = parseResult.member_warnings ?? [];
+    const hasMatched = editableMatched.length > 0;
+    const hasNew = editableNewItems.length > 0;
+    const hasNeedsReview = parseResult.needs_review_items.length > 0;
+    const hasNotAddressed = parseResult.not_addressed_items.length > 0;
+    const hasMembers = (parseResult.member_user_ids_to_add?.length ?? 0) > 0;
 
     return (
       <div className="pb-20">
         <PageHeader
-          title="Coverage Review"
+          title="Walkthrough Review"
           backTo={`/scopes/${id}/walkthrough`}
           actions={
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setParseResult(null)}>
-                <ArrowLeft className="h-4 w-4 mr-1" />Back
-              </Button>
-              <Button size="sm" onClick={handleApplyUpdates} disabled={applying || parseResult.proposed_updates.length === 0}>
-                {applying ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Applying...</> : <><CheckCircle2 className="h-4 w-4 mr-1" />Apply Updates</>}
-              </Button>
-            </div>
+            <Button size="sm" variant="outline" onClick={() => { setParseResult(null); setEditableNewItems([]); setEditableMatched([]); }}>
+              <ArrowLeft className="h-4 w-4 mr-1" />Back
+            </Button>
           }
         />
         <div className="p-4 space-y-6">
@@ -491,39 +326,150 @@ const ScopeWalkthrough = () => {
           )}
 
           {/* Members to add */}
-          {(parseResult.member_user_ids_to_add?.length ?? 0) > 0 && (
+          {hasMembers && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Will add members: {(parseResult.member_display_names_to_add ?? []).join(', ')}</span>
+            </div>
+          )}
+
+          {/* SECTION A: Matched existing items */}
+          {hasMatched && (
             <div>
               <h2 className="text-sm font-semibold flex items-center gap-1 mb-2">
-                <CheckCircle2 className="h-4 w-4" /> Members to Add ({parseResult.member_user_ids_to_add!.length})
-              </h2>
-              <div className="space-y-1">
-                {(parseResult.member_display_names_to_add ?? []).map((name, i) => (
-                  <Card key={i} className="p-2">
-                    <p className="text-sm">{name} <span className="text-xs text-muted-foreground">(viewer)</span></p>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Not Addressed */}
-          {parseResult.not_addressed_items.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold text-destructive flex items-center gap-1 mb-2">
-                <XCircle className="h-4 w-4" /> Not Addressed ({parseResult.not_addressed_items.length})
+                <CheckCircle2 className="h-4 w-4" /> Matched Items ({editableMatched.length})
               </h2>
               <div className="space-y-2">
-                {parseResult.not_addressed_items.map(item => (
-                  <Card key={item.id} className="p-3">
-                    <p className="text-sm">{item.description}</p>
+                {editableMatched.map((item, i) => (
+                  <Card key={item.scope_item_id} className={`p-3 ${item.applyUpdate ? '' : 'opacity-60'}`}>
+                    <div className="flex items-start gap-2">
+                      <Checkbox
+                        checked={item.applyUpdate}
+                        onCheckedChange={(c) => setEditableMatched(prev => prev.map((m, j) => j === i ? { ...m, applyUpdate: !!c } : m))}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{item.description}</p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span>{item.current_status}</span>
+                          <span>→</span>
+                          <span className="font-medium text-foreground">{item.suggested_status}</span>
+                        </div>
+                        {item.suggested_notes && (
+                          <p className="text-xs text-muted-foreground mt-1">{item.suggested_notes}</p>
+                        )}
+                      </div>
+                    </div>
                   </Card>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Needs Review */}
-          {parseResult.needs_review_items.length > 0 && (
+          {/* SECTION B: New items to create */}
+          {hasNew && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold">New Items ({editableNewItems.length})</h2>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Save all to library</Label>
+                  <Switch checked={saveAllToLibrary} onCheckedChange={handleSaveAllToggle} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                {editableNewItems.map((item, i) => {
+                  const computedTotal = (item.editedQty ? parseFloat(item.editedQty) : 0) * (item.editedUnitCost ? parseFloat(item.editedUnitCost) : 0);
+                  return (
+                    <Card key={i} className={`p-3 space-y-2 ${item.selected ? 'ring-2 ring-primary' : 'opacity-60'}`}>
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          checked={item.selected}
+                          onCheckedChange={(c) => updateNewItem(i, { selected: !!c })}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 space-y-2">
+                          <Input
+                            value={item.editedDescription}
+                            onChange={e => updateNewItem(i, { editedDescription: e.target.value })}
+                            placeholder="Description"
+                            className="text-sm font-medium"
+                          />
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Qty</Label>
+                              <Input
+                                type="number"
+                                value={item.editedQty}
+                                onChange={e => updateNewItem(i, { editedQty: e.target.value })}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Unit</Label>
+                              <Input
+                                value={item.editedUnit}
+                                onChange={e => updateNewItem(i, { editedUnit: e.target.value })}
+                                placeholder="sqft, lf..."
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">$/unit</Label>
+                              <Input
+                                type="number"
+                                value={item.editedUnitCost}
+                                onChange={e => updateNewItem(i, { editedUnitCost: e.target.value })}
+                                placeholder="0.00"
+                                className="h-8 text-sm"
+                                step="0.01"
+                              />
+                            </div>
+                          </div>
+                          {computedTotal > 0 && (
+                            <p className="text-xs text-muted-foreground">Total: ${computedTotal.toFixed(2)}</p>
+                          )}
+                          {item.editedNotes && (
+                            <Input
+                              value={item.editedNotes}
+                              onChange={e => updateNewItem(i, { editedNotes: e.target.value })}
+                              placeholder="Notes"
+                              className="h-8 text-xs"
+                            />
+                          )}
+                          <div className="flex items-center gap-4 text-xs">
+                            <label className="flex items-center gap-1.5">
+                              <Checkbox
+                                checked={item.saveToLibrary}
+                                onCheckedChange={(c) => updateNewItem(i, { saveToLibrary: !!c })}
+                                className="h-3.5 w-3.5"
+                              />
+                              <span className="text-muted-foreground">Library</span>
+                            </label>
+                            {item.matched_cost_item_id && (
+                              <>
+                                <label className="flex items-center gap-1.5">
+                                  <Checkbox
+                                    checked={item.updateLibraryPrice}
+                                    onCheckedChange={(c) => updateNewItem(i, { updateLibraryPrice: !!c })}
+                                    className="h-3.5 w-3.5"
+                                  />
+                                  <span className="text-muted-foreground">Update library price</span>
+                                </label>
+                                <span className="text-primary text-xs">✓ matched</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SECTION C: Needs Review */}
+          {hasNeedsReview && (
             <div>
               <h2 className="text-sm font-semibold text-accent-foreground flex items-center gap-1 mb-2">
                 <AlertTriangle className="h-4 w-4" /> Needs Review ({parseResult.needs_review_items.length})
@@ -539,42 +485,43 @@ const ScopeWalkthrough = () => {
             </div>
           )}
 
-          {/* Proposed Updates */}
-          {parseResult.proposed_updates.length > 0 && (
+          {/* Not Addressed */}
+          {hasNotAddressed && (
             <div>
-              <h2 className="text-sm font-semibold flex items-center gap-1 mb-2">
-                <CheckCircle2 className="h-4 w-4" /> Proposed Updates ({parseResult.proposed_updates.length})
+              <h2 className="text-sm font-semibold text-destructive flex items-center gap-1 mb-2">
+                <XCircle className="h-4 w-4" /> Not Addressed ({parseResult.not_addressed_items.length})
               </h2>
               <div className="space-y-2">
-                {parseResult.proposed_updates.map(update => (
-                  <Card key={update.scope_item_id} className="p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">{update.description || update.scope_item_id}</p>
-                        {update.notes && <p className="text-xs text-muted-foreground mt-1">{update.notes}</p>}
-                      </div>
-                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-muted">{update.status}</span>
-                    </div>
+                {parseResult.not_addressed_items.map(item => (
+                  <Card key={item.id} className="p-3">
+                    <p className="text-sm">{item.description}</p>
                   </Card>
                 ))}
               </div>
             </div>
           )}
 
-          {parseResult.proposed_updates.length === 0 && parseResult.not_addressed_items.length === 0 && parseResult.needs_review_items.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">No items matched from the walkthrough text.</p>
+          {/* Empty state */}
+          {!hasMatched && !hasNew && !hasNeedsReview && !hasNotAddressed && (
+            <p className="text-center text-muted-foreground py-8">No items found in the walkthrough text.</p>
+          )}
+
+          {/* Commit button */}
+          {totalCommitCount > 0 && (
+            <Button onClick={handleCommit} disabled={committing} className="w-full">
+              {committing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Committing...</> : `Commit ${totalCommitCount} Change${totalCommitCount !== 1 ? 's' : ''}`}
+            </Button>
           )}
         </div>
       </div>
     );
   }
 
-  // WALKTHROUGH CAPTURE SCREEN
+  // CAPTURE SCREEN
   return (
     <div className="pb-20">
       <PageHeader title="Walkthrough" backTo={`/scopes/${id}`} />
       <div className="p-4 space-y-4">
-        {/* Tip for empty scopes */}
         {scopeItemCount === 0 && (
           <Alert>
             <Info className="h-4 w-4" />
@@ -603,10 +550,10 @@ const ScopeWalkthrough = () => {
           </Button>
           <Button
             className="flex-1"
-            onClick={handleReviewCoverage}
+            onClick={handleReview}
             disabled={loading || (!text.trim() && blocks.length === 0)}
           >
-            {loading ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Reviewing...</> : scopeItemCount === 0 ? 'Generate Items' : 'Review Coverage'}
+            {loading ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Reviewing...</> : 'Review Walkthrough'}
           </Button>
         </div>
       </div>

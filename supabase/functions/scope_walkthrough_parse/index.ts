@@ -49,22 +49,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch scope items + known users + cost_items in parallel
+    // Fetch all data in parallel
     const [itemsRes, profilesRes, aliasesRes, costItemsRes] = await Promise.all([
-      adminClient.from('scope_items').select('id, description, status, notes, qty, unit, phase_key').eq('scope_id', scope_id),
+      adminClient.from('scope_items').select('id, description, status, notes, qty, unit, phase_key, cost_item_id, unit_cost_override').eq('scope_id', scope_id),
       adminClient.from('profiles').select('id, full_name').not('full_name', 'is', null).neq('full_name', ''),
       adminClient.from('profile_aliases').select('user_id, alias'),
       adminClient.from('cost_items').select('id, name, normalized_name, default_total_cost, unit_type').eq('active', true),
     ]);
 
-    const scopeItems = itemsRes.data || [];
     if (itemsRes.error) {
       return new Response(JSON.stringify({ error: itemsRes.error.message }), { status: 500, headers: corsHeaders });
     }
 
-    // Build known users
+    const scopeItems = itemsRes.data || [];
     const allProfiles = profilesRes.data || [];
     const allAliases = aliasesRes.data || [];
+    const costItems = costItemsRes.data || [];
+
+    // Build known users
     const aliasMap = new Map<string, string[]>();
     for (const a of allAliases) {
       if (!aliasMap.has(a.user_id)) aliasMap.set(a.user_id, []);
@@ -76,8 +78,7 @@ Deno.serve(async (req) => {
       aliases: aliasMap.get(p.id) || [],
     }));
 
-    // Build cost items lookup
-    const costItems = costItemsRes.data || [];
+    // Build cost items lookup by normalized_name
     const costItemsByNorm = new Map<string, any>();
     for (const ci of costItems) {
       if (ci.normalized_name) costItemsByNorm.set(ci.normalized_name, ci);
@@ -85,167 +86,60 @@ Deno.serve(async (req) => {
 
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
-    // Determine mode
-    const isGenerateMode = scopeItems.length === 0;
+    // Build scope items context for LLM (may be empty)
+    const existingItemsList = scopeItems.length > 0
+      ? scopeItems.map(i =>
+          `- ID: ${i.id} | "${i.description}" | Status: ${i.status} | Qty: ${i.qty ?? 'N/A'} | Unit: ${i.unit ?? 'N/A'}`
+        ).join('\n')
+      : '(none)';
 
-    if (isGenerateMode) {
-      // GENERATE MODE
-      const systemPrompt = `You are a construction scope item generator. Given walkthrough notes dictated during a property inspection, extract distinct work items and explicitly assigned people.
+    const systemPrompt = `You are a construction scope analyzer. Given walkthrough notes from a property inspection and a list of existing scope items (which may be empty), do TWO things:
 
-ITEM EXTRACTION:
-For each distinct work item mentioned, create a scope item with:
-- description: concise description of the work
-- notes: any additional context from the walkthrough
-- qty: numeric quantity if mentioned (null otherwise)
-- unit: unit of measurement if mentioned, e.g. "sqft", "lf", "each" (null otherwise)
-- phase_key: construction phase if identifiable, e.g. "demo", "rough", "finish" (null otherwise)
-- suggested_unit_cost: estimated unit cost in dollars if you can reasonably estimate (null otherwise)
+1) MATCH existing scope items mentioned in the walkthrough text
+2) GENERATE new scope items for work mentioned that does NOT match any existing item
+
+MATCHING RULES:
+- For each existing scope item, check if the walkthrough text discusses it
+- If clearly mentioned with condition info, include in "matched" with suggested status (OK, Repair, Replace) and any updated notes
+- If mentioned but ambiguous, include in "needs_review_items" with a reason
+- If not mentioned at all, include in "not_addressed_items"
+
+GENERATION RULES:
+- For any work mentioned in the walkthrough that does NOT correspond to an existing scope item, create a new item
+- Each new item needs: description, notes (if any), qty (number or null), unit (sqft/lf/each/piece or null), phase_key (demo/rough/finish or null)
+- Do not duplicate existing items. If the walkthrough text discusses an existing item, match it, don't generate a duplicate.
 
 PERSON EXTRACTION RULES:
-Extract people who are EXPLICITLY ASSIGNED work in the walkthrough text. Only match against KNOWN USERS below.
-- Only include a person when there is explicit assignment language like "X job", "for X", "have X do", "X needs to", "X and Y do".
-- Do NOT include people who are merely mentioned without assignment context.
-- A confident match can be:
-  (a) case-insensitive exact match to full_name, OR
-  (b) case-insensitive exact match to an alias, OR
-  (c) case-insensitive unique substring match against full_name if it matches exactly one person.
-- If multiple candidates match a name, do NOT include them — add a warning instead.
-- Vendors/company names should be ignored unless they match a known user.
+Extract people EXPLICITLY ASSIGNED work. Match against KNOWN USERS only.
+- Only include when there is explicit assignment language ("X job", "for X", "have X do", "X needs to")
+- Confident match: case-insensitive exact match on full_name or alias, or unique substring match
+- If multiple candidates match, do NOT include — add a warning
+- Vendors/company names ignored unless they match a known user
+
+EXISTING SCOPE ITEMS:
+${existingItemsList}
 
 KNOWN USERS:
 ${JSON.stringify(knownUsers)}
 
-Return ONLY valid JSON with this exact structure:
+Return ONLY valid JSON:
 {
-  "generated_items": [
-    { "description": "string", "notes": "string or null", "qty": null, "unit": null, "phase_key": null, "suggested_unit_cost": null }
+  "matched": [
+    { "scope_item_id": "uuid", "suggested_status": "OK|Repair|Replace", "suggested_notes": "string or null", "suggested_qty": null, "suggested_unit": null }
   ],
-  "member_user_ids_to_add": ["uuid"],
-  "member_display_names_to_add": ["full_name"],
-  "member_warnings": ["string"]
-}`;
-
-      const llmResponse = await fetch('https://api.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${lovableApiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `WALKTHROUGH NOTES:\n${walkthrough_text}` },
-          ],
-          temperature: 0.2,
-        }),
-      });
-
-      if (!llmResponse.ok) {
-        const errText = await llmResponse.text();
-        console.error('LLM error:', errText);
-        return new Response(JSON.stringify({ error: 'AI processing failed' }), { status: 502, headers: corsHeaders });
-      }
-
-      const llmData = await llmResponse.json();
-      const content = llmData.choices?.[0]?.message?.content ?? '';
-
-      let parsed: any;
-      try {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error('No JSON found');
-        parsed = JSON.parse(jsonMatch[0]);
-      } catch {
-        console.error('Failed to parse LLM output:', content);
-        return new Response(JSON.stringify({ error: 'Failed to parse AI response' }), { status: 502, headers: corsHeaders });
-      }
-
-      const validUserIds = new Set(allProfiles.map((p: any) => p.id));
-
-      // Enrich generated items with cost_items matching
-      const generatedItems = (parsed.generated_items || []).map((item: any) => {
-        const norm = normalize(item.description || '');
-        const matched = costItemsByNorm.get(norm);
-        return {
-          description: item.description || '',
-          notes: typeof item.notes === 'string' ? item.notes : null,
-          qty: typeof item.qty === 'number' ? item.qty : null,
-          unit: typeof item.unit === 'string' ? item.unit : null,
-          phase_key: typeof item.phase_key === 'string' ? item.phase_key : null,
-          suggested_unit_cost: typeof item.suggested_unit_cost === 'number' ? item.suggested_unit_cost : null,
-          matched_cost_item_id: matched?.id || null,
-          matched_cost_item_unit: matched?.unit_type || null,
-          matched_cost_item_unit_cost: matched?.default_total_cost || null,
-        };
-      });
-
-      const memberIds = (parsed.member_user_ids_to_add || []).filter((id: string) => validUserIds.has(id));
-      let memberNames = parsed.member_display_names_to_add || [];
-      if (memberNames.length !== memberIds.length) {
-        memberNames = memberIds.map((id: string) => allProfiles.find((p: any) => p.id === id)?.full_name || 'Unknown');
-      }
-
-      const result = {
-        mode: 'generate',
-        generated_items: generatedItems,
-        proposed_updates: [],
-        not_addressed_items: [],
-        needs_review_items: [],
-        member_user_ids_to_add: memberIds,
-        member_display_names_to_add: memberNames,
-        member_warnings: Array.isArray(parsed.member_warnings) ? parsed.member_warnings.filter((w: any) => typeof w === 'string') : [],
-      };
-
-      return new Response(JSON.stringify(result), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // COVERAGE MODE (existing behavior)
-    const itemsList = scopeItems.map(i =>
-      `- ID: ${i.id} | Description: "${i.description}" | Status: ${i.status} | Qty: ${i.qty ?? 'N/A'} | Unit: ${i.unit ?? 'N/A'} | Phase: ${i.phase_key ?? 'N/A'}`
-    ).join('\n');
-
-    const systemPrompt = `You are a construction scope analyzer. Given a list of scope items and walkthrough notes dictated during a property inspection, determine the condition of each scope item AND extract explicitly assigned people.
-
-SCOPE ITEM ANALYSIS:
-For each scope item, analyze the walkthrough text and:
-1. If the item is clearly mentioned and its condition is described, set status to one of: "OK", "Repair", "Replace"
-2. If the item is mentioned but the description is ambiguous, set status to "Needs Review" and include it in needs_review_items with a reason
-3. If the item is not mentioned at all, include it in not_addressed_items
-
-PERSON EXTRACTION RULES:
-Extract people who are EXPLICITLY ASSIGNED work in the walkthrough text. Only match against KNOWN USERS below.
-- Only include a person when there is explicit assignment language like "X job", "for X", "have X do", "X needs to", "X and Y do".
-- Do NOT include people who are merely mentioned without assignment context.
-- A confident match can be:
-  (a) case-insensitive exact match to full_name, OR
-  (b) case-insensitive exact match to an alias, OR
-  (c) case-insensitive unique substring match against full_name if it matches exactly one person.
-- If multiple candidates match a name, do NOT include them — add a warning instead.
-- If no match, assigned_to_user_id must be null and add warning.
-- Vendors/company names should be ignored unless they match a known user.
-
-KNOWN USERS:
-${JSON.stringify(knownUsers)}
-
-Return ONLY valid JSON with this exact structure:
-{
-  "proposed_updates": [
-    { "scope_item_id": "uuid", "description": "item description", "status": "OK|Repair|Replace", "notes": "relevant walkthrough notes" }
-  ],
-  "not_addressed_items": [
-    { "id": "uuid", "description": "item description" }
+  "new_items": [
+    { "description": "string", "notes": "string or null", "qty": null, "unit": null, "phase_key": null }
   ],
   "needs_review_items": [
-    { "id": "uuid", "description": "item description", "reason": "why review is needed" }
+    { "id": "uuid", "description": "string", "reason": "string" }
+  ],
+  "not_addressed_items": [
+    { "id": "uuid", "description": "string" }
   ],
   "member_user_ids_to_add": ["uuid"],
-  "member_display_names_to_add": ["full_name"],
-  "member_warnings": ["string explaining ambiguous/unmatched names"]
+  "member_display_names_to_add": ["string"],
+  "member_warnings": ["string"]
 }`;
-
-    const userPrompt = `SCOPE ITEMS:\n${itemsList}\n\nWALKTHROUGH NOTES:\n${walkthrough_text}`;
 
     const llmResponse = await fetch('https://api.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -257,7 +151,7 @@ Return ONLY valid JSON with this exact structure:
         model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
+          { role: 'user', content: `WALKTHROUGH NOTES:\n${walkthrough_text}` },
         ],
         temperature: 0.2,
       }),
@@ -282,10 +176,45 @@ Return ONLY valid JSON with this exact structure:
       return new Response(JSON.stringify({ error: 'Failed to parse AI response' }), { status: 502, headers: corsHeaders });
     }
 
-    const validStatuses = ['OK', 'Repair', 'Replace', 'Needs Review'];
     const validItemIds = new Set(scopeItems.map(i => i.id));
     const validUserIds = new Set(allProfiles.map((p: any) => p.id));
+    const validStatuses = ['OK', 'Repair', 'Replace'];
 
+    // Validate matched items
+    const matched = (parsed.matched || [])
+      .filter((m: any) => m.scope_item_id && validItemIds.has(m.scope_item_id) && validStatuses.includes(m.suggested_status))
+      .map((m: any) => {
+        const existing = scopeItems.find(i => i.id === m.scope_item_id);
+        return {
+          scope_item_id: m.scope_item_id,
+          description: existing?.description || '',
+          current_status: existing?.status || 'Not Checked',
+          suggested_status: m.suggested_status,
+          suggested_notes: typeof m.suggested_notes === 'string' ? m.suggested_notes : null,
+          suggested_qty: typeof m.suggested_qty === 'number' ? m.suggested_qty : null,
+          suggested_unit: typeof m.suggested_unit === 'string' ? m.suggested_unit : null,
+        };
+      });
+
+    // Enrich new items with cost library matching
+    const newItems = (parsed.new_items || []).map((item: any) => {
+      const desc = item.description || '';
+      const norm = normalize(desc);
+      const costMatch = costItemsByNorm.get(norm);
+      return {
+        description: desc,
+        notes: typeof item.notes === 'string' ? item.notes : null,
+        qty: typeof item.qty === 'number' ? item.qty : null,
+        unit: typeof item.unit === 'string' ? item.unit : null,
+        phase_key: typeof item.phase_key === 'string' ? item.phase_key : null,
+        normalized_name: norm,
+        matched_cost_item_id: costMatch?.id || null,
+        matched_cost_item_unit: costMatch?.unit_type || null,
+        matched_cost_item_unit_cost: costMatch?.default_total_cost || null,
+      };
+    });
+
+    // Validate member IDs
     const memberIds = (parsed.member_user_ids_to_add || []).filter((id: string) => validUserIds.has(id));
     let memberNames = parsed.member_display_names_to_add || [];
     if (memberNames.length !== memberIds.length) {
@@ -293,19 +222,12 @@ Return ONLY valid JSON with this exact structure:
     }
 
     const result = {
-      mode: 'coverage',
-      proposed_updates: (parsed.proposed_updates || []).filter(
-        (u: any) => u.scope_item_id && validItemIds.has(u.scope_item_id) && validStatuses.includes(u.status)
-      ).map((u: any) => ({
-        scope_item_id: u.scope_item_id,
-        description: u.description || scopeItems.find(i => i.id === u.scope_item_id)?.description || '',
-        status: u.status,
-        notes: typeof u.notes === 'string' ? u.notes : '',
-      })),
-      not_addressed_items: (parsed.not_addressed_items || []).filter(
+      matched,
+      new_items: newItems,
+      needs_review_items: (parsed.needs_review_items || []).filter(
         (i: any) => i.id && validItemIds.has(i.id)
       ),
-      needs_review_items: (parsed.needs_review_items || []).filter(
+      not_addressed_items: (parsed.not_addressed_items || []).filter(
         (i: any) => i.id && validItemIds.has(i.id)
       ),
       member_user_ids_to_add: memberIds,
