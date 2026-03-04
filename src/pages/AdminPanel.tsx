@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import CostLibrary from '@/components/CostLibrary';
+import AdminAliases from '@/components/AdminAliases';
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -84,6 +85,7 @@ const AdminPanel = () => {
           <TabsList className="mb-3">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
+            <TabsTrigger value="aliases">Aliases</TabsTrigger>
             <TabsTrigger value="sections">Sections</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>
@@ -130,6 +132,9 @@ const AdminPanel = () => {
           </TabsContent>
           <TabsContent value="cost-library">
             <CostLibrary />
+          </TabsContent>
+          <TabsContent value="aliases">
+            <AdminAliases />
           </TabsContent>
         </Tabs>
       </div>

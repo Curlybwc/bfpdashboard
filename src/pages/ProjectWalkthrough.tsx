@@ -203,6 +203,28 @@ const ProjectWalkthrough = () => {
         }
       }
 
+      // Auto-add assigned users as project members (conflict-ignore)
+      const assignedIds = [...new Set(approved.map(d => d.assigned_to_user_id).filter(Boolean))] as string[];
+      if (assignedIds.length > 0) {
+        const { data: existingMembers } = await supabase
+          .from('project_members')
+          .select('user_id')
+          .eq('project_id', id);
+        const existingIds = new Set((existingMembers || []).map(m => m.user_id));
+        const newIds = assignedIds.filter(uid => !existingIds.has(uid));
+        if (newIds.length > 0) {
+          await supabase.from('project_members').upsert(
+            newIds.map(uid => ({ project_id: id, user_id: uid, role: 'contractor' as const })),
+            { onConflict: 'project_id,user_id', ignoreDuplicates: true }
+          );
+          const newNames = newIds.map(uid => {
+            const draft = approved.find(d => d.assigned_to_user_id === uid);
+            return draft?.assigned_to_display || 'Unknown';
+          });
+          toast({ title: `Added members: ${newNames.join(', ')}` });
+        }
+      }
+
       toast({ title: `${approved.length} task(s) created` });
       navigate(`/projects/${id}`, { replace: true });
     } finally {

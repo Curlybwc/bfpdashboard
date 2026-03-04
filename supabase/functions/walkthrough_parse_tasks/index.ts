@@ -32,11 +32,9 @@ function sanitizeDraft(raw: any) {
   for (const key of ALLOWED_DRAFT_KEYS) {
     if (key in raw) draft[key] = raw[key];
   }
-  // Validate priority
   if (draft.priority && !VALID_PRIORITIES.includes(draft.priority)) {
     draft.priority = null;
   }
-  // Coerce materials
   if (!Array.isArray(draft.materials)) {
     draft.materials = [];
   } else {
@@ -89,7 +87,6 @@ serve(async (req) => {
       });
     }
 
-    // Check admin or project member
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -125,13 +122,31 @@ serve(async (req) => {
       }
     }
 
-    // Fetch members for LLM context
-    const { data: members } = await adminClient
-      .from("project_members")
-      .select("user_id, role, profiles(full_name)")
-      .eq("project_id", project_id);
+    // Fetch ALL known users (profiles + aliases) for assignment matching
+    const [profilesRes, aliasesRes, membersRes] = await Promise.all([
+      adminClient.from("profiles").select("id, full_name").not("full_name", "is", null).neq("full_name", ""),
+      adminClient.from("profile_aliases").select("user_id, alias"),
+      adminClient.from("project_members").select("user_id, role, profiles(full_name)").eq("project_id", project_id),
+    ]);
 
-    const memberList = (members || []).map((m: any) => ({
+    const allProfiles = profilesRes.data || [];
+    const allAliases = aliasesRes.data || [];
+
+    // Build known users with aliases
+    const aliasMap = new Map<string, string[]>();
+    for (const a of allAliases) {
+      if (!aliasMap.has(a.user_id)) aliasMap.set(a.user_id, []);
+      aliasMap.get(a.user_id)!.push(a.alias);
+    }
+
+    const knownUsers = allProfiles.map((p: any) => ({
+      id: p.id,
+      full_name: p.full_name,
+      aliases: aliasMap.get(p.id) || [],
+    }));
+
+    // Project members for context
+    const memberList = (membersRes.data || []).map((m: any) => ({
       user_id: m.user_id,
       name: m.profiles?.full_name || "Unknown",
       role: m.role,
@@ -142,8 +157,6 @@ serve(async (req) => {
 RULES:
 - CREATE ONLY. Never reference updating existing tasks.
 - Output valid JSON only. No markdown, no explanation.
-- Default assigned_to_user_id = null unless you can confidently match a name.
-- If ambiguous match (multiple members match), leave assigned_to_user_id null and add a warning.
 - Extract materials aggressively from the text.
 - Infer trade only if obvious (e.g. "plumber", "electrician").
 - Extract room_area if mentioned (e.g. "kitchen", "master bath").
@@ -158,7 +171,22 @@ MATERIAL TASK RULE:
 - Only create a material-acquisition task if the user explicitly indicates it is a separate work assignment (e.g. "Send Andrew to Home Depot to restock supplies").
 - If materials are mentioned without clear linkage to a specific task, attach them to the nearest/most relevant task rather than creating a new one.
 
-PROJECT MEMBERS (for assignment matching):
+ASSIGNMENT MATCHING RULES:
+You MUST use the KNOWN USERS list below for assignment. Do NOT invent user IDs.
+- Only assign assigned_to_user_id when you can confidently match EXACTLY one user in KNOWN USERS.
+- A confident match can be:
+  (a) case-insensitive exact match to full_name, OR
+  (b) case-insensitive exact match to an alias, OR
+  (c) case-insensitive unique substring match against full_name if it matches exactly one person (e.g. "Judah" matches only "Judah Bahr").
+- If multiple candidates match, set assigned_to_user_id = null and add a warning listing candidate full_name values.
+- If no candidates match, set assigned_to_user_id = null and add a warning.
+- When assigned, set assigned_to_display to the matched person's full_name.
+- Vendors/company names should be ignored for assignment unless they match a known user.
+
+KNOWN USERS (match assignments against these):
+${JSON.stringify(knownUsers)}
+
+CURRENT PROJECT MEMBERS (for context only):
 ${JSON.stringify(memberList)}
 
 OUTPUT FORMAT (JSON only):
@@ -231,7 +259,6 @@ OUTPUT FORMAT (JSON only):
       });
     }
 
-    // Strip markdown code fences if present
     let jsonStr = rawContent.trim();
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
@@ -264,7 +291,17 @@ OUTPUT FORMAT (JSON only):
       }
     }
 
-    const sanitizedDrafts = parsed.draft_tasks.map(sanitizeDraft);
+    // Validate assigned_to_user_id against known user IDs
+    const validUserIds = new Set(allProfiles.map((p: any) => p.id));
+    const sanitizedDrafts = parsed.draft_tasks.map((raw: any) => {
+      const draft = sanitizeDraft(raw);
+      if (draft.assigned_to_user_id && !validUserIds.has(draft.assigned_to_user_id)) {
+        draft.assigned_to_user_id = null;
+        draft.assigned_to_display = null;
+      }
+      return draft;
+    });
+
     const warnings = Array.isArray(parsed.warnings)
       ? parsed.warnings.filter((w: any) => typeof w === "string")
       : [];
