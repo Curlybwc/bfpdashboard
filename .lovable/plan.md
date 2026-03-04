@@ -1,65 +1,50 @@
 
 
-## Findings: RLS & Permission Analysis for `can_manage_projects`
+## Edit Project Title & Address — Plan
 
-### 1. Current INSERT Policies
+### A) Current State
 
-| Table | Policy | USING / WITH CHECK |
-|-------|--------|--------------------|
-| `projects` | "Auth can insert projects" | `auth.uid() IS NOT NULL` |
-| `scopes` | "Insert scopes" | `auth.uid() IS NOT NULL` |
-| `project_members` | "Insert project members" | `is_admin(auth.uid()) OR get_project_role(...) = 'manager' OR (self-bootstrap: user_id = auth.uid() AND role = 'manager' AND no existing members)` |
-| `scope_members` | "Insert scope members" | Same pattern as project_members (self-bootstrap allowed) |
+- **`projects` table**: has `name` (text, NOT NULL) and `address` (text, nullable). No changes needed.
+- **RLS UPDATE policy**: `"Members can update projects"` allows `is_admin(auth.uid()) OR is_project_member(auth.uid(), id)`. Already sufficient — admins and project members can update. No migration needed.
+- **ProjectDetail header**: `PageHeader` receives `title={project.name}`. Address shown below header in a secondary line with `StatusBadge`.
+- **ProjectList**: Shows `p.name` as title, `p.address` with MapPin icon as secondary text. Both read directly from fetched data (no cache — just `useState` + `fetchProjects()`).
+- **Admin/role detection**: `useAdmin()` for `isAdmin`/`canManageProjects`; `projectRole` derived from `project_members` query in `fetchData()`.
+- **`canCreateTask`**: `isAdmin || projectRole === 'manager' || projectRole === 'contractor'` — reuse this to gate edit access (managers and admins should edit project details).
 
-**Key finding**: Any authenticated user can already INSERT into `projects` and `scopes`. The bootstrap policy on `project_members` allows the creator to self-add as manager only when no members exist yet. This means the current system is **wide open for project/scope creation** -- adding `can_manage_projects` would actually be a **tightening** of permissions.
+### B) Plan
 
-### 2. Task UPDATE Policy (Financial Field Protection)
+**UI — `ProjectDetail.tsx` only**
 
-| Table | Policy | Expression |
-|-------|--------|------------|
-| `tasks` | "Update tasks" | `is_admin(auth.uid()) OR (is_project_member(...) AND role IN ('contractor', 'manager'))` |
+1. Add an **Edit (Pencil) button** in the `PageHeader` actions area, visible when `isAdmin || projectRole === 'manager'`.
+2. Clicking opens a **shadcn Dialog** (same pattern as the "New Task" dialog already in the file) with:
+   - **Title** field: `Input`, required, pre-filled with `project.name`
+   - **Address** field: `Input`, optional, pre-filled with `project.address || ''`
+3. On submit: `supabase.from('projects').update({ name, address: address || null }).eq('id', id)`
+4. On success: close dialog, toast "Project updated", call `fetchData()` to refresh local state (this updates the header title and address line immediately).
+5. On error: keep dialog open, show destructive toast.
 
-**`actual_total_cost` is NOT protected separately.** Any contractor or manager on the project can update it today. There is no column-level or trigger-based restriction. To prevent `can_manage_projects` users from editing financial fields, we would need either:
-- A trigger that rejects changes to `actual_total_cost` unless `is_admin`
-- Or column-level grants (complex in Supabase)
+**No DB/RLS migration needed.** The existing UPDATE policy already covers admins and project members.
 
-### 3. Auto-Add Creator Trigger
+**Display behavior** (already correct, no changes):
+- ProjectDetail: `PageHeader title={project.name}`, address shown as secondary text below.
+- ProjectList: `p.name` as heading, `p.address` with MapPin when present.
+- No caching layer (react-query not used for projects) — navigation back to list triggers `fetchProjects()` via `useEffect`.
 
-**No trigger exists.** The creator-to-manager membership is handled in application code:
-- `ProjectList.tsx` line 38: manual insert after project creation
-- `ScopeList.tsx` line 42: manual insert after scope creation
-- `ScopeDetail.tsx` line 101: manual insert during scope-to-project conversion
-
-This is a risk -- if the second insert fails silently, the creator is locked out. A database trigger would be more robust.
-
-### 4. Policies Referencing `is_admin()`
-
-Used in SELECT/UPDATE/DELETE across all tables. INSERT policies for `projects` and `scopes` do **not** reference `is_admin()` -- they only require authentication.
-
-### 5. Privilege Escalation Risks
-
-- **profiles.is_admin**: Protected by UPDATE policy `(auth.uid() = id) OR is_admin(auth.uid())`. A `can_manage_projects` user could update their own profile row but `is_admin` defaults to false and self-update is allowed. However, they could theoretically set `is_admin = true` on their own row since the UPDATE policy permits self-updates with no column restriction. **This is an existing vulnerability regardless of `can_manage_projects`.**
-- **project_members role**: A project manager can update roles within their project. No escalation to admin.
-
-### 6. Recommended Implementation Plan
-
-1. **Migration**: Add `can_manage_projects boolean default false` to `profiles`
-2. **Tighten INSERT on projects**: Change from `auth.uid() IS NOT NULL` to `is_admin(auth.uid()) OR can_manage_projects(auth.uid())`
-3. **Tighten INSERT on scopes**: Same pattern
-4. **Protect `actual_total_cost`**: Add a validation trigger on `tasks` that rejects changes to `actual_total_cost` unless `is_admin(auth.uid())`
-5. **Protect `is_admin` column**: Add a validation trigger on `profiles` that prevents non-admins from setting `is_admin = true` (fixes existing vulnerability)
-6. **Optional**: Add a trigger on `projects` INSERT to auto-add creator as manager in `project_members`
-7. **Frontend**: Gate the "New Project" / "New Scope" buttons behind `isAdmin || canManageProjects`
-8. **Admin Panel**: Add toggle for `can_manage_projects` alongside the admin toggle
-
-### Files Affected
+### C) Files to Touch
 
 | File | Change |
-|------|--------|
-| Migration SQL | Add column, helper function, tighten RLS, add triggers |
-| `src/hooks/useAuth.tsx` | Expose `canManageProjects` from profile |
-| `src/pages/ProjectList.tsx` | Gate create button |
-| `src/pages/ScopeList.tsx` | Gate create button |
-| `src/pages/TaskDetail.tsx` | Disable `actual_total_cost` field for non-admins |
-| `src/pages/AdminPanel.tsx` | Add `can_manage_projects` toggle |
+|---|---|
+| `src/pages/ProjectDetail.tsx` | Add Pencil button + edit Dialog with name/address fields + save handler |
+
+No migration. No new files. No other pages need changes.
+
+### D) Acceptance Criteria
+
+- Admin or project manager sees Edit button; viewers/contractors do not
+- Edit dialog pre-fills current name and address
+- Title is required; address is optional (can be cleared to empty)
+- Saving updates the project row and immediately refreshes the header title and address line
+- Empty address saves as `null` (not empty string)
+- Error keeps dialog open with destructive toast
+- Non-authorized users cannot update via API (RLS enforced)
 
