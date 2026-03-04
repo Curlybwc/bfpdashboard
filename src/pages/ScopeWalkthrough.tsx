@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 
@@ -18,6 +19,9 @@ interface ParseResult {
   proposed_updates: ProposedUpdate[];
   not_addressed_items: { id: string; description: string }[];
   needs_review_items: { id: string; description: string; reason: string }[];
+  member_user_ids_to_add?: string[];
+  member_display_names_to_add?: string[];
+  member_warnings?: string[];
 }
 
 const ScopeWalkthrough = () => {
@@ -32,7 +36,6 @@ const ScopeWalkthrough = () => {
   const [applying, setApplying] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
 
-  // Auto-grow textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -82,6 +85,30 @@ const ScopeWalkthrough = () => {
       });
 
       if (error) throw error;
+
+      // Auto-add scope members (conflict-ignore)
+      const memberIds = parseResult.member_user_ids_to_add ?? [];
+      if (memberIds.length > 0) {
+        const { data: existingMembers } = await supabase
+          .from('scope_members')
+          .select('user_id')
+          .eq('scope_id', id);
+        const existingIds = new Set((existingMembers || []).map(m => m.user_id));
+        const newIds = memberIds.filter(uid => !existingIds.has(uid));
+        if (newIds.length > 0) {
+          await supabase.from('scope_members').upsert(
+            newIds.map(uid => ({ scope_id: id, user_id: uid, role: 'viewer' as const })),
+            { onConflict: 'scope_id,user_id', ignoreDuplicates: true }
+          );
+          const displayNames = parseResult.member_display_names_to_add ?? [];
+          const newNames = newIds.map((uid, i) => {
+            const idx = memberIds.indexOf(uid);
+            return displayNames[idx] || 'Unknown';
+          });
+          toast({ title: `Added members: ${newNames.join(', ')}` });
+        }
+      }
+
       toast({ title: 'Updates applied successfully' });
       navigate(`/scopes/${id}`);
     } catch (err: any) {
@@ -93,6 +120,8 @@ const ScopeWalkthrough = () => {
 
   // Coverage Screen
   if (parseResult) {
+    const memberWarnings = parseResult.member_warnings ?? [];
+
     return (
       <div className="pb-20">
         <PageHeader
@@ -110,6 +139,37 @@ const ScopeWalkthrough = () => {
           }
         />
         <div className="p-4 space-y-6">
+          {/* Member warnings */}
+          {memberWarnings.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Assignment Warnings</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-1">
+                  {memberWarnings.map((w, i) => (
+                    <li key={i} className="text-sm">{w}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Members to add */}
+          {(parseResult.member_user_ids_to_add?.length ?? 0) > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold flex items-center gap-1 mb-2">
+                <CheckCircle2 className="h-4 w-4" /> Members to Add ({parseResult.member_user_ids_to_add!.length})
+              </h2>
+              <div className="space-y-1">
+                {(parseResult.member_display_names_to_add ?? []).map((name, i) => (
+                  <Card key={i} className="p-2">
+                    <p className="text-sm">{name} <span className="text-xs text-muted-foreground">(viewer)</span></p>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Not Addressed */}
           {parseResult.not_addressed_items.length > 0 && (
             <div>

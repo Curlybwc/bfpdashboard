@@ -20,7 +20,6 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Validate JWT
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -31,13 +30,11 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    // Parse body
     const { scope_id, walkthrough_text } = await req.json();
     if (!scope_id || !walkthrough_text) {
       return new Response(JSON.stringify({ error: 'scope_id and walkthrough_text required' }), { status: 400, headers: corsHeaders });
     }
 
-    // Check membership using service role
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: isAdmin } = await adminClient.rpc('is_admin', { _user_id: userId });
@@ -48,14 +45,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch scope items
-    const { data: scopeItems, error: itemsError } = await adminClient
-      .from('scope_items')
-      .select('id, description, status, notes, qty, unit, phase_key')
-      .eq('scope_id', scope_id);
+    // Fetch scope items + known users in parallel
+    const [itemsRes, profilesRes, aliasesRes] = await Promise.all([
+      adminClient.from('scope_items').select('id, description, status, notes, qty, unit, phase_key').eq('scope_id', scope_id),
+      adminClient.from('profiles').select('id, full_name').not('full_name', 'is', null).neq('full_name', ''),
+      adminClient.from('profile_aliases').select('user_id, alias'),
+    ]);
 
-    if (itemsError) {
-      return new Response(JSON.stringify({ error: itemsError.message }), { status: 500, headers: corsHeaders });
+    const scopeItems = itemsRes.data;
+    if (itemsRes.error) {
+      return new Response(JSON.stringify({ error: itemsRes.error.message }), { status: 500, headers: corsHeaders });
     }
 
     if (!scopeItems || scopeItems.length === 0) {
@@ -63,22 +62,53 @@ Deno.serve(async (req) => {
         proposed_updates: [],
         not_addressed_items: [],
         needs_review_items: [],
+        member_user_ids_to_add: [],
+        member_display_names_to_add: [],
+        member_warnings: [],
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Call LLM
+    // Build known users
+    const allProfiles = profilesRes.data || [];
+    const allAliases = aliasesRes.data || [];
+    const aliasMap = new Map<string, string[]>();
+    for (const a of allAliases) {
+      if (!aliasMap.has(a.user_id)) aliasMap.set(a.user_id, []);
+      aliasMap.get(a.user_id)!.push(a.alias);
+    }
+    const knownUsers = allProfiles.map((p: any) => ({
+      id: p.id,
+      full_name: p.full_name,
+      aliases: aliasMap.get(p.id) || [],
+    }));
+
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
     const itemsList = scopeItems.map(i =>
       `- ID: ${i.id} | Description: "${i.description}" | Status: ${i.status} | Qty: ${i.qty ?? 'N/A'} | Unit: ${i.unit ?? 'N/A'} | Phase: ${i.phase_key ?? 'N/A'}`
     ).join('\n');
 
-    const systemPrompt = `You are a construction scope analyzer. Given a list of scope items and walkthrough notes dictated during a property inspection, determine the condition of each scope item.
+    const systemPrompt = `You are a construction scope analyzer. Given a list of scope items and walkthrough notes dictated during a property inspection, determine the condition of each scope item AND extract explicitly assigned people.
 
+SCOPE ITEM ANALYSIS:
 For each scope item, analyze the walkthrough text and:
 1. If the item is clearly mentioned and its condition is described, set status to one of: "OK", "Repair", "Replace"
 2. If the item is mentioned but the description is ambiguous, set status to "Needs Review" and include it in needs_review_items with a reason
 3. If the item is not mentioned at all, include it in not_addressed_items
+
+PERSON EXTRACTION RULES:
+Extract people who are EXPLICITLY ASSIGNED work in the walkthrough text. Only match against KNOWN USERS below.
+- Only include a person when there is explicit assignment language like "X job", "for X", "have X do", "X needs to", "X and Y do".
+- Do NOT include people who are merely mentioned without assignment context.
+- A confident match can be:
+  (a) case-insensitive exact match to full_name, OR
+  (b) case-insensitive exact match to an alias, OR
+  (c) case-insensitive unique substring match against full_name if it matches exactly one person.
+- If multiple candidates match a name, do NOT include them — add a warning instead.
+- Vendors/company names should be ignored unless they match a known user.
+
+KNOWN USERS:
+${JSON.stringify(knownUsers)}
 
 Return ONLY valid JSON with this exact structure:
 {
@@ -90,7 +120,10 @@ Return ONLY valid JSON with this exact structure:
   ],
   "needs_review_items": [
     { "id": "uuid", "description": "item description", "reason": "why review is needed" }
-  ]
+  ],
+  "member_user_ids_to_add": ["uuid"],
+  "member_display_names_to_add": ["full_name"],
+  "member_warnings": ["string explaining ambiguous/unmatched names"]
 }`;
 
     const userPrompt = `SCOPE ITEMS:\n${itemsList}\n\nWALKTHROUGH NOTES:\n${walkthrough_text}`;
@@ -120,7 +153,6 @@ Return ONLY valid JSON with this exact structure:
     const llmData = await llmResponse.json();
     const content = llmData.choices?.[0]?.message?.content ?? '';
 
-    // Extract JSON from response
     let parsed: ParseResult;
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -131,9 +163,9 @@ Return ONLY valid JSON with this exact structure:
       return new Response(JSON.stringify({ error: 'Failed to parse AI response' }), { status: 502, headers: corsHeaders });
     }
 
-    // Validate structure
     const validStatuses = ['OK', 'Repair', 'Replace', 'Needs Review'];
     const validItemIds = new Set(scopeItems.map(i => i.id));
+    const validUserIds = new Set(allProfiles.map((p: any) => p.id));
 
     const result = {
       proposed_updates: (parsed.proposed_updates || []).filter(
@@ -150,7 +182,23 @@ Return ONLY valid JSON with this exact structure:
       needs_review_items: (parsed.needs_review_items || []).filter(
         (i: any) => i.id && validItemIds.has(i.id)
       ),
+      // Validate member IDs against known profiles
+      member_user_ids_to_add: (parsed.member_user_ids_to_add || []).filter(
+        (id: string) => validUserIds.has(id)
+      ),
+      member_display_names_to_add: parsed.member_display_names_to_add || [],
+      member_warnings: Array.isArray(parsed.member_warnings)
+        ? parsed.member_warnings.filter((w: any) => typeof w === 'string')
+        : [],
     };
+
+    // Ensure display names array matches ids array length
+    if (result.member_display_names_to_add.length !== result.member_user_ids_to_add.length) {
+      // Rebuild display names from profiles
+      result.member_display_names_to_add = result.member_user_ids_to_add.map(
+        (id: string) => allProfiles.find((p: any) => p.id === id)?.full_name || 'Unknown'
+      );
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -165,4 +213,7 @@ interface ParseResult {
   proposed_updates: any[];
   not_addressed_items: any[];
   needs_review_items: any[];
+  member_user_ids_to_add?: string[];
+  member_display_names_to_add?: string[];
+  member_warnings?: string[];
 }

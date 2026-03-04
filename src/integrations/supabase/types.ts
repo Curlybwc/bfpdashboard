@@ -151,6 +151,35 @@ export type Database = {
           },
         ]
       }
+      profile_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_aliases_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           can_manage_projects: boolean
