@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Plus, ChevronDown, X, Mic, Zap, Package, Trash2, Loader2 } from 'lucide-react';
+import { Plus, ChevronDown, X, Mic, Zap, Package, Trash2, Loader2, Pencil } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
@@ -51,6 +51,10 @@ const ProjectDetail = () => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   const fetchData = async () => {
     if (!id) return;
@@ -77,6 +81,31 @@ const ProjectDetail = () => {
   }, [projectMembers]);
 
   const canCreateTask = isAdmin || projectRole === 'manager' || projectRole === 'contractor';
+  const canEditProject = isAdmin || projectRole === 'manager';
+
+  const openEditDialog = () => {
+    setEditName(project?.name || '');
+    setEditAddress(project?.address || '');
+    setEditOpen(true);
+  };
+
+  const handleEditProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !editName.trim()) return;
+    setEditSaving(true);
+    const { error } = await supabase.from('projects').update({
+      name: editName.trim(),
+      address: editAddress.trim() || null,
+    }).eq('id', id);
+    setEditSaving(false);
+    if (error) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setEditOpen(false);
+    toast({ title: 'Project updated' });
+    fetchData();
+  };
 
   useEffect(() => { fetchData(); }, [id]);
 
@@ -168,9 +197,14 @@ const ProjectDetail = () => {
         actions={
           canCreateTask ? (
             <div className="flex gap-2">
+              {canEditProject && (
+                <Button size="sm" variant="outline" onClick={openEditDialog}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
-                <Package className="h-4 w-4 mr-1" />Materials
-              </Button>
+                 <Package className="h-4 w-4 mr-1" />Materials
+               </Button>
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
                 <Zap className="h-4 w-4 mr-1" />Field Mode
               </Button>
@@ -313,6 +347,24 @@ const ProjectDetail = () => {
           ) : undefined
         }
       />
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
+          <form onSubmit={handleEditProject} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Address (optional)</Label>
+              <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="e.g. 123 Main St" />
+            </div>
+            <Button type="submit" className="w-full" disabled={editSaving || !editName.trim()}>
+              {editSaving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : 'Save'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={deleteDialogOpen} onOpenChange={(nextOpen) => { if (deleting) return; setDeleteDialogOpen(nextOpen); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
