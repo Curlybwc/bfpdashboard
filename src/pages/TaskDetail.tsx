@@ -42,6 +42,14 @@ const TaskDetail = () => {
   const [fieldCapture, setFieldCapture] = useState<any>(null);
   const [markingReviewed, setMarkingReviewed] = useState(false);
 
+  // Recipe state
+  const [suggestedRecipe, setSuggestedRecipe] = useState<{ id: string; name: string } | null>(null);
+  const [expandingRecipe, setExpandingRecipe] = useState(false);
+  const [saveRecipeOpen, setSaveRecipeOpen] = useState(false);
+  const [saveRecipeName, setSaveRecipeName] = useState('');
+  const [saveRecipeTrade, setSaveRecipeTrade] = useState('');
+  const [savingRecipe, setSavingRecipe] = useState(false);
+
   // Crew state
   const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
   const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
