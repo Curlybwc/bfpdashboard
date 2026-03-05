@@ -799,6 +799,7 @@ export type Database = {
           notes: string | null
           provided_by: string | null
           qty: number | null
+          qty_formula: string | null
           recipe_step_id: string
           sku: string | null
           store_section: string | null
@@ -812,6 +813,7 @@ export type Database = {
           notes?: string | null
           provided_by?: string | null
           qty?: number | null
+          qty_formula?: string | null
           recipe_step_id: string
           sku?: string | null
           store_section?: string | null
@@ -825,6 +827,7 @@ export type Database = {
           notes?: string | null
           provided_by?: string | null
           qty?: number | null
+          qty_formula?: string | null
           recipe_step_id?: string
           sku?: string | null
           store_section?: string | null
