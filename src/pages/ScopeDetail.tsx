@@ -28,6 +28,7 @@ const ScopeDetail = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isAdmin } = useAdmin();
   const [scope, setScope] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
@@ -36,6 +37,9 @@ const ScopeDetail = () => {
   const [editForm, setEditForm] = useState<any>({});
   const [finalPassOpen, setFinalPassOpen] = useState(false);
   const [dedupeOpen, setDedupeOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
 
   // Checklist coverage state
   const [checklistItems, setChecklistItems] = useState<any[]>([]);
