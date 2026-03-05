@@ -83,8 +83,10 @@ const AdminRecipes = () => {
   const [newMatName, setNewMatName] = useState('');
   const [newMatQty, setNewMatQty] = useState('');
   const [newMatUnit, setNewMatUnit] = useState('');
-  const [newMatStore, setNewMatStore] = useState('');
+  const [newMatStoreSection, setNewMatStoreSection] = useState('');
   const [newMatSku, setNewMatSku] = useState('');
+  const [newMatVendorUrl, setNewMatVendorUrl] = useState('');
+  const [newMatProvidedBy, setNewMatProvidedBy] = useState('either');
 
   const canAccess = isAdmin || canManageProjects;
 
