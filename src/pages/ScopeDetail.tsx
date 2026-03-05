@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
 import { PRICING_STATUSES, SCOPE_ITEM_STATUSES, type PricingStatus, type ScopeItemStatus } from '@/lib/supabase-types';
 
@@ -407,8 +408,11 @@ const ScopeDetail = () => {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
                       <StatusBadge status={item.pricing_status} />
+                      {item.pricing_status === 'Needs Pricing' && item.notes && /\$/.test(item.notes) && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">$ in text</Badge>
+                      )}
                       {isDraft && (
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => startEdit(item)}>
                           <Pencil className="h-3.5 w-3.5" />

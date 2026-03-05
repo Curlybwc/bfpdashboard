@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react';
@@ -31,6 +32,11 @@ interface NewItem {
   notes: string | null;
   qty: number | null;
   unit: string | null;
+  unit_cost: number | null;
+  total_cost: number | null;
+  price_evidence: string | null;
+  price_confidence: string | null;
+  price_source: 'walkthrough' | 'library' | 'missing';
   phase_key: string | null;
   normalized_name: string;
   matched_cost_item_id: string | null;
@@ -57,11 +63,29 @@ interface EditableNewItem extends NewItem {
   editedQty: string;
   editedUnit: string;
   editedUnitCost: string;
+  useLibraryPrice: boolean;
 }
 
 interface EditableMatchedItem extends MatchedItem {
   applyUpdate: boolean;
 }
+
+const PriceSourceBadge = ({ source, hasNotesPrice }: { source: 'walkthrough' | 'library' | 'missing'; hasNotesPrice?: boolean }) => {
+  if (source === 'walkthrough') {
+    return <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-green-600 hover:bg-green-600">Walkthrough</Badge>;
+  }
+  if (source === 'library') {
+    return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Library</Badge>;
+  }
+  return (
+    <div className="flex items-center gap-1">
+      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Missing</Badge>
+      {hasNotesPrice && (
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">$ in text</Badge>
+      )}
+    </div>
+  );
+};
 
 const ScopeWalkthrough = () => {
   const { id } = useParams<{ id: string }>();
@@ -122,14 +146,15 @@ const ScopeWalkthrough = () => {
       const result = data as ParseResult;
       setParseResult(result);
 
-      // Initialize editable new items
+      // Initialize editable new items with structured pricing
       setEditableNewItems((result.new_items || []).map(item => {
-        const unitCost = item.matched_cost_item_unit_cost ?? null;
+        const unitCost = item.unit_cost ?? item.matched_cost_item_unit_cost ?? null;
         return {
           ...item,
           selected: true,
           saveToLibrary: true,
           updateLibraryPrice: false,
+          useLibraryPrice: false,
           editedDescription: item.description,
           editedNotes: item.notes || '',
           editedQty: item.qty != null ? String(item.qty) : '1',
@@ -194,7 +219,6 @@ const ScopeWalkthrough = () => {
       }
 
       // 2) Create new scope items
-      const selectedNew = editableNewItems.filter(item => item.selected);
       const costItemIdMap = new Map<number, string | null>();
 
       for (let i = 0; i < editableNewItems.length; i++) {
@@ -211,7 +235,6 @@ const ScopeWalkthrough = () => {
               await supabase.from('cost_items').update({ default_total_cost: unitCost }).eq('id', costItemId);
             }
           } else if (!costItemId) {
-            // Try to find by normalized_name first
             const { data: existing } = await supabase
               .from('cost_items')
               .select('id')
@@ -246,6 +269,7 @@ const ScopeWalkthrough = () => {
           if (!item.selected) return null;
           const qty = item.editedQty ? parseFloat(item.editedQty) : null;
           const unitCost = item.editedUnitCost ? parseFloat(item.editedUnitCost) : null;
+          const pricingStatus = unitCost != null ? 'Priced' : 'Needs Pricing';
           return {
             scope_id: id,
             description: item.editedDescription,
@@ -256,6 +280,7 @@ const ScopeWalkthrough = () => {
             cost_item_id: costItemIdMap.get(i) || null,
             unit_cost_override: unitCost,
             computed_total: qty != null && unitCost != null ? qty * unitCost : null,
+            pricing_status: pricingStatus,
           };
         })
         .filter(Boolean);
@@ -279,7 +304,19 @@ const ScopeWalkthrough = () => {
   };
 
   const updateNewItem = (index: number, updates: Partial<EditableNewItem>) => {
-    setEditableNewItems(prev => prev.map((item, i) => i === index ? { ...item, ...updates } : item));
+    setEditableNewItems(prev => prev.map((item, i) => {
+      if (i !== index) return item;
+      const updated = { ...item, ...updates };
+      // If toggling useLibraryPrice, swap the unit cost
+      if ('useLibraryPrice' in updates && item.matched_cost_item_unit_cost != null) {
+        if (updates.useLibraryPrice) {
+          updated.editedUnitCost = String(item.matched_cost_item_unit_cost);
+        } else if (item.unit_cost != null) {
+          updated.editedUnitCost = String(item.unit_cost);
+        }
+      }
+      return updated;
+    }));
   };
 
   const handleSaveAllToggle = (checked: boolean) => {
@@ -379,6 +416,9 @@ const ScopeWalkthrough = () => {
               <div className="space-y-2">
                 {editableNewItems.map((item, i) => {
                   const computedTotal = (item.editedQty ? parseFloat(item.editedQty) : 0) * (item.editedUnitCost ? parseFloat(item.editedUnitCost) : 0);
+                  const hasNotesWithPrice = !!(item.editedNotes && /\$/.test(item.editedNotes));
+                  const currentPriceSource = item.editedUnitCost ? (item.useLibraryPrice ? 'library' : item.price_source) : 'missing';
+
                   return (
                     <Card key={i} className={`p-3 space-y-2 ${item.selected ? 'ring-2 ring-primary' : 'opacity-60'}`}>
                       <div className="flex items-start gap-2">
@@ -388,12 +428,15 @@ const ScopeWalkthrough = () => {
                           className="mt-1"
                         />
                         <div className="flex-1 space-y-2">
-                          <Input
-                            value={item.editedDescription}
-                            onChange={e => updateNewItem(i, { editedDescription: e.target.value })}
-                            placeholder="Description"
-                            className="text-sm font-medium"
-                          />
+                          <div className="flex items-center justify-between gap-2">
+                            <Input
+                              value={item.editedDescription}
+                              onChange={e => updateNewItem(i, { editedDescription: e.target.value })}
+                              placeholder="Description"
+                              className="text-sm font-medium flex-1"
+                            />
+                            <PriceSourceBadge source={currentPriceSource as any} hasNotesPrice={hasNotesWithPrice && currentPriceSource === 'missing'} />
+                          </div>
                           <div className="grid grid-cols-3 gap-2">
                             <div className="space-y-1">
                               <Label className="text-xs text-muted-foreground">Qty</Label>
@@ -428,6 +471,9 @@ const ScopeWalkthrough = () => {
                           {computedTotal > 0 && (
                             <p className="text-xs text-muted-foreground">Total: ${computedTotal.toFixed(2)}</p>
                           )}
+                          {item.price_evidence && (
+                            <p className="text-[10px] text-muted-foreground italic">"{item.price_evidence}"</p>
+                          )}
                           {item.editedNotes && (
                             <Input
                               value={item.editedNotes}
@@ -436,7 +482,7 @@ const ScopeWalkthrough = () => {
                               className="h-8 text-xs"
                             />
                           )}
-                          <div className="flex items-center gap-4 text-xs">
+                          <div className="flex items-center gap-4 text-xs flex-wrap">
                             <label className="flex items-center gap-1.5">
                               <Checkbox
                                 checked={item.saveToLibrary}
@@ -455,6 +501,16 @@ const ScopeWalkthrough = () => {
                                   />
                                   <span className="text-muted-foreground">Update library price</span>
                                 </label>
+                                {item.price_source === 'walkthrough' && item.matched_cost_item_unit_cost != null && (
+                                  <label className="flex items-center gap-1.5">
+                                    <Checkbox
+                                      checked={item.useLibraryPrice}
+                                      onCheckedChange={(c) => updateNewItem(i, { useLibraryPrice: !!c })}
+                                      className="h-3.5 w-3.5"
+                                    />
+                                    <span className="text-muted-foreground">Use library (${item.matched_cost_item_unit_cost})</span>
+                                  </label>
+                                )}
                                 <span className="text-primary text-xs">✓ matched</span>
                               </>
                             )}

@@ -9,6 +9,122 @@ function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
+// Deterministic pricing extractor — runs after LLM to fill gaps
+function extractPricing(item: any, walkthroughText: string) {
+  const text = [item.description, item.notes, item.price_evidence, walkthroughText]
+    .filter(Boolean).join(' ');
+
+  let qty = typeof item.qty === 'number' ? item.qty : null;
+  let unit = typeof item.unit === 'string' ? item.unit : null;
+  let unitCost = typeof item.unit_cost === 'number' ? item.unit_cost : null;
+  let totalCost = typeof item.total_cost === 'number' ? item.total_cost : null;
+  const priceEvidence = typeof item.price_evidence === 'string' ? item.price_evidence : null;
+  const priceConfidence = typeof item.price_confidence === 'string' ? item.price_confidence : null;
+
+  // Extract quantity patterns: "15 windows", "3 dumpsters", "800 square feet"
+  const unitMap: Record<string, string> = {
+    'square foot': 'sqft', 'square feet': 'sqft', 'sq ft': 'sqft', 'sqft': 'sqft',
+    'sf': 'sqft', 'squares': 'square', 'square': 'square',
+    'linear foot': 'lf', 'linear feet': 'lf', 'lf': 'lf',
+    'window': 'window', 'windows': 'window',
+    'door': 'door', 'doors': 'door',
+    'dumpster': 'dumpster', 'dumpsters': 'dumpster',
+    'each': 'each', 'piece': 'piece', 'pieces': 'piece',
+    'gallon': 'gallon', 'gallons': 'gallon',
+    'bag': 'bag', 'bags': 'bag',
+    'sheet': 'sheet', 'sheets': 'sheet',
+    'roll': 'roll', 'rolls': 'roll',
+    'box': 'box', 'boxes': 'box',
+  };
+  const unitPattern = Object.keys(unitMap).sort((a, b) => b.length - a.length).join('|');
+
+  // Parse "X [unit]" quantity patterns (only fill if LLM left blank)
+  if (qty == null) {
+    const qtyRegex = new RegExp(`(\\d+(?:,\\d{3})*)\\s*(?:${unitPattern})`, 'gi');
+    const qtyMatch = qtyRegex.exec(text);
+    if (qtyMatch) {
+      qty = parseFloat(qtyMatch[1].replace(/,/g, ''));
+      if (unit == null) {
+        // Find which unit matched
+        const afterNum = text.slice(qtyMatch.index + qtyMatch[1].length).trim().toLowerCase();
+        for (const [pattern, mapped] of Object.entries(unitMap)) {
+          if (afterNum.startsWith(pattern)) {
+            unit = mapped;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Parse "$Y per [unit]" or "$Y a [unit]" or "at $Y a [unit]" or "at$Y"
+  if (unitCost == null) {
+    const perUnitRegex = /(?:at\s*)?\$\s*([\d,]+(?:\.\d+)?)\s*(?:per|a|\/)\s*(\w+)/gi;
+    const perMatch = perUnitRegex.exec(text);
+    if (perMatch) {
+      unitCost = parseFloat(perMatch[1].replace(/,/g, ''));
+      if (unit == null) {
+        const matchedUnit = perMatch[2].toLowerCase();
+        unit = unitMap[matchedUnit] || matchedUnit;
+      }
+    }
+  }
+
+  // Parse total cost patterns: "cost $Z", "is $Z", "total $Z", standalone "$Z" after description keywords
+  if (totalCost == null) {
+    // "going to cost $8000", "cost $8000", "HVAC $8000", "about $Z"
+    const totalRegex = /(?:cost|about|total|is|for)\s*\$\s*([\d,]+(?:\.\d+)?)/gi;
+    const totalMatch = totalRegex.exec(text);
+    if (totalMatch) {
+      totalCost = parseFloat(totalMatch[1].replace(/,/g, ''));
+    }
+  }
+
+  // If still no total, look for standalone $ amounts in the description context
+  if (totalCost == null && unitCost == null) {
+    const desc = (item.description || '').toLowerCase();
+    // Search for "$X" near the item description in walkthrough
+    const descWords = desc.split(/\s+/).filter((w: string) => w.length > 3);
+    if (descWords.length > 0) {
+      const escapedWords = descWords.map((w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      for (const word of escapedWords) {
+        const contextRegex = new RegExp(`${word}[^.]*?\\$\\s*([\\d,]+(?:\\.\\d+)?)`, 'gi');
+        const ctxMatch = contextRegex.exec(walkthroughText);
+        if (ctxMatch) {
+          totalCost = parseFloat(ctxMatch[1].replace(/,/g, ''));
+          break;
+        }
+      }
+    }
+  }
+
+  // If only total provided and no unit cost, set qty=1, unit="job", unit_cost=total
+  if (totalCost != null && unitCost == null && qty == null) {
+    qty = 1;
+    unit = unit || 'job';
+    unitCost = totalCost;
+  }
+
+  // If we have qty and total but no unit cost, derive it
+  if (totalCost != null && unitCost == null && qty != null && qty > 0) {
+    unitCost = totalCost / qty;
+  }
+
+  // If we have qty and unit cost but no total, derive it
+  if (totalCost == null && unitCost != null && qty != null) {
+    totalCost = qty * unitCost;
+  }
+
+  return {
+    qty,
+    unit,
+    unit_cost: unitCost,
+    total_cost: totalCost,
+    price_evidence: priceEvidence,
+    price_confidence: priceConfidence,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -106,7 +222,24 @@ MATCHING RULES:
 
 GENERATION RULES:
 - For any work mentioned in the walkthrough that does NOT correspond to an existing scope item, create a new item
-- Each new item needs: description, notes (if any), qty (number or null), unit (sqft/lf/each/piece or null), phase_key (demo/rough/finish or null)
+- Each new item needs ALL of these fields:
+  - description: clear task description
+  - notes: supplementary info only (NOT pricing — pricing goes in structured fields)
+  - qty: number extracted from text (e.g. "15 windows" → 15, "3 dumpsters" → 3, "800 square feet" → 800). If no quantity mentioned, use null.
+  - unit: the unit type (e.g. "window", "dumpster", "sqft", "lf", "square", "job", "each"). If no unit, use null.
+  - unit_cost: dollar amount per unit extracted from text (e.g. "$500 per window" → 500, "$450 a square" → 450, "$4 a square foot" → 4). If no per-unit price, use null.
+  - total_cost: total dollar amount for this item (e.g. "roof is going to cost $8000" → 8000, "HVAC $8000" → 8000). If no total mentioned, use null.
+  - price_evidence: the exact original phrase from the walkthrough that contains pricing info (e.g. "15 windows at $500 a window that's going to be about $8000"). If no pricing mentioned, use null.
+  - price_confidence: "high" if explicit numbers stated, "medium" if estimated/approximate language used, "low" if inferred. null if no pricing.
+  - phase_key: "demo", "rough", "finish", or null
+
+CRITICAL PRICING RULES:
+- ALWAYS extract quantities from text: "15 windows" → qty=15, "3 dumpsters" → qty=3
+- ALWAYS extract unit costs: "$500 per window" → unit_cost=500, "$450 a square" → unit_cost=450
+- ALWAYS extract totals: "going to cost $8000" → total_cost=8000, "HVAC $8000" → total_cost=8000
+- If ONLY a total is mentioned with no per-unit price: set qty=1, unit="job", unit_cost=total_cost
+- If BOTH total and per-unit exist: populate both; total_cost is the override
+- NEVER put pricing information in the notes field. Notes are for non-pricing observations only.
 - Do not duplicate existing items. If the walkthrough text discusses an existing item, match it, don't generate a duplicate.
 
 PERSON EXTRACTION RULES:
@@ -128,7 +261,7 @@ Return ONLY valid JSON:
     { "scope_item_id": "uuid", "suggested_status": "OK|Repair|Replace", "suggested_notes": "string or null", "suggested_qty": null, "suggested_unit": null }
   ],
   "new_items": [
-    { "description": "string", "notes": "string or null", "qty": null, "unit": null, "phase_key": null }
+    { "description": "string", "notes": "string or null", "qty": null, "unit": null, "unit_cost": null, "total_cost": null, "price_evidence": "string or null", "price_confidence": "string or null", "phase_key": null }
   ],
   "needs_review_items": [
     { "id": "uuid", "description": "string", "reason": "string" }
@@ -159,7 +292,13 @@ Return ONLY valid JSON:
 
     if (!llmResponse.ok) {
       const errText = await llmResponse.text();
-      console.error('LLM error:', errText);
+      console.error('LLM error:', llmResponse.status, errText);
+      if (llmResponse.status === 429) {
+        return new Response(JSON.stringify({ error: 'Rate limit exceeded, please try again later.' }), { status: 429, headers: corsHeaders });
+      }
+      if (llmResponse.status === 402) {
+        return new Response(JSON.stringify({ error: 'Payment required, please add credits.' }), { status: 402, headers: corsHeaders });
+      }
       return new Response(JSON.stringify({ error: 'AI processing failed' }), { status: 502, headers: corsHeaders });
     }
 
@@ -170,7 +309,11 @@ Return ONLY valid JSON:
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error('No JSON found');
-      parsed = JSON.parse(jsonMatch[0]);
+      // Clean control characters and trailing commas
+      const cleaned = jsonMatch[0]
+        .replace(/[\x00-\x1f\x7f]/g, ' ')
+        .replace(/,\s*([}\]])/g, '$1');
+      parsed = JSON.parse(cleaned);
     } catch {
       console.error('Failed to parse LLM output:', content);
       return new Response(JSON.stringify({ error: 'Failed to parse AI response' }), { status: 502, headers: corsHeaders });
@@ -196,21 +339,50 @@ Return ONLY valid JSON:
         };
       });
 
-    // Enrich new items with cost library matching
+    // Process new items: LLM output + deterministic post-processing + cost library enrichment
     const newItems = (parsed.new_items || []).map((item: any) => {
+      // Run deterministic pricing extractor
+      const extracted = extractPricing(item, walkthrough_text);
+
       const desc = item.description || '';
       const norm = normalize(desc);
       const costMatch = costItemsByNorm.get(norm);
+
+      // Determine final values: extractor fills gaps, doesn't overwrite LLM
+      const finalQty = extracted.qty;
+      const finalUnit = extracted.unit;
+      let finalUnitCost = extracted.unit_cost;
+      const finalTotalCost = extracted.total_cost;
+
+      // Cost library fills ONLY if walkthrough didn't provide pricing
+      let matchedCostItemId = costMatch?.id || null;
+      let matchedCostItemUnit = costMatch?.unit_type || null;
+      let matchedCostItemUnitCost = costMatch?.default_total_cost || null;
+      let priceSource: 'walkthrough' | 'library' | 'missing' = 'missing';
+
+      if (finalUnitCost != null || finalTotalCost != null) {
+        priceSource = 'walkthrough';
+      } else if (matchedCostItemUnitCost != null) {
+        // Only fill from library if walkthrough didn't provide
+        finalUnitCost = matchedCostItemUnitCost;
+        priceSource = 'library';
+      }
+
       return {
         description: desc,
         notes: typeof item.notes === 'string' ? item.notes : null,
-        qty: typeof item.qty === 'number' ? item.qty : null,
-        unit: typeof item.unit === 'string' ? item.unit : null,
+        qty: finalQty,
+        unit: finalUnit || matchedCostItemUnit,
+        unit_cost: finalUnitCost,
+        total_cost: finalTotalCost,
+        price_evidence: extracted.price_evidence,
+        price_confidence: extracted.price_confidence,
+        price_source: priceSource,
         phase_key: typeof item.phase_key === 'string' ? item.phase_key : null,
         normalized_name: norm,
-        matched_cost_item_id: costMatch?.id || null,
-        matched_cost_item_unit: costMatch?.unit_type || null,
-        matched_cost_item_unit_cost: costMatch?.default_total_cost || null,
+        matched_cost_item_id: matchedCostItemId,
+        matched_cost_item_unit: matchedCostItemUnit,
+        matched_cost_item_unit_cost: matchedCostItemUnitCost,
       };
     });
 
