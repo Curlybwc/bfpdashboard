@@ -1,97 +1,134 @@
 
 
-## Plan: Crew Tasks (Multi-Person, Multi-Day)
+# Architecture Snapshot: Tasks System
 
-### 1. Database Migration
+## 1. Database Structure (`tasks` table)
 
-Single migration adding columns, tables, indexes, RLS, and a helper function.
+Full schema from the provided context:
 
-**New columns on `tasks`:**
-- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
-- `lead_user_id uuid NULL`
+| Column | Type | Nullable | Default |
+|---|---|---|---|
+| id | uuid | No | gen_random_uuid() |
+| project_id | uuid | No | — |
+| task | text | No | — |
+| stage | task_stage (enum) | No | 'Ready' |
+| priority | task_priority (enum) | No | '2 – This Week' |
+| materials_on_site | materials_status (enum) | No | 'No' |
+| parent_task_id | uuid | Yes | — |
+| assigned_to_user_id | uuid | Yes | — |
+| claimed_by_user_id | uuid | Yes | — |
+| claimed_at | timestamptz | Yes | — |
+| started_by_user_id | uuid | Yes | — |
+| started_at | timestamptz | Yes | — |
+| completed_at | timestamptz | Yes | — |
+| created_by | uuid | No | — |
+| created_at | timestamptz | No | now() |
+| updated_at | timestamptz | No | now() |
+| due_date | date | Yes | — |
+| trade | text | Yes | — |
+| room_area | text | Yes | — |
+| notes | text | Yes | — |
+| actual_total_cost | numeric | Yes | — |
+| source_scope_item_id | uuid | Yes | — |
+| field_capture_id | uuid | Yes | — |
+| needs_manager_review | boolean | No | false |
+| assignment_mode | text | No | 'solo' |
+| lead_user_id | uuid | Yes | — |
 
-**New table `task_candidates` (eligibility pool):**
-```sql
-CREATE TABLE public.task_candidates (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
+**Confirmed fields exist**: `parent_task_id`, `assigned_to_user_id`, `stage`, `priority`, `actual_total_cost`, `claimed_by_user_id`, `started_by_user_id`, `completed_at`.
+
+**No ordering field exists** — no `position`, `order_index`, or `sort_order`. Tasks are ordered by `created_at DESC` in queries.
+
+## 2. Task Hierarchy
+
+- **Mechanism**: Self-referencing `parent_task_id` column.
+- **Depth**: Single level only. The UI builds a flat map of `childrenMap[parent_id] = [children]` and renders children directly under parents. No recursive/deep nesting.
+- **Tree built client-side** in `ProjectDetail.tsx` (lines 148-155):
+
+```typescript
+const rootTasks = tasks.filter(t => !t.parent_task_id);
+const childrenMap: Record<string, any[]> = {};
+tasks.forEach(t => {
+  if (t.parent_task_id) {
+    childrenMap[t.parent_task_id] = childrenMap[t.parent_task_id] || [];
+    childrenMap[t.parent_task_id].push(t);
+  }
+});
 ```
 
-**New table `task_workers` (active crew):**
-```sql
-CREATE TABLE public.task_workers (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  active boolean NOT NULL DEFAULT true,
-  joined_at timestamptz NOT NULL DEFAULT now(),
-  left_at timestamptz NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
-CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
-```
+- **Stage sync**: Bi-directional. Completing last child auto-completes parent. Un-doing a child reverts parent from Done to In Progress. Both handled in `TaskDetail.tsx` and `TaskCard.tsx`.
 
-**RLS on `task_candidates`:**
-- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
-- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
+## 3. Task Creation Flow
 
-**RLS on `task_workers`:**
-- SELECT: same as task_candidates SELECT
-- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
-- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
-- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
+**Primary creation point**: `ProjectDetail.tsx` lines 112-145.
 
-### 2. Today Tab (`src/pages/Today.tsx`)
+- Inserts into `tasks` with fields: `project_id`, `task`, `stage`, `priority`, `materials_on_site`, `room_area`, `trade`, `notes`, `created_by`, `assigned_to_user_id`.
+- Then optionally bulk-inserts `task_materials`.
+- **No `parent_task_id` in the creation dialog** — subtasks are not created from this UI. There is no UI for creating subtasks currently visible.
+- **Other creation paths**:
+  - `field_mode_submit` edge function — creates tasks from AI-parsed field notes.
+  - `scope_walkthrough_apply` edge function — creates tasks from scope conversion.
+  - `walkthrough_parse_tasks` edge function — creates tasks from project walkthrough.
 
-Add two additional queries in `fetchTasks` after existing solo queries:
+## 4. Project → Task Relationship
 
-**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
+- `tasks.project_id` is required (NOT NULL, no default).
+- Every task must belong to a project. No orphan tasks possible.
+- Queried via `supabase.from('tasks').select('*').eq('project_id', id)`.
 
-**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
+## 5. Task List UI
 
-Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
+**File**: `src/pages/ProjectDetail.tsx` (lines 392-431).
 
-### 3. TaskCard (`src/components/TaskCard.tsx`)
+- Root tasks rendered as `TaskCard` components.
+- Expand/collapse via `expandedIds` Set state (lines 51, 157-164).
+- Children rendered inline under expanded parents as `TaskCard` with `isChild` prop.
+- `TaskCard` shows: status badge, priority flag, due date, material count, action buttons (Dibs/Start/Complete or Join/Leave for crew).
 
-Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+## 6. Cost Handling
 
-When `isCrewTask`:
-- Show a small crew icon + "N active" badge next to status
-- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
-- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
-- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
-- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+- **`actual_total_cost`** on `tasks` — admin-only editable (protected by `protect_actual_cost` trigger).
+- **No `estimated_cost` field** on tasks.
+- **Cost rollup** in `ProjectDetail.tsx` (lines 167-174): Parent cost = sum of children's `actual_total_cost`. If no children, uses own value. Project total = sum of all root task costs.
+- Scope items have separate pricing (`unit_cost_override`, `computed_total`, `pricing_status`) but those are on `scope_items`, not tasks.
 
-### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+## 7. Existing Templates/Recipes
 
-**Crew toggle** (visible to admin/manager only, below Assigned To):
-- Switch labeled "Crew Task"
-- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
-- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+**No task recipe or task template system exists.** The only "template" concept is `checklist_templates` / `checklist_items` for scope review checklists — completely unrelated to task generation.
 
-**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
-- "Active Crew" list showing names from `task_workers` joined to `profiles`
-- Join/Leave button for current user
-- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+No tables, files, or logic for: recipes, task_templates, reusable_tasks, blueprints.
 
-**Solo mode**: keep existing Assigned To UI unchanged.
+## 8. Bulk Task Operations
 
-### 5. Files to Modify
+**No bulk task operations exist.** There is no multi-select, batch edit, or duplicate functionality for tasks.
 
-1. **Migration SQL** — new columns, tables, indexes, RLS
-2. `src/pages/Today.tsx` — crew task queries merged into sections
-3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
-4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
-5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
+Bulk operations exist only for materials (`Shopping.tsx`, `ProjectMaterials.tsx`) — mark purchased/delivered in bulk. These don't touch tasks.
 
-### 6. Key Edge Cases
+## 9. Edge Functions That Modify Tasks
 
-- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
-- Crew Available shows even when task is 'In Progress' (multiple people can join)
-- Upsert PK on `task_workers` prevents duplicate joins
-- Done tasks filtered out everywhere by existing stage checks
-- Crew→Solo cleanup deletes both tables to prevent orphan rows
+| Function | Purpose |
+|---|---|
+| `field_mode_submit` | Creates tasks + materials from AI-parsed field notes |
+| `walkthrough_parse_tasks` | AI parses project walkthrough text into tasks |
+| `scope_walkthrough_apply` | Applies scope walkthrough results (creates/updates scope items, not tasks directly) |
+| `scope_walkthrough_parse` | AI parses scope walkthrough (scope items, not tasks) |
+| `field_mode_parse` | AI parses raw field text (returns parsed JSON, doesn't insert) |
+
+Only `field_mode_submit` and `walkthrough_parse_tasks` actually INSERT into `tasks`.
+
+## 10. Technical Constraints for Recipe Expansion
+
+1. **No sort_order on tasks** — recipe children would need insertion order. Currently ordered by `created_at DESC`. Adding a `sort_order` column would be needed for deterministic ordering of expanded recipe steps.
+
+2. **Single-level nesting only** — the UI only supports parent→children (one level). Recipes with nested sub-recipes would require deeper nesting support or flattening.
+
+3. **No bulk task insert UI** — recipe expansion would need to insert N children in one operation. The DB and edge functions already do multi-insert (field_mode_submit inserts tasks in a loop), so the backend supports it. The frontend would need new logic.
+
+4. **No task duplication** — no existing "clone task" helper to build on.
+
+5. **`parent_task_id` not settable from UI** — the creation dialog doesn't expose it. Recipe expansion would bypass the dialog and insert directly.
+
+6. **RLS is permissive enough** — contractors and managers can insert tasks on their projects, so recipe expansion wouldn't need RLS changes.
+
+7. **Cost fields are task-level only** — recipes with estimated costs would need either a new field on tasks or mapping to scope_items via `source_scope_item_id`.
 
