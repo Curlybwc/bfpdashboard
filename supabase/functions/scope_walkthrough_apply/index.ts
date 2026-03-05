@@ -20,7 +20,6 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Validate JWT
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -31,7 +30,6 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub;
 
-    // Parse body
     const { scope_id, approved_updates } = await req.json();
     if (!scope_id || !Array.isArray(approved_updates) || approved_updates.length === 0) {
       return new Response(JSON.stringify({ error: 'scope_id and approved_updates[] required' }), { status: 400, headers: corsHeaders });
@@ -39,7 +37,6 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Check membership
     const { data: isAdmin } = await adminClient.rpc('is_admin', { _user_id: userId });
     if (!isAdmin) {
       const { data: role } = await adminClient.rpc('get_scope_role', { _user_id: userId, _scope_id: scope_id });
@@ -48,7 +45,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Validate scope_item ownership
     const itemIds = approved_updates.map((u: any) => u.scope_item_id);
     const { data: validItems, error: validErr } = await adminClient
       .from('scope_items')
@@ -66,8 +62,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'scope_item_id mismatch', invalid_ids: invalid }), { status: 400, headers: corsHeaders });
     }
 
-    // Validate statuses and apply updates
-    const validStatuses = ['Not Checked', 'OK', 'Repair', 'Replace', 'Needs Review'];
+    const validStatuses = ['Not Checked', 'OK', 'Repair', 'Replace', 'Get Bid'];
     const errors: string[] = [];
 
     for (const update of approved_updates) {

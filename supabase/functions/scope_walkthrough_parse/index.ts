@@ -343,7 +343,7 @@ Return ONLY valid JSON:
 
     const validItemIds = new Set(scopeItems.map(i => i.id));
     const validUserIds = new Set(allProfiles.map((p: any) => p.id));
-    const validStatuses = ['OK', 'Repair', 'Replace'];
+    const validStatuses = ['OK', 'Repair', 'Replace', 'Get Bid'];
 
     // Validate matched items
     const matched = (parsed.matched || [])

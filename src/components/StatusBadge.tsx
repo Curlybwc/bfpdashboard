@@ -17,6 +17,7 @@ const colorMap: Record<string, string> = {
   No: 'bg-destructive/15 text-destructive',
   Priced: 'bg-success/15 text-success',
   'Needs Pricing': 'bg-warning/20 text-warning',
+  'Get Bid': 'bg-amber-100 text-amber-700',
 };
 
 const StatusBadge = ({ status }: { status: string }) => (
