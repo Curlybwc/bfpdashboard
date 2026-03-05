@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
 import FinalPassSheet from '@/components/FinalPassSheet';
+import DeduplicateSheet from '@/components/DeduplicateSheet';
 import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
 import { isChecklistCovered } from '@/lib/checklistMatch';
 
