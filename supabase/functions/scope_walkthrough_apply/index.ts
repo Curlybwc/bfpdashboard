@@ -73,9 +73,8 @@ Deno.serve(async (req) => {
       }
 
       const updateData: Record<string, any> = { status: update.status };
-      if (typeof update.notes === 'string') {
-        updateData.notes = update.notes;
-      }
+      if (typeof update.notes === 'string') updateData.notes = update.notes;
+      updateData.pricing_status = pricingMap.get(update.scope_item_id) != null ? 'Priced' : 'Needs Pricing';
 
       const { error } = await adminClient
         .from('scope_items')
