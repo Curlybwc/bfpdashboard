@@ -22,6 +22,11 @@ const Today = () => {
   const [assigneeMap, setAssigneeMap] = useState<Record<string, string>>({});
   const [isManager, setIsManager] = useState(false);
 
+  // Crew task state
+  const [crewActiveTaskIds, setCrewActiveTaskIds] = useState<Set<string>>(new Set());
+  const [crewCandidateTaskIds, setCrewCandidateTaskIds] = useState<Set<string>>(new Set());
+  const [crewWorkerCounts, setCrewWorkerCounts] = useState<Record<string, number>>({});
+
   const fetchTasks = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -34,9 +39,8 @@ const Today = () => {
     const memberProjectIds = (memberships || []).map(m => m.project_id);
 
     // Check if user is manager on any project
-    const managerOnAny = (memberships || []).length > 0;
     let hasManagerRole = false;
-    if (managerOnAny) {
+    if (memberProjectIds.length > 0) {
       const { data: managerCheck } = await supabase
         .from('project_members')
         .select('role')
@@ -47,7 +51,8 @@ const Today = () => {
     }
     setIsManager(hasManagerRole);
 
-    const [ipRes, assignedRes, availRes] = await Promise.all([
+    // Solo queries + crew membership queries in parallel
+    const [ipRes, assignedRes, availRes, myWorkerRows, myCandidateRows] = await Promise.all([
       supabase
         .from('tasks')
         .select('*')
@@ -70,16 +75,69 @@ const Today = () => {
         .is('assigned_to_user_id', null)
         .eq('stage', 'Ready')
         .eq('materials_on_site', 'Yes')
+        .eq('assignment_mode', 'solo')
         .in('project_id', memberProjectIds.length > 0 ? memberProjectIds : ['00000000-0000-0000-0000-000000000000'])
         .order('due_date', { ascending: true, nullsFirst: false })
         .order('priority', { ascending: true })
         .order('created_at', { ascending: true })
         .limit(20),
+      // My active crew worker rows
+      supabase
+        .from('task_workers')
+        .select('task_id')
+        .eq('user_id', user.id)
+        .eq('active', true),
+      // My candidate rows
+      supabase
+        .from('task_candidates')
+        .select('task_id')
+        .eq('user_id', user.id),
     ]);
 
-    setInProgress(ipRes.data || []);
+    const myActiveTaskIds = new Set((myWorkerRows.data || []).map(r => r.task_id));
+    const myCandidateIds = new Set((myCandidateRows.data || []).map(r => r.task_id));
+    setCrewActiveTaskIds(myActiveTaskIds);
+    setCrewCandidateTaskIds(myCandidateIds);
+
+    // Fetch crew tasks for In Progress (active worker on non-Done crew tasks)
+    let crewIpTasks: any[] = [];
+    if (myActiveTaskIds.size > 0) {
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .in('id', [...myActiveTaskIds])
+        .eq('assignment_mode', 'crew')
+        .neq('stage', 'Done');
+      crewIpTasks = data || [];
+    }
+
+    // Fetch crew tasks for Available (candidate but not active worker, non-Done)
+    const crewAvailableIds = [...myCandidateIds].filter(id => !myActiveTaskIds.has(id));
+    let crewAvailTasks: any[] = [];
+    if (crewAvailableIds.length > 0) {
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .in('id', crewAvailableIds)
+        .eq('assignment_mode', 'crew')
+        .neq('stage', 'Done');
+      crewAvailTasks = data || [];
+    }
+
+    // Merge and dedupe
+    const soloIp = ipRes.data || [];
+    const mergedIp = [...soloIp];
+    const ipIds = new Set(soloIp.map(t => t.id));
+    crewIpTasks.forEach(t => { if (!ipIds.has(t.id)) mergedIp.push(t); });
+
+    const soloAvail = availRes.data || [];
+    const mergedAvail = [...soloAvail];
+    const availIds = new Set(soloAvail.map(t => t.id));
+    crewAvailTasks.forEach(t => { if (!availIds.has(t.id)) mergedAvail.push(t); });
+
+    setInProgress(mergedIp);
     setAssigned(assignedRes.data || []);
-    setAvailable(availRes.data || []);
+    setAvailable(mergedAvail);
 
     // Fetch needs_manager_review tasks (for admins and managers)
     let reviewTasks: any[] = [];
@@ -95,7 +153,22 @@ const Today = () => {
     }
     setNeedsReview(reviewTasks);
 
-    const allTasks = [...(ipRes.data || []), ...(assignedRes.data || []), ...(availRes.data || []), ...reviewTasks];
+    const allTasks = [...mergedIp, ...(assignedRes.data || []), ...mergedAvail, ...reviewTasks];
+
+    // Fetch active worker counts for all crew tasks
+    const crewTaskIds = allTasks.filter(t => t.assignment_mode === 'crew').map(t => t.id);
+    if (crewTaskIds.length > 0) {
+      const { data: workerRows } = await supabase
+        .from('task_workers')
+        .select('task_id')
+        .in('task_id', crewTaskIds)
+        .eq('active', true);
+      const counts: Record<string, number> = {};
+      (workerRows || []).forEach(r => { counts[r.task_id] = (counts[r.task_id] || 0) + 1; });
+      setCrewWorkerCounts(counts);
+    } else {
+      setCrewWorkerCounts({});
+    }
 
     // Fetch project names
     const projectIds = [...new Set(allTasks.map(t => t.project_id))];
@@ -109,7 +182,7 @@ const Today = () => {
       setProjectMap(map);
     }
 
-    // Batch fetch parent titles (no N+1)
+    // Batch fetch parent titles
     const parentIds = [...new Set(allTasks.map(t => t.parent_task_id).filter(Boolean))];
     if (parentIds.length > 0) {
       const { data: parents } = await supabase
@@ -123,7 +196,7 @@ const Today = () => {
       setParentTitles({});
     }
 
-    // Batch fetch assignee names (exclude current user)
+    // Batch fetch assignee names
     const assigneeIds = [...new Set(
       allTasks.map(t => t.assigned_to_user_id).filter((id): id is string => !!id && id !== user!.id)
     )];
@@ -165,6 +238,10 @@ const Today = () => {
               onUpdate={fetchTasks}
               parentTitle={t.parent_task_id ? parentTitles[t.parent_task_id] : undefined}
               context="today"
+              isCrewTask={t.assignment_mode === 'crew'}
+              isActiveWorker={crewActiveTaskIds.has(t.id)}
+              isCandidate={crewCandidateTaskIds.has(t.id)}
+              activeWorkerCount={crewWorkerCounts[t.id] || 0}
             />
           ))}
         </div>

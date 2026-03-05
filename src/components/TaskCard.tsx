@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown } from 'lucide-react';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 
 interface TaskCardProps {
@@ -28,6 +28,10 @@ interface TaskCardProps {
   context?: 'today' | 'project';
   projectAddress?: string;
   assigneeName?: string;
+  isCrewTask?: boolean;
+  isActiveWorker?: boolean;
+  isCandidate?: boolean;
+  activeWorkerCount?: number;
 }
 
 const TaskCard = ({
@@ -35,6 +39,7 @@ const TaskCard = ({
   showProjectName = true, isChild = false, parentTitle,
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
+  isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
@@ -54,9 +59,15 @@ const TaskCard = ({
   const isUnassigned = !task.assigned_to_user_id;
   const materialsReady = task.materials_on_site === 'Yes';
 
-  const showDibs = isUnassigned && task.stage === 'Ready';
-  const showStart = isAssignedToMe && task.stage === 'Ready';
-  const showComplete = isAssignedToMe && task.stage === 'In Progress';
+  // Solo action visibility
+  const showDibs = !isCrewTask && isUnassigned && task.stage === 'Ready';
+  const showStart = !isCrewTask && isAssignedToMe && task.stage === 'Ready';
+  const showComplete = !isCrewTask && isAssignedToMe && task.stage === 'In Progress';
+
+  // Crew action visibility
+  const showJoin = isCrewTask && isCandidate && !isActiveWorker;
+  const showLeave = isCrewTask && isActiveWorker;
+
   const showNeedsMaterials = !materialsReady && materialCount > 0;
   const hasChildren = childCount > 0;
   const canComplete = hasChildren ? allChildrenDone : true;
@@ -109,7 +120,6 @@ const TaskCard = ({
     }).eq('id', task.id);
 
     if (!error && task.parent_task_id) {
-      // Check if all siblings are now Done
       const { data: siblings } = await supabase
         .from('tasks')
         .select('id, stage')
@@ -126,6 +136,39 @@ const TaskCard = ({
     }
 
     setLoading(false);
+    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    else onUpdate();
+  };
+
+  const handleJoinCrew = async () => {
+    setLoading(true);
+    // Upsert into task_workers
+    const { error } = await supabase.from('task_workers').upsert({
+      task_id: task.id,
+      user_id: userId,
+      active: true,
+      joined_at: new Date().toISOString(),
+      left_at: null,
+    }, { onConflict: 'task_id,user_id' });
+
+    // Optionally set task to In Progress if Ready
+    if (!error && task.stage === 'Ready') {
+      await supabase.from('tasks').update({ stage: 'In Progress' }).eq('id', task.id);
+    }
+
+    setLoading(false);
+    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    else onUpdate();
+  };
+
+  const handleLeaveCrew = async () => {
+    setLoading(true);
+    const { error } = await supabase.from('task_workers').update({
+      active: false,
+      left_at: new Date().toISOString(),
+    }).eq('task_id', task.id).eq('user_id', userId);
+    setLoading(false);
+
     if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
     else onUpdate();
   };
@@ -171,6 +214,12 @@ const TaskCard = ({
           )}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <StatusBadge status={task.stage} />
+            {isCrewTask && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {activeWorkerCount} active
+              </Badge>
+            )}
             <span className="text-xs text-muted-foreground flex items-center gap-0.5">
               <Flag className="h-3 w-3" />
               {task.priority}
@@ -202,6 +251,7 @@ const TaskCard = ({
           </div>
         </Link>
 
+        {/* Solo actions */}
         {(showDibs || showStart || showComplete) && (
           <div className="mt-2 flex gap-2">
             {showDibs && (
@@ -240,6 +290,22 @@ const TaskCard = ({
                   <TooltipContent>All subtasks must be completed first.</TooltipContent>
                 </Tooltip>
               )
+            )}
+          </div>
+        )}
+
+        {/* Crew actions */}
+        {(showJoin || showLeave) && (
+          <div className="mt-2 flex gap-2">
+            {showJoin && (
+              <Button size="sm" onClick={handleJoinCrew} disabled={loading}>
+                Join
+              </Button>
+            )}
+            {showLeave && (
+              <Button size="sm" variant="outline" onClick={handleLeaveCrew} disabled={loading}>
+                Leave
+              </Button>
             )}
           </div>
         )}

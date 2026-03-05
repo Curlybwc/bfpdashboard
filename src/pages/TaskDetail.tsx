@@ -14,8 +14,10 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
-import { Package, Trash2, Zap, CheckCircle2 } from 'lucide-react';
+import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { Card } from '@/components/ui/card';
 
@@ -38,6 +40,11 @@ const TaskDetail = () => {
   const [fieldCapture, setFieldCapture] = useState<any>(null);
   const [markingReviewed, setMarkingReviewed] = useState(false);
 
+  // Crew state
+  const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
+  const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
+  const [crewToggleLoading, setCrewToggleLoading] = useState(false);
+
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
@@ -51,6 +58,12 @@ const TaskDetail = () => {
 
   useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
 
+  useEffect(() => {
+    if (task?.assignment_mode === 'crew') {
+      fetchCrewData();
+    }
+  }, [task?.assignment_mode, task?.id]);
+
   // Fetch field capture when task loads
   useEffect(() => {
     if (!task?.field_capture_id) { setFieldCapture(null); return; }
@@ -58,6 +71,33 @@ const TaskDetail = () => {
       setFieldCapture(data);
     });
   }, [task?.field_capture_id]);
+
+  const fetchCrewData = async () => {
+    if (!taskId) return;
+    const [workersRes, candidatesRes] = await Promise.all([
+      supabase.from('task_workers').select('user_id, active').eq('task_id', taskId),
+      supabase.from('task_candidates').select('user_id').eq('task_id', taskId),
+    ]);
+
+    const workerUserIds = (workersRes.data || []).map(w => w.user_id);
+    const candidateUserIds = (candidatesRes.data || []).map(c => c.user_id);
+    setCrewCandidates(candidateUserIds);
+
+    // Fetch profile names for workers
+    if (workerUserIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', workerUserIds);
+      const profileMap: Record<string, string> = {};
+      (profiles || []).forEach(p => { profileMap[p.id] = p.full_name || 'Unknown'; });
+
+      setCrewWorkers((workersRes.data || []).map(w => ({
+        user_id: w.user_id,
+        active: w.active,
+        full_name: profileMap[w.user_id] || 'Unknown',
+      })));
+    } else {
+      setCrewWorkers([]);
+    }
+  };
 
   const handleMarkReviewed = async () => {
     if (!taskId) return;
@@ -73,7 +113,8 @@ const TaskDetail = () => {
     setSaving(true);
 
     const oldStage = task.stage;
-    const newAssignedTo = assignedTo === 'unassigned' ? null : assignedTo;
+    const isCrewMode = task.assignment_mode === 'crew';
+    const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' ? null : assignedTo);
 
     const updatePayload: any = {
       task: taskText,
@@ -99,8 +140,8 @@ const TaskDetail = () => {
       }
     }
 
-    // Assignment cascade
-    if (!error && cascadeAssign && children.length > 0) {
+    // Assignment cascade (solo only)
+    if (!error && !isCrewMode && cascadeAssign && children.length > 0) {
       await supabase.from('tasks').update({
         assigned_to_user_id: newAssignedTo,
       }).in('id', children.map(c => c.id));
@@ -149,8 +190,117 @@ const TaskDetail = () => {
   };
 
   const canDelete = isAdmin || projectRole === 'manager';
+  const canManageCrew = isAdmin || projectRole === 'manager';
   const hasChildren = children.length > 0;
   const allChildrenDone = hasChildren && children.every(c => c.stage === 'Done');
+  const isCrewMode = task?.assignment_mode === 'crew';
+
+  // Crew toggle handlers
+  const handleToggleCrew = async (checked: boolean) => {
+    if (!taskId || !task) return;
+    setCrewToggleLoading(true);
+
+    if (checked) {
+      // Solo -> Crew
+      const priorAssignee = task.assigned_to_user_id;
+      await supabase.from('tasks').update({
+        assignment_mode: 'crew',
+        lead_user_id: priorAssignee || null,
+        assigned_to_user_id: null,
+      }).eq('id', taskId);
+
+      if (priorAssignee) {
+        // Add as candidate
+        await supabase.from('task_candidates').upsert({
+          task_id: taskId,
+          user_id: priorAssignee,
+        }, { onConflict: 'task_id,user_id' });
+        // Add as active worker
+        await supabase.from('task_workers').upsert({
+          task_id: taskId,
+          user_id: priorAssignee,
+          active: true,
+          joined_at: new Date().toISOString(),
+          left_at: null,
+        }, { onConflict: 'task_id,user_id' });
+      }
+    } else {
+      // Crew -> Solo
+      const activeWorkers = crewWorkers.filter(w => w.active);
+      let newAssignee: string | null = null;
+      if (activeWorkers.length === 1) {
+        newAssignee = activeWorkers[0].user_id;
+      } else if (task.lead_user_id) {
+        newAssignee = task.lead_user_id;
+      }
+
+      await supabase.from('tasks').update({
+        assignment_mode: 'solo',
+        assigned_to_user_id: newAssignee,
+      }).eq('id', taskId);
+
+      // Clean up crew tables
+      await Promise.all([
+        supabase.from('task_candidates').delete().eq('task_id', taskId),
+        supabase.from('task_workers').delete().eq('task_id', taskId),
+      ]);
+    }
+
+    setCrewToggleLoading(false);
+    fetchTask();
+    if (checked) fetchCrewData();
+  };
+
+  // Crew join/leave for current user
+  const handleJoinCrew = async () => {
+    if (!user || !taskId) return;
+    setActionLoading(true);
+    await supabase.from('task_workers').upsert({
+      task_id: taskId,
+      user_id: user.id,
+      active: true,
+      joined_at: new Date().toISOString(),
+      left_at: null,
+    }, { onConflict: 'task_id,user_id' });
+
+    if (task.stage === 'Ready') {
+      await supabase.from('tasks').update({ stage: 'In Progress' }).eq('id', taskId);
+    }
+    setActionLoading(false);
+    fetchTask();
+    fetchCrewData();
+  };
+
+  const handleLeaveCrew = async () => {
+    if (!user || !taskId) return;
+    setActionLoading(true);
+    await supabase.from('task_workers').update({
+      active: false,
+      left_at: new Date().toISOString(),
+    }).eq('task_id', taskId).eq('user_id', user.id);
+    setActionLoading(false);
+    fetchTask();
+    fetchCrewData();
+  };
+
+  // Candidate management
+  const handleAddCandidate = async (userId: string) => {
+    if (!taskId) return;
+    await supabase.from('task_candidates').upsert({
+      task_id: taskId,
+      user_id: userId,
+    }, { onConflict: 'task_id,user_id' });
+    fetchCrewData();
+  };
+
+  const handleRemoveCandidate = async (userId: string) => {
+    if (!taskId) return;
+    await Promise.all([
+      supabase.from('task_candidates').delete().eq('task_id', taskId).eq('user_id', userId),
+      supabase.from('task_workers').delete().eq('task_id', taskId).eq('user_id', userId),
+    ]);
+    fetchCrewData();
+  };
 
   const handleDelete = async () => {
     if (!taskId) return;
@@ -163,6 +313,8 @@ const TaskDetail = () => {
   const isAssignedToMe = user && task?.assigned_to_user_id === user.id;
   const isUnassigned = !task?.assigned_to_user_id;
   const materialsReady = task?.materials_on_site === 'Yes';
+  const meIsCandidate = user ? crewCandidates.includes(user.id) : false;
+  const meIsActiveWorker = user ? crewWorkers.some(w => w.user_id === user.id && w.active) : false;
 
   const handleDibs = async (force = false) => {
     if (!user || !taskId) return;
@@ -205,7 +357,6 @@ const TaskDetail = () => {
       completed_at: new Date().toISOString(),
     }).eq('id', taskId);
 
-    // If child task, check siblings for auto-completing parent
     if (task?.parent_task_id) {
       const { data: siblings } = await supabase
         .from('tasks')
@@ -229,16 +380,19 @@ const TaskDetail = () => {
 
   if (!task) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
+  // Members not yet candidates (for adding)
+  const nonCandidateMembers = projectMembers.filter(m => !crewCandidates.includes(m.user_id));
+
   return (
     <div className="pb-20">
       <PageHeader title="Task Detail" backTo={`/projects/${projectId}`} />
       <div className="p-4 space-y-4">
         {/* Lifecycle action buttons */}
-        <div className="flex gap-2">
-          {isUnassigned && task.stage === 'Ready' && (
+        <div className="flex gap-2 flex-wrap">
+          {!isCrewMode && isUnassigned && task.stage === 'Ready' && (
             <Button variant="outline" onClick={() => handleDibs()} disabled={actionLoading}>Dibs</Button>
           )}
-          {isAssignedToMe && task.stage === 'Ready' && (
+          {!isCrewMode && isAssignedToMe && task.stage === 'Ready' && (
             materialsReady ? (
               <Button onClick={handleStart} disabled={actionLoading}>Start</Button>
             ) : (
@@ -250,7 +404,7 @@ const TaskDetail = () => {
               </Tooltip>
             )
           )}
-          {isAssignedToMe && task.stage === 'In Progress' && (
+          {!isCrewMode && isAssignedToMe && task.stage === 'In Progress' && (
             canComplete ? (
               <Button onClick={handleComplete} disabled={actionLoading}>Complete</Button>
             ) : (
@@ -262,11 +416,21 @@ const TaskDetail = () => {
               </Tooltip>
             )
           )}
+          {/* Crew actions */}
+          {isCrewMode && meIsCandidate && !meIsActiveWorker && (
+            <Button onClick={handleJoinCrew} disabled={actionLoading}>
+              <Users className="h-4 w-4 mr-1" />Join
+            </Button>
+          )}
+          {isCrewMode && meIsActiveWorker && (
+            <Button variant="outline" onClick={handleLeaveCrew} disabled={actionLoading}>Leave</Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setMaterialsOpen(true)}>
             <Package className="h-4 w-4" />
             Materials
           </Button>
         </div>
+
         <div className="space-y-2">
           <Label>Task</Label>
           <Input value={taskText} onChange={(e) => setTaskText(e.target.value)} />
@@ -311,32 +475,105 @@ const TaskDetail = () => {
             <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>Assigned To</Label>
-          <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-              {projectMembers.map((m) => (
-                <SelectItem key={m.user_id} value={m.user_id}>
-                  {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {hasChildren && (
-            <div className="flex items-center gap-2 mt-1">
-              <Checkbox
-                id="cascade-assign"
-                checked={cascadeAssign}
-                onCheckedChange={(v) => setCascadeAssign(!!v)}
-              />
-              <label htmlFor="cascade-assign" className="text-sm text-muted-foreground">
-                {assignedTo === 'unassigned' ? 'Also unassign subtasks' : 'Also assign subtasks to this user'}
-              </label>
+
+        {/* Crew toggle (manager/admin only) */}
+        {canManageCrew && (
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Crew Task
+            </Label>
+            <Switch
+              checked={isCrewMode}
+              onCheckedChange={handleToggleCrew}
+              disabled={crewToggleLoading}
+            />
+          </div>
+        )}
+
+        {/* Crew panel */}
+        {isCrewMode && (
+          <Card className="p-3 space-y-3">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Active Crew</Label>
+              {crewWorkers.filter(w => w.active).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active workers</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {crewWorkers.filter(w => w.active).map(w => (
+                    <Badge key={w.user_id} variant="secondary">{w.full_name}</Badge>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* Candidate pool (manager/admin) */}
+            {canManageCrew && (
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Eligible Workers</Label>
+                <div className="space-y-1">
+                  {crewCandidates.map(uid => {
+                    const member = projectMembers.find(m => m.user_id === uid);
+                    const name = member?.profiles?.full_name || 'Unknown';
+                    return (
+                      <div key={uid} className="flex items-center justify-between text-sm border rounded px-2 py-1">
+                        <span>{name}</span>
+                        <button onClick={() => handleRemoveCandidate(uid)} className="text-muted-foreground hover:text-destructive">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                {nonCandidateMembers.length > 0 && (
+                  <Select onValueChange={handleAddCandidate}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Add eligible worker..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {nonCandidateMembers.map(m => (
+                        <SelectItem key={m.user_id} value={m.user_id}>
+                          {m.profiles?.full_name || 'Unnamed'} ({m.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Solo assignment (only in solo mode) */}
+        {!isCrewMode && (
+          <div className="space-y-2">
+            <Label>Assigned To</Label>
+            <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {projectMembers.map((m) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>
+                    {m.profiles?.full_name || 'Unnamed'} ({m.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasChildren && (
+              <div className="flex items-center gap-2 mt-1">
+                <Checkbox
+                  id="cascade-assign"
+                  checked={cascadeAssign}
+                  onCheckedChange={(v) => setCascadeAssign(!!v)}
+                />
+                <label htmlFor="cascade-assign" className="text-sm text-muted-foreground">
+                  {assignedTo === 'unassigned' ? 'Also unassign subtasks' : 'Also assign subtasks to this user'}
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label>Actual Total Cost</Label>
           <Input type="number" value={actualCost} onChange={(e) => setActualCost(e.target.value)} placeholder="$" disabled={!isAdmin} />

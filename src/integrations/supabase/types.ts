@@ -472,6 +472,29 @@ export type Database = {
         }
         Relationships: []
       }
+      task_candidates: {
+        Row: {
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_candidates_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_materials: {
         Row: {
           confirmed_on_site: boolean
@@ -547,10 +570,43 @@ export type Database = {
           },
         ]
       }
+      task_workers: {
+        Row: {
+          active: boolean
+          joined_at: string
+          left_at: string | null
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          joined_at?: string
+          left_at?: string | null
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          joined_at?: string
+          left_at?: string | null
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_workers_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           actual_total_cost: number | null
           assigned_to_user_id: string | null
+          assignment_mode: string
           claimed_at: string | null
           claimed_by_user_id: string | null
           completed_at: string | null
@@ -559,6 +615,7 @@ export type Database = {
           due_date: string | null
           field_capture_id: string | null
           id: string
+          lead_user_id: string | null
           materials_on_site: Database["public"]["Enums"]["materials_status"]
           needs_manager_review: boolean
           notes: string | null
@@ -577,6 +634,7 @@ export type Database = {
         Insert: {
           actual_total_cost?: number | null
           assigned_to_user_id?: string | null
+          assignment_mode?: string
           claimed_at?: string | null
           claimed_by_user_id?: string | null
           completed_at?: string | null
@@ -585,6 +643,7 @@ export type Database = {
           due_date?: string | null
           field_capture_id?: string | null
           id?: string
+          lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           needs_manager_review?: boolean
           notes?: string | null
@@ -603,6 +662,7 @@ export type Database = {
         Update: {
           actual_total_cost?: number | null
           assigned_to_user_id?: string | null
+          assignment_mode?: string
           claimed_at?: string | null
           claimed_by_user_id?: string | null
           completed_at?: string | null
@@ -611,6 +671,7 @@ export type Database = {
           due_date?: string | null
           field_capture_id?: string | null
           id?: string
+          lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           needs_manager_review?: boolean
           notes?: string | null
