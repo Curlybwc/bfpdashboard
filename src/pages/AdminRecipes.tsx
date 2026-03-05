@@ -258,6 +258,7 @@ const AdminRecipes = () => {
       sku: newMatSku.trim() || null,
       vendor_url: newMatVendorUrl.trim() || null,
       provided_by: newMatProvidedBy || 'either',
+      qty_formula: newMatFormula.trim() || null,
     });
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
