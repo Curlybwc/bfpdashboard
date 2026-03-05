@@ -272,6 +272,9 @@ const ScopeDetail = () => {
           <div className="flex items-center gap-2">
             {isDraft && (
               <>
+                <Button size="sm" variant="outline" onClick={() => setDedupeOpen(true)}>
+                  <Merge className="h-4 w-4 mr-1" />Deduplicate
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setFinalPassOpen(true)}>
                   <CheckSquare className="h-4 w-4 mr-1" />Final Pass
                 </Button>
