@@ -42,8 +42,10 @@ interface StepMaterial {
   material_name: string;
   qty: number | null;
   unit: string | null;
-  store: string | null;
   sku: string | null;
+  vendor_url: string | null;
+  store_section: string | null;
+  provided_by: string | null;
   notes: string | null;
 }
 
