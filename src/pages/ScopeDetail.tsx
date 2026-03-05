@@ -408,8 +408,11 @@ const ScopeDetail = () => {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
                       <StatusBadge status={item.pricing_status} />
+                      {item.pricing_status === 'Needs Pricing' && item.notes && /\$/.test(item.notes) && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">$ in text</Badge>
+                      )}
                       {isDraft && (
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => startEdit(item)}>
                           <Pencil className="h-3.5 w-3.5" />
