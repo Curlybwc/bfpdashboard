@@ -264,7 +264,7 @@ const AdminRecipes = () => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStoreSection(''); setNewMatSku(''); setNewMatVendorUrl(''); setNewMatProvidedBy('either');
+    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStoreSection(''); setNewMatSku(''); setNewMatVendorUrl(''); setNewMatProvidedBy('either'); setNewMatFormula('');
     fetchStepMaterials(expandedStepId);
   };
 
