@@ -218,39 +218,18 @@ const TaskDetail = () => {
   const handleExpandRecipe = async (recipeId: string) => {
     if (!taskId || !task || !user) return;
     setExpandingRecipe(true);
-    const { data: steps } = await supabase
-      .from('task_recipe_steps')
-      .select('*')
-      .eq('recipe_id', recipeId)
-      .order('sort_order');
-    if (!steps || steps.length === 0) {
-      toast({ title: 'Recipe has no steps', variant: 'destructive' });
+    const { data, error } = await supabase.rpc('expand_recipe', {
+      p_parent_task_id: taskId,
+      p_recipe_id: recipeId,
+      p_user_id: user.id,
+    });
+    if (error) {
+      toast({ title: 'Error expanding recipe', description: error.message, variant: 'destructive' });
       setExpandingRecipe(false);
       return;
     }
-    const childInserts = steps.map(step => ({
-      project_id: task.project_id,
-      parent_task_id: taskId,
-      task: step.title,
-      sort_order: step.sort_order * 10,
-      source_recipe_id: recipeId,
-      source_recipe_step_id: step.id,
-      trade: step.trade || task.trade || null,
-      priority: task.priority,
-      room_area: task.room_area || null,
-      stage: 'Not Ready' as const,
-      materials_on_site: 'No' as const,
-      created_by: user.id,
-    }));
-    const { error: insertErr } = await supabase.from('tasks').insert(childInserts);
-    if (insertErr) {
-      toast({ title: 'Error expanding recipe', description: insertErr.message, variant: 'destructive' });
-      setExpandingRecipe(false);
-      return;
-    }
-    await supabase.from('tasks').update({ expanded_recipe_id: recipeId }).eq('id', taskId);
     setExpandingRecipe(false);
-    toast({ title: 'Recipe expanded' });
+    toast({ title: `Recipe expanded (${data} steps)` });
     fetchTask();
     fetchChildren();
   };
