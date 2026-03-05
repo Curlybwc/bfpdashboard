@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      checklist_items: {
+        Row: {
+          active: boolean
+          category: string | null
+          created_at: string
+          default_cost_item_id: string | null
+          id: string
+          label: string
+          normalized_label: string
+          sort_order: number
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          created_at?: string
+          default_cost_item_id?: string | null
+          id?: string
+          label: string
+          normalized_label: string
+          sort_order?: number
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          created_at?: string
+          default_cost_item_id?: string | null
+          id?: string
+          label?: string
+          normalized_label?: string
+          sort_order?: number
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_default_cost_item_id_fkey"
+            columns: ["default_cost_item_id"]
+            isOneToOne: false
+            referencedRelation: "cost_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cost_items: {
         Row: {
           active: boolean
@@ -287,6 +365,48 @@ export type Database = {
           },
         ]
       }
+      scope_checklist_reviews: {
+        Row: {
+          checklist_item_id: string
+          id: string
+          notes: string | null
+          scope_id: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          checklist_item_id: string
+          id?: string
+          notes?: string | null
+          scope_id: string
+          state: string
+          updated_at?: string
+        }
+        Update: {
+          checklist_item_id?: string
+          id?: string
+          notes?: string | null
+          scope_id?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scope_checklist_reviews_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_checklist_reviews_scope_id_fkey"
+            columns: ["scope_id"]
+            isOneToOne: false
+            referencedRelation: "scopes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scope_items: {
         Row: {
           added_after_conversion: boolean
@@ -399,6 +519,7 @@ export type Database = {
         Row: {
           address: string
           baseline_locked_at: string | null
+          checklist_template_id: string | null
           converted_at: string | null
           converted_project_id: string | null
           created_at: string
@@ -412,6 +533,7 @@ export type Database = {
         Insert: {
           address: string
           baseline_locked_at?: string | null
+          checklist_template_id?: string | null
           converted_at?: string | null
           converted_project_id?: string | null
           created_at?: string
@@ -425,6 +547,7 @@ export type Database = {
         Update: {
           address?: string
           baseline_locked_at?: string | null
+          checklist_template_id?: string | null
           converted_at?: string | null
           converted_project_id?: string | null
           created_at?: string
@@ -436,6 +559,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "scopes_checklist_template_id_fkey"
+            columns: ["checklist_template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "scopes_converted_project_id_fkey"
             columns: ["converted_project_id"]
