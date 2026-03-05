@@ -29,6 +29,7 @@ interface MatchedItem {
 
 interface NewItem {
   description: string;
+  status: string;
   notes: string | null;
   qty: number | null;
   unit: string | null;
@@ -47,7 +48,7 @@ interface NewItem {
 interface ParseResult {
   matched: MatchedItem[];
   new_items: NewItem[];
-  needs_review_items: { id: string; description: string; reason: string }[];
+  get_bid_items: { id: string; description: string; reason: string }[];
   not_addressed_items: { id: string; description: string }[];
   member_user_ids_to_add?: string[];
   member_display_names_to_add?: string[];
