@@ -242,7 +242,7 @@ const AdminRecipes = () => {
       setExpandedStepId(stepId);
       fetchStepMaterials(stepId);
     }
-    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStore(''); setNewMatSku('');
+    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStoreSection(''); setNewMatSku(''); setNewMatVendorUrl(''); setNewMatProvidedBy('either');
   };
 
   const handleAddMaterial = async () => {
