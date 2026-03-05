@@ -422,7 +422,7 @@ Return ONLY valid JSON:
     const result = {
       matched,
       new_items: newItems,
-      needs_review_items: (parsed.needs_review_items || []).filter(
+      get_bid_items: (parsed.get_bid_items || parsed.needs_review_items || []).filter(
         (i: any) => i.id && validItemIds.has(i.id)
       ),
       not_addressed_items: (parsed.not_addressed_items || []).filter(
