@@ -1,134 +1,168 @@
 
 
-# Architecture Snapshot: Tasks System
+# Recipe System — Final Implementation Plan
 
-## 1. Database Structure (`tasks` table)
+## 1. Database Schema
 
-Full schema from the provided context:
+### New Tables
+
+**`task_recipes`**
 
 | Column | Type | Nullable | Default |
 |---|---|---|---|
-| id | uuid | No | gen_random_uuid() |
-| project_id | uuid | No | — |
-| task | text | No | — |
-| stage | task_stage (enum) | No | 'Ready' |
-| priority | task_priority (enum) | No | '2 – This Week' |
-| materials_on_site | materials_status (enum) | No | 'No' |
-| parent_task_id | uuid | Yes | — |
-| assigned_to_user_id | uuid | Yes | — |
-| claimed_by_user_id | uuid | Yes | — |
-| claimed_at | timestamptz | Yes | — |
-| started_by_user_id | uuid | Yes | — |
-| started_at | timestamptz | Yes | — |
-| completed_at | timestamptz | Yes | — |
+| id | uuid PK | No | gen_random_uuid() |
+| name | text | No | — |
+| trade | text | Yes | NULL |
+| keywords | text[] | No | '{}' |
+| is_repeatable | boolean | No | false |
+| estimated_cost | numeric | Yes | NULL |
+| last_actual_avg | numeric | Yes | NULL |
+| last_actual_count | integer | No | 0 |
+| active | boolean | No | true |
 | created_by | uuid | No | — |
 | created_at | timestamptz | No | now() |
 | updated_at | timestamptz | No | now() |
-| due_date | date | Yes | — |
-| trade | text | Yes | — |
-| room_area | text | Yes | — |
-| notes | text | Yes | — |
-| actual_total_cost | numeric | Yes | — |
-| source_scope_item_id | uuid | Yes | — |
-| field_capture_id | uuid | Yes | — |
-| needs_manager_review | boolean | No | false |
-| assignment_mode | text | No | 'solo' |
-| lead_user_id | uuid | Yes | — |
 
-**Confirmed fields exist**: `parent_task_id`, `assigned_to_user_id`, `stage`, `priority`, `actual_total_cost`, `claimed_by_user_id`, `started_by_user_id`, `completed_at`.
+RLS: SELECT for authenticated; INSERT/UPDATE/DELETE for `is_admin(auth.uid()) OR can_manage_projects(auth.uid())`.
 
-**No ordering field exists** — no `position`, `order_index`, or `sort_order`. Tasks are ordered by `created_at DESC` in queries.
+**`task_recipe_steps`**
 
-## 2. Task Hierarchy
+| Column | Type | Nullable | Default |
+|---|---|---|---|
+| id | uuid PK | No | gen_random_uuid() |
+| recipe_id | uuid FK | No | — |
+| title | text | No | — |
+| sort_order | integer | No | — |
+| trade | text | Yes | NULL |
+| notes | text | Yes | NULL |
+| is_optional | boolean | No | false |
+| created_at | timestamptz | No | now() |
 
-- **Mechanism**: Self-referencing `parent_task_id` column.
-- **Depth**: Single level only. The UI builds a flat map of `childrenMap[parent_id] = [children]` and renders children directly under parents. No recursive/deep nesting.
-- **Tree built client-side** in `ProjectDetail.tsx` (lines 148-155):
+FK: `recipe_id REFERENCES task_recipes(id) ON DELETE CASCADE`
 
-```typescript
-const rootTasks = tasks.filter(t => !t.parent_task_id);
-const childrenMap: Record<string, any[]> = {};
-tasks.forEach(t => {
-  if (t.parent_task_id) {
-    childrenMap[t.parent_task_id] = childrenMap[t.parent_task_id] || [];
-    childrenMap[t.parent_task_id].push(t);
-  }
-});
-```
+Index: `CREATE INDEX idx_recipe_steps_order ON task_recipe_steps(recipe_id, sort_order)`
 
-- **Stage sync**: Bi-directional. Completing last child auto-completes parent. Un-doing a child reverts parent from Done to In Progress. Both handled in `TaskDetail.tsx` and `TaskCard.tsx`.
+### Columns Added to `scope_items`
 
-## 3. Task Creation Flow
+- `recipe_hint_id uuid REFERENCES task_recipes(id) ON DELETE SET NULL`
 
-**Primary creation point**: `ProjectDetail.tsx` lines 112-145.
+### Columns Added to `tasks`
 
-- Inserts into `tasks` with fields: `project_id`, `task`, `stage`, `priority`, `materials_on_site`, `room_area`, `trade`, `notes`, `created_by`, `assigned_to_user_id`.
-- Then optionally bulk-inserts `task_materials`.
-- **No `parent_task_id` in the creation dialog** — subtasks are not created from this UI. There is no UI for creating subtasks currently visible.
-- **Other creation paths**:
-  - `field_mode_submit` edge function — creates tasks from AI-parsed field notes.
-  - `scope_walkthrough_apply` edge function — creates tasks from scope conversion.
-  - `walkthrough_parse_tasks` edge function — creates tasks from project walkthrough.
+- `sort_order integer` (nullable, no default)
+- `recipe_hint_id uuid REFERENCES task_recipes(id) ON DELETE SET NULL`
+- `source_recipe_id uuid REFERENCES task_recipes(id) ON DELETE SET NULL`
+- `source_recipe_step_id uuid REFERENCES task_recipe_steps(id) ON DELETE SET NULL`
+- `expanded_recipe_id uuid REFERENCES task_recipes(id) ON DELETE SET NULL`
 
-## 4. Project → Task Relationship
+All nullable with `ON DELETE SET NULL`.
 
-- `tasks.project_id` is required (NOT NULL, no default).
-- Every task must belong to a project. No orphan tasks possible.
-- Queried via `supabase.from('tasks').select('*').eq('project_id', id)`.
+### Single Migration
 
-## 5. Task List UI
+One migration creates both tables, all columns, all indexes, and all RLS policies.
 
-**File**: `src/pages/ProjectDetail.tsx` (lines 392-431).
+---
 
-- Root tasks rendered as `TaskCard` components.
-- Expand/collapse via `expandedIds` Set state (lines 51, 157-164).
-- Children rendered inline under expanded parents as `TaskCard` with `isChild` prop.
-- `TaskCard` shows: status badge, priority flag, due date, material count, action buttons (Dibs/Start/Complete or Join/Leave for crew).
+## 2. Recipe Expansion Logic
 
-## 6. Cost Handling
+**Guard condition**: expansion is blocked ONLY when the task already has children. No restriction based on `source_recipe_id` — tasks created by recipes can expand other recipes (multi-level).
 
-- **`actual_total_cost`** on `tasks` — admin-only editable (protected by `protect_actual_cost` trigger).
-- **No `estimated_cost` field** on tasks.
-- **Cost rollup** in `ProjectDetail.tsx` (lines 167-174): Parent cost = sum of children's `actual_total_cost`. If no children, uses own value. Project total = sum of all root task costs.
-- Scope items have separate pricing (`unit_cost_override`, `computed_total`, `pricing_status`) but those are on `scope_items`, not tasks.
+**Expansion steps**:
+1. Fetch `task_recipe_steps` for the recipe, ordered by `sort_order`
+2. Insert child tasks with: `project_id`, `parent_task_id`, `task` (from step title), `sort_order` (step sort_order × 10 for gaps), `source_recipe_id`, `source_recipe_step_id`, `trade` (step trade or parent trade), `priority` (inherit parent), `room_area` (inherit parent), `stage: 'Not Ready'`, `created_by`
+3. Update parent task: set `expanded_recipe_id = recipe.id`
+4. Refresh task list, auto-expand parent
 
-## 7. Existing Templates/Recipes
+All done client-side with standard Supabase inserts. No edge function needed. Expanded tasks are fully editable — users can add, delete, reorder, reassign.
 
-**No task recipe or task template system exists.** The only "template" concept is `checklist_templates` / `checklist_items` for scope review checklists — completely unrelated to task generation.
+---
 
-No tables, files, or logic for: recipes, task_templates, reusable_tasks, blueprints.
+## 3. Recipe Matching / Suggestion Logic
 
-## 8. Bulk Task Operations
+**New file**: `src/lib/recipeMatch.ts`
 
-**No bulk task operations exist.** There is no multi-select, batch edit, or duplicate functionality for tasks.
+Function `suggestRecipes(description, recipes)`:
+- Normalize description (reuse `normalizeForChecklistMatch` patterns)
+- For each recipe, check each keyword via substring match + adaptive Jaccard
+- Return sorted matches
 
-Bulk operations exist only for materials (`Shopping.tsx`, `ProjectMaterials.tsx`) — mark purchased/delivered in bulk. These don't touch tasks.
+**In `scope_walkthrough_parse` edge function**: After LLM parsing, run deterministic recipe matching on items with status `Repair` or `Replace` only. Attach `recipe_hint_id` to response. Same algorithm duplicated server-side (inline in the edge function).
 
-## 9. Edge Functions That Modify Tasks
+**In `ScopeWalkthrough.tsx`**: On commit, write `recipe_hint_id` to scope items.
 
-| Function | Purpose |
+**In `ScopeDetail.tsx` `handleConvert`** (line 240-248): Add `recipe_hint_id: item.recipe_hint_id || null` to task inserts.
+
+**In `TaskDetail.tsx`**: If task has no children:
+- If `recipe_hint_id` exists, fetch that recipe and show banner
+- Else run `suggestRecipes` as fallback
+- Show: "Recipe available: {name} — [Expand]"
+
+---
+
+## 4. Task Ordering
+
+Add `sort_order integer` (nullable) to tasks. Update all task queries:
+
+| Location | New ordering |
 |---|---|
-| `field_mode_submit` | Creates tasks + materials from AI-parsed field notes |
-| `walkthrough_parse_tasks` | AI parses project walkthrough text into tasks |
-| `scope_walkthrough_apply` | Applies scope walkthrough results (creates/updates scope items, not tasks directly) |
-| `scope_walkthrough_parse` | AI parses scope walkthrough (scope items, not tasks) |
-| `field_mode_parse` | AI parses raw field text (returns parsed JSON, doesn't insert) |
+| `ProjectDetail.tsx` line 63 | `.order('sort_order', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false })` |
+| `TaskDetail.tsx` fetchChildren | `.order('sort_order', { ascending: true, nullsFirst: false }).order('created_at', { ascending: true })` |
+| `Today.tsx` | Same pattern where children are fetched |
 
-Only `field_mode_submit` and `walkthrough_parse_tasks` actually INSERT into `tasks`.
+Existing tasks remain `sort_order = NULL` and sort by `created_at` (NULLS LAST behavior).
 
-## 10. Technical Constraints for Recipe Expansion
+---
 
-1. **No sort_order on tasks** — recipe children would need insertion order. Currently ordered by `created_at DESC`. Adding a `sort_order` column would be needed for deterministic ordering of expanded recipe steps.
+## 5. Recipe Editor UI
 
-2. **Single-level nesting only** — the UI only supports parent→children (one level). Recipes with nested sub-recipes would require deeper nesting support or flattening.
+**New file**: `src/pages/AdminRecipes.tsx`
 
-3. **No bulk task insert UI** — recipe expansion would need to insert N children in one operation. The DB and edge functions already do multi-insert (field_mode_submit inserts tasks in a loop), so the backend supports it. The frontend would need new logic.
+- List all recipes (name, trade, estimated_cost, step count)
+- Click to edit: inline step list with add/delete/reorder/edit title
+- Create new recipe with name, trade, keywords, estimated_cost
+- Recipe edits only affect future expansions
 
-4. **No task duplication** — no existing "clone task" helper to build on.
+**Integration**: Add "Recipes" tab to `AdminPanel.tsx` TabsList. Add route `/admin/recipes` in `App.tsx`.
 
-5. **`parent_task_id` not settable from UI** — the creation dialog doesn't expose it. Recipe expansion would bypass the dialog and insert directly.
+---
 
-6. **RLS is permissive enough** — contractors and managers can insert tasks on their projects, so recipe expansion wouldn't need RLS changes.
+## 6. Create Recipe From Tasks
 
-7. **Cost fields are task-level only** — recipes with estimated costs would need either a new field on tasks or mapping to scope_items via `source_scope_item_id`.
+In `TaskDetail.tsx`, when a parent task has children, show a "Save as Recipe" button (admin/manager only).
+
+Behavior:
+1. Prompt for recipe name and trade
+2. Read children tasks ordered by `sort_order NULLS LAST, created_at`
+3. Insert `task_recipes` row with name, trade, `created_by`
+4. Insert `task_recipe_steps` with titles from child task descriptions, `sort_order` from position index × 10
+5. Toast confirmation
+
+---
+
+## 7. Cost Learning Mechanism
+
+When a parent task with `expanded_recipe_id` is marked Done (existing stage-sync logic already detects this):
+1. Sum `actual_total_cost` of all children
+2. Fetch the recipe's current `last_actual_avg` and `last_actual_count`
+3. Compute incremental average: `new_avg = old_avg + (actual - old_avg) / (old_count + 1)`
+4. Update recipe with new avg and count
+
+This is a future enhancement — the schema supports it now but the trigger logic will be added later. Does not affect existing cost rollup behavior.
+
+---
+
+## 8. Files to Modify
+
+| File | Change |
+|---|---|
+| **Migration SQL** | Create tables, columns, indexes, RLS |
+| `src/lib/recipeMatch.ts` (new) | Suggestion matching utility |
+| `src/lib/supabase-types.ts` | Add `AssignmentMode` already exists; no recipe types needed beyond DB types |
+| `src/pages/AdminRecipes.tsx` (new) | Recipe CRUD page |
+| `src/pages/AdminPanel.tsx` | Add Recipes tab |
+| `src/App.tsx` | Add `/admin/recipes` route |
+| `src/pages/TaskDetail.tsx` | Recipe suggestion banner, expand action, "Save as Recipe" button |
+| `src/pages/ProjectDetail.tsx` | Update query ordering |
+| `src/pages/ScopeDetail.tsx` | Add `recipe_hint_id` to task inserts during conversion (line 240-248) |
+| `src/pages/ScopeWalkthrough.tsx` | Pass `recipe_hint_id` on commit |
+| `supabase/functions/scope_walkthrough_parse/index.ts` | Post-LLM recipe matching for Repair/Replace items |
 
