@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, Wrench, RefreshCw, HelpCircle } from 'lucide-react';
+import { isChecklistCovered } from '@/lib/checklistMatch';
 
 interface ChecklistItem {
   id: string;
