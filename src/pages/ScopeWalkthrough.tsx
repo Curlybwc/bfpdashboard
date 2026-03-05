@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { SCOPE_ITEM_STATUSES } from '@/lib/supabase-types';
 import { matchExistingScopeItem, strongerStatus } from '@/lib/checklistMatch';
+import { detectRehabTemplates, type RehabTemplate } from '@/lib/rehabMatch';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import PageHeader from '@/components/PageHeader';
@@ -13,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Info, BookOpen, Plus } from 'lucide-react';
 
 function normalizeForLibrary(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -116,6 +117,11 @@ const ScopeWalkthrough = () => {
   const [committing, setCommitting] = useState(false);
   const [saveAllToLibrary, setSaveAllToLibrary] = useState(true);
 
+  // Rehab detection state
+  const [detectedRehabs, setDetectedRehabs] = useState<{ template: RehabTemplate; score: number }[]>([]);
+  const [generatedRehabIds, setGeneratedRehabIds] = useState<Set<string>>(new Set());
+  const [generatingRehabId, setGeneratingRehabId] = useState<string | null>(null);
+
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -149,6 +155,12 @@ const ScopeWalkthrough = () => {
 
     setLoading(true);
     try {
+      // Fetch rehab templates for detection
+      const { data: rehabTemplates } = await supabase
+        .from('rehab_library')
+        .select('id, name, keywords')
+        .eq('active', true);
+
       const { data, error } = await supabase.functions.invoke('scope_walkthrough_parse', {
         body: { scope_id: id, walkthrough_text: allText },
       });
@@ -156,6 +168,12 @@ const ScopeWalkthrough = () => {
 
       const result = data as ParseResult;
       setParseResult(result);
+
+      // Detect rehab templates
+      if (rehabTemplates && rehabTemplates.length > 0) {
+        const matches = detectRehabTemplates(allText, rehabTemplates as RehabTemplate[]);
+        setDetectedRehabs(matches);
+      }
 
       // Initialize editable new items with structured pricing
       setEditableNewItems((result.new_items || []).map(item => {
@@ -428,6 +446,41 @@ const ScopeWalkthrough = () => {
     setEditableNewItems(prev => prev.map(item => ({ ...item, saveToLibrary: checked })));
   };
 
+  const handleGenerateRehab = async (templateId: string) => {
+    if (!id) return;
+    setGeneratingRehabId(templateId);
+    try {
+      const { data: items } = await supabase
+        .from('rehab_library_items')
+        .select('*')
+        .eq('library_id', templateId)
+        .order('sort_order');
+
+      if (!items || items.length === 0) {
+        toast({ title: 'No items in this template', variant: 'destructive' });
+        return;
+      }
+
+      const inserts = items.map((item: any) => ({
+        scope_id: id,
+        description: item.description,
+        status: item.default_status || 'Repair',
+        recipe_hint_id: item.recipe_hint_id || null,
+        pricing_status: 'Needs Pricing' as const,
+      }));
+
+      const { error } = await supabase.from('scope_items').insert(inserts);
+      if (error) throw error;
+
+      setGeneratedRehabIds(prev => new Set(prev).add(templateId));
+      toast({ title: `${items.length} scope items generated` });
+    } catch (err: any) {
+      toast({ title: 'Error generating scope', description: err.message, variant: 'destructive' });
+    } finally {
+      setGeneratingRehabId(null);
+    }
+  };
+
   const selectedNewCount = editableNewItems.filter(i => i.selected).length;
   const matchedApplyCount = editableMatched.filter(m => m.applyUpdate).length;
   const totalCommitCount = selectedNewCount + matchedApplyCount;
@@ -453,6 +506,39 @@ const ScopeWalkthrough = () => {
           }
         />
         <div className="p-4 space-y-6">
+          {/* Detected Rehab Templates */}
+          {detectedRehabs.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold flex items-center gap-1 mb-2">
+                <BookOpen className="h-4 w-4" /> Detected Rehab Types ({detectedRehabs.length})
+              </h2>
+              <div className="space-y-2">
+                {detectedRehabs.map(({ template }) => (
+                  <Card key={template.id} className="p-3 flex items-center justify-between">
+                    <p className="text-sm font-medium">{template.name}</p>
+                    {generatedRehabIds.has(template.id) ? (
+                      <Badge variant="default" className="text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Generated</Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleGenerateRehab(template.id)}
+                        disabled={generatingRehabId === template.id}
+                      >
+                        {generatingRehabId === template.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <Plus className="h-3 w-3 mr-1" />
+                        )}
+                        Generate Scope
+                      </Button>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Member warnings */}
           {memberWarnings.length > 0 && (
             <Alert variant="destructive">

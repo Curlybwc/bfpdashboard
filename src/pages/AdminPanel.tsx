@@ -82,12 +82,14 @@ const AdminPanel = () => {
           if (v === 'materials') navigate('/admin/inventory/materials');
           if (v === 'sections') navigate('/admin/store-sections');
           if (v === 'recipes') navigate('/admin/recipes');
+          if (v === 'rehab') navigate('/admin/rehab-library');
         }}>
           <TabsList className="mb-3">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
             <TabsTrigger value="aliases">Aliases</TabsTrigger>
             <TabsTrigger value="recipes">Recipes</TabsTrigger>
+            <TabsTrigger value="rehab">Rehab</TabsTrigger>
             <TabsTrigger value="sections">Sections</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>

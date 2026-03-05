@@ -365,6 +365,87 @@ export type Database = {
           },
         ]
       }
+      rehab_library: {
+        Row: {
+          active: boolean
+          category: string | null
+          created_at: string
+          created_by: string
+          id: string
+          keywords: string[] | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          keywords?: string[] | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          keywords?: string[] | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rehab_library_items: {
+        Row: {
+          created_at: string
+          default_status: string
+          description: string
+          id: string
+          library_id: string
+          recipe_hint_id: string | null
+          sort_order: number
+          trade: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_status?: string
+          description: string
+          id?: string
+          library_id: string
+          recipe_hint_id?: string | null
+          sort_order?: number
+          trade?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_status?: string
+          description?: string
+          id?: string
+          library_id?: string
+          recipe_hint_id?: string | null
+          sort_order?: number
+          trade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rehab_library_items_library_id_fkey"
+            columns: ["library_id"]
+            isOneToOne: false
+            referencedRelation: "rehab_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rehab_library_items_recipe_hint_id_fkey"
+            columns: ["recipe_hint_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scope_checklist_reviews: {
         Row: {
           checklist_item_id: string
@@ -706,6 +787,50 @@ export type Database = {
             columns: ["tool_type_id"]
             isOneToOne: false
             referencedRelation: "tool_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_recipe_step_materials: {
+        Row: {
+          created_at: string
+          id: string
+          material_name: string
+          notes: string | null
+          qty: number | null
+          recipe_step_id: string
+          sku: string | null
+          store: string | null
+          unit: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          material_name: string
+          notes?: string | null
+          qty?: number | null
+          recipe_step_id: string
+          sku?: string | null
+          store?: string | null
+          unit?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          material_name?: string
+          notes?: string | null
+          qty?: number | null
+          recipe_step_id?: string
+          sku?: string | null
+          store?: string | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_recipe_step_materials_recipe_step_id_fkey"
+            columns: ["recipe_step_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipe_steps"
             referencedColumns: ["id"]
           },
         ]
