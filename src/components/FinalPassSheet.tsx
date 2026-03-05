@@ -1,11 +1,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeForChecklistMatch } from '@/lib/checklistMatch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, Wrench, RefreshCw, HelpCircle } from 'lucide-react';
+import { isChecklistCovered } from '@/lib/checklistMatch';
 
 interface ChecklistItem {
   id: string;
@@ -34,8 +36,6 @@ interface FinalPassSheetProps {
 }
 
 type ActionState = 'OK' | 'Repair' | 'Replace' | 'Get Bid';
-
-const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
 const UNIT_MAP: Record<string, string> = {
   each: 'each',
@@ -80,20 +80,10 @@ const FinalPassSheet = ({ scopeId, items, open, onOpenChange, onUpdate }: FinalP
   useEffect(() => { fetchChecklist(); }, [fetchChecklist]);
 
   const isCovered = (ci: ChecklistItem) => {
-    // Check scope_items match by normalized description or cost_item_id
-    const normalizedItems = items.map(si => ({
-      ...si,
-      normalized_description: normalize(si.description),
-    }));
-
-    const matchByScopeItem = normalizedItems.some(si =>
-      si.normalized_description === ci.normalized_label ||
-      (si.cost_item_id != null && ci.default_cost_item_id != null && si.cost_item_id === ci.default_cost_item_id)
+    const matchByScopeItem = items.some(si =>
+      isChecklistCovered(si.description, ci.normalized_label, si.cost_item_id, ci.default_cost_item_id)
     );
-
-    // Check if review row exists (any state, since row absence = Not Checked)
     const matchByReview = reviews.some(r => r.checklist_item_id === ci.id);
-
     return matchByScopeItem || matchByReview;
   };
 
@@ -123,7 +113,7 @@ const FinalPassSheet = ({ scopeId, items, open, onOpenChange, onUpdate }: FinalP
         const normalizedLabel = ci.normalized_label;
 
         // Check for existing scope_item by normalized description OR cost_item_id
-        const existingByDesc = items.find(si => normalize(si.description) === normalizedLabel);
+        const existingByDesc = items.find(si => normalizeForChecklistMatch(si.description) === normalizedLabel);
         const existingByCost = ci.default_cost_item_id
           ? items.find(si => si.cost_item_id === ci.default_cost_item_id)
           : null;

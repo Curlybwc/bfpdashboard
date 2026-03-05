@@ -9,6 +9,46 @@ function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
+/** Normalize for checklist matching: strip verbs, apply synonyms, remove punctuation */
+function normalizeForChecklistMatch(s: string): string {
+  let t = s.toLowerCase().trim().replace(/\s+/g, ' ');
+  t = t.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  // Strip leading verbs/fillers
+  t = t.replace(/^(replace|repair|get bid|bid|need to|we need to|install|remove|new)\s+/i, '').trim();
+  // Synonym map
+  const synonyms: [RegExp, string][] = [
+    [/\b(bathroom|5x7 bathroom)\b/, 'bathroom replacement'],
+    [/\b(furnace|ac|furnace\/ac|furnace ac)\b/, 'hvac'],
+    [/\b(sewer hookup|sewer connect|sewer trench)\b/, 'sewer lateral'],
+    [/\b(breaker box|panel|meter|mast|service)\b/, 'electrical panel'],
+    [/\b(trashout|cleanout|trash out|clean out)\b/, 'dumpsters'],
+    [/\b(countertops?|counters?)\b/, 'kitchen counters'],
+    [/\b(kitchen)\s+(cabinets?)\b/, 'kitchen cabinets'],
+  ];
+  for (const [pat, replacement] of synonyms) {
+    t = t.replace(pat, replacement);
+  }
+  return t.trim();
+}
+
+function jaccardSimilarity(a: string, b: string): number {
+  const setA = new Set(a.split(' ').filter(Boolean));
+  const setB = new Set(b.split(' ').filter(Boolean));
+  const intersection = [...setA].filter(x => setB.has(x)).length;
+  const union = new Set([...setA, ...setB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function adaptiveJaccardMatch(siNorm: string, ciNorm: string): boolean {
+  // Substring containment
+  if (siNorm.includes(ciNorm) || ciNorm.includes(siNorm)) return true;
+  const siTokens = siNorm.split(' ').filter(Boolean).length;
+  const ciTokens = ciNorm.split(' ').filter(Boolean).length;
+  const minTokens = Math.min(siTokens, ciTokens);
+  const threshold = minTokens <= 2 ? 0.50 : 0.70;
+  return jaccardSimilarity(siNorm, ciNorm) >= threshold;
+}
+
 // Deterministic pricing extractor — runs after LLM to fill gaps
 function extractPricing(item: any, walkthroughText: string) {
   const text = [item.description, item.notes, item.price_evidence, walkthroughText]
@@ -21,7 +61,6 @@ function extractPricing(item: any, walkthroughText: string) {
   const priceEvidence = typeof item.price_evidence === 'string' ? item.price_evidence : null;
   const priceConfidence = typeof item.price_confidence === 'string' ? item.price_confidence : null;
 
-  // Extract quantity patterns: "15 windows", "3 dumpsters", "800 square feet"
   const unitMap: Record<string, string> = {
     'square foot': 'sqft', 'square feet': 'sqft', 'sq ft': 'sqft', 'sqft': 'sqft',
     'sf': 'sqft', 'squares': 'square', 'square': 'square',
@@ -38,14 +77,12 @@ function extractPricing(item: any, walkthroughText: string) {
   };
   const unitPattern = Object.keys(unitMap).sort((a, b) => b.length - a.length).join('|');
 
-  // Parse "X [unit]" quantity patterns (only fill if LLM left blank)
   if (qty == null) {
     const qtyRegex = new RegExp(`(\\d+(?:,\\d{3})*)\\s*(?:${unitPattern})`, 'gi');
     const qtyMatch = qtyRegex.exec(text);
     if (qtyMatch) {
       qty = parseFloat(qtyMatch[1].replace(/,/g, ''));
       if (unit == null) {
-        // Find which unit matched
         const afterNum = text.slice(qtyMatch.index + qtyMatch[1].length).trim().toLowerCase();
         for (const [pattern, mapped] of Object.entries(unitMap)) {
           if (afterNum.startsWith(pattern)) {
@@ -57,7 +94,6 @@ function extractPricing(item: any, walkthroughText: string) {
     }
   }
 
-  // Parse "$Y per [unit]" or "$Y a [unit]" or "at $Y a [unit]" or "at$Y"
   if (unitCost == null) {
     const perUnitRegex = /(?:at\s*)?\$\s*([\d,]+(?:\.\d+)?)\s*(?:per|a|\/)\s*(\w+)/gi;
     const perMatch = perUnitRegex.exec(text);
@@ -70,9 +106,7 @@ function extractPricing(item: any, walkthroughText: string) {
     }
   }
 
-  // Parse total cost patterns: "cost $Z", "is $Z", "total $Z", standalone "$Z" after description keywords
   if (totalCost == null) {
-    // "going to cost $8000", "cost $8000", "HVAC $8000", "about $Z"
     const totalRegex = /(?:cost|about|total|is|for)\s*\$\s*([\d,]+(?:\.\d+)?)/gi;
     const totalMatch = totalRegex.exec(text);
     if (totalMatch) {
@@ -80,10 +114,8 @@ function extractPricing(item: any, walkthroughText: string) {
     }
   }
 
-  // If still no total, look for standalone $ amounts in the description context
   if (totalCost == null && unitCost == null) {
     const desc = (item.description || '').toLowerCase();
-    // Search for "$X" near the item description in walkthrough
     const descWords = desc.split(/\s+/).filter((w: string) => w.length > 3);
     if (descWords.length > 0) {
       const escapedWords = descWords.map((w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -98,19 +130,16 @@ function extractPricing(item: any, walkthroughText: string) {
     }
   }
 
-  // If only total provided and no unit cost, set qty=1, unit="job", unit_cost=total
   if (totalCost != null && unitCost == null && qty == null) {
     qty = 1;
     unit = unit || 'job';
     unitCost = totalCost;
   }
 
-  // If we have qty and total but no unit cost, derive it
   if (totalCost != null && unitCost == null && qty != null && qty > 0) {
     unitCost = totalCost / qty;
   }
 
-  // If we have qty and unit cost but no total, derive it
   if (totalCost == null && unitCost != null && qty != null) {
     totalCost = qty * unitCost;
   }
@@ -165,12 +194,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch all data in parallel
-    const [itemsRes, profilesRes, aliasesRes, costItemsRes] = await Promise.all([
+    // Fetch all data in parallel (including checklist)
+    const [itemsRes, profilesRes, aliasesRes, costItemsRes, scopeRes] = await Promise.all([
       adminClient.from('scope_items').select('id, description, status, notes, qty, unit, phase_key, cost_item_id, unit_cost_override').eq('scope_id', scope_id),
       adminClient.from('profiles').select('id, full_name').not('full_name', 'is', null).neq('full_name', ''),
       adminClient.from('profile_aliases').select('user_id, alias'),
       adminClient.from('cost_items').select('id, name, normalized_name, default_total_cost, unit_type').eq('active', true),
+      adminClient.from('scopes').select('checklist_template_id').eq('id', scope_id).single(),
     ]);
 
     if (itemsRes.error) {
@@ -181,6 +211,30 @@ Deno.serve(async (req) => {
     const allProfiles = profilesRes.data || [];
     const allAliases = aliasesRes.data || [];
     const costItems = costItemsRes.data || [];
+
+    // --- Fetch checklist items ---
+    let checklistItems: any[] = [];
+    let templateId = scopeRes.data?.checklist_template_id || null;
+    if (!templateId) {
+      const { data: defaultTpl } = await adminClient.from('checklist_templates')
+        .select('id').eq('active', true).limit(1);
+      templateId = defaultTpl?.[0]?.id || null;
+    }
+    if (templateId) {
+      const { data: ci } = await adminClient.from('checklist_items')
+        .select('id, label, normalized_label, category, default_cost_item_id')
+        .eq('template_id', templateId).eq('active', true);
+      checklistItems = ci || [];
+    }
+    const checklistIdSet = new Set(checklistItems.map((c: any) => c.id));
+
+    // Fetch existing reviews for not_addressed calculation
+    let existingReviewIds = new Set<string>();
+    if (checklistItems.length > 0) {
+      const { data: existingRevs } = await adminClient.from('scope_checklist_reviews')
+        .select('checklist_item_id').eq('scope_id', scope_id);
+      existingReviewIds = new Set((existingRevs || []).map((r: any) => r.checklist_item_id));
+    }
 
     // Build known users
     const aliasMap = new Map<string, string[]>();
@@ -202,12 +256,16 @@ Deno.serve(async (req) => {
 
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
-    // Build scope items context for LLM (may be empty)
     const existingItemsList = scopeItems.length > 0
       ? scopeItems.map(i =>
           `- ID: ${i.id} | "${i.description}" | Status: ${i.status} | Qty: ${i.qty ?? 'N/A'} | Unit: ${i.unit ?? 'N/A'}`
         ).join('\n')
       : '(none)';
+
+    // Build checklist context for LLM
+    const checklistContext = checklistItems.length > 0
+      ? `\nCHECKLIST ITEMS (assign checklist_item_id from this list if a walkthrough item matches, or null):\n${JSON.stringify(checklistItems.map((c: any) => ({ id: c.id, label: c.label, category: c.category })))}`
+      : '';
 
     const systemPrompt = `You are a construction scope analyzer. Given walkthrough notes from a property inspection and a list of existing scope items (which may be empty), do TWO things:
 
@@ -254,6 +312,7 @@ GENERATION RULES:
   - price_evidence: the exact original phrase from the walkthrough that contains pricing info. If no pricing mentioned, use null.
   - price_confidence: "high" if explicit numbers stated, "medium" if estimated/approximate language used, "low" if inferred. null if no pricing.
   - phase_key: "demo", "rough", "finish", or null
+  - checklist_item_id: if a checklist item matches this work, provide its id. Otherwise null.
 
 CRITICAL PRICING RULES:
 - ALWAYS extract quantities from text: "15 windows" → qty=15, "3 dumpsters" → qty=3
@@ -276,20 +335,24 @@ ${existingItemsList}
 
 KNOWN USERS:
 ${JSON.stringify(knownUsers)}
+${checklistContext}
 
 Return ONLY valid JSON:
 {
   "matched": [
-    { "scope_item_id": "uuid", "suggested_status": "OK|Repair|Replace|Get Bid", "suggested_notes": "string or null", "suggested_qty": null, "suggested_unit": null }
+    { "scope_item_id": "uuid", "suggested_status": "OK|Repair|Replace|Get Bid", "suggested_notes": "string or null", "suggested_qty": null, "suggested_unit": null, "checklist_item_id": "uuid or null" }
   ],
   "new_items": [
-    { "description": "string", "status": "Repair|Replace|Get Bid|OK", "notes": "string or null", "qty": null, "unit": null, "unit_cost": null, "total_cost": null, "price_evidence": "string or null", "price_confidence": "string or null", "phase_key": null }
+    { "description": "string", "status": "Repair|Replace|Get Bid|OK", "notes": "string or null", "qty": null, "unit": null, "unit_cost": null, "total_cost": null, "price_evidence": "string or null", "price_confidence": "string or null", "phase_key": null, "checklist_item_id": "uuid or null" }
   ],
   "get_bid_items": [
     { "id": "uuid", "description": "string", "reason": "string" }
   ],
   "not_addressed_items": [
     { "id": "uuid", "description": "string" }
+  ],
+  "not_addressed_checklist_items": [
+    { "id": "uuid", "label": "string", "category": "string" }
   ],
   "member_user_ids_to_add": ["uuid"],
   "member_display_names_to_add": ["string"],
@@ -331,7 +394,6 @@ Return ONLY valid JSON:
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error('No JSON found');
-      // Clean control characters and trailing commas
       const cleaned = jsonMatch[0]
         .replace(/[\x00-\x1f\x7f]/g, ' ')
         .replace(/,\s*([}\]])/g, '$1');
@@ -345,11 +407,63 @@ Return ONLY valid JSON:
     const validUserIds = new Set(allProfiles.map((p: any) => p.id));
     const validStatuses = ['OK', 'Repair', 'Replace', 'Get Bid'];
 
-    // Validate matched items
+    // --- Deterministic checklist mapping function ---
+    function assignChecklistId(itemDesc: string, costItemId: string | null): { id: string | null; label: string | null; category: string | null } {
+      if (checklistItems.length === 0) return { id: null, label: null, category: null };
+
+      // 1) Cost item link match
+      if (costItemId) {
+        const match = checklistItems.find((c: any) => c.default_cost_item_id === costItemId);
+        if (match) return { id: match.id, label: match.label, category: match.category };
+      }
+
+      // 2) Exact normalized match (normalize the description, compare to stored normalized_label)
+      const norm = normalizeForChecklistMatch(itemDesc);
+      const exactMatch = checklistItems.find((c: any) => c.normalized_label === norm);
+      if (exactMatch) return { id: exactMatch.id, label: exactMatch.label, category: exactMatch.category };
+
+      // 3) Fuzzy match with adaptive threshold + substring containment
+      let bestScore = 0;
+      let bestMatch: any = null;
+      for (const c of checklistItems) {
+        const ciNorm = c.normalized_label;
+        // Substring containment
+        if (norm.includes(ciNorm) || ciNorm.includes(norm)) {
+          return { id: c.id, label: c.label, category: c.category };
+        }
+        const score = jaccardSimilarity(norm, ciNorm);
+        const siTokens = norm.split(' ').filter(Boolean).length;
+        const ciTokens = ciNorm.split(' ').filter(Boolean).length;
+        const minTokens = Math.min(siTokens, ciTokens);
+        const threshold = minTokens <= 2 ? 0.50 : 0.70;
+        if (score >= threshold && score > bestScore) {
+          bestScore = score;
+          bestMatch = c;
+        }
+      }
+      if (bestMatch) return { id: bestMatch.id, label: bestMatch.label, category: bestMatch.category };
+
+      return { id: null, label: null, category: null };
+    }
+
+    // Validate matched items + assign checklist
     const matched = (parsed.matched || [])
       .filter((m: any) => m.scope_item_id && validItemIds.has(m.scope_item_id) && validStatuses.includes(m.suggested_status))
       .map((m: any) => {
         const existing = scopeItems.find(i => i.id === m.scope_item_id);
+        // Deterministic checklist mapping (override LLM)
+        const checklistMatch = assignChecklistId(
+          existing?.description || '',
+          existing?.cost_item_id || null
+        );
+        // Fallback to LLM suggestion if valid
+        const llmChecklistId = m.checklist_item_id;
+        const finalChecklist = checklistMatch.id
+          ? checklistMatch
+          : (llmChecklistId && checklistIdSet.has(llmChecklistId)
+            ? { id: llmChecklistId, label: checklistItems.find((c: any) => c.id === llmChecklistId)?.label || null, category: checklistItems.find((c: any) => c.id === llmChecklistId)?.category || null }
+            : { id: null, label: null, category: null });
+
         return {
           scope_item_id: m.scope_item_id,
           description: existing?.description || '',
@@ -358,25 +472,25 @@ Return ONLY valid JSON:
           suggested_notes: typeof m.suggested_notes === 'string' ? m.suggested_notes : null,
           suggested_qty: typeof m.suggested_qty === 'number' ? m.suggested_qty : null,
           suggested_unit: typeof m.suggested_unit === 'string' ? m.suggested_unit : null,
+          checklist_item_id: finalChecklist.id,
+          checklist_label: finalChecklist.label,
+          checklist_category: finalChecklist.category,
         };
       });
 
-    // Process new items: LLM output + deterministic post-processing + cost library enrichment
+    // Process new items
     const newItems = (parsed.new_items || []).map((item: any) => {
-      // Run deterministic pricing extractor
       const extracted = extractPricing(item, walkthrough_text);
 
       const desc = item.description || '';
       const norm = normalize(desc);
       const costMatch = costItemsByNorm.get(norm);
 
-      // Determine final values: extractor fills gaps, doesn't overwrite LLM
       const finalQty = extracted.qty;
       const finalUnit = extracted.unit;
       let finalUnitCost = extracted.unit_cost;
       const finalTotalCost = extracted.total_cost;
 
-      // Cost library fills ONLY if walkthrough didn't provide pricing
       let matchedCostItemId = costMatch?.id || null;
       let matchedCostItemUnit = costMatch?.unit_type || null;
       let matchedCostItemUnitCost = costMatch?.default_total_cost || null;
@@ -385,13 +499,21 @@ Return ONLY valid JSON:
       if (finalUnitCost != null || finalTotalCost != null) {
         priceSource = 'walkthrough';
       } else if (matchedCostItemUnitCost != null) {
-        // Only fill from library if walkthrough didn't provide
         finalUnitCost = matchedCostItemUnitCost;
         priceSource = 'library';
       }
 
-      // Determine status for new items: use LLM status, default to 'Get Bid'
+      // Coerce Not Checked to Get Bid for mentioned items
       const llmStatus = typeof item.status === 'string' && validStatuses.includes(item.status) ? item.status : 'Get Bid';
+
+      // Deterministic checklist mapping
+      const checklistMatch = assignChecklistId(desc, matchedCostItemId);
+      const llmChecklistId = item.checklist_item_id;
+      const finalChecklist = checklistMatch.id
+        ? checklistMatch
+        : (llmChecklistId && checklistIdSet.has(llmChecklistId)
+          ? { id: llmChecklistId, label: checklistItems.find((c: any) => c.id === llmChecklistId)?.label || null, category: checklistItems.find((c: any) => c.id === llmChecklistId)?.category || null }
+          : { id: null, label: null, category: null });
 
       return {
         description: desc,
@@ -409,8 +531,35 @@ Return ONLY valid JSON:
         matched_cost_item_id: matchedCostItemId,
         matched_cost_item_unit: matchedCostItemUnit,
         matched_cost_item_unit_cost: matchedCostItemUnitCost,
+        checklist_item_id: finalChecklist.id,
+        checklist_label: finalChecklist.label,
+        checklist_category: finalChecklist.category,
       };
     });
+
+    // --- Deterministic not_addressed_checklist_items ---
+    const coveredChecklistIds = new Set<string>();
+    // From walkthrough matched/new items
+    for (const m of matched) { if (m.checklist_item_id) coveredChecklistIds.add(m.checklist_item_id); }
+    for (const n of newItems) { if (n.checklist_item_id) coveredChecklistIds.add(n.checklist_item_id); }
+    // From existing scope items (deterministic match)
+    for (const ci of checklistItems) {
+      if (coveredChecklistIds.has(ci.id)) continue;
+      const matchByScopeItem = scopeItems.some((si: any) => {
+        if (si.cost_item_id && ci.default_cost_item_id && si.cost_item_id === ci.default_cost_item_id) return true;
+        const siNorm = normalizeForChecklistMatch(si.description);
+        if (siNorm === ci.normalized_label) return true;
+        if (adaptiveJaccardMatch(siNorm, ci.normalized_label)) return true;
+        return false;
+      });
+      if (matchByScopeItem) coveredChecklistIds.add(ci.id);
+    }
+    // From existing reviews
+    for (const rid of existingReviewIds) coveredChecklistIds.add(rid);
+
+    const notAddressedChecklistItems = checklistItems
+      .filter((ci: any) => !coveredChecklistIds.has(ci.id))
+      .map((ci: any) => ({ id: ci.id, label: ci.label, category: ci.category }));
 
     // Validate member IDs
     const memberIds = (parsed.member_user_ids_to_add || []).filter((id: string) => validUserIds.has(id));
@@ -428,6 +577,7 @@ Return ONLY valid JSON:
       not_addressed_items: (parsed.not_addressed_items || []).filter(
         (i: any) => i.id && validItemIds.has(i.id)
       ),
+      not_addressed_checklist_items: notAddressedChecklistItems,
       member_user_ids_to_add: memberIds,
       member_display_names_to_add: memberNames,
       member_warnings: Array.isArray(parsed.member_warnings)

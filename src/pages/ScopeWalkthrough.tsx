@@ -26,6 +26,9 @@ interface MatchedItem {
   suggested_notes: string | null;
   suggested_qty: number | null;
   suggested_unit: string | null;
+  checklist_item_id: string | null;
+  checklist_label: string | null;
+  checklist_category: string | null;
 }
 
 interface NewItem {
@@ -44,6 +47,9 @@ interface NewItem {
   matched_cost_item_id: string | null;
   matched_cost_item_unit: string | null;
   matched_cost_item_unit_cost: number | null;
+  checklist_item_id: string | null;
+  checklist_label: string | null;
+  checklist_category: string | null;
 }
 
 interface ParseResult {
@@ -51,6 +57,7 @@ interface ParseResult {
   new_items: NewItem[];
   get_bid_items: { id: string; description: string; reason: string }[];
   not_addressed_items: { id: string; description: string }[];
+  not_addressed_checklist_items?: { id: string; label: string; category: string | null }[];
   member_user_ids_to_add?: string[];
   member_display_names_to_add?: string[];
   member_warnings?: string[];
@@ -296,7 +303,60 @@ const ScopeWalkthrough = () => {
         if (insertError) throw insertError;
       }
 
-      // 3) Auto-add members
+      // 3) Auto-checkoff: upsert scope_checklist_reviews
+      const reviewRows: { scope_id: string; checklist_item_id: string; state: string; notes: string | null }[] = [];
+      const validChecklistStates = ['OK', 'Repair', 'Replace', 'Get Bid'];
+      const strongStates = ['Repair', 'Replace', 'Get Bid'];
+
+      for (const m of matchedToApply) {
+        if (m.checklist_item_id && validChecklistStates.includes(m.suggested_status)) {
+          reviewRows.push({ scope_id: id!, checklist_item_id: m.checklist_item_id, state: m.suggested_status, notes: null });
+        }
+      }
+      for (const item of editableNewItems) {
+        if (!item.selected || !item.checklist_item_id) continue;
+        const st = item.editedStatus === 'Not Checked' ? 'Get Bid' : item.editedStatus;
+        if (validChecklistStates.includes(st)) {
+          reviewRows.push({ scope_id: id!, checklist_item_id: item.checklist_item_id, state: st, notes: null });
+        }
+      }
+
+      if (reviewRows.length > 0) {
+        const checklistIds = reviewRows.map(r => r.checklist_item_id);
+        const { data: existingRevs } = await supabase.from('scope_checklist_reviews')
+          .select('checklist_item_id, state, notes').eq('scope_id', id!).in('checklist_item_id', checklistIds);
+        const existingMap = new Map((existingRevs || []).map(r => [r.checklist_item_id, r]));
+
+        const finalRows = reviewRows
+          .filter(r => {
+            const existing = existingMap.get(r.checklist_item_id);
+            if (!existing) return true;
+            if (strongStates.includes(existing.state) && r.state === 'OK') return false;
+            return true;
+          })
+          .map(r => {
+            const existing = existingMap.get(r.checklist_item_id);
+            let notes = existing?.notes || null;
+            if (!notes) {
+              notes = 'From walkthrough';
+            } else if (!notes.includes('From walkthrough')) {
+              notes = notes + '; From walkthrough';
+            }
+            return {
+              scope_id: r.scope_id,
+              checklist_item_id: r.checklist_item_id,
+              state: r.state,
+              notes,
+              updated_at: new Date().toISOString(),
+            };
+          });
+
+        if (finalRows.length > 0) {
+          await supabase.from('scope_checklist_reviews').upsert(finalRows, { onConflict: 'scope_id,checklist_item_id' });
+        }
+      }
+
+      // 4) Auto-add members
       await autoAddMembers();
 
       const totalActions = matchedToApply.length + scopeItemInserts.length;
@@ -401,6 +461,11 @@ const ScopeWalkthrough = () => {
                         {item.suggested_notes && (
                           <p className="text-xs text-muted-foreground mt-1">{item.suggested_notes}</p>
                         )}
+                        {item.checklist_label ? (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Checklist: {item.checklist_category} / {item.checklist_label}</p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Checklist: no match</p>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -491,6 +556,11 @@ const ScopeWalkthrough = () => {
                           )}
                           {item.price_evidence && (
                             <p className="text-[10px] text-muted-foreground italic">"{item.price_evidence}"</p>
+                          )}
+                          {item.checklist_label ? (
+                            <p className="text-[10px] text-muted-foreground">Checklist: {item.checklist_category} / {item.checklist_label}</p>
+                          ) : (
+                            <p className="text-[10px] text-muted-foreground">Checklist: no match</p>
                           )}
                           {item.editedNotes && (
                             <Input

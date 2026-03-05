@@ -19,8 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
 import FinalPassSheet from '@/components/FinalPassSheet';
 import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
-
-const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+import { isChecklistCovered } from '@/lib/checklistMatch';
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -95,8 +94,7 @@ const ScopeDetail = () => {
     if (checklistItems.length === 0) return 0;
     return checklistItems.filter(ci => {
       const matchByScopeItem = items.some(si =>
-        normalize(si.description) === ci.normalized_label ||
-        (si.cost_item_id != null && ci.default_cost_item_id != null && si.cost_item_id === ci.default_cost_item_id)
+        isChecklistCovered(si.description, ci.normalized_label, si.cost_item_id, ci.default_cost_item_id)
       );
       const matchByReview = reviews.some(r => r.checklist_item_id === ci.id);
       return matchByScopeItem || matchByReview;
