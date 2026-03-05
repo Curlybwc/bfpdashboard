@@ -229,7 +229,7 @@ const ScopeDetail = () => {
                         <Label>Description</Label>
                         <Input value={desc} onChange={(e) => setDesc(e.target.value)} required />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-3 gap-3">
                         <div className="space-y-2">
                           <Label>Qty</Label>
                           <Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
@@ -237,6 +237,10 @@ const ScopeDetail = () => {
                         <div className="space-y-2">
                           <Label>Unit</Label>
                           <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="sqft, lf..." />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>$/unit</Label>
+                          <Input type="number" value={unitCostNew} onChange={(e) => setUnitCostNew(e.target.value)} step="0.01" placeholder="0.00" />
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
