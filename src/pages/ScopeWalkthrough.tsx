@@ -240,11 +240,24 @@ const ScopeWalkthrough = () => {
     try {
       // 1) Apply matched item updates
       const matchedToApply = editableMatched.filter(m => m.applyUpdate);
+
+      // Batch-fetch unit_cost_override for all matched items (no N+1)
+      const matchedIds = matchedToApply.map(m => m.scope_item_id);
+      let pricingMap = new Map<string, number | null>();
+      if (matchedIds.length > 0) {
+        const { data: pricingRows } = await supabase
+          .from('scope_items')
+          .select('id, unit_cost_override')
+          .in('id', matchedIds);
+        pricingMap = new Map((pricingRows || []).map(r => [r.id, r.unit_cost_override]));
+      }
+
       for (const m of matchedToApply) {
         const updates: any = { status: m.suggested_status };
         if (m.suggested_notes) updates.notes = m.suggested_notes;
         if (m.suggested_qty != null) updates.qty = m.suggested_qty;
         if (m.suggested_unit) updates.unit = m.suggested_unit;
+        updates.pricing_status = pricingMap.get(m.scope_item_id) != null ? 'Priced' : 'Needs Pricing';
         await supabase.from('scope_items').update(updates).eq('id', m.scope_item_id);
       }
 
