@@ -24,6 +24,8 @@ function normalizeForChecklistMatch(s: string): string {
     [/\b(trashout|cleanout|trash out|clean out)\b/, 'dumpsters'],
     [/\b(countertops?|counters?)\b/, 'kitchen counters'],
     [/\b(kitchen)\s+(cabinets?)\b/, 'kitchen cabinets'],
+    [/\b(hardwood floors?|hardwoods?|sand floors?|sand and finish)\b/, 'refinish hardwoods'],
+    [/\b(vinyl plank|luxury vinyl|lvp|vinyl flooring)\b/, 'vinyl flooring'],
   ];
   for (const [pat, replacement] of synonyms) {
     t = t.replace(pat, replacement);
