@@ -64,6 +64,7 @@ interface EditableNewItem extends NewItem {
   editedQty: string;
   editedUnit: string;
   editedUnitCost: string;
+  editedStatus: string;
   useLibraryPrice: boolean;
 }
 
