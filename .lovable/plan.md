@@ -1,97 +1,100 @@
 
 
-## Plan: Crew Tasks (Multi-Person, Multi-Day)
+# Implementation Plan: Final Pass Checklist + Scope Total Estimate
 
-### 1. Database Migration
+## 1. Database Migration (schema)
 
-Single migration adding columns, tables, indexes, RLS, and a helper function.
+Single migration creating 3 tables, adding 1 column to `scopes`, and setting up RLS.
 
-**New columns on `tasks`:**
-- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
-- `lead_user_id uuid NULL`
+### checklist_templates
+- id, name, active (default true), created_at, updated_at
+- RLS: SELECT for authenticated; INSERT/UPDATE/DELETE admin-only via `is_admin(auth.uid())`
 
-**New table `task_candidates` (eligibility pool):**
-```sql
-CREATE TABLE public.task_candidates (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
-```
+### checklist_items
+- id, template_id (FK cascade), label (NOT NULL), normalized_label (NOT NULL, indexed with template_id), category, default_cost_item_id (FK SET NULL), sort_order (default 0), active (default true), created_at, updated_at
+- Composite index on (template_id, normalized_label)
+- RLS: SELECT for authenticated; INSERT/UPDATE/DELETE admin-only
 
-**New table `task_workers` (active crew):**
-```sql
-CREATE TABLE public.task_workers (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  active boolean NOT NULL DEFAULT true,
-  joined_at timestamptz NOT NULL DEFAULT now(),
-  left_at timestamptz NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
-CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
-```
+### scope_checklist_reviews
+- id, scope_id (FK cascade), checklist_item_id (FK cascade), state (text NOT NULL, **no default**), notes, updated_at
+- UNIQUE(scope_id, checklist_item_id)
+- RLS:
+  - SELECT: `is_admin(auth.uid()) OR is_scope_member(auth.uid(), scope_id)`
+  - INSERT: `is_admin(auth.uid()) OR get_scope_role(auth.uid(), scope_id) IN ('editor','manager')`
+  - UPDATE: same as INSERT
+  - DELETE: `is_admin(auth.uid())`
 
-**RLS on `task_candidates`:**
-- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
-- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
+### scopes column
+- `ALTER TABLE scopes ADD COLUMN checklist_template_id uuid REFERENCES checklist_templates(id) ON DELETE SET NULL`
 
-**RLS on `task_workers`:**
-- SELECT: same as task_candidates SELECT
-- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
-- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
-- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
+### updated_at triggers
+- Add `update_updated_at_column` trigger to checklist_templates, checklist_items, scope_checklist_reviews
 
-### 2. Today Tab (`src/pages/Today.tsx`)
+## 2. Seed Data (via insert tool, not migration)
 
-Add two additional queries in `fetchTasks` after existing solo queries:
+Insert "Standard Rehab Checklist" template, then ~24 big-ticket items with normalized_label populated:
 
-**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
+| Category | Items |
+|---|---|
+| Exterior | Roof, Gutters, Siding, Windows, Exterior Doors, Soffit/Fascia, Porch/Deck, Driveway |
+| Interior | Kitchen Cabinets, Kitchen Counters, Bathroom(s), Flooring, Paint Interior, Paint Exterior, Drywall, Interior Doors, Trim/Baseboard |
+| Mechanical | HVAC, Water Heater, Electrical Panel, Sewer Lateral, Drain Tile/Sump |
+| Site | Foundation, Dumpsters, Landscaping |
 
-**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
+Each with sort_order, category, and `normalized_label = lower(trim(label))`.
 
-Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
+## 3. New Component: FinalPassSheet
 
-### 3. TaskCard (`src/components/TaskCard.tsx`)
+**File**: `src/components/FinalPassSheet.tsx`
 
-Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+Sheet/drawer component. Props: `scopeId`, `items` (scope_items), `open`, `onOpenChange`, `onUpdate` callback.
 
-When `isCrewTask`:
-- Show a small crew icon + "N active" badge next to status
-- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
-- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
-- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
-- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+**Coverage logic** — a checklist item is "covered" if ANY of:
+- A scope_item exists with normalized description matching `checklist_item.normalized_label`
+- A scope_item exists with `cost_item_id == checklist_item.default_cost_item_id` (when both non-null)
+- A `scope_checklist_reviews` row exists for this checklist_item_id + scope_id
 
-### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+**Display**: Uncovered items grouped by category, each with 4 action buttons: OK, Repair, Replace, Get Bid.
 
-**Crew toggle** (visible to admin/manager only, below Assigned To):
-- Switch labeled "Crew Task"
-- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
-- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+**On action**:
+- **OK**: Upsert `scope_checklist_reviews` with state='OK'. No scope_item created.
+- **Repair/Replace/Get Bid**:
+  1. Check for existing scope_item by normalized description OR cost_item_id match
+  2. If found: UPDATE its status to chosen state
+  3. If not found: INSERT new scope_item with description, status, cost_item_id, unit_cost_override (from cost_items.default_total_cost), unit (mapped from unit_type: each→each, sqft→sqft, lf→lf, piece→piece), qty=1, computed_total, pricing_status derived
+  4. Upsert scope_checklist_reviews with chosen state
 
-**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
-- "Active Crew" list showing names from `task_workers` joined to `profiles`
-- Join/Leave button for current user
-- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+**Constraint**: Never writes state='Not Checked' — absence of row = Not Checked.
 
-**Solo mode**: keep existing Assigned To UI unchanged.
+## 4. ScopeDetail.tsx Changes
 
-### 5. Files to Modify
+### Estimated Total Card (between address row and items list)
+- `estimatedTotal` = sum of non-null `computed_total`
+- `unpricedCount` = items where `unit_cost_override` is null
+- `getBidUnpriced` = items where status='Get Bid' AND unit_cost_override is null
+- Tooltip on info icon: "Estimated Total sums priced items. Unpriced items are not included."
 
-1. **Migration SQL** — new columns, tables, indexes, RLS
-2. `src/pages/Today.tsx` — crew task queries merged into sections
-3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
-4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
-5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
+### Coverage Summary Row (clickable, opens FinalPassSheet)
+- "Coverage: X / Y checked" — X = covered count, Y = total checklist items
+- Click opens FinalPassSheet
 
-### 6. Key Edge Cases
+### Final Pass Button in header actions
+- Between Walkthrough and +Item buttons
+- Opens FinalPassSheet drawer
 
-- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
-- Crew Available shows even when task is 'In Progress' (multiple people can join)
-- Upsert PK on `task_workers` prevents duplicate joins
-- Done tasks filtered out everywhere by existing stage checks
-- Crew→Solo cleanup deletes both tables to prevent orphan rows
+### New state: `finalPassOpen` boolean, checklist data fetching
+
+## 5. StatusBadge Updates
+
+Add missing colors: `OK` → green, `Not Checked` → gray, `Repair` → orange, `Replace` → red.
+
+## 6. Files Summary
+
+| File | Action |
+|---|---|
+| Migration SQL | Create: 3 tables + column + RLS + triggers + indexes |
+| Seed SQL (insert tool) | Insert template + ~24 checklist items |
+| `src/components/FinalPassSheet.tsx` | Create new |
+| `src/pages/ScopeDetail.tsx` | Add total card, coverage row, Final Pass button, state |
+| `src/components/StatusBadge.tsx` | Add OK/Not Checked/Repair/Replace colors |
 
