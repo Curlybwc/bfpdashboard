@@ -350,7 +350,15 @@ const AdminRecipes = () => {
                     {stepMaterials.map(mat => (
                       <div key={mat.id} className="flex items-center gap-2 text-xs">
                         <span className="flex-1 truncate">{mat.material_name}</span>
-                        {mat.qty != null && <span className="text-muted-foreground">{mat.qty} {mat.unit || ''}</span>}
+                        {mat.qty_formula ? (
+                          <Badge variant="default" className="text-[9px] font-mono">{mat.qty_formula}</Badge>
+                        ) : mat.qty != null ? (
+                          <span className="text-muted-foreground">{mat.qty} {mat.unit || ''}</span>
+                        ) : null}
+                        {mat.qty_formula && mat.qty != null && (
+                          <span className="text-muted-foreground text-[9px]">(fallback: {mat.qty})</span>
+                        )}
+                        {!mat.qty_formula && mat.unit && mat.qty != null && null}
                         {mat.store_section && <Badge variant="secondary" className="text-[9px]">{mat.store_section}</Badge>}
                         {mat.sku && <Badge variant="outline" className="text-[9px]">{mat.sku}</Badge>}
                         {mat.provided_by && mat.provided_by !== 'either' && <Badge variant="outline" className="text-[9px]">{mat.provided_by}</Badge>}
@@ -366,6 +374,10 @@ const AdminRecipes = () => {
                       <Button size="sm" onClick={handleAddMaterial} disabled={!newMatName.trim()} className="h-7 text-xs">
                         <Plus className="h-3 w-3" />
                       </Button>
+                    </div>
+                    <div className="space-y-1">
+                      <Input placeholder="Qty Formula (e.g. room_sqft * 1.1)" value={newMatFormula} onChange={e => setNewMatFormula(e.target.value)} className="h-7 text-xs" />
+                      <p className="text-[10px] text-muted-foreground">Variables: room_sqft, perimeter_ft, task_qty</p>
                     </div>
                     <div className="grid grid-cols-3 gap-1">
                       <Select value={newMatStoreSection} onValueChange={setNewMatStoreSection}>
