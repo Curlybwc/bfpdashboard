@@ -18,6 +18,10 @@ const colorMap: Record<string, string> = {
   Priced: 'bg-success/15 text-success',
   'Needs Pricing': 'bg-warning/20 text-warning',
   'Get Bid': 'bg-amber-100 text-amber-700',
+  OK: 'bg-success/15 text-success',
+  'Not Checked': 'bg-muted text-muted-foreground',
+  Repair: 'bg-orange-100 text-orange-700',
+  Replace: 'bg-destructive/15 text-destructive',
 };
 
 const StatusBadge = ({ status }: { status: string }) => (
