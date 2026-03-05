@@ -208,6 +208,67 @@ serve(async (req) => {
       }
     }
 
+    // Apply material bundles to created tasks
+    const { data: activeBundles } = await adminClient
+      .from("task_material_bundles")
+      .select("id, name, keywords, priority")
+      .eq("active", true);
+
+    if (activeBundles && activeBundles.length > 0) {
+      for (let i = 0; i < createdTaskIds.length; i++) {
+        const taskId = createdTaskIds[i];
+        const taskTitle = tasks[i]?.title || "";
+        const matched = matchBundles(taskTitle, activeBundles as BundleRow[]);
+        if (matched.length === 0) {
+          await adminClient.from("tasks").update({ bundles_applied: true }).eq("id", taskId);
+          continue;
+        }
+
+        // Get existing materials for dedup
+        const { data: existingMats } = await adminClient
+          .from("task_materials")
+          .select("name, sku, unit")
+          .eq("task_id", taskId);
+        const existingKeys = new Set(
+          (existingMats || []).map((m: any) =>
+            `${(m.name || "").toLowerCase()}|${(m.sku || "").toLowerCase()}|${(m.unit || "").toLowerCase()}`
+          )
+        );
+
+        for (const bundle of matched) {
+          const { data: bundleItems } = await adminClient
+            .from("task_material_bundle_items")
+            .select("*")
+            .eq("bundle_id", bundle.id);
+          if (!bundleItems || bundleItems.length === 0) continue;
+
+          const toInsert = [];
+          for (const item of bundleItems as any[]) {
+            const key = `${(item.material_name || "").toLowerCase()}|${(item.sku || "").toLowerCase()}|${(item.unit || "").toLowerCase()}`;
+            if (existingKeys.has(key)) continue;
+            existingKeys.add(key);
+            toInsert.push({
+              task_id: taskId,
+              name: item.material_name,
+              quantity: item.qty,
+              unit: item.unit || null,
+              sku: item.sku || null,
+              vendor_url: item.vendor_url || null,
+              store_section: item.store_section || null,
+              provided_by: item.provided_by || "either",
+              item_type: "material",
+              purchased: false,
+              delivered: false,
+            });
+          }
+          if (toInsert.length > 0) {
+            await adminClient.from("task_materials").insert(toInsert);
+          }
+        }
+        await adminClient.from("tasks").update({ bundles_applied: true }).eq("id", taskId);
+      }
+    }
+
     return new Response(
       JSON.stringify({ field_capture_id: capture.id, created_task_ids: createdTaskIds }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
