@@ -113,7 +113,7 @@ const FinalPassSheet = ({ scopeId, items, open, onOpenChange, onUpdate }: FinalP
         const normalizedLabel = ci.normalized_label;
 
         // Check for existing scope_item by normalized description OR cost_item_id
-        const existingByDesc = items.find(si => normalize(si.description) === normalizedLabel);
+        const existingByDesc = items.find(si => normalizeForChecklistMatch(si.description) === normalizedLabel);
         const existingByCost = ci.default_cost_item_id
           ? items.find(si => si.cost_item_id === ci.default_cost_item_id)
           : null;

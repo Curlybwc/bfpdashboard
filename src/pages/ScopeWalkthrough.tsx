@@ -303,7 +303,60 @@ const ScopeWalkthrough = () => {
         if (insertError) throw insertError;
       }
 
-      // 3) Auto-add members
+      // 3) Auto-checkoff: upsert scope_checklist_reviews
+      const reviewRows: { scope_id: string; checklist_item_id: string; state: string; notes: string | null }[] = [];
+      const validChecklistStates = ['OK', 'Repair', 'Replace', 'Get Bid'];
+      const strongStates = ['Repair', 'Replace', 'Get Bid'];
+
+      for (const m of matchedToApply) {
+        if (m.checklist_item_id && validChecklistStates.includes(m.suggested_status)) {
+          reviewRows.push({ scope_id: id!, checklist_item_id: m.checklist_item_id, state: m.suggested_status, notes: null });
+        }
+      }
+      for (const item of editableNewItems) {
+        if (!item.selected || !item.checklist_item_id) continue;
+        const st = item.editedStatus === 'Not Checked' ? 'Get Bid' : item.editedStatus;
+        if (validChecklistStates.includes(st)) {
+          reviewRows.push({ scope_id: id!, checklist_item_id: item.checklist_item_id, state: st, notes: null });
+        }
+      }
+
+      if (reviewRows.length > 0) {
+        const checklistIds = reviewRows.map(r => r.checklist_item_id);
+        const { data: existingRevs } = await supabase.from('scope_checklist_reviews')
+          .select('checklist_item_id, state, notes').eq('scope_id', id!).in('checklist_item_id', checklistIds);
+        const existingMap = new Map((existingRevs || []).map(r => [r.checklist_item_id, r]));
+
+        const finalRows = reviewRows
+          .filter(r => {
+            const existing = existingMap.get(r.checklist_item_id);
+            if (!existing) return true;
+            if (strongStates.includes(existing.state) && r.state === 'OK') return false;
+            return true;
+          })
+          .map(r => {
+            const existing = existingMap.get(r.checklist_item_id);
+            let notes = existing?.notes || null;
+            if (!notes) {
+              notes = 'From walkthrough';
+            } else if (!notes.includes('From walkthrough')) {
+              notes = notes + '; From walkthrough';
+            }
+            return {
+              scope_id: r.scope_id,
+              checklist_item_id: r.checklist_item_id,
+              state: r.state,
+              notes,
+              updated_at: new Date().toISOString(),
+            };
+          });
+
+        if (finalRows.length > 0) {
+          await supabase.from('scope_checklist_reviews').upsert(finalRows, { onConflict: 'scope_id,checklist_item_id' });
+        }
+      }
+
+      // 4) Auto-add members
       await autoAddMembers();
 
       const totalActions = matchedToApply.length + scopeItemInserts.length;
