@@ -16,7 +16,7 @@ import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Uploa
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
-import { PRICING_STATUSES, SCOPE_ITEM_STATUSES, type PricingStatus, type ScopeItemStatus } from '@/lib/supabase-types';
+import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
