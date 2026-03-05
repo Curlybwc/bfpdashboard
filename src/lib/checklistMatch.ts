@@ -49,3 +49,62 @@ export function isChecklistCovered(siDescription: string, ciNormalizedLabel: str
   const threshold = minTokens <= 2 ? 0.50 : 0.70;
   return jaccardSimilarity(siNorm, ciNorm) >= threshold;
 }
+
+/** Status priority for merge decisions */
+const STATUS_PRIORITY: Record<string, number> = {
+  'Replace': 5, 'Repair': 4, 'Get Bid': 3, 'OK': 2, 'Not Checked': 1,
+};
+
+export function strongerStatus(a: string, b: string): string {
+  return (STATUS_PRIORITY[a] || 0) >= (STATUS_PRIORITY[b] || 0) ? a : b;
+}
+
+/** Find an existing scope item that matches a candidate description/cost_item_id.
+ *  Returns the best match or null. If multiple tie, returns null to avoid wrong merges. */
+export function matchExistingScopeItem<T extends { description: string; cost_item_id: string | null }>(
+  items: T[],
+  candidateDescription: string,
+  candidateCostItemId: string | null,
+): T | null {
+  // A) cost_item_id match
+  if (candidateCostItemId) {
+    const costMatches = items.filter(si => si.cost_item_id === candidateCostItemId);
+    if (costMatches.length === 1) return costMatches[0];
+    if (costMatches.length > 1) return null; // ambiguous
+  }
+
+  const candNorm = normalizeForChecklistMatch(candidateDescription);
+  if (!candNorm) return null;
+
+  // B) exact normalized match
+  const exactMatches = items.filter(si => normalizeForChecklistMatch(si.description) === candNorm);
+  if (exactMatches.length === 1) return exactMatches[0];
+  if (exactMatches.length > 1) return null;
+
+  // C) substring containment
+  const subMatches = items.filter(si => {
+    const siNorm = normalizeForChecklistMatch(si.description);
+    return siNorm.includes(candNorm) || candNorm.includes(siNorm);
+  });
+  if (subMatches.length === 1) return subMatches[0];
+  if (subMatches.length > 1) return null;
+
+  // D) fuzzy Jaccard
+  let bestScore = 0;
+  let bestItem: T | null = null;
+  let tieCount = 0;
+  for (const si of items) {
+    const siNorm = normalizeForChecklistMatch(si.description);
+    const siTokens = siNorm.split(' ').filter(Boolean).length;
+    const candTokens = candNorm.split(' ').filter(Boolean).length;
+    const minTokens = Math.min(siTokens, candTokens);
+    const threshold = minTokens <= 2 ? 0.50 : 0.70;
+    const score = jaccardSimilarity(siNorm, candNorm);
+    if (score >= threshold) {
+      if (score > bestScore) { bestScore = score; bestItem = si; tieCount = 1; }
+      else if (score === bestScore) { tieCount++; }
+    }
+  }
+  if (tieCount === 1 && bestItem) return bestItem;
+  return null;
+}
