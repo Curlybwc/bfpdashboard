@@ -1,13 +1,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { normalizeForChecklistMatch } from '@/lib/checklistMatch';
+import { normalizeForChecklistMatch, isChecklistCovered } from '@/lib/checklistMatch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, Wrench, RefreshCw, HelpCircle } from 'lucide-react';
-import { isChecklistCovered } from '@/lib/checklistMatch';
 
 interface ChecklistItem {
   id: string;
@@ -29,7 +28,6 @@ interface ScopeItem {
 
 interface FinalPassSheetProps {
   scopeId: string;
-  items: ScopeItem[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: () => void;
@@ -44,14 +42,15 @@ const UNIT_MAP: Record<string, string> = {
   piece: 'piece',
 };
 
-const FinalPassSheet = ({ scopeId, items, open, onOpenChange, onUpdate }: FinalPassSheetProps) => {
+const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassSheetProps) => {
   const { toast } = useToast();
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [scopeItems, setScopeItems] = useState<ScopeItem[]>([]);
   const [reviews, setReviews] = useState<{ checklist_item_id: string; state: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
 
-  const fetchChecklist = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     if (!open) return;
     setLoading(true);
 
@@ -65,22 +64,25 @@ const FinalPassSheet = ({ scopeId, items, open, onOpenChange, onUpdate }: FinalP
     const templateId = templates?.[0]?.id;
     if (!templateId) { setLoading(false); return; }
 
-    const [{ data: ci }, { data: rev }] = await Promise.all([
+    const [{ data: ci }, { data: rev }, { data: si }] = await Promise.all([
       supabase.from('checklist_items').select('id, label, normalized_label, category, default_cost_item_id, sort_order')
         .eq('template_id', templateId).eq('active', true).order('sort_order'),
       supabase.from('scope_checklist_reviews').select('checklist_item_id, state')
+        .eq('scope_id', scopeId),
+      supabase.from('scope_items').select('id, description, status, cost_item_id, unit_cost_override, computed_total')
         .eq('scope_id', scopeId),
     ]);
 
     setChecklistItems(ci || []);
     setReviews(rev || []);
+    setScopeItems(si || []);
     setLoading(false);
   }, [open, scopeId]);
 
-  useEffect(() => { fetchChecklist(); }, [fetchChecklist]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const isCovered = (ci: ChecklistItem) => {
-    const matchByScopeItem = items.some(si =>
+    const matchByScopeItem = scopeItems.some(si =>
       isChecklistCovered(si.description, ci.normalized_label, si.cost_item_id, ci.default_cost_item_id)
     );
     const matchByReview = reviews.some(r => r.checklist_item_id === ci.id);
@@ -101,7 +103,6 @@ const FinalPassSheet = ({ scopeId, items, open, onOpenChange, onUpdate }: FinalP
     setActing(ci.id);
     try {
       if (action === 'OK') {
-        // Only create review, no scope_item
         const { error } = await supabase.from('scope_checklist_reviews').upsert({
           scope_id: scopeId,
           checklist_item_id: ci.id,
@@ -109,47 +110,56 @@ const FinalPassSheet = ({ scopeId, items, open, onOpenChange, onUpdate }: FinalP
         }, { onConflict: 'scope_id,checklist_item_id' });
         if (error) throw error;
       } else {
-        // Repair/Replace/Get Bid: find or create scope_item, then upsert review
-        const normalizedLabel = ci.normalized_label;
-
-        // Check for existing scope_item by normalized description OR cost_item_id
-        const existingByDesc = items.find(si => normalizeForChecklistMatch(si.description) === normalizedLabel);
-        const existingByCost = ci.default_cost_item_id
-          ? items.find(si => si.cost_item_id === ci.default_cost_item_id)
-          : null;
-        const existing = existingByDesc || existingByCost;
+        // Use the same matching logic as isCovered
+        const existing = scopeItems.find(si =>
+          isChecklistCovered(si.description, ci.normalized_label, si.cost_item_id, ci.default_cost_item_id)
+        );
 
         if (existing) {
-          // Update existing scope_item status
           const { error } = await supabase.from('scope_items').update({ status: action }).eq('id', existing.id);
           if (error) throw error;
         } else {
-          // Build new scope_item
+          // Resolve pricing: try default_cost_item_id first, then fallback search
           let unitCost: number | null = null;
           let unitText: string | null = null;
+          let resolvedCostItemId: string | null = ci.default_cost_item_id;
 
-          if (ci.default_cost_item_id) {
+          if (resolvedCostItemId) {
             const { data: costItem } = await supabase.from('cost_items')
               .select('default_total_cost, unit_type')
-              .eq('id', ci.default_cost_item_id).single();
+              .eq('id', resolvedCostItemId).single();
             if (costItem) {
               unitCost = costItem.default_total_cost;
               unitText = UNIT_MAP[costItem.unit_type] || costItem.unit_type;
             }
           }
 
-          const computedTotal = unitCost != null ? 1 * unitCost : null;
+          // Fallback: search cost_items by normalized_name
+          if (!resolvedCostItemId || unitCost == null) {
+            const { data: costMatch } = await supabase.from('cost_items')
+              .select('id, default_total_cost, unit_type')
+              .ilike('normalized_name', `%${ci.normalized_label}%`)
+              .eq('active', true)
+              .limit(1);
+            if (costMatch?.[0]) {
+              resolvedCostItemId = costMatch[0].id;
+              unitCost = costMatch[0].default_total_cost;
+              unitText = UNIT_MAP[costMatch[0].unit_type] || costMatch[0].unit_type;
+            }
+          }
+
+          const computedTotal = unitCost != null && unitCost > 0 ? 1 * unitCost : null;
 
           const { error } = await supabase.from('scope_items').insert({
             scope_id: scopeId,
             description: ci.label,
             status: action,
-            cost_item_id: ci.default_cost_item_id,
-            unit_cost_override: unitCost,
+            cost_item_id: resolvedCostItemId,
+            unit_cost_override: unitCost != null && unitCost > 0 ? unitCost : null,
             unit: unitText,
             qty: 1,
             computed_total: computedTotal,
-            pricing_status: unitCost != null ? 'Priced' : 'Needs Pricing',
+            pricing_status: unitCost != null && unitCost > 0 ? 'Priced' : 'Needs Pricing',
           });
           if (error) throw error;
         }
@@ -165,8 +175,7 @@ const FinalPassSheet = ({ scopeId, items, open, onOpenChange, onUpdate }: FinalP
 
       toast({ title: `${ci.label} → ${action}` });
       onUpdate();
-      // Refresh local state
-      await fetchChecklist();
+      await fetchAll();
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
