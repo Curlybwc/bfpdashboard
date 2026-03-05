@@ -26,6 +26,9 @@ interface MatchedItem {
   suggested_notes: string | null;
   suggested_qty: number | null;
   suggested_unit: string | null;
+  checklist_item_id: string | null;
+  checklist_label: string | null;
+  checklist_category: string | null;
 }
 
 interface NewItem {
@@ -44,6 +47,9 @@ interface NewItem {
   matched_cost_item_id: string | null;
   matched_cost_item_unit: string | null;
   matched_cost_item_unit_cost: number | null;
+  checklist_item_id: string | null;
+  checklist_label: string | null;
+  checklist_category: string | null;
 }
 
 interface ParseResult {
@@ -51,6 +57,7 @@ interface ParseResult {
   new_items: NewItem[];
   get_bid_items: { id: string; description: string; reason: string }[];
   not_addressed_items: { id: string; description: string }[];
+  not_addressed_checklist_items?: { id: string; label: string; category: string | null }[];
   member_user_ids_to_add?: string[];
   member_display_names_to_add?: string[];
   member_warnings?: string[];
