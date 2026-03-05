@@ -147,8 +147,7 @@ const ScopeDetail = () => {
 
   // Filter items for conversion
   const convertibleItems = items.filter(item =>
-    ['Repair', 'Replace'].includes(item.status) ||
-    (item.qty && item.qty > 0) ||
+    ['Repair', 'Replace', 'Get Bid'].includes(item.status) ||
     (item.computed_total && item.computed_total > 0)
   );
 
