@@ -253,6 +253,7 @@ const TaskDetail = () => {
       title: c.task,
       sort_order: (idx + 1) * 10,
       trade: null as string | null,
+      created_by: user.id,
     }));
     await supabase.from('task_recipe_steps').insert(stepInserts);
     setSavingRecipe(false);
