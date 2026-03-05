@@ -783,6 +783,26 @@ const TaskDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={saveRecipeOpen} onOpenChange={setSaveRecipeOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Save as Recipe</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Recipe Name</Label>
+              <Input value={saveRecipeName} onChange={(e) => setSaveRecipeName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Trade</Label>
+              <Input value={saveRecipeTrade} onChange={(e) => setSaveRecipeTrade(e.target.value)} />
+            </div>
+            <p className="text-sm text-muted-foreground">{children.length} step(s) will be saved.</p>
+            <Button className="w-full" onClick={handleSaveAsRecipe} disabled={savingRecipe || !saveRecipeName.trim()}>
+              {savingRecipe ? 'Saving…' : 'Save Recipe'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
