@@ -531,6 +531,21 @@ const TaskDetail = () => {
           </Button>
         </div>
 
+        {/* Recipe suggestion banner */}
+        {suggestedRecipe && children.length === 0 && (
+          <Card className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen className="h-4 w-4 text-primary shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">Recipe: {suggestedRecipe.name}</p>
+              </div>
+            </div>
+            <Button size="sm" onClick={() => handleExpandRecipe(suggestedRecipe.id)} disabled={expandingRecipe}>
+              {expandingRecipe ? 'Expanding…' : 'Expand'}
+            </Button>
+          </Card>
+        )}
+
         <div className="space-y-2">
           <Label>Task</Label>
           <Input value={taskText} onChange={(e) => setTaskText(e.target.value)} />
