@@ -348,7 +348,9 @@ const AdminRecipes = () => {
                       <div key={mat.id} className="flex items-center gap-2 text-xs">
                         <span className="flex-1 truncate">{mat.material_name}</span>
                         {mat.qty != null && <span className="text-muted-foreground">{mat.qty} {mat.unit || ''}</span>}
+                        {mat.store_section && <Badge variant="secondary" className="text-[9px]">{mat.store_section}</Badge>}
                         {mat.sku && <Badge variant="outline" className="text-[9px]">{mat.sku}</Badge>}
+                        {mat.provided_by && mat.provided_by !== 'either' && <Badge variant="outline" className="text-[9px]">{mat.provided_by}</Badge>}
                         <button onClick={() => handleDeleteMaterial(mat.id)} className="text-muted-foreground hover:text-destructive shrink-0">
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -362,10 +364,31 @@ const AdminRecipes = () => {
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      <Input placeholder="Store" value={newMatStore} onChange={e => setNewMatStore(e.target.value)} className="h-7 text-xs" />
+                    <div className="grid grid-cols-3 gap-1">
+                      <Select value={newMatStoreSection} onValueChange={setNewMatStoreSection}>
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue placeholder="Section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {storeSections.map(s => (
+                            <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Input placeholder="SKU" value={newMatSku} onChange={e => setNewMatSku(e.target.value)} className="h-7 text-xs" />
+                      <Select value={newMatProvidedBy} onValueChange={setNewMatProvidedBy}>
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue placeholder="Provided by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="either">Either</SelectItem>
+                          <SelectItem value="company">Company</SelectItem>
+                          <SelectItem value="contractor">Contractor</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                    <Input placeholder="Vendor URL" value={newMatVendorUrl} onChange={e => setNewMatVendorUrl(e.target.value)} className="h-7 text-xs" />
                   </div>
                 )}
               </div>
