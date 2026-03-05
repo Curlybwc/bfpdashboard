@@ -716,6 +716,100 @@ export type Database = {
           },
         ]
       }
+      task_material_bundle_items: {
+        Row: {
+          bundle_id: string
+          created_at: string
+          id: string
+          material_name: string
+          provided_by: string | null
+          qty: number | null
+          sku: string | null
+          store_section: string | null
+          unit: string | null
+          vendor_url: string | null
+        }
+        Insert: {
+          bundle_id: string
+          created_at?: string
+          id?: string
+          material_name: string
+          provided_by?: string | null
+          qty?: number | null
+          sku?: string | null
+          store_section?: string | null
+          unit?: string | null
+          vendor_url?: string | null
+        }
+        Update: {
+          bundle_id?: string
+          created_at?: string
+          id?: string
+          material_name?: string
+          provided_by?: string | null
+          qty?: number | null
+          sku?: string | null
+          store_section?: string | null
+          unit?: string | null
+          vendor_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_material_bundle_items_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "task_material_bundles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_material_bundles: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string
+          id: string
+          keywords: string[] | null
+          name: string
+          priority: number
+          recipe_id: string | null
+          trade: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by: string
+          id?: string
+          keywords?: string[] | null
+          name: string
+          priority?: number
+          recipe_id?: string | null
+          trade?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string
+          id?: string
+          keywords?: string[] | null
+          name?: string
+          priority?: number
+          recipe_id?: string | null
+          trade?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_material_bundles_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_materials: {
         Row: {
           confirmed_on_site: boolean
@@ -970,6 +1064,7 @@ export type Database = {
           actual_total_cost: number | null
           assigned_to_user_id: string | null
           assignment_mode: string
+          bundles_applied: boolean
           claimed_at: string | null
           claimed_by_user_id: string | null
           completed_at: string | null
@@ -1003,6 +1098,7 @@ export type Database = {
           actual_total_cost?: number | null
           assigned_to_user_id?: string | null
           assignment_mode?: string
+          bundles_applied?: boolean
           claimed_at?: string | null
           claimed_by_user_id?: string | null
           completed_at?: string | null
@@ -1036,6 +1132,7 @@ export type Database = {
           actual_total_cost?: number | null
           assigned_to_user_id?: string | null
           assignment_mode?: string
+          bundles_applied?: boolean
           claimed_at?: string | null
           claimed_by_user_id?: string | null
           completed_at?: string | null

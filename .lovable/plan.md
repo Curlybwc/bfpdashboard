@@ -1,113 +1,97 @@
 
 
-## Material Bundles — Final Schema Adjustments
+## Plan: Crew Tasks (Multi-Person, Multi-Day)
 
-Neither the bundle tables nor the `bundles_applied` column exist yet in the database. This migration will create **everything** needed for the bundle system schema in a single migration, incorporating the two requested adjustments.
+### 1. Database Migration
 
-### Migration SQL
+Single migration adding columns, tables, indexes, RLS, and a helper function.
 
+**New columns on `tasks`:**
+- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
+- `lead_user_id uuid NULL`
+
+**New table `task_candidates` (eligibility pool):**
 ```sql
--- 1. Bundle definition table
-CREATE TABLE public.task_material_bundles (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  trade text,
-  keywords text[] DEFAULT '{}',
-  priority integer NOT NULL DEFAULT 100,
-  active boolean NOT NULL DEFAULT true,
-  recipe_id uuid REFERENCES public.task_recipes(id) ON DELETE SET NULL,
-  created_by uuid NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+CREATE TABLE public.task_candidates (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  PRIMARY KEY (task_id, user_id)
 );
-
--- 2. Bundle items table
-CREATE TABLE public.task_material_bundle_items (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  bundle_id uuid NOT NULL REFERENCES public.task_material_bundles(id) ON DELETE CASCADE,
-  material_name text NOT NULL,
-  qty numeric,
-  unit text,
-  sku text,
-  vendor_url text,
-  store_section text,
-  provided_by text DEFAULT 'either',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT chk_bundle_item_provided_by CHECK (provided_by IN ('company','contractor','either'))
-);
-
--- 3. Add bundles_applied flag to tasks
-ALTER TABLE public.tasks ADD COLUMN bundles_applied boolean NOT NULL DEFAULT false;
-
--- 4. Indexes
-CREATE INDEX idx_task_material_bundle_items_bundle ON public.task_material_bundle_items(bundle_id);
-CREATE INDEX idx_task_material_bundles_active ON public.task_material_bundles(active);
-
--- 5. RLS on task_material_bundles
-ALTER TABLE public.task_material_bundles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "View bundles" ON public.task_material_bundles
-  FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Insert bundles" ON public.task_material_bundles
-  FOR INSERT TO authenticated WITH CHECK (is_admin(auth.uid()) OR can_manage_projects(auth.uid()));
-
-CREATE POLICY "Update bundles" ON public.task_material_bundles
-  FOR UPDATE TO authenticated USING (is_admin(auth.uid()) OR can_manage_projects(auth.uid()));
-
-CREATE POLICY "Delete bundles" ON public.task_material_bundles
-  FOR DELETE TO authenticated USING (is_admin(auth.uid()));
-
--- 6. RLS on task_material_bundle_items
-ALTER TABLE public.task_material_bundle_items ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "View bundle items" ON public.task_material_bundle_items
-  FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Insert bundle items" ON public.task_material_bundle_items
-  FOR INSERT TO authenticated WITH CHECK (is_admin(auth.uid()) OR can_manage_projects(auth.uid()));
-
-CREATE POLICY "Update bundle items" ON public.task_material_bundle_items
-  FOR UPDATE TO authenticated USING (is_admin(auth.uid()) OR can_manage_projects(auth.uid()));
-
-CREATE POLICY "Delete bundle items" ON public.task_material_bundle_items
-  FOR DELETE TO authenticated USING (is_admin(auth.uid()) OR can_manage_projects(auth.uid()));
-
--- 7. updated_at trigger for bundles
-CREATE TRIGGER set_updated_at_task_material_bundles
-  BEFORE UPDATE ON public.task_material_bundles
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
 ```
 
-### Final `task_material_bundles` Schema
+**New table `task_workers` (active crew):**
+```sql
+CREATE TABLE public.task_workers (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
+CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
+```
 
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid PK | |
-| name | text NOT NULL | |
-| trade | text | |
-| keywords | text[] | Default `{}` |
-| priority | integer | Default 100, lower = higher priority |
-| active | boolean | Default true |
-| recipe_id | uuid FK → task_recipes | ON DELETE SET NULL, unused by logic for now |
-| created_by | uuid | |
-| created_at | timestamptz | |
-| updated_at | timestamptz | Auto-updated via trigger |
+**RLS on `task_candidates`:**
+- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
+- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
 
-### Adjustments Incorporated
+**RLS on `task_workers`:**
+- SELECT: same as task_candidates SELECT
+- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
+- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
+- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
 
-1. **`recipe_id`** — optional FK to `task_recipes`, SET NULL on delete. Not used by bundle matching or insertion logic. Reserved for future linking.
-2. **`idx_task_material_bundles_active`** — index on `active` column for efficient filtering during bundle matching.
+### 2. Today Tab (`src/pages/Today.tsx`)
 
-### Unchanged Bundle Behavior
+Add two additional queries in `fetchTasks` after existing solo queries:
 
-All previously approved logic remains the same:
-- `task_material_bundle_items` schema (with `provided_by` CHECK constraint)
-- `bundles_applied` guard on `tasks`
-- `applyBundles` utility (match → dedup by name+sku+unit → insert → set flag)
-- `bundleMatch` logic (normalize + Jaccard + substring, sort by priority)
-- Trigger points: ProjectDetail, ProjectWalkthrough, field_mode_submit
-- AdminMaterialBundles UI
+**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
 
-No existing tables, shopping logic, or recipe expansion are modified.
+**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
+
+Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
+
+### 3. TaskCard (`src/components/TaskCard.tsx`)
+
+Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+
+When `isCrewTask`:
+- Show a small crew icon + "N active" badge next to status
+- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
+- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
+- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
+- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+
+### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+
+**Crew toggle** (visible to admin/manager only, below Assigned To):
+- Switch labeled "Crew Task"
+- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
+- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+
+**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
+- "Active Crew" list showing names from `task_workers` joined to `profiles`
+- Join/Leave button for current user
+- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+
+**Solo mode**: keep existing Assigned To UI unchanged.
+
+### 5. Files to Modify
+
+1. **Migration SQL** — new columns, tables, indexes, RLS
+2. `src/pages/Today.tsx` — crew task queries merged into sections
+3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
+4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
+5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
+
+### 6. Key Edge Cases
+
+- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
+- Crew Available shows even when task is 'In Progress' (multiple people can join)
+- Upsert PK on `task_workers` prevents duplicate joins
+- Done tasks filtered out everywhere by existing stage checks
+- Crew→Solo cleanup deletes both tables to prevent orphan rows
 

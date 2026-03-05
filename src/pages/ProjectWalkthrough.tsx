@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import PageHeader from '@/components/PageHeader';
+import { applyBundles } from '@/lib/applyBundles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -184,22 +185,26 @@ const ProjectWalkthrough = () => {
           return; // Stop on error
         }
 
-        const validMaterials = draft.materials.filter(m => m.name.trim());
-        if (task && validMaterials.length > 0) {
-          const { error: matError } = await supabase.from('task_materials').insert(
-            validMaterials.map(m => ({
-              task_id: task.id,
-              name: m.name,
-              quantity: m.quantity,
-              unit: m.unit,
-              purchased: false,
-              delivered: false,
-            }))
-          );
-          if (matError) {
-            toast({ title: 'Materials insert failed', description: matError.message, variant: 'destructive' });
-            return;
+        if (task) {
+          const validMaterials = draft.materials.filter(m => m.name.trim());
+          if (validMaterials.length > 0) {
+            const { error: matError } = await supabase.from('task_materials').insert(
+              validMaterials.map(m => ({
+                task_id: task.id,
+                name: m.name,
+                quantity: m.quantity,
+                unit: m.unit,
+                purchased: false,
+                delivered: false,
+              }))
+            );
+            if (matError) {
+              toast({ title: 'Materials insert failed', description: matError.message, variant: 'destructive' });
+              return;
+            }
           }
+          // Apply material bundles
+          await applyBundles(task.id, draft.task);
         }
       }
 
