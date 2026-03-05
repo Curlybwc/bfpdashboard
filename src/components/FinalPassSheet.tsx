@@ -71,7 +71,7 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
         .eq('template_id', templateId).eq('active', true).order('sort_order'),
       supabase.from('scope_checklist_reviews').select('checklist_item_id, state')
         .eq('scope_id', scopeId),
-      supabase.from('scope_items').select('id, description, status, cost_item_id, unit_cost_override, computed_total')
+      supabase.from('scope_items').select('id, description, status, cost_item_id, qty, unit, unit_cost_override, computed_total')
         .eq('scope_id', scopeId),
     ]);
 
