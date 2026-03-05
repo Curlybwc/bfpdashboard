@@ -54,18 +54,23 @@ const ScopeDetail = () => {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
+    const qtyVal = qty ? parseFloat(qty) : null;
+    const ucVal = unitCostNew ? parseFloat(unitCostNew) : null;
+    const computedTotal = qtyVal != null && ucVal != null ? qtyVal * ucVal : null;
     const { error } = await supabase.from('scope_items').insert({
       scope_id: id,
       description: desc,
-      qty: qty ? parseFloat(qty) : null,
+      qty: qtyVal,
       unit: unit || null,
+      unit_cost_override: ucVal,
+      computed_total: computedTotal,
       phase_key: phaseKey || null,
-      pricing_status: pricingStatus,
+      pricing_status: ucVal != null ? 'Priced' : 'Needs Pricing',
       status: itemStatus,
       notes: itemNotes || null,
     });
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    setDesc(''); setQty(''); setUnit(''); setPhaseKey(''); setPricingStatus('Needs Pricing'); setItemStatus('Not Checked'); setItemNotes('');
+    setDesc(''); setQty(''); setUnit(''); setUnitCostNew(''); setPhaseKey(''); setItemStatus('Not Checked'); setItemNotes('');
     setOpen(false);
     fetchData();
   };
