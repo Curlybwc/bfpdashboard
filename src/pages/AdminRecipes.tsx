@@ -199,7 +199,9 @@ const AdminRecipes = () => {
   if (selectedRecipe) {
     return (
       <div className="pb-20">
-        <PageHeader title={selectedRecipe.name} backTo="/admin/recipes" />
+        <PageHeader title={selectedRecipe.name} backTo="/admin" actions={
+          <Button size="sm" variant="ghost" onClick={() => { setSelectedRecipe(null); setSteps([]); }}>Back to list</Button>
+        } />
         <div className="p-4 space-y-4">
           <div className="space-y-2">
             <Label>Name</Label>
