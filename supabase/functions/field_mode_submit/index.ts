@@ -13,6 +13,60 @@ const PRIORITY_MAP: Record<string, string> = {
   low: "4 \u2013 When Time",
 };
 
+function normalizeForMatch(s: string): string {
+  let t = s.toLowerCase().trim().replace(/\s+/g, ' ');
+  t = t.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  t = t.replace(/^(replace|repair|get bid|bid|need to|we need to|install|remove|new)\s+/i, '').trim();
+  return t;
+}
+
+function jaccardSim(a: string, b: string): number {
+  const setA = new Set(a.split(' ').filter(Boolean));
+  const setB = new Set(b.split(' ').filter(Boolean));
+  const intersection = [...setA].filter(x => setB.has(x)).length;
+  const union = new Set([...setA, ...setB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+interface BundleRow {
+  id: string;
+  name: string;
+  keywords: string[] | null;
+  priority: number;
+}
+
+function matchBundles(description: string, bundles: BundleRow[]): BundleRow[] {
+  const norm = normalizeForMatch(description);
+  if (!norm) return [];
+  const results: { bundle: BundleRow; score: number }[] = [];
+  for (const bundle of bundles) {
+    let bestScore = 0;
+    const keywords = bundle.keywords || [];
+    for (const kw of keywords) {
+      const kwNorm = normalizeForMatch(kw);
+      if (!kwNorm) continue;
+      if (norm === kwNorm) { bestScore = Math.max(bestScore, 1.0); continue; }
+      if (norm.includes(kwNorm) || kwNorm.includes(norm)) { bestScore = Math.max(bestScore, 0.9); continue; }
+      const minT = Math.min(norm.split(' ').length, kwNorm.split(' ').length);
+      const thresh = minT <= 2 ? 0.50 : 0.70;
+      const sc = jaccardSim(norm, kwNorm);
+      if (sc >= thresh) bestScore = Math.max(bestScore, sc);
+    }
+    const nameNorm = normalizeForMatch(bundle.name);
+    if (nameNorm) {
+      if (norm === nameNorm) bestScore = Math.max(bestScore, 1.0);
+      else if (norm.includes(nameNorm) || nameNorm.includes(norm)) bestScore = Math.max(bestScore, 0.85);
+      else {
+        const sc = jaccardSim(norm, nameNorm);
+        const minT = Math.min(norm.split(' ').length, nameNorm.split(' ').length);
+        if (sc >= (minT <= 2 ? 0.50 : 0.70)) bestScore = Math.max(bestScore, sc);
+      }
+    }
+    if (bestScore > 0) results.push({ bundle, score: bestScore });
+  }
+  return results.sort((a, b) => a.bundle.priority - b.bundle.priority || b.score - a.score).map(r => r.bundle);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
