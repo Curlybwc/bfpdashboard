@@ -252,14 +252,16 @@ const AdminRecipes = () => {
       material_name: newMatName.trim(),
       qty: newMatQty ? parseFloat(newMatQty) : null,
       unit: newMatUnit.trim() || null,
-      store: newMatStore.trim() || null,
+      store_section: newMatStoreSection || null,
       sku: newMatSku.trim() || null,
+      vendor_url: newMatVendorUrl.trim() || null,
+      provided_by: newMatProvidedBy || 'either',
     });
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStore(''); setNewMatSku('');
+    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStoreSection(''); setNewMatSku(''); setNewMatVendorUrl(''); setNewMatProvidedBy('either');
     fetchStepMaterials(expandedStepId);
   };
 
