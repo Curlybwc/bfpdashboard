@@ -55,7 +55,6 @@ const AdminRecipes = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { sections: storeSections } = useStoreSections();
-  const { toast } = useToast();
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
