@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Upload, Info, CheckSquare, Merge } from 'lucide-react';
+import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Upload, Info, CheckSquare, Merge, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
@@ -27,6 +28,7 @@ const ScopeDetail = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isAdmin } = useAdmin();
   const [scope, setScope] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
@@ -35,6 +37,9 @@ const ScopeDetail = () => {
   const [editForm, setEditForm] = useState<any>({});
   const [finalPassOpen, setFinalPassOpen] = useState(false);
   const [dedupeOpen, setDedupeOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
 
   // Checklist coverage state
   const [checklistItems, setChecklistItems] = useState<any[]>([]);
@@ -260,6 +265,31 @@ const ScopeDetail = () => {
     fetchChecklistCoverage();
   };
 
+  const handleDeleteItem = async (itemId: string) => {
+    setDeletingId(itemId);
+    const { error } = await supabase.from('scope_items').delete().eq('id', itemId).eq('scope_id', id!);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setDeletingId(null);
+      return;
+    }
+    toast({ title: 'Item deleted' });
+    setItems(prev => prev.filter(i => i.id !== itemId));
+    setDeletingId(null);
+  };
+
+  const handleSaveTitle = async () => {
+    if (!id) return;
+    const { error } = await supabase.from('scopes').update({ name: titleDraft }).eq('id', id);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setScope((prev: any) => ({ ...prev, name: titleDraft }));
+    setEditingTitle(false);
+    toast({ title: 'Title updated' });
+  };
+
   if (!scope) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   const isDraft = scope.status === 'Draft';
@@ -267,7 +297,7 @@ const ScopeDetail = () => {
   return (
     <div className="pb-20">
       <PageHeader
-        title={scope.name || 'Scope Detail'}
+        title={scope.name || scope.address}
         backTo="/scopes"
         actions={
           <div className="flex items-center gap-2">
@@ -357,7 +387,37 @@ const ScopeDetail = () => {
       <div className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <StatusBadge status={scope.status} />
-          <span className="text-sm text-muted-foreground">{scope.address}</span>
+          {isAdmin && editingTitle ? (
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <Input
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                className="h-8 text-sm flex-1"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(); if (e.key === 'Escape') setEditingTitle(false); }}
+              />
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleSaveTitle}>
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingTitle(false)}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <span className="text-sm text-muted-foreground">{scope.address}</span>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => { setTitleDraft(scope.name || ''); setEditingTitle(true); }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </>
+          )}
         </div>
 
         {/* Estimated Total Card */}
@@ -518,6 +578,33 @@ const ScopeDetail = () => {
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => startEdit(item)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
+                      )}
+                      {isAdmin && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete scope item?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                "{item.description}" will be permanently removed.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteItem(item.id)}
+                                disabled={deletingId === item.id}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                {deletingId === item.id ? 'Deleting...' : 'Delete'}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
                   </div>
