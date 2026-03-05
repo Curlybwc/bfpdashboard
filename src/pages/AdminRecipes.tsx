@@ -159,6 +159,7 @@ const AdminRecipes = () => {
       title: newStepTitle.trim(),
       sort_order: maxOrder + 10,
       trade: newStepTrade.trim() || null,
+      created_by: user?.id,
     });
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
