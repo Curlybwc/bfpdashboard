@@ -13,11 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Upload, Info, CheckSquare } from 'lucide-react';
+import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Upload, Info, CheckSquare, Merge } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
 import FinalPassSheet from '@/components/FinalPassSheet';
+import DeduplicateSheet from '@/components/DeduplicateSheet';
 import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
 import { isChecklistCovered } from '@/lib/checklistMatch';
 
@@ -33,6 +34,7 @@ const ScopeDetail = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [finalPassOpen, setFinalPassOpen] = useState(false);
+  const [dedupeOpen, setDedupeOpen] = useState(false);
 
   // Checklist coverage state
   const [checklistItems, setChecklistItems] = useState<any[]>([]);
@@ -270,6 +272,9 @@ const ScopeDetail = () => {
           <div className="flex items-center gap-2">
             {isDraft && (
               <>
+                <Button size="sm" variant="outline" onClick={() => setDedupeOpen(true)}>
+                  <Merge className="h-4 w-4 mr-1" />Deduplicate
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setFinalPassOpen(true)}>
                   <CheckSquare className="h-4 w-4 mr-1" />Final Pass
                 </Button>
@@ -528,6 +533,13 @@ const ScopeDetail = () => {
         open={finalPassOpen}
         onOpenChange={setFinalPassOpen}
         onUpdate={handleFinalPassUpdate}
+      />
+
+      <DeduplicateSheet
+        scopeId={id!}
+        open={dedupeOpen}
+        onOpenChange={setDedupeOpen}
+        onUpdate={() => { fetchData(); fetchChecklistCoverage(); }}
       />
     </div>
   );
