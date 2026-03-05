@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,11 +12,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Upload } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Upload, Info, CheckSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
+import FinalPassSheet from '@/components/FinalPassSheet';
 import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
+
+const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +33,11 @@ const ScopeDetail = () => {
   const [converting, setConverting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [finalPassOpen, setFinalPassOpen] = useState(false);
+
+  // Checklist coverage state
+  const [checklistItems, setChecklistItems] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   // New item fields
   const [desc, setDesc] = useState('');
@@ -49,7 +58,50 @@ const ScopeDetail = () => {
     if (si) setItems(si);
   };
 
-  useEffect(() => { fetchData(); }, [id]);
+  const fetchChecklistCoverage = async () => {
+    if (!id) return;
+    const { data: templates } = await supabase
+      .from('checklist_templates')
+      .select('id')
+      .eq('active', true)
+      .limit(1);
+    const templateId = templates?.[0]?.id;
+    if (!templateId) return;
+
+    const [{ data: ci }, { data: rev }] = await Promise.all([
+      supabase.from('checklist_items').select('id, label, normalized_label, category, default_cost_item_id, sort_order')
+        .eq('template_id', templateId).eq('active', true).order('sort_order'),
+      supabase.from('scope_checklist_reviews').select('checklist_item_id, state')
+        .eq('scope_id', id),
+    ]);
+    setChecklistItems(ci || []);
+    setReviews(rev || []);
+  };
+
+  useEffect(() => { fetchData(); fetchChecklistCoverage(); }, [id]);
+
+  // Computed totals
+  const estimatedTotal = useMemo(() =>
+    items.reduce((sum, i) => sum + (i.computed_total ?? 0), 0), [items]);
+
+  const unpricedCount = useMemo(() =>
+    items.filter(i => i.unit_cost_override == null).length, [items]);
+
+  const getBidUnpriced = useMemo(() =>
+    items.filter(i => i.status === 'Get Bid' && i.unit_cost_override == null).length, [items]);
+
+  // Coverage
+  const coveredCount = useMemo(() => {
+    if (checklistItems.length === 0) return 0;
+    return checklistItems.filter(ci => {
+      const matchByScopeItem = items.some(si =>
+        normalize(si.description) === ci.normalized_label ||
+        (si.cost_item_id != null && ci.default_cost_item_id != null && si.cost_item_id === ci.default_cost_item_id)
+      );
+      const matchByReview = reviews.some(r => r.checklist_item_id === ci.id);
+      return matchByScopeItem || matchByReview;
+    }).length;
+  }, [checklistItems, items, reviews]);
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,6 +254,11 @@ const ScopeDetail = () => {
     navigate(`/projects/${project.id}`);
   };
 
+  const handleFinalPassUpdate = () => {
+    fetchData();
+    fetchChecklistCoverage();
+  };
+
   if (!scope) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   const isDraft = scope.status === 'Draft';
@@ -215,6 +272,9 @@ const ScopeDetail = () => {
           <div className="flex items-center gap-2">
             {isDraft && (
               <>
+                <Button size="sm" variant="outline" onClick={() => setFinalPassOpen(true)}>
+                  <CheckSquare className="h-4 w-4 mr-1" />Final Pass
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => navigate(`/scopes/${id}/walkthrough`)}>
                   <ClipboardList className="h-4 w-4 mr-1" />Walkthrough
                 </Button>
@@ -295,6 +355,49 @@ const ScopeDetail = () => {
           <StatusBadge status={scope.status} />
           <span className="text-sm text-muted-foreground">{scope.address}</span>
         </div>
+
+        {/* Estimated Total Card */}
+        <Card className="p-4 mb-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-lg font-semibold">
+                  ${estimatedTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs max-w-[200px]">Estimated Total sums priced items. Unpriced items are not included.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <p className="text-xs text-muted-foreground">Estimated Total</p>
+            </div>
+            <div className="text-right text-xs text-muted-foreground space-y-0.5">
+              {unpricedCount > 0 && <p>Unpriced items: {unpricedCount}</p>}
+              {getBidUnpriced > 0 && <p>Get Bid items unpriced: {getBidUnpriced}</p>}
+            </div>
+          </div>
+
+          {/* Coverage summary row */}
+          {checklistItems.length > 0 && (
+            <button
+              className="w-full mt-3 pt-3 border-t flex items-center justify-between text-sm hover:bg-accent/50 -mx-1 px-1 rounded transition-colors"
+              onClick={() => setFinalPassOpen(true)}
+            >
+              <span className="flex items-center gap-1.5">
+                <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                Coverage: {coveredCount} / {checklistItems.length} checked
+              </span>
+              <span className="text-muted-foreground text-xs">▸</span>
+            </button>
+          )}
+        </Card>
+
         <h2 className="text-sm font-medium text-muted-foreground mb-3">
           Scope Items ({items.length})
         </h2>
@@ -305,7 +408,6 @@ const ScopeDetail = () => {
             items.map((item) => (
               <Card key={item.id} className="p-3">
                 {editingId === item.id ? (
-                  // EDIT MODE
                   <div className="space-y-2">
                     <Input
                       value={editForm.description}
@@ -371,7 +473,6 @@ const ScopeDetail = () => {
                     </div>
                   </div>
                 ) : (
-                  // VIEW MODE
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{item.description}</p>
@@ -382,7 +483,6 @@ const ScopeDetail = () => {
                         {item.computed_total != null && <span>• Total: ${item.computed_total}</span>}
                         {item.status && item.status !== 'Not Checked' && <span>• {item.status}</span>}
                       </div>
-                      {/* Library sync buttons */}
                       {isDraft && item.cost_item_id && (
                         <div className="flex gap-2 mt-2">
                           <Button
@@ -424,6 +524,14 @@ const ScopeDetail = () => {
         </div>
         <ScopeMembers scopeId={id!} />
       </div>
+
+      <FinalPassSheet
+        scopeId={id!}
+        items={items}
+        open={finalPassOpen}
+        onOpenChange={setFinalPassOpen}
+        onUpdate={handleFinalPassUpdate}
+      />
     </div>
   );
 };
