@@ -47,6 +47,7 @@ interface StepMaterial {
   store_section: string | null;
   provided_by: string | null;
   notes: string | null;
+  qty_formula: string | null;
 }
 
 const AdminRecipes = () => {
