@@ -719,7 +719,14 @@ const TaskDetail = () => {
 
         {hasChildren && (
           <div className="space-y-1">
-            <Label>Subtasks ({children.length})</Label>
+            <div className="flex items-center justify-between">
+              <Label>Subtasks ({children.length})</Label>
+              {canDelete && (
+                <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
+                  <Save className="h-3.5 w-3.5 mr-1" />Save as Recipe
+                </Button>
+              )}
+            </div>
             {children.map(c => (
               <div key={c.id} className="text-sm border rounded px-3 py-2 flex justify-between">
                 <span className="truncate">{c.task}</span>
