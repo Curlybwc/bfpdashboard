@@ -34,8 +34,8 @@ const ScopeDetail = () => {
   const [desc, setDesc] = useState('');
   const [qty, setQty] = useState('');
   const [unit, setUnit] = useState('');
+  const [unitCostNew, setUnitCostNew] = useState('');
   const [phaseKey, setPhaseKey] = useState('');
-  const [pricingStatus, setPricingStatus] = useState<PricingStatus>('Needs Pricing');
   const [itemStatus, setItemStatus] = useState<ScopeItemStatus>('Not Checked');
   const [itemNotes, setItemNotes] = useState('');
 
