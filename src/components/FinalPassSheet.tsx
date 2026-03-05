@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { normalizeForChecklistMatch, isChecklistCovered } from '@/lib/checklistMatch';
+import { normalizeForChecklistMatch, isChecklistCovered, matchExistingScopeItem } from '@/lib/checklistMatch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,8 @@ interface ScopeItem {
   description: string;
   status: string;
   cost_item_id: string | null;
+  qty: number | null;
+  unit: string | null;
   unit_cost_override: number | null;
   computed_total: number | null;
 }
@@ -69,7 +71,7 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
         .eq('template_id', templateId).eq('active', true).order('sort_order'),
       supabase.from('scope_checklist_reviews').select('checklist_item_id, state')
         .eq('scope_id', scopeId),
-      supabase.from('scope_items').select('id, description, status, cost_item_id, unit_cost_override, computed_total')
+      supabase.from('scope_items').select('id, description, status, cost_item_id, qty, unit, unit_cost_override, computed_total')
         .eq('scope_id', scopeId),
     ]);
 
@@ -110,55 +112,75 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
         }, { onConflict: 'scope_id,checklist_item_id' });
         if (error) throw error;
       } else {
-        // Use the same matching logic as isCovered
-        const existing = scopeItems.find(si =>
-          isChecklistCovered(si.description, ci.normalized_label, si.cost_item_id, ci.default_cost_item_id)
-        );
+        // Use matchExistingScopeItem for consistent dedup
+        const existing = matchExistingScopeItem(scopeItems, ci.label, ci.default_cost_item_id);
 
         if (existing) {
-          const { error } = await supabase.from('scope_items').update({ status: action }).eq('id', existing.id);
+          // UPDATE existing — backfill pricing if missing
+          const updates: Record<string, any> = { status: action };
+          if (!existing.cost_item_id && ci.default_cost_item_id) updates.cost_item_id = ci.default_cost_item_id;
+          if (existing.qty == null) updates.qty = 1;
+
+          if (existing.unit_cost_override == null) {
+            // Try to pull pricing
+            let unitCost: number | null = null;
+            let unitText: string | null = null;
+            const costId = ci.default_cost_item_id || existing.cost_item_id;
+            if (costId) {
+              const { data: costItem } = await supabase.from('cost_items')
+                .select('default_total_cost, unit_type').eq('id', costId).single();
+              if (costItem && costItem.default_total_cost > 0) {
+                unitCost = costItem.default_total_cost;
+                unitText = UNIT_MAP[costItem.unit_type] || costItem.unit_type;
+              }
+            }
+            if (unitCost == null) {
+              const { data: costMatch } = await supabase.from('cost_items')
+                .select('id, default_total_cost, unit_type')
+                .ilike('normalized_name', `%${ci.normalized_label}%`)
+                .eq('active', true).limit(1);
+              if (costMatch?.[0] && costMatch[0].default_total_cost > 0) {
+                unitCost = costMatch[0].default_total_cost;
+                unitText = UNIT_MAP[costMatch[0].unit_type] || costMatch[0].unit_type;
+                if (!updates.cost_item_id && !existing.cost_item_id) updates.cost_item_id = costMatch[0].id;
+              }
+            }
+            if (unitCost != null) {
+              updates.unit_cost_override = unitCost;
+              if (unitText) updates.unit = unitText;
+              const finalQty = updates.qty ?? existing.qty ?? 1;
+              updates.computed_total = finalQty * unitCost;
+              updates.pricing_status = 'Priced';
+            }
+          }
+
+          const { error } = await supabase.from('scope_items').update(updates).eq('id', existing.id);
           if (error) throw error;
         } else {
-          // Resolve pricing: try default_cost_item_id first, then fallback search
+          // INSERT new — resolve pricing
           let unitCost: number | null = null;
           let unitText: string | null = null;
           let resolvedCostItemId: string | null = ci.default_cost_item_id;
 
           if (resolvedCostItemId) {
             const { data: costItem } = await supabase.from('cost_items')
-              .select('default_total_cost, unit_type')
-              .eq('id', resolvedCostItemId).single();
-            if (costItem) {
-              unitCost = costItem.default_total_cost;
-              unitText = UNIT_MAP[costItem.unit_type] || costItem.unit_type;
-            }
+              .select('default_total_cost, unit_type').eq('id', resolvedCostItemId).single();
+            if (costItem) { unitCost = costItem.default_total_cost; unitText = UNIT_MAP[costItem.unit_type] || costItem.unit_type; }
           }
-
-          // Fallback: search cost_items by normalized_name
           if (!resolvedCostItemId || unitCost == null) {
             const { data: costMatch } = await supabase.from('cost_items')
               .select('id, default_total_cost, unit_type')
               .ilike('normalized_name', `%${ci.normalized_label}%`)
-              .eq('active', true)
-              .limit(1);
-            if (costMatch?.[0]) {
-              resolvedCostItemId = costMatch[0].id;
-              unitCost = costMatch[0].default_total_cost;
-              unitText = UNIT_MAP[costMatch[0].unit_type] || costMatch[0].unit_type;
-            }
+              .eq('active', true).limit(1);
+            if (costMatch?.[0]) { resolvedCostItemId = costMatch[0].id; unitCost = costMatch[0].default_total_cost; unitText = UNIT_MAP[costMatch[0].unit_type] || costMatch[0].unit_type; }
           }
 
           const computedTotal = unitCost != null && unitCost > 0 ? 1 * unitCost : null;
-
           const { error } = await supabase.from('scope_items').insert({
-            scope_id: scopeId,
-            description: ci.label,
-            status: action,
+            scope_id: scopeId, description: ci.label, status: action,
             cost_item_id: resolvedCostItemId,
             unit_cost_override: unitCost != null && unitCost > 0 ? unitCost : null,
-            unit: unitText,
-            qty: 1,
-            computed_total: computedTotal,
+            unit: unitText, qty: 1, computed_total: computedTotal,
             pricing_status: unitCost != null && unitCost > 0 ? 'Priced' : 'Needs Pricing',
           });
           if (error) throw error;

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { SCOPE_ITEM_STATUSES } from '@/lib/supabase-types';
+import { matchExistingScopeItem, strongerStatus } from '@/lib/checklistMatch';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import PageHeader from '@/components/PageHeader';
@@ -274,32 +275,65 @@ const ScopeWalkthrough = () => {
         costItemIdMap.set(i, costItemId);
       }
 
-      // Build scope_item inserts
-      const scopeItemInserts = editableNewItems
-        .map((item, i) => {
-          if (!item.selected) return null;
-          const qty = item.editedQty ? parseFloat(item.editedQty) : null;
-          const unitCost = item.editedUnitCost ? parseFloat(item.editedUnitCost) : null;
+      // Fetch fresh scope_items for dedup matching
+      const { data: currentScopeItems } = await supabase.from('scope_items')
+        .select('id, description, status, cost_item_id, qty, unit, unit_cost_override, computed_total, notes')
+        .eq('scope_id', id);
+      const existingScopeItems = currentScopeItems || [];
+
+      const scopeItemInserts: any[] = [];
+      let mergedCount = 0;
+
+      for (let i = 0; i < editableNewItems.length; i++) {
+        const item = editableNewItems[i];
+        if (!item.selected) continue;
+        const qty = item.editedQty ? parseFloat(item.editedQty) : null;
+        const unitCost = item.editedUnitCost ? parseFloat(item.editedUnitCost) : null;
+        const status = item.editedStatus === 'Not Checked' ? 'Get Bid' : (item.editedStatus || 'Get Bid');
+        const costItemId = costItemIdMap.get(i) || null;
+
+        // Try to match an existing scope item
+        const match = matchExistingScopeItem(existingScopeItems, item.editedDescription, costItemId);
+
+        if (match) {
+          // UPDATE existing — merge non-destructively
+          const updates: Record<string, any> = {};
+          updates.status = strongerStatus(match.status, status);
+          if (match.unit_cost_override == null && unitCost != null) updates.unit_cost_override = unitCost;
+          if (match.qty == null && qty != null) { updates.qty = qty; updates.unit = item.editedUnit || null; }
+          if (!match.cost_item_id && costItemId) updates.cost_item_id = costItemId;
+
+          const finalUnitCost = updates.unit_cost_override ?? match.unit_cost_override;
+          const finalQty = updates.qty ?? match.qty;
+          if (finalUnitCost != null && finalQty != null) updates.computed_total = finalQty * finalUnitCost;
+          updates.pricing_status = (updates.unit_cost_override ?? match.unit_cost_override) != null ? 'Priced' : 'Needs Pricing';
+
+          // Append notes
+          const newNote = item.editedNotes || null;
+          if (newNote && (!match.notes || !match.notes.includes(newNote))) {
+            updates.notes = match.notes ? `${match.notes}; ${newNote}` : newNote;
+          }
+
+          await supabase.from('scope_items').update(updates).eq('id', match.id);
+          // Remove from existingScopeItems to prevent double-matching
+          const idx = existingScopeItems.findIndex(s => s.id === match.id);
+          if (idx >= 0) existingScopeItems.splice(idx, 1);
+          mergedCount++;
+        } else {
           const pricingStatus = unitCost != null ? 'Priced' : 'Needs Pricing';
-          const status = item.editedStatus || 'Get Bid';
-          return {
-            scope_id: id,
-            description: item.editedDescription,
-            status: status === 'Not Checked' ? 'Get Bid' : status,
-            notes: item.editedNotes || null,
-            qty,
-            unit: item.editedUnit || null,
-            phase_key: item.phase_key || null,
-            cost_item_id: costItemIdMap.get(i) || null,
+          scopeItemInserts.push({
+            scope_id: id, description: item.editedDescription,
+            status, notes: item.editedNotes || null, qty, unit: item.editedUnit || null,
+            phase_key: item.phase_key || null, cost_item_id: costItemId,
             unit_cost_override: unitCost,
             computed_total: qty != null && unitCost != null ? qty * unitCost : null,
             pricing_status: pricingStatus,
-          };
-        })
-        .filter(Boolean);
+          });
+        }
+      }
 
       if (scopeItemInserts.length > 0) {
-        const { error: insertError } = await supabase.from('scope_items').insert(scopeItemInserts as any);
+        const { error: insertError } = await supabase.from('scope_items').insert(scopeItemInserts);
         if (insertError) throw insertError;
       }
 
@@ -359,8 +393,12 @@ const ScopeWalkthrough = () => {
       // 4) Auto-add members
       await autoAddMembers();
 
-      const totalActions = matchedToApply.length + scopeItemInserts.length;
-      toast({ title: `${totalActions} item${totalActions !== 1 ? 's' : ''} updated/created` });
+      const totalActions = matchedToApply.length + scopeItemInserts.length + mergedCount;
+      const parts = [];
+      if (matchedToApply.length) parts.push(`${matchedToApply.length} updated`);
+      if (scopeItemInserts.length) parts.push(`${scopeItemInserts.length} created`);
+      if (mergedCount) parts.push(`${mergedCount} merged`);
+      toast({ title: `${totalActions} item${totalActions !== 1 ? 's' : ''}: ${parts.join(', ')}` });
       navigate(`/scopes/${id}`);
     } catch (err: any) {
       toast({ title: 'Error committing changes', description: err.message, variant: 'destructive' });
