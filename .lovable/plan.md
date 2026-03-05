@@ -1,50 +1,97 @@
 
 
-## Edit Project Title & Address — Plan
+## Plan: Crew Tasks (Multi-Person, Multi-Day)
 
-### A) Current State
+### 1. Database Migration
 
-- **`projects` table**: has `name` (text, NOT NULL) and `address` (text, nullable). No changes needed.
-- **RLS UPDATE policy**: `"Members can update projects"` allows `is_admin(auth.uid()) OR is_project_member(auth.uid(), id)`. Already sufficient — admins and project members can update. No migration needed.
-- **ProjectDetail header**: `PageHeader` receives `title={project.name}`. Address shown below header in a secondary line with `StatusBadge`.
-- **ProjectList**: Shows `p.name` as title, `p.address` with MapPin icon as secondary text. Both read directly from fetched data (no cache — just `useState` + `fetchProjects()`).
-- **Admin/role detection**: `useAdmin()` for `isAdmin`/`canManageProjects`; `projectRole` derived from `project_members` query in `fetchData()`.
-- **`canCreateTask`**: `isAdmin || projectRole === 'manager' || projectRole === 'contractor'` — reuse this to gate edit access (managers and admins should edit project details).
+Single migration adding columns, tables, indexes, RLS, and a helper function.
 
-### B) Plan
+**New columns on `tasks`:**
+- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
+- `lead_user_id uuid NULL`
 
-**UI — `ProjectDetail.tsx` only**
+**New table `task_candidates` (eligibility pool):**
+```sql
+CREATE TABLE public.task_candidates (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
+```
 
-1. Add an **Edit (Pencil) button** in the `PageHeader` actions area, visible when `isAdmin || projectRole === 'manager'`.
-2. Clicking opens a **shadcn Dialog** (same pattern as the "New Task" dialog already in the file) with:
-   - **Title** field: `Input`, required, pre-filled with `project.name`
-   - **Address** field: `Input`, optional, pre-filled with `project.address || ''`
-3. On submit: `supabase.from('projects').update({ name, address: address || null }).eq('id', id)`
-4. On success: close dialog, toast "Project updated", call `fetchData()` to refresh local state (this updates the header title and address line immediately).
-5. On error: keep dialog open, show destructive toast.
+**New table `task_workers` (active crew):**
+```sql
+CREATE TABLE public.task_workers (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
+CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
+```
 
-**No DB/RLS migration needed.** The existing UPDATE policy already covers admins and project members.
+**RLS on `task_candidates`:**
+- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
+- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
 
-**Display behavior** (already correct, no changes):
-- ProjectDetail: `PageHeader title={project.name}`, address shown as secondary text below.
-- ProjectList: `p.name` as heading, `p.address` with MapPin when present.
-- No caching layer (react-query not used for projects) — navigation back to list triggers `fetchProjects()` via `useEffect`.
+**RLS on `task_workers`:**
+- SELECT: same as task_candidates SELECT
+- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
+- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
+- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
 
-### C) Files to Touch
+### 2. Today Tab (`src/pages/Today.tsx`)
 
-| File | Change |
-|---|---|
-| `src/pages/ProjectDetail.tsx` | Add Pencil button + edit Dialog with name/address fields + save handler |
+Add two additional queries in `fetchTasks` after existing solo queries:
 
-No migration. No new files. No other pages need changes.
+**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
 
-### D) Acceptance Criteria
+**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
 
-- Admin or project manager sees Edit button; viewers/contractors do not
-- Edit dialog pre-fills current name and address
-- Title is required; address is optional (can be cleared to empty)
-- Saving updates the project row and immediately refreshes the header title and address line
-- Empty address saves as `null` (not empty string)
-- Error keeps dialog open with destructive toast
-- Non-authorized users cannot update via API (RLS enforced)
+Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
+
+### 3. TaskCard (`src/components/TaskCard.tsx`)
+
+Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+
+When `isCrewTask`:
+- Show a small crew icon + "N active" badge next to status
+- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
+- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
+- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
+- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+
+### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+
+**Crew toggle** (visible to admin/manager only, below Assigned To):
+- Switch labeled "Crew Task"
+- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
+- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+
+**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
+- "Active Crew" list showing names from `task_workers` joined to `profiles`
+- Join/Leave button for current user
+- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+
+**Solo mode**: keep existing Assigned To UI unchanged.
+
+### 5. Files to Modify
+
+1. **Migration SQL** — new columns, tables, indexes, RLS
+2. `src/pages/Today.tsx` — crew task queries merged into sections
+3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
+4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
+5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
+
+### 6. Key Edge Cases
+
+- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
+- Crew Available shows even when task is 'In Progress' (multiple people can join)
+- Upsert PK on `task_workers` prevents duplicate joins
+- Done tasks filtered out everywhere by existing stage checks
+- Crew→Solo cleanup deletes both tables to prevent orphan rows
 
