@@ -563,7 +563,7 @@ const ScopeWalkthrough = () => {
           )}
 
           {/* Empty state */}
-          {!hasMatched && !hasNew && !hasNeedsReview && !hasNotAddressed && (
+          {!hasMatched && !hasNew && !hasGetBid && !hasNotAddressed && (
             <p className="text-center text-muted-foreground py-8">No items found in the walkthrough text.</p>
           )}
 
