@@ -245,6 +245,7 @@ const ScopeDetail = () => {
         priority: '2 – This Week' as const,
         materials_on_site: 'No' as const,
         created_by: user.id,
+        recipe_hint_id: item.recipe_hint_id || null,
       }));
       await supabase.from('tasks').insert(taskInserts);
     }

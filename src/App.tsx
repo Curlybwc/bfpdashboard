@@ -70,6 +70,7 @@ const AppRoutes = () => {
             <Route path="/scopes/:id/walkthrough" element={<ScopeWalkthrough />} />
             <Route path="/shopping" element={<Shopping />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/admin/recipes" element={<AdminRecipes />} />
             <Route path="/admin/store-sections" element={<AdminStoreSections />} />
             <Route path="/admin/inventory/tools" element={<ToolInventory />} />
             <Route path="/admin/inventory/materials" element={<MaterialInventory />} />

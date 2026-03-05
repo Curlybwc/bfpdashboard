@@ -60,7 +60,7 @@ const ProjectDetail = () => {
     if (!id) return;
     const [{ data: proj }, { data: t }, { data: members }] = await Promise.all([
       supabase.from('projects').select('*').eq('id', id).single(),
-      supabase.from('tasks').select('*').eq('project_id', id).order('created_at', { ascending: false }),
+      supabase.from('tasks').select('*').eq('project_id', id).order('sort_order', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false }),
       supabase.from('project_members').select('user_id, role, profiles(full_name)').eq('project_id', id),
     ]);
     if (proj) setProject(proj);
