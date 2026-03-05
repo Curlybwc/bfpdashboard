@@ -19,8 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
 import FinalPassSheet from '@/components/FinalPassSheet';
 import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
-
-const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+import { isChecklistCovered } from '@/lib/checklistMatch';
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
