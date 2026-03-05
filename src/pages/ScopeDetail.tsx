@@ -534,6 +534,13 @@ const ScopeDetail = () => {
         onOpenChange={setFinalPassOpen}
         onUpdate={handleFinalPassUpdate}
       />
+
+      <DeduplicateSheet
+        scopeId={id!}
+        open={dedupeOpen}
+        onOpenChange={setDedupeOpen}
+        onUpdate={() => { fetchData(); fetchChecklistCoverage(); }}
+      />
     </div>
   );
 };
