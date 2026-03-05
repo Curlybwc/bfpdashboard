@@ -713,6 +713,7 @@ export type Database = {
       task_recipe_steps: {
         Row: {
           created_at: string
+          created_by: string | null
           id: string
           is_optional: boolean
           notes: string | null
@@ -723,6 +724,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           id?: string
           is_optional?: boolean
           notes?: string | null
@@ -733,6 +735,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           id?: string
           is_optional?: boolean
           notes?: string | null
@@ -759,7 +762,7 @@ export type Database = {
           estimated_cost: number | null
           id: string
           is_repeatable: boolean
-          keywords: string[]
+          keywords: string[] | null
           last_actual_avg: number | null
           last_actual_count: number
           name: string
@@ -773,7 +776,7 @@ export type Database = {
           estimated_cost?: number | null
           id?: string
           is_repeatable?: boolean
-          keywords?: string[]
+          keywords?: string[] | null
           last_actual_avg?: number | null
           last_actual_count?: number
           name: string
@@ -787,7 +790,7 @@ export type Database = {
           estimated_cost?: number | null
           id?: string
           is_repeatable?: boolean
-          keywords?: string[]
+          keywords?: string[] | null
           last_actual_avg?: number | null
           last_actual_count?: number
           name?: string
@@ -1086,6 +1089,14 @@ export type Database = {
     }
     Functions: {
       can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
+      expand_recipe: {
+        Args: {
+          p_parent_task_id: string
+          p_recipe_id: string
+          p_user_id: string
+        }
+        Returns: number
+      }
       get_project_role: {
         Args: { _project_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["project_member_role"]

@@ -3,7 +3,7 @@ import { normalizeForChecklistMatch, jaccardSimilarity } from './checklistMatch'
 export interface RecipeForMatch {
   id: string;
   name: string;
-  keywords: string[];
+  keywords: string[] | null;
 }
 
 export interface RecipeSuggestion {
@@ -24,23 +24,22 @@ export function suggestRecipes(description: string, recipes: RecipeForMatch[]): 
   for (const recipe of recipes) {
     let bestScore = 0;
 
-    for (const keyword of recipe.keywords) {
+    const keywords = recipe.keywords && recipe.keywords.length > 0 ? recipe.keywords : [];
+
+    for (const keyword of keywords) {
       const kwNorm = normalizeForChecklistMatch(keyword);
       if (!kwNorm) continue;
 
-      // Exact match
       if (norm === kwNorm) {
         bestScore = Math.max(bestScore, 1.0);
         continue;
       }
 
-      // Substring containment
       if (norm.includes(kwNorm) || kwNorm.includes(norm)) {
         bestScore = Math.max(bestScore, 0.9);
         continue;
       }
 
-      // Adaptive Jaccard
       const normTokens = norm.split(' ').filter(Boolean).length;
       const kwTokens = kwNorm.split(' ').filter(Boolean).length;
       const minTokens = Math.min(normTokens, kwTokens);

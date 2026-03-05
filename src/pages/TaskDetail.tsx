@@ -70,21 +70,27 @@ const TaskDetail = () => {
 
   // Recipe suggestion effect
   useEffect(() => {
-    if (!task || children.length > 0) { setSuggestedRecipe(null); return; }
+    if (!task) { setSuggestedRecipe(null); return; }
+    // If already expanded, show read-only badge
+    if (task.expanded_recipe_id) {
+      supabase.from('task_recipes').select('id, name').eq('id', task.expanded_recipe_id).single().then(({ data }) => {
+        setSuggestedRecipe(data ? { id: data.id, name: data.name } : null);
+      });
+      return;
+    }
+    if (children.length > 0) { setSuggestedRecipe(null); return; }
     const fetchRecipeSuggestion = async () => {
-      // If task has recipe_hint_id, use that directly
       if (task.recipe_hint_id) {
         const { data } = await supabase.from('task_recipes').select('id, name').eq('id', task.recipe_hint_id).eq('active', true).single();
         if (data) { setSuggestedRecipe(data); return; }
       }
-      // Fallback: keyword matching
       const { data: recipes } = await supabase.from('task_recipes').select('id, name, keywords').eq('active', true);
       if (!recipes || recipes.length === 0) { setSuggestedRecipe(null); return; }
       const suggestions = suggestRecipes(task.task, recipes as RecipeForMatch[]);
       setSuggestedRecipe(suggestions.length > 0 ? { id: suggestions[0].recipe.id, name: suggestions[0].recipe.name } : null);
     };
     fetchRecipeSuggestion();
-  }, [task?.id, task?.task, task?.recipe_hint_id, children.length]);
+  }, [task?.id, task?.task, task?.recipe_hint_id, task?.expanded_recipe_id, children.length]);
 
   useEffect(() => {
     if (task?.assignment_mode === 'crew') {
@@ -212,39 +218,18 @@ const TaskDetail = () => {
   const handleExpandRecipe = async (recipeId: string) => {
     if (!taskId || !task || !user) return;
     setExpandingRecipe(true);
-    const { data: steps } = await supabase
-      .from('task_recipe_steps')
-      .select('*')
-      .eq('recipe_id', recipeId)
-      .order('sort_order');
-    if (!steps || steps.length === 0) {
-      toast({ title: 'Recipe has no steps', variant: 'destructive' });
+    const { data, error } = await supabase.rpc('expand_recipe', {
+      p_parent_task_id: taskId,
+      p_recipe_id: recipeId,
+      p_user_id: user.id,
+    });
+    if (error) {
+      toast({ title: 'Error expanding recipe', description: error.message, variant: 'destructive' });
       setExpandingRecipe(false);
       return;
     }
-    const childInserts = steps.map(step => ({
-      project_id: task.project_id,
-      parent_task_id: taskId,
-      task: step.title,
-      sort_order: step.sort_order * 10,
-      source_recipe_id: recipeId,
-      source_recipe_step_id: step.id,
-      trade: step.trade || task.trade || null,
-      priority: task.priority,
-      room_area: task.room_area || null,
-      stage: 'Not Ready' as const,
-      materials_on_site: 'No' as const,
-      created_by: user.id,
-    }));
-    const { error: insertErr } = await supabase.from('tasks').insert(childInserts);
-    if (insertErr) {
-      toast({ title: 'Error expanding recipe', description: insertErr.message, variant: 'destructive' });
-      setExpandingRecipe(false);
-      return;
-    }
-    await supabase.from('tasks').update({ expanded_recipe_id: recipeId }).eq('id', taskId);
     setExpandingRecipe(false);
-    toast({ title: 'Recipe expanded' });
+    toast({ title: `Recipe expanded (${data} steps)` });
     fetchTask();
     fetchChildren();
   };
@@ -268,6 +253,7 @@ const TaskDetail = () => {
       title: c.task,
       sort_order: (idx + 1) * 10,
       trade: null as string | null,
+      created_by: user.id,
     }));
     await supabase.from('task_recipe_steps').insert(stepInserts);
     setSavingRecipe(false);
@@ -531,8 +517,14 @@ const TaskDetail = () => {
           </Button>
         </div>
 
-        {/* Recipe suggestion banner */}
-        {suggestedRecipe && children.length === 0 && (
+        {/* Recipe: read-only badge if already expanded, suggestion banner if expandable */}
+        {task.expanded_recipe_id && suggestedRecipe && (
+          <Card className="p-3 flex items-center gap-2 border-muted">
+            <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+            <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
+          </Card>
+        )}
+        {!task.expanded_recipe_id && suggestedRecipe && children.length === 0 && (
           <Card className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
             <div className="flex items-center gap-2 min-w-0">
               <BookOpen className="h-4 w-4 text-primary shrink-0" />
