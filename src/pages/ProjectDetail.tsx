@@ -19,6 +19,7 @@ import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
 import TaskCard from '@/components/TaskCard';
 import { useAdmin } from '@/hooks/useAdmin';
+import { applyBundles } from '@/lib/applyBundles';
 
 interface ProjectMember {
   user_id: string;
