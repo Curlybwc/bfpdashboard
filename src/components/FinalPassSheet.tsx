@@ -154,6 +154,10 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
             }
           }
 
+          // Always derive pricing_status from final unit_cost_override
+          const finalUnitCost = updates.unit_cost_override ?? existing.unit_cost_override;
+          updates.pricing_status = finalUnitCost != null ? 'Priced' : 'Needs Pricing';
+
           const { error } = await supabase.from('scope_items').update(updates).eq('id', existing.id);
           if (error) throw error;
         } else {

@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const itemIds = approved_updates.map((u: any) => u.scope_item_id);
     const { data: validItems, error: validErr } = await adminClient
       .from('scope_items')
-      .select('id')
+      .select('id, unit_cost_override')
       .eq('scope_id', scope_id)
       .in('id', itemIds);
 
@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
     }
 
     const validIds = new Set((validItems || []).map((i: any) => i.id));
+    const pricingMap = new Map((validItems || []).map((i: any) => [i.id, i.unit_cost_override]));
     const invalid = itemIds.filter((id: string) => !validIds.has(id));
     if (invalid.length > 0) {
       return new Response(JSON.stringify({ error: 'scope_item_id mismatch', invalid_ids: invalid }), { status: 400, headers: corsHeaders });
