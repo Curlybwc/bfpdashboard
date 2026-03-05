@@ -297,7 +297,7 @@ const ScopeDetail = () => {
   return (
     <div className="pb-20">
       <PageHeader
-        title={scope.name || 'Scope Detail'}
+        title={scope.name || scope.address}
         backTo="/scopes"
         actions={
           <div className="flex items-center gap-2">
