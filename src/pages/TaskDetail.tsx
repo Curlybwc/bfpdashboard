@@ -517,8 +517,14 @@ const TaskDetail = () => {
           </Button>
         </div>
 
-        {/* Recipe suggestion banner */}
-        {suggestedRecipe && children.length === 0 && (
+        {/* Recipe: read-only badge if already expanded, suggestion banner if expandable */}
+        {task.expanded_recipe_id && suggestedRecipe && (
+          <Card className="p-3 flex items-center gap-2 border-muted">
+            <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+            <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
+          </Card>
+        )}
+        {!task.expanded_recipe_id && suggestedRecipe && children.length === 0 && (
           <Card className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
             <div className="flex items-center gap-2 min-w-0">
               <BookOpen className="h-4 w-4 text-primary shrink-0" />
