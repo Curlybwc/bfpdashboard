@@ -126,17 +126,22 @@ const ProjectDetail = () => {
       assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
     }).select('id').single();
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    if (data && pendingMaterials.length > 0) {
-      await supabase.from('task_materials').insert(
-        pendingMaterials.map(m => ({
-          task_id: data.id,
-          name: m.name,
-          quantity: m.quantity ? parseFloat(m.quantity) : null,
-          unit: m.unit || null,
-          purchased: false,
-          delivered: false,
-        }))
-      );
+    if (data) {
+      // Insert manually added materials
+      if (pendingMaterials.length > 0) {
+        await supabase.from('task_materials').insert(
+          pendingMaterials.map(m => ({
+            task_id: data.id,
+            name: m.name,
+            quantity: m.quantity ? parseFloat(m.quantity) : null,
+            unit: m.unit || null,
+            purchased: false,
+            delivered: false,
+          }))
+        );
+      }
+      // Apply material bundles (no recipe expansion here)
+      await applyBundles(data.id, taskName);
     }
     setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
     setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
