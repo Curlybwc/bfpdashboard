@@ -525,7 +525,6 @@ const ScopeDetail = () => {
 
       <FinalPassSheet
         scopeId={id!}
-        items={items}
         open={finalPassOpen}
         onOpenChange={setFinalPassOpen}
         onUpdate={handleFinalPassUpdate}
