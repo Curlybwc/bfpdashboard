@@ -506,6 +506,39 @@ const ScopeWalkthrough = () => {
           }
         />
         <div className="p-4 space-y-6">
+          {/* Detected Rehab Templates */}
+          {detectedRehabs.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold flex items-center gap-1 mb-2">
+                <BookOpen className="h-4 w-4" /> Detected Rehab Types ({detectedRehabs.length})
+              </h2>
+              <div className="space-y-2">
+                {detectedRehabs.map(({ template }) => (
+                  <Card key={template.id} className="p-3 flex items-center justify-between">
+                    <p className="text-sm font-medium">{template.name}</p>
+                    {generatedRehabIds.has(template.id) ? (
+                      <Badge variant="default" className="text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Generated</Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleGenerateRehab(template.id)}
+                        disabled={generatingRehabId === template.id}
+                      >
+                        {generatingRehabId === template.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <Plus className="h-3 w-3 mr-1" />
+                        )}
+                        Generate Scope
+                      </Button>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Member warnings */}
           {memberWarnings.length > 0 && (
             <Alert variant="destructive">
