@@ -461,6 +461,11 @@ const ScopeWalkthrough = () => {
                         {item.suggested_notes && (
                           <p className="text-xs text-muted-foreground mt-1">{item.suggested_notes}</p>
                         )}
+                        {item.checklist_label ? (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Checklist: {item.checklist_category} / {item.checklist_label}</p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Checklist: no match</p>
+                        )}
                       </div>
                     </div>
                   </Card>
