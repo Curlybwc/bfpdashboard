@@ -201,8 +201,80 @@ const TaskDetail = () => {
 
   const fetchChildren = async () => {
     if (!taskId) return;
-    const { data } = await supabase.from('tasks').select('id, task, stage, assigned_to_user_id').eq('parent_task_id', taskId);
+    const { data } = await supabase.from('tasks')
+      .select('id, task, stage, assigned_to_user_id')
+      .eq('parent_task_id', taskId)
+      .order('sort_order', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true });
     setChildren(data || []);
+  };
+
+  const handleExpandRecipe = async (recipeId: string) => {
+    if (!taskId || !task || !user) return;
+    setExpandingRecipe(true);
+    const { data: steps } = await supabase
+      .from('task_recipe_steps')
+      .select('*')
+      .eq('recipe_id', recipeId)
+      .order('sort_order');
+    if (!steps || steps.length === 0) {
+      toast({ title: 'Recipe has no steps', variant: 'destructive' });
+      setExpandingRecipe(false);
+      return;
+    }
+    const childInserts = steps.map(step => ({
+      project_id: task.project_id,
+      parent_task_id: taskId,
+      task: step.title,
+      sort_order: step.sort_order * 10,
+      source_recipe_id: recipeId,
+      source_recipe_step_id: step.id,
+      trade: step.trade || task.trade || null,
+      priority: task.priority,
+      room_area: task.room_area || null,
+      stage: 'Not Ready' as const,
+      materials_on_site: 'No' as const,
+      created_by: user.id,
+    }));
+    const { error: insertErr } = await supabase.from('tasks').insert(childInserts);
+    if (insertErr) {
+      toast({ title: 'Error expanding recipe', description: insertErr.message, variant: 'destructive' });
+      setExpandingRecipe(false);
+      return;
+    }
+    await supabase.from('tasks').update({ expanded_recipe_id: recipeId }).eq('id', taskId);
+    setExpandingRecipe(false);
+    toast({ title: 'Recipe expanded' });
+    fetchTask();
+    fetchChildren();
+  };
+
+  const handleSaveAsRecipe = async () => {
+    if (!user || !saveRecipeName.trim() || children.length === 0) return;
+    setSavingRecipe(true);
+    const { data: recipe, error: recipeErr } = await supabase.from('task_recipes').insert({
+      name: saveRecipeName.trim(),
+      trade: saveRecipeTrade.trim() || null,
+      keywords: [],
+      created_by: user.id,
+    }).select('id').single();
+    if (recipeErr || !recipe) {
+      toast({ title: 'Error', description: recipeErr?.message, variant: 'destructive' });
+      setSavingRecipe(false);
+      return;
+    }
+    const stepInserts = children.map((c, idx) => ({
+      recipe_id: recipe.id,
+      title: c.task,
+      sort_order: (idx + 1) * 10,
+      trade: null as string | null,
+    }));
+    await supabase.from('task_recipe_steps').insert(stepInserts);
+    setSavingRecipe(false);
+    setSaveRecipeOpen(false);
+    setSaveRecipeName('');
+    setSaveRecipeTrade('');
+    toast({ title: 'Recipe saved from tasks' });
   };
 
   const fetchMembers = async () => {
