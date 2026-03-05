@@ -446,6 +446,41 @@ const ScopeWalkthrough = () => {
     setEditableNewItems(prev => prev.map(item => ({ ...item, saveToLibrary: checked })));
   };
 
+  const handleGenerateRehab = async (templateId: string) => {
+    if (!id) return;
+    setGeneratingRehabId(templateId);
+    try {
+      const { data: items } = await supabase
+        .from('rehab_library_items')
+        .select('*')
+        .eq('library_id', templateId)
+        .order('sort_order');
+
+      if (!items || items.length === 0) {
+        toast({ title: 'No items in this template', variant: 'destructive' });
+        return;
+      }
+
+      const inserts = items.map((item: any) => ({
+        scope_id: id,
+        description: item.description,
+        status: item.default_status || 'Repair',
+        recipe_hint_id: item.recipe_hint_id || null,
+        pricing_status: 'Needs Pricing' as const,
+      }));
+
+      const { error } = await supabase.from('scope_items').insert(inserts);
+      if (error) throw error;
+
+      setGeneratedRehabIds(prev => new Set(prev).add(templateId));
+      toast({ title: `${items.length} scope items generated` });
+    } catch (err: any) {
+      toast({ title: 'Error generating scope', description: err.message, variant: 'destructive' });
+    } finally {
+      setGeneratingRehabId(null);
+    }
+  };
+
   const selectedNewCount = editableNewItems.filter(i => i.selected).length;
   const matchedApplyCount = editableMatched.filter(m => m.applyUpdate).length;
   const totalCommitCount = selectedNewCount + matchedApplyCount;
