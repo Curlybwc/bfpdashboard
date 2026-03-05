@@ -1,0 +1,1 @@
+UPDATE public.scope_items SET status = 'Get Bid' WHERE status = 'Needs Review';

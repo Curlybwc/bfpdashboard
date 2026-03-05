@@ -214,22 +214,44 @@ Deno.serve(async (req) => {
 1) MATCH existing scope items mentioned in the walkthrough text
 2) GENERATE new scope items for work mentioned that does NOT match any existing item
 
+STATUS SEMANTICS (CRITICAL):
+- "Not Checked" = item was NOT mentioned in walkthrough at all. NEVER assign this to a mentioned item.
+- "OK" = explicitly mentioned as fine, good condition, not needed, doesn't need work
+- "Repair" = explicitly mentioned needing repair or fix
+- "Replace" = explicitly mentioned needing replacement
+- "Get Bid" = mentioned but: uncertain pricing, needs external bid, specialty trade, or ambiguous condition
+
+DEFAULT STATUS FOR MENTIONED ITEMS:
+- If explicit "replace" language → "Replace"
+- If explicit "repair" or "fix" language → "Repair"  
+- If explicit "ok / looks good / fine / doesn't need" language → "OK"
+- If uncertainty language OR pricing missing OR specialty-trade keywords → "Get Bid"
+- Otherwise for any mentioned item → "Get Bid" (NEVER "Not Checked")
+
+SPECIALTY TRADE KEYWORDS (default to Get Bid unless explicitly priced):
+- sewer lateral, trench, sewer connect
+- electrical panel, meter, mast, service upgrade
+- foundation, structural
+- drain tile, sump pump
+- whole house plumbing, re-pipe
+
 MATCHING RULES:
 - For each existing scope item, check if the walkthrough text discusses it
-- If clearly mentioned with condition info, include in "matched" with suggested status (OK, Repair, Replace) and any updated notes
-- If mentioned but ambiguous, include in "needs_review_items" with a reason
+- If clearly mentioned with condition info, include in "matched" with suggested status per rules above
+- If mentioned but ambiguous, include in "get_bid_items" with a reason
 - If not mentioned at all, include in "not_addressed_items"
 
 GENERATION RULES:
 - For any work mentioned in the walkthrough that does NOT correspond to an existing scope item, create a new item
 - Each new item needs ALL of these fields:
   - description: clear task description
+  - status: assign per the status rules above (NEVER "Not Checked" for generated items)
   - notes: supplementary info only (NOT pricing — pricing goes in structured fields)
   - qty: number extracted from text (e.g. "15 windows" → 15, "3 dumpsters" → 3, "800 square feet" → 800). If no quantity mentioned, use null.
   - unit: the unit type (e.g. "window", "dumpster", "sqft", "lf", "square", "job", "each"). If no unit, use null.
   - unit_cost: dollar amount per unit extracted from text (e.g. "$500 per window" → 500, "$450 a square" → 450, "$4 a square foot" → 4). If no per-unit price, use null.
   - total_cost: total dollar amount for this item (e.g. "roof is going to cost $8000" → 8000, "HVAC $8000" → 8000). If no total mentioned, use null.
-  - price_evidence: the exact original phrase from the walkthrough that contains pricing info (e.g. "15 windows at $500 a window that's going to be about $8000"). If no pricing mentioned, use null.
+  - price_evidence: the exact original phrase from the walkthrough that contains pricing info. If no pricing mentioned, use null.
   - price_confidence: "high" if explicit numbers stated, "medium" if estimated/approximate language used, "low" if inferred. null if no pricing.
   - phase_key: "demo", "rough", "finish", or null
 
@@ -258,12 +280,12 @@ ${JSON.stringify(knownUsers)}
 Return ONLY valid JSON:
 {
   "matched": [
-    { "scope_item_id": "uuid", "suggested_status": "OK|Repair|Replace", "suggested_notes": "string or null", "suggested_qty": null, "suggested_unit": null }
+    { "scope_item_id": "uuid", "suggested_status": "OK|Repair|Replace|Get Bid", "suggested_notes": "string or null", "suggested_qty": null, "suggested_unit": null }
   ],
   "new_items": [
-    { "description": "string", "notes": "string or null", "qty": null, "unit": null, "unit_cost": null, "total_cost": null, "price_evidence": "string or null", "price_confidence": "string or null", "phase_key": null }
+    { "description": "string", "status": "Repair|Replace|Get Bid|OK", "notes": "string or null", "qty": null, "unit": null, "unit_cost": null, "total_cost": null, "price_evidence": "string or null", "price_confidence": "string or null", "phase_key": null }
   ],
-  "needs_review_items": [
+  "get_bid_items": [
     { "id": "uuid", "description": "string", "reason": "string" }
   ],
   "not_addressed_items": [
@@ -321,7 +343,7 @@ Return ONLY valid JSON:
 
     const validItemIds = new Set(scopeItems.map(i => i.id));
     const validUserIds = new Set(allProfiles.map((p: any) => p.id));
-    const validStatuses = ['OK', 'Repair', 'Replace'];
+    const validStatuses = ['OK', 'Repair', 'Replace', 'Get Bid'];
 
     // Validate matched items
     const matched = (parsed.matched || [])
@@ -368,8 +390,12 @@ Return ONLY valid JSON:
         priceSource = 'library';
       }
 
+      // Determine status for new items: use LLM status, default to 'Get Bid'
+      const llmStatus = typeof item.status === 'string' && validStatuses.includes(item.status) ? item.status : 'Get Bid';
+
       return {
         description: desc,
+        status: llmStatus,
         notes: typeof item.notes === 'string' ? item.notes : null,
         qty: finalQty,
         unit: finalUnit || matchedCostItemUnit,
@@ -396,7 +422,7 @@ Return ONLY valid JSON:
     const result = {
       matched,
       new_items: newItems,
-      needs_review_items: (parsed.needs_review_items || []).filter(
+      get_bid_items: (parsed.get_bid_items || parsed.needs_review_items || []).filter(
         (i: any) => i.id && validItemIds.has(i.id)
       ),
       not_addressed_items: (parsed.not_addressed_items || []).filter(

@@ -16,7 +16,7 @@ import { Plus, ArrowRightLeft, ClipboardList, Pencil, Check, X, RotateCcw, Uploa
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import ScopeMembers from '@/components/ScopeMembers';
-import { PRICING_STATUSES, SCOPE_ITEM_STATUSES, type PricingStatus, type ScopeItemStatus } from '@/lib/supabase-types';
+import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,8 +34,8 @@ const ScopeDetail = () => {
   const [desc, setDesc] = useState('');
   const [qty, setQty] = useState('');
   const [unit, setUnit] = useState('');
+  const [unitCostNew, setUnitCostNew] = useState('');
   const [phaseKey, setPhaseKey] = useState('');
-  const [pricingStatus, setPricingStatus] = useState<PricingStatus>('Needs Pricing');
   const [itemStatus, setItemStatus] = useState<ScopeItemStatus>('Not Checked');
   const [itemNotes, setItemNotes] = useState('');
 
@@ -54,18 +54,23 @@ const ScopeDetail = () => {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
+    const qtyVal = qty ? parseFloat(qty) : null;
+    const ucVal = unitCostNew ? parseFloat(unitCostNew) : null;
+    const computedTotal = qtyVal != null && ucVal != null ? qtyVal * ucVal : null;
     const { error } = await supabase.from('scope_items').insert({
       scope_id: id,
       description: desc,
-      qty: qty ? parseFloat(qty) : null,
+      qty: qtyVal,
       unit: unit || null,
+      unit_cost_override: ucVal,
+      computed_total: computedTotal,
       phase_key: phaseKey || null,
-      pricing_status: pricingStatus,
+      pricing_status: ucVal != null ? 'Priced' : 'Needs Pricing',
       status: itemStatus,
       notes: itemNotes || null,
     });
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    setDesc(''); setQty(''); setUnit(''); setPhaseKey(''); setPricingStatus('Needs Pricing'); setItemStatus('Not Checked'); setItemNotes('');
+    setDesc(''); setQty(''); setUnit(''); setUnitCostNew(''); setPhaseKey(''); setItemStatus('Not Checked'); setItemNotes('');
     setOpen(false);
     fetchData();
   };
@@ -142,8 +147,7 @@ const ScopeDetail = () => {
 
   // Filter items for conversion
   const convertibleItems = items.filter(item =>
-    ['Repair', 'Replace'].includes(item.status) ||
-    (item.qty && item.qty > 0) ||
+    ['Repair', 'Replace', 'Get Bid'].includes(item.status) ||
     (item.computed_total && item.computed_total > 0)
   );
 
@@ -225,7 +229,7 @@ const ScopeDetail = () => {
                         <Label>Description</Label>
                         <Input value={desc} onChange={(e) => setDesc(e.target.value)} required />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-3 gap-3">
                         <div className="space-y-2">
                           <Label>Qty</Label>
                           <Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
@@ -234,21 +238,14 @@ const ScopeDetail = () => {
                           <Label>Unit</Label>
                           <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="sqft, lf..." />
                         </div>
+                        <div className="space-y-2">
+                          <Label>$/unit</Label>
+                          <Input type="number" value={unitCostNew} onChange={(e) => setUnitCostNew(e.target.value)} step="0.01" placeholder="0.00" />
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Phase</Label>
-                          <Input value={phaseKey} onChange={(e) => setPhaseKey(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Pricing</Label>
-                          <Select value={pricingStatus} onValueChange={(v) => setPricingStatus(v as PricingStatus)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {PRICING_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <div className="space-y-2">
+                        <Label>Phase</Label>
+                        <Input value={phaseKey} onChange={(e) => setPhaseKey(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label>Status</Label>

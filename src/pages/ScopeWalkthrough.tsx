@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { SCOPE_ITEM_STATUSES } from '@/lib/supabase-types';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import PageHeader from '@/components/PageHeader';
@@ -29,6 +30,7 @@ interface MatchedItem {
 
 interface NewItem {
   description: string;
+  status: string;
   notes: string | null;
   qty: number | null;
   unit: string | null;
@@ -47,7 +49,7 @@ interface NewItem {
 interface ParseResult {
   matched: MatchedItem[];
   new_items: NewItem[];
-  needs_review_items: { id: string; description: string; reason: string }[];
+  get_bid_items: { id: string; description: string; reason: string }[];
   not_addressed_items: { id: string; description: string }[];
   member_user_ids_to_add?: string[];
   member_display_names_to_add?: string[];
@@ -63,6 +65,7 @@ interface EditableNewItem extends NewItem {
   editedQty: string;
   editedUnit: string;
   editedUnitCost: string;
+  editedStatus: string;
   useLibraryPrice: boolean;
 }
 
@@ -160,6 +163,7 @@ const ScopeWalkthrough = () => {
           editedQty: item.qty != null ? String(item.qty) : '1',
           editedUnit: item.unit || item.matched_cost_item_unit || '',
           editedUnitCost: unitCost != null ? String(unitCost) : '',
+          editedStatus: item.status || 'Get Bid',
         };
       }));
 
@@ -270,9 +274,11 @@ const ScopeWalkthrough = () => {
           const qty = item.editedQty ? parseFloat(item.editedQty) : null;
           const unitCost = item.editedUnitCost ? parseFloat(item.editedUnitCost) : null;
           const pricingStatus = unitCost != null ? 'Priced' : 'Needs Pricing';
+          const status = item.editedStatus || 'Get Bid';
           return {
             scope_id: id,
             description: item.editedDescription,
+            status: status === 'Not Checked' ? 'Get Bid' : status,
             notes: item.editedNotes || null,
             qty,
             unit: item.editedUnit || null,
@@ -333,7 +339,7 @@ const ScopeWalkthrough = () => {
     const memberWarnings = parseResult.member_warnings ?? [];
     const hasMatched = editableMatched.length > 0;
     const hasNew = editableNewItems.length > 0;
-    const hasNeedsReview = parseResult.needs_review_items.length > 0;
+    const hasGetBid = (parseResult.get_bid_items?.length ?? 0) > 0;
     const hasNotAddressed = parseResult.not_addressed_items.length > 0;
     const hasMembers = (parseResult.member_user_ids_to_add?.length ?? 0) > 0;
 
@@ -468,6 +474,18 @@ const ScopeWalkthrough = () => {
                               />
                             </div>
                           </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Status</Label>
+                            <select
+                              value={item.editedStatus}
+                              onChange={e => updateNewItem(i, { editedStatus: e.target.value })}
+                              className="h-8 text-xs rounded-md border border-input bg-background px-2"
+                            >
+                              {SCOPE_ITEM_STATUSES.filter(s => s !== 'Not Checked').map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          </div>
                           {computedTotal > 0 && (
                             <p className="text-xs text-muted-foreground">Total: ${computedTotal.toFixed(2)}</p>
                           )}
@@ -524,14 +542,14 @@ const ScopeWalkthrough = () => {
             </div>
           )}
 
-          {/* SECTION C: Needs Review */}
-          {hasNeedsReview && (
+          {/* SECTION C: Get Bid */}
+          {hasGetBid && (
             <div>
               <h2 className="text-sm font-semibold text-accent-foreground flex items-center gap-1 mb-2">
-                <AlertTriangle className="h-4 w-4" /> Needs Review ({parseResult.needs_review_items.length})
+                <AlertTriangle className="h-4 w-4" /> Get Bid ({parseResult.get_bid_items.length})
               </h2>
               <div className="space-y-2">
-                {parseResult.needs_review_items.map(item => (
+                {parseResult.get_bid_items.map(item => (
                   <Card key={item.id} className="p-3">
                     <p className="text-sm font-medium">{item.description}</p>
                     <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
@@ -558,7 +576,7 @@ const ScopeWalkthrough = () => {
           )}
 
           {/* Empty state */}
-          {!hasMatched && !hasNew && !hasNeedsReview && !hasNotAddressed && (
+          {!hasMatched && !hasNew && !hasGetBid && !hasNotAddressed && (
             <p className="text-center text-muted-foreground py-8">No items found in the walkthrough text.</p>
           )}
 

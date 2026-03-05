@@ -18,5 +18,5 @@ export const PRICING_STATUSES: PricingStatus[] = ['Priced', 'Needs Pricing'];
 
 export type AssignmentMode = 'solo' | 'crew';
 
-export type ScopeItemStatus = 'Not Checked' | 'OK' | 'Repair' | 'Replace' | 'Needs Review';
-export const SCOPE_ITEM_STATUSES: ScopeItemStatus[] = ['Not Checked', 'OK', 'Repair', 'Replace', 'Needs Review'];
+export type ScopeItemStatus = 'Not Checked' | 'OK' | 'Repair' | 'Replace' | 'Get Bid';
+export const SCOPE_ITEM_STATUSES: ScopeItemStatus[] = ['Not Checked', 'OK', 'Repair', 'Replace', 'Get Bid'];
