@@ -18,6 +18,7 @@ import ScopeWalkthrough from "./pages/ScopeWalkthrough";
 import AdminPanel from "./pages/AdminPanel";
 import AdminStoreSections from "./pages/AdminStoreSections";
 import AdminRecipes from "./pages/AdminRecipes";
+import AdminRehabLibrary from "./pages/AdminRehabLibrary";
 import ToolInventory from "./pages/ToolInventory";
 import MaterialInventory from "./pages/MaterialInventory";
 import Today from "./pages/Today";
