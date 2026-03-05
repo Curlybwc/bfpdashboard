@@ -265,6 +265,31 @@ const ScopeDetail = () => {
     fetchChecklistCoverage();
   };
 
+  const handleDeleteItem = async (itemId: string) => {
+    setDeletingId(itemId);
+    const { error } = await supabase.from('scope_items').delete().eq('id', itemId).eq('scope_id', id!);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setDeletingId(null);
+      return;
+    }
+    toast({ title: 'Item deleted' });
+    setItems(prev => prev.filter(i => i.id !== itemId));
+    setDeletingId(null);
+  };
+
+  const handleSaveTitle = async () => {
+    if (!id) return;
+    const { error } = await supabase.from('scopes').update({ name: titleDraft }).eq('id', id);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setScope((prev: any) => ({ ...prev, name: titleDraft }));
+    setEditingTitle(false);
+    toast({ title: 'Title updated' });
+  };
+
   if (!scope) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   const isDraft = scope.status === 'Draft';
