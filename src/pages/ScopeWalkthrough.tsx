@@ -474,6 +474,18 @@ const ScopeWalkthrough = () => {
                               />
                             </div>
                           </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground whitespace-nowrap">Status</Label>
+                            <select
+                              value={item.editedStatus}
+                              onChange={e => updateNewItem(i, { editedStatus: e.target.value })}
+                              className="h-8 text-xs rounded-md border border-input bg-background px-2"
+                            >
+                              {SCOPE_ITEM_STATUSES.filter(s => s !== 'Not Checked').map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          </div>
                           {computedTotal > 0 && (
                             <p className="text-xs text-muted-foreground">Total: ${computedTotal.toFixed(2)}</p>
                           )}
