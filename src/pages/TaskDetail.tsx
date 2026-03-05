@@ -16,10 +16,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
-import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus } from 'lucide-react';
+import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { Card } from '@/components/ui/card';
+import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -40,6 +42,14 @@ const TaskDetail = () => {
   const [fieldCapture, setFieldCapture] = useState<any>(null);
   const [markingReviewed, setMarkingReviewed] = useState(false);
 
+  // Recipe state
+  const [suggestedRecipe, setSuggestedRecipe] = useState<{ id: string; name: string } | null>(null);
+  const [expandingRecipe, setExpandingRecipe] = useState(false);
+  const [saveRecipeOpen, setSaveRecipeOpen] = useState(false);
+  const [saveRecipeName, setSaveRecipeName] = useState('');
+  const [saveRecipeTrade, setSaveRecipeTrade] = useState('');
+  const [savingRecipe, setSavingRecipe] = useState(false);
+
   // Crew state
   const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
   const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
@@ -57,6 +67,24 @@ const TaskDetail = () => {
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
 
   useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
+
+  // Recipe suggestion effect
+  useEffect(() => {
+    if (!task || children.length > 0) { setSuggestedRecipe(null); return; }
+    const fetchRecipeSuggestion = async () => {
+      // If task has recipe_hint_id, use that directly
+      if (task.recipe_hint_id) {
+        const { data } = await supabase.from('task_recipes').select('id, name').eq('id', task.recipe_hint_id).eq('active', true).single();
+        if (data) { setSuggestedRecipe(data); return; }
+      }
+      // Fallback: keyword matching
+      const { data: recipes } = await supabase.from('task_recipes').select('id, name, keywords').eq('active', true);
+      if (!recipes || recipes.length === 0) { setSuggestedRecipe(null); return; }
+      const suggestions = suggestRecipes(task.task, recipes as RecipeForMatch[]);
+      setSuggestedRecipe(suggestions.length > 0 ? { id: suggestions[0].recipe.id, name: suggestions[0].recipe.name } : null);
+    };
+    fetchRecipeSuggestion();
+  }, [task?.id, task?.task, task?.recipe_hint_id, children.length]);
 
   useEffect(() => {
     if (task?.assignment_mode === 'crew') {
@@ -173,8 +201,80 @@ const TaskDetail = () => {
 
   const fetchChildren = async () => {
     if (!taskId) return;
-    const { data } = await supabase.from('tasks').select('id, task, stage, assigned_to_user_id').eq('parent_task_id', taskId);
+    const { data } = await supabase.from('tasks')
+      .select('id, task, stage, assigned_to_user_id')
+      .eq('parent_task_id', taskId)
+      .order('sort_order', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true });
     setChildren(data || []);
+  };
+
+  const handleExpandRecipe = async (recipeId: string) => {
+    if (!taskId || !task || !user) return;
+    setExpandingRecipe(true);
+    const { data: steps } = await supabase
+      .from('task_recipe_steps')
+      .select('*')
+      .eq('recipe_id', recipeId)
+      .order('sort_order');
+    if (!steps || steps.length === 0) {
+      toast({ title: 'Recipe has no steps', variant: 'destructive' });
+      setExpandingRecipe(false);
+      return;
+    }
+    const childInserts = steps.map(step => ({
+      project_id: task.project_id,
+      parent_task_id: taskId,
+      task: step.title,
+      sort_order: step.sort_order * 10,
+      source_recipe_id: recipeId,
+      source_recipe_step_id: step.id,
+      trade: step.trade || task.trade || null,
+      priority: task.priority,
+      room_area: task.room_area || null,
+      stage: 'Not Ready' as const,
+      materials_on_site: 'No' as const,
+      created_by: user.id,
+    }));
+    const { error: insertErr } = await supabase.from('tasks').insert(childInserts);
+    if (insertErr) {
+      toast({ title: 'Error expanding recipe', description: insertErr.message, variant: 'destructive' });
+      setExpandingRecipe(false);
+      return;
+    }
+    await supabase.from('tasks').update({ expanded_recipe_id: recipeId }).eq('id', taskId);
+    setExpandingRecipe(false);
+    toast({ title: 'Recipe expanded' });
+    fetchTask();
+    fetchChildren();
+  };
+
+  const handleSaveAsRecipe = async () => {
+    if (!user || !saveRecipeName.trim() || children.length === 0) return;
+    setSavingRecipe(true);
+    const { data: recipe, error: recipeErr } = await supabase.from('task_recipes').insert({
+      name: saveRecipeName.trim(),
+      trade: saveRecipeTrade.trim() || null,
+      keywords: [],
+      created_by: user.id,
+    }).select('id').single();
+    if (recipeErr || !recipe) {
+      toast({ title: 'Error', description: recipeErr?.message, variant: 'destructive' });
+      setSavingRecipe(false);
+      return;
+    }
+    const stepInserts = children.map((c, idx) => ({
+      recipe_id: recipe.id,
+      title: c.task,
+      sort_order: (idx + 1) * 10,
+      trade: null as string | null,
+    }));
+    await supabase.from('task_recipe_steps').insert(stepInserts);
+    setSavingRecipe(false);
+    setSaveRecipeOpen(false);
+    setSaveRecipeName('');
+    setSaveRecipeTrade('');
+    toast({ title: 'Recipe saved from tasks' });
   };
 
   const fetchMembers = async () => {
@@ -431,6 +531,21 @@ const TaskDetail = () => {
           </Button>
         </div>
 
+        {/* Recipe suggestion banner */}
+        {suggestedRecipe && children.length === 0 && (
+          <Card className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen className="h-4 w-4 text-primary shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">Recipe: {suggestedRecipe.name}</p>
+              </div>
+            </div>
+            <Button size="sm" onClick={() => handleExpandRecipe(suggestedRecipe.id)} disabled={expandingRecipe}>
+              {expandingRecipe ? 'Expanding…' : 'Expand'}
+            </Button>
+          </Card>
+        )}
+
         <div className="space-y-2">
           <Label>Task</Label>
           <Input value={taskText} onChange={(e) => setTaskText(e.target.value)} />
@@ -604,7 +719,14 @@ const TaskDetail = () => {
 
         {hasChildren && (
           <div className="space-y-1">
-            <Label>Subtasks ({children.length})</Label>
+            <div className="flex items-center justify-between">
+              <Label>Subtasks ({children.length})</Label>
+              {canDelete && (
+                <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
+                  <Save className="h-3.5 w-3.5 mr-1" />Save as Recipe
+                </Button>
+              )}
+            </div>
             {children.map(c => (
               <div key={c.id} className="text-sm border rounded px-3 py-2 flex justify-between">
                 <span className="truncate">{c.task}</span>
@@ -661,6 +783,26 @@ const TaskDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={saveRecipeOpen} onOpenChange={setSaveRecipeOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Save as Recipe</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Recipe Name</Label>
+              <Input value={saveRecipeName} onChange={(e) => setSaveRecipeName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Trade</Label>
+              <Input value={saveRecipeTrade} onChange={(e) => setSaveRecipeTrade(e.target.value)} />
+            </div>
+            <p className="text-sm text-muted-foreground">{children.length} step(s) will be saved.</p>
+            <Button className="w-full" onClick={handleSaveAsRecipe} disabled={savingRecipe || !saveRecipeName.trim()}>
+              {savingRecipe ? 'Saving…' : 'Save Recipe'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
