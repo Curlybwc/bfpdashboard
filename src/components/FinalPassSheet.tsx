@@ -1,10 +1,13 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeForChecklistMatch, isChecklistCovered, matchExistingScopeItem } from '@/lib/checklistMatch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, Wrench, RefreshCw, HelpCircle } from 'lucide-react';
 
@@ -26,6 +29,7 @@ interface ScopeItem {
   unit: string | null;
   unit_cost_override: number | null;
   computed_total: number | null;
+  notes: string | null;
 }
 
 interface FinalPassSheetProps {
@@ -36,6 +40,15 @@ interface FinalPassSheetProps {
 }
 
 type ActionState = 'OK' | 'Repair' | 'Replace' | 'Get Bid';
+
+interface DetailForm {
+  qty: string;
+  unit: string;
+  unitCost: string;
+  notes: string;
+}
+
+const UNIT_OPTIONS = ['each', 'sqft', 'lf', 'piece'];
 
 const UNIT_MAP: Record<string, string> = {
   each: 'each',
@@ -52,11 +65,15 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
 
+  // Detail dialog state
+  const [pendingAction, setPendingAction] = useState<{ ci: ChecklistItem; action: ActionState } | null>(null);
+  const [detailForm, setDetailForm] = useState<DetailForm>({ qty: '1', unit: '', unitCost: '', notes: '' });
+  const [saving, setSaving] = useState(false);
+
   const fetchAll = useCallback(async () => {
     if (!open) return;
     setLoading(true);
 
-    // Get the default template
     const { data: templates } = await supabase
       .from('checklist_templates')
       .select('id')
@@ -71,7 +88,7 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
         .eq('template_id', templateId).eq('active', true).order('sort_order'),
       supabase.from('scope_checklist_reviews').select('checklist_item_id, state')
         .eq('scope_id', scopeId),
-      supabase.from('scope_items').select('id, description, status, cost_item_id, qty, unit, unit_cost_override, computed_total')
+      supabase.from('scope_items').select('id, description, status, cost_item_id, qty, unit, unit_cost_override, computed_total, notes')
         .eq('scope_id', scopeId),
     ]);
 
@@ -93,7 +110,6 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
 
   const uncoveredItems = checklistItems.filter(ci => !isCovered(ci));
 
-  // Group by category
   const grouped = uncoveredItems.reduce<Record<string, ChecklistItem[]>>((acc, ci) => {
     const cat = ci.category || 'Other';
     if (!acc[cat]) acc[cat] = [];
@@ -101,105 +117,17 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
     return acc;
   }, {});
 
-  const handleAction = async (ci: ChecklistItem, action: ActionState) => {
+  // OK — immediate save (unchanged)
+  const handleOK = async (ci: ChecklistItem) => {
     setActing(ci.id);
     try {
-      if (action === 'OK') {
-        const { error } = await supabase.from('scope_checklist_reviews').upsert({
-          scope_id: scopeId,
-          checklist_item_id: ci.id,
-          state: 'OK',
-        }, { onConflict: 'scope_id,checklist_item_id' });
-        if (error) throw error;
-      } else {
-        // Use matchExistingScopeItem for consistent dedup
-        const existing = matchExistingScopeItem(scopeItems, ci.label, ci.default_cost_item_id);
-
-        if (existing) {
-          // UPDATE existing — backfill pricing if missing
-          const updates: Record<string, any> = { status: action };
-          if (!existing.cost_item_id && ci.default_cost_item_id) updates.cost_item_id = ci.default_cost_item_id;
-          if (existing.qty == null) updates.qty = 1;
-
-          if (existing.unit_cost_override == null) {
-            // Try to pull pricing
-            let unitCost: number | null = null;
-            let unitText: string | null = null;
-            const costId = ci.default_cost_item_id || existing.cost_item_id;
-            if (costId) {
-              const { data: costItem } = await supabase.from('cost_items')
-                .select('default_total_cost, unit_type').eq('id', costId).single();
-              if (costItem && costItem.default_total_cost > 0) {
-                unitCost = costItem.default_total_cost;
-                unitText = UNIT_MAP[costItem.unit_type] || costItem.unit_type;
-              }
-            }
-            if (unitCost == null) {
-              const { data: costMatch } = await supabase.from('cost_items')
-                .select('id, default_total_cost, unit_type')
-                .ilike('normalized_name', `%${ci.normalized_label}%`)
-                .eq('active', true).limit(1);
-              if (costMatch?.[0] && costMatch[0].default_total_cost > 0) {
-                unitCost = costMatch[0].default_total_cost;
-                unitText = UNIT_MAP[costMatch[0].unit_type] || costMatch[0].unit_type;
-                if (!updates.cost_item_id && !existing.cost_item_id) updates.cost_item_id = costMatch[0].id;
-              }
-            }
-            if (unitCost != null) {
-              updates.unit_cost_override = unitCost;
-              if (unitText) updates.unit = unitText;
-              const finalQty = updates.qty ?? existing.qty ?? 1;
-              updates.computed_total = finalQty * unitCost;
-              updates.pricing_status = 'Priced';
-            }
-          }
-
-          // Always derive pricing_status from final unit_cost_override
-          const finalUnitCost = updates.unit_cost_override ?? existing.unit_cost_override;
-          updates.pricing_status = finalUnitCost != null ? 'Priced' : 'Needs Pricing';
-
-          const { error } = await supabase.from('scope_items').update(updates).eq('id', existing.id);
-          if (error) throw error;
-        } else {
-          // INSERT new — resolve pricing
-          let unitCost: number | null = null;
-          let unitText: string | null = null;
-          let resolvedCostItemId: string | null = ci.default_cost_item_id;
-
-          if (resolvedCostItemId) {
-            const { data: costItem } = await supabase.from('cost_items')
-              .select('default_total_cost, unit_type').eq('id', resolvedCostItemId).single();
-            if (costItem) { unitCost = costItem.default_total_cost; unitText = UNIT_MAP[costItem.unit_type] || costItem.unit_type; }
-          }
-          if (!resolvedCostItemId || unitCost == null) {
-            const { data: costMatch } = await supabase.from('cost_items')
-              .select('id, default_total_cost, unit_type')
-              .ilike('normalized_name', `%${ci.normalized_label}%`)
-              .eq('active', true).limit(1);
-            if (costMatch?.[0]) { resolvedCostItemId = costMatch[0].id; unitCost = costMatch[0].default_total_cost; unitText = UNIT_MAP[costMatch[0].unit_type] || costMatch[0].unit_type; }
-          }
-
-          const computedTotal = unitCost != null && unitCost > 0 ? 1 * unitCost : null;
-          const { error } = await supabase.from('scope_items').insert({
-            scope_id: scopeId, description: ci.label, status: action,
-            cost_item_id: resolvedCostItemId,
-            unit_cost_override: unitCost != null && unitCost > 0 ? unitCost : null,
-            unit: unitText, qty: 1, computed_total: computedTotal,
-            pricing_status: unitCost != null && unitCost > 0 ? 'Priced' : 'Needs Pricing',
-          });
-          if (error) throw error;
-        }
-
-        // Upsert review
-        const { error: revErr } = await supabase.from('scope_checklist_reviews').upsert({
-          scope_id: scopeId,
-          checklist_item_id: ci.id,
-          state: action,
-        }, { onConflict: 'scope_id,checklist_item_id' });
-        if (revErr) throw revErr;
-      }
-
-      toast({ title: `${ci.label} → ${action}` });
+      const { error } = await supabase.from('scope_checklist_reviews').upsert({
+        scope_id: scopeId,
+        checklist_item_id: ci.id,
+        state: 'OK',
+      }, { onConflict: 'scope_id,checklist_item_id' });
+      if (error) throw error;
+      toast({ title: `${ci.label} → OK` });
       onUpdate();
       await fetchAll();
     } catch (err: any) {
@@ -209,76 +137,300 @@ const FinalPassSheet = ({ scopeId, open, onOpenChange, onUpdate }: FinalPassShee
     }
   };
 
+  // Open detail dialog with prefill
+  const openDetailDialog = async (ci: ChecklistItem, action: ActionState) => {
+    // 1) Try existing scope item match
+    const existing = matchExistingScopeItem(scopeItems, ci.label, ci.default_cost_item_id);
+
+    if (existing) {
+      setDetailForm({
+        qty: existing.qty != null ? String(existing.qty) : '1',
+        unit: existing.unit || '',
+        unitCost: existing.unit_cost_override != null ? String(existing.unit_cost_override) : '',
+        notes: existing.notes || '',
+      });
+    } else {
+      // 2) Try cost library defaults
+      let unitCost = '';
+      let unit = '';
+
+      if (ci.default_cost_item_id) {
+        const { data: costItem } = await supabase.from('cost_items')
+          .select('default_total_cost, unit_type').eq('id', ci.default_cost_item_id).single();
+        if (costItem) {
+          if (costItem.default_total_cost > 0) unitCost = String(costItem.default_total_cost);
+          unit = UNIT_MAP[costItem.unit_type] || costItem.unit_type;
+        }
+      }
+
+      if (!unitCost) {
+        const { data: costMatch } = await supabase.from('cost_items')
+          .select('default_total_cost, unit_type')
+          .ilike('normalized_name', `%${ci.normalized_label}%`)
+          .eq('active', true).limit(1);
+        if (costMatch?.[0]) {
+          if (costMatch[0].default_total_cost > 0) unitCost = String(costMatch[0].default_total_cost);
+          if (!unit) unit = UNIT_MAP[costMatch[0].unit_type] || costMatch[0].unit_type;
+        }
+      }
+
+      setDetailForm({ qty: '1', unit, unitCost, notes: '' });
+    }
+
+    setPendingAction({ ci, action });
+  };
+
+  // Parse helper: blank/NaN → null
+  const parseNum = (s: string): number | null => {
+    if (!s.trim()) return null;
+    const n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  };
+
+  // Confirm save from dialog
+  const handleConfirmAction = async () => {
+    if (!pendingAction) return;
+    setSaving(true);
+    const { ci, action } = pendingAction;
+
+    const qty = parseNum(detailForm.qty);
+    const unitCost = parseNum(detailForm.unitCost);
+    const computedTotal = qty != null && unitCost != null ? qty * unitCost : null;
+    const pricingStatus = unitCost != null ? 'Priced' : 'Needs Pricing';
+    const formNotes = detailForm.notes.trim() || null;
+
+    try {
+      const existing = matchExistingScopeItem(scopeItems, ci.label, ci.default_cost_item_id);
+
+      if (existing) {
+        const updates: Record<string, any> = {
+          status: action,
+          qty,
+          unit: detailForm.unit || null,
+          unit_cost_override: unitCost,
+          computed_total: computedTotal,
+          pricing_status: pricingStatus,
+        };
+
+        // Backfill cost_item_id if missing
+        if (!existing.cost_item_id && ci.default_cost_item_id) {
+          updates.cost_item_id = ci.default_cost_item_id;
+        }
+
+        // Notes: append if existing differs
+        if (formNotes) {
+          if (existing.notes && existing.notes.trim() && formNotes !== existing.notes.trim()) {
+            updates.notes = existing.notes.trim() + '\n' + formNotes;
+          } else {
+            updates.notes = formNotes;
+          }
+        }
+
+        const { error } = await supabase.from('scope_items').update(updates).eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        // Insert new
+        let resolvedCostItemId: string | null = ci.default_cost_item_id;
+
+        if (!resolvedCostItemId) {
+          const { data: costMatch } = await supabase.from('cost_items')
+            .select('id')
+            .ilike('normalized_name', `%${ci.normalized_label}%`)
+            .eq('active', true).limit(1);
+          if (costMatch?.[0]) resolvedCostItemId = costMatch[0].id;
+        }
+
+        const { error } = await supabase.from('scope_items').insert({
+          scope_id: scopeId,
+          description: ci.label,
+          status: action,
+          cost_item_id: resolvedCostItemId,
+          qty,
+          unit: detailForm.unit || null,
+          unit_cost_override: unitCost,
+          computed_total: computedTotal,
+          pricing_status: pricingStatus,
+          notes: formNotes,
+        });
+        if (error) throw error;
+      }
+
+      // Upsert review
+      const { error: revErr } = await supabase.from('scope_checklist_reviews').upsert({
+        scope_id: scopeId,
+        checklist_item_id: ci.id,
+        state: action,
+      }, { onConflict: 'scope_id,checklist_item_id' });
+      if (revErr) throw revErr;
+
+      toast({ title: `${ci.label} → ${action}` });
+      onUpdate();
+      setPendingAction(null);
+      await fetchAll();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const coveredCount = checklistItems.filter(ci => isCovered(ci)).length;
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center justify-between">
-            <span>Final Pass</span>
-            <Badge variant="secondary" className="text-xs">
-              {coveredCount} / {checklistItems.length} checked
-            </Badge>
-          </SheetTitle>
-        </SheetHeader>
+  const displayTotal = (() => {
+    const q = parseNum(detailForm.qty);
+    const u = parseNum(detailForm.unitCost);
+    if (q != null && u != null) return `$${(q * u).toFixed(2)}`;
+    return '—';
+  })();
 
-        {loading ? (
-          <p className="text-center text-muted-foreground py-8">Loading checklist…</p>
-        ) : uncoveredItems.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">All checklist items covered! ✓</p>
-        ) : (
-          <div className="space-y-4 mt-4">
-            {Object.entries(grouped).map(([category, categoryItems]) => (
-              <div key={category}>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{category}</h3>
-                <div className="space-y-2">
-                  {categoryItems.map(ci => (
-                    <div key={ci.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
-                      <span className="text-sm font-medium flex-1 min-w-0">{ci.label}</span>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <Button
-                          size="sm" variant="ghost"
-                          className="h-7 px-2 text-xs text-success"
-                          disabled={acting === ci.id}
-                          onClick={() => handleAction(ci, 'OK')}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-0.5" />OK
-                        </Button>
-                        <Button
-                          size="sm" variant="ghost"
-                          className="h-7 px-2 text-xs text-orange-600"
-                          disabled={acting === ci.id}
-                          onClick={() => handleAction(ci, 'Repair')}
-                        >
-                          <Wrench className="h-3.5 w-3.5 mr-0.5" />Repair
-                        </Button>
-                        <Button
-                          size="sm" variant="ghost"
-                          className="h-7 px-2 text-xs text-destructive"
-                          disabled={acting === ci.id}
-                          onClick={() => handleAction(ci, 'Replace')}
-                        >
-                          <RefreshCw className="h-3.5 w-3.5 mr-0.5" />Replace
-                        </Button>
-                        <Button
-                          size="sm" variant="ghost"
-                          className="h-7 px-2 text-xs text-amber-600"
-                          disabled={acting === ci.id}
-                          onClick={() => handleAction(ci, 'Get Bid')}
-                        >
-                          <HelpCircle className="h-3.5 w-3.5 mr-0.5" />Bid
-                        </Button>
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center justify-between">
+              <span>Final Pass</span>
+              <Badge variant="secondary" className="text-xs">
+                {coveredCount} / {checklistItems.length} checked
+              </Badge>
+            </SheetTitle>
+          </SheetHeader>
+
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8">Loading checklist…</p>
+          ) : uncoveredItems.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">All checklist items covered! ✓</p>
+          ) : (
+            <div className="space-y-4 mt-4">
+              {Object.entries(grouped).map(([category, categoryItems]) => (
+                <div key={category}>
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{category}</h3>
+                  <div className="space-y-2">
+                    {categoryItems.map(ci => (
+                      <div key={ci.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
+                        <span className="text-sm font-medium flex-1 min-w-0">{ci.label}</span>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 px-2 text-xs text-success"
+                            disabled={acting === ci.id}
+                            onClick={() => handleOK(ci)}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-0.5" />OK
+                          </Button>
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 px-2 text-xs text-orange-600"
+                            disabled={acting === ci.id}
+                            onClick={() => openDetailDialog(ci, 'Repair')}
+                          >
+                            <Wrench className="h-3.5 w-3.5 mr-0.5" />Repair
+                          </Button>
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 px-2 text-xs text-destructive"
+                            disabled={acting === ci.id}
+                            onClick={() => openDetailDialog(ci, 'Replace')}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5 mr-0.5" />Replace
+                          </Button>
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 px-2 text-xs text-amber-600"
+                            disabled={acting === ci.id}
+                            onClick={() => openDetailDialog(ci, 'Get Bid')}
+                          >
+                            <HelpCircle className="h-3.5 w-3.5 mr-0.5" />Bid
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Detail Dialog */}
+      <Dialog open={!!pendingAction} onOpenChange={(o) => { if (!o) setPendingAction(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {pendingAction?.ci.label}
+              <Badge variant={pendingAction?.action === 'Replace' ? 'destructive' : 'secondary'} className="text-xs">
+                {pendingAction?.action}
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Qty</label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={detailForm.qty}
+                  onChange={e => setDetailForm(f => ({ ...f, qty: e.target.value }))}
+                  placeholder="1"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Unit</label>
+                <Select value={detailForm.unit} onValueChange={v => setDetailForm(f => ({ ...f, unit: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map(u => (
+                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Unit Cost ($)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={detailForm.unitCost}
+                  onChange={e => setDetailForm(f => ({ ...f, unitCost: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Total</label>
+                <div className="h-10 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium">
+                  {displayTotal}
                 </div>
               </div>
-            ))}
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Notes</label>
+              <Textarea
+                value={detailForm.notes}
+                onChange={e => setDetailForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Optional notes…"
+                rows={2}
+              />
+            </div>
           </div>
-        )}
-      </SheetContent>
-    </Sheet>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPendingAction(null)} disabled={saving}>Cancel</Button>
+            <Button onClick={handleConfirmAction} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
