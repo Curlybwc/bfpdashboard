@@ -36,8 +36,6 @@ interface FinalPassSheetProps {
 
 type ActionState = 'OK' | 'Repair' | 'Replace' | 'Get Bid';
 
-const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
-
 const UNIT_MAP: Record<string, string> = {
   each: 'each',
   sqft: 'sqft',
