@@ -3,7 +3,7 @@ import { normalizeForChecklistMatch, jaccardSimilarity } from './checklistMatch'
 export interface RecipeForMatch {
   id: string;
   name: string;
-  keywords: string[];
+  keywords: string[] | null;
 }
 
 export interface RecipeSuggestion {
