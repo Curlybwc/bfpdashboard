@@ -162,6 +162,7 @@ const ScopeWalkthrough = () => {
           editedQty: item.qty != null ? String(item.qty) : '1',
           editedUnit: item.unit || item.matched_cost_item_unit || '',
           editedUnitCost: unitCost != null ? String(unitCost) : '',
+          editedStatus: item.status || 'Get Bid',
         };
       }));
 
