@@ -117,6 +117,11 @@ const ScopeWalkthrough = () => {
   const [committing, setCommitting] = useState(false);
   const [saveAllToLibrary, setSaveAllToLibrary] = useState(true);
 
+  // Rehab detection state
+  const [detectedRehabs, setDetectedRehabs] = useState<{ template: RehabTemplate; score: number }[]>([]);
+  const [generatedRehabIds, setGeneratedRehabIds] = useState<Set<string>>(new Set());
+  const [generatingRehabId, setGeneratingRehabId] = useState<string | null>(null);
+
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
