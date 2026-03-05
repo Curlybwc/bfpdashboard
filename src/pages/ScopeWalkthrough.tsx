@@ -529,14 +529,14 @@ const ScopeWalkthrough = () => {
             </div>
           )}
 
-          {/* SECTION C: Needs Review */}
-          {hasNeedsReview && (
+          {/* SECTION C: Get Bid */}
+          {hasGetBid && (
             <div>
               <h2 className="text-sm font-semibold text-accent-foreground flex items-center gap-1 mb-2">
-                <AlertTriangle className="h-4 w-4" /> Needs Review ({parseResult.needs_review_items.length})
+                <AlertTriangle className="h-4 w-4" /> Get Bid ({parseResult.get_bid_items.length})
               </h2>
               <div className="space-y-2">
-                {parseResult.needs_review_items.map(item => (
+                {parseResult.get_bid_items.map(item => (
                   <Card key={item.id} className="p-3">
                     <p className="text-sm font-medium">{item.description}</p>
                     <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
