@@ -34,6 +34,7 @@ const ScopeDetail = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [finalPassOpen, setFinalPassOpen] = useState(false);
+  const [dedupeOpen, setDedupeOpen] = useState(false);
 
   // Checklist coverage state
   const [checklistItems, setChecklistItems] = useState<any[]>([]);
