@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { SCOPE_ITEM_STATUSES } from '@/lib/supabase-types';
+import { matchExistingScopeItem, strongerStatus } from '@/lib/checklistMatch';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import PageHeader from '@/components/PageHeader';
