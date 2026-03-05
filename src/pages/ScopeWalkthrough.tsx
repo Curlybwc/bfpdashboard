@@ -393,8 +393,12 @@ const ScopeWalkthrough = () => {
       // 4) Auto-add members
       await autoAddMembers();
 
-      const totalActions = matchedToApply.length + scopeItemInserts.length;
-      toast({ title: `${totalActions} item${totalActions !== 1 ? 's' : ''} updated/created` });
+      const totalActions = matchedToApply.length + scopeItemInserts.length + mergedCount;
+      const parts = [];
+      if (matchedToApply.length) parts.push(`${matchedToApply.length} updated`);
+      if (scopeItemInserts.length) parts.push(`${scopeItemInserts.length} created`);
+      if (mergedCount) parts.push(`${mergedCount} merged`);
+      toast({ title: `${totalActions} item${totalActions !== 1 ? 's' : ''}: ${parts.join(', ')}` });
       navigate(`/scopes/${id}`);
     } catch (err: any) {
       toast({ title: 'Error committing changes', description: err.message, variant: 'destructive' });
