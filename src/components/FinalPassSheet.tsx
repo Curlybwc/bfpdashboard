@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { normalizeForChecklistMatch, isChecklistCovered } from '@/lib/checklistMatch';
+import { normalizeForChecklistMatch, isChecklistCovered, matchExistingScopeItem } from '@/lib/checklistMatch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
