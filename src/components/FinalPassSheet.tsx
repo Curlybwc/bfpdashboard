@@ -22,6 +22,8 @@ interface ScopeItem {
   description: string;
   status: string;
   cost_item_id: string | null;
+  qty: number | null;
+  unit: string | null;
   unit_cost_override: number | null;
   computed_total: number | null;
 }
