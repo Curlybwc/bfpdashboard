@@ -387,7 +387,37 @@ const ScopeDetail = () => {
       <div className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <StatusBadge status={scope.status} />
-          <span className="text-sm text-muted-foreground">{scope.address}</span>
+          {isAdmin && editingTitle ? (
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <Input
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                className="h-8 text-sm flex-1"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(); if (e.key === 'Escape') setEditingTitle(false); }}
+              />
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleSaveTitle}>
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingTitle(false)}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <span className="text-sm text-muted-foreground">{scope.address}</span>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => { setTitleDraft(scope.name || ''); setEditingTitle(true); }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </>
+          )}
         </div>
 
         {/* Estimated Total Card */}
