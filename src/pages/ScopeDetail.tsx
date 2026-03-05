@@ -243,20 +243,9 @@ const ScopeDetail = () => {
                           <Input type="number" value={unitCostNew} onChange={(e) => setUnitCostNew(e.target.value)} step="0.01" placeholder="0.00" />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Phase</Label>
-                          <Input value={phaseKey} onChange={(e) => setPhaseKey(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Pricing</Label>
-                          <Select value={pricingStatus} onValueChange={(v) => setPricingStatus(v as PricingStatus)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {PRICING_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <div className="space-y-2">
+                        <Label>Phase</Label>
+                        <Input value={phaseKey} onChange={(e) => setPhaseKey(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label>Status</Label>
