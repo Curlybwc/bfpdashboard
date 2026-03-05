@@ -557,6 +557,11 @@ const ScopeWalkthrough = () => {
                           {item.price_evidence && (
                             <p className="text-[10px] text-muted-foreground italic">"{item.price_evidence}"</p>
                           )}
+                          {item.checklist_label ? (
+                            <p className="text-[10px] text-muted-foreground">Checklist: {item.checklist_category} / {item.checklist_label}</p>
+                          ) : (
+                            <p className="text-[10px] text-muted-foreground">Checklist: no match</p>
+                          )}
                           {item.editedNotes && (
                             <Input
                               value={item.editedNotes}
