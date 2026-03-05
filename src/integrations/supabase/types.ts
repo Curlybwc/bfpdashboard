@@ -797,33 +797,39 @@ export type Database = {
           id: string
           material_name: string
           notes: string | null
+          provided_by: string | null
           qty: number | null
           recipe_step_id: string
           sku: string | null
-          store: string | null
+          store_section: string | null
           unit: string | null
+          vendor_url: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           material_name: string
           notes?: string | null
+          provided_by?: string | null
           qty?: number | null
           recipe_step_id: string
           sku?: string | null
-          store?: string | null
+          store_section?: string | null
           unit?: string | null
+          vendor_url?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           material_name?: string
           notes?: string | null
+          provided_by?: string | null
           qty?: number | null
           recipe_step_id?: string
           sku?: string | null
-          store?: string | null
+          store_section?: string | null
           unit?: string | null
+          vendor_url?: string | null
         }
         Relationships: [
           {
