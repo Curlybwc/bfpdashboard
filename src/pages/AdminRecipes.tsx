@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useStoreSections } from '@/hooks/useStoreSections';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, ChevronUp, Package } from 'lucide-react';
 
 interface Recipe {
@@ -40,8 +42,10 @@ interface StepMaterial {
   material_name: string;
   qty: number | null;
   unit: string | null;
-  store: string | null;
   sku: string | null;
+  vendor_url: string | null;
+  store_section: string | null;
+  provided_by: string | null;
   notes: string | null;
 }
 
@@ -50,6 +54,7 @@ const AdminRecipes = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { sections: storeSections } = useStoreSections();
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
@@ -78,8 +83,10 @@ const AdminRecipes = () => {
   const [newMatName, setNewMatName] = useState('');
   const [newMatQty, setNewMatQty] = useState('');
   const [newMatUnit, setNewMatUnit] = useState('');
-  const [newMatStore, setNewMatStore] = useState('');
+  const [newMatStoreSection, setNewMatStoreSection] = useState('');
   const [newMatSku, setNewMatSku] = useState('');
+  const [newMatVendorUrl, setNewMatVendorUrl] = useState('');
+  const [newMatProvidedBy, setNewMatProvidedBy] = useState('either');
 
   const canAccess = isAdmin || canManageProjects;
 
@@ -235,7 +242,7 @@ const AdminRecipes = () => {
       setExpandedStepId(stepId);
       fetchStepMaterials(stepId);
     }
-    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStore(''); setNewMatSku('');
+    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStoreSection(''); setNewMatSku(''); setNewMatVendorUrl(''); setNewMatProvidedBy('either');
   };
 
   const handleAddMaterial = async () => {
@@ -245,14 +252,16 @@ const AdminRecipes = () => {
       material_name: newMatName.trim(),
       qty: newMatQty ? parseFloat(newMatQty) : null,
       unit: newMatUnit.trim() || null,
-      store: newMatStore.trim() || null,
+      store_section: newMatStoreSection || null,
       sku: newMatSku.trim() || null,
+      vendor_url: newMatVendorUrl.trim() || null,
+      provided_by: newMatProvidedBy || 'either',
     });
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStore(''); setNewMatSku('');
+    setNewMatName(''); setNewMatQty(''); setNewMatUnit(''); setNewMatStoreSection(''); setNewMatSku(''); setNewMatVendorUrl(''); setNewMatProvidedBy('either');
     fetchStepMaterials(expandedStepId);
   };
 
@@ -339,7 +348,9 @@ const AdminRecipes = () => {
                       <div key={mat.id} className="flex items-center gap-2 text-xs">
                         <span className="flex-1 truncate">{mat.material_name}</span>
                         {mat.qty != null && <span className="text-muted-foreground">{mat.qty} {mat.unit || ''}</span>}
+                        {mat.store_section && <Badge variant="secondary" className="text-[9px]">{mat.store_section}</Badge>}
                         {mat.sku && <Badge variant="outline" className="text-[9px]">{mat.sku}</Badge>}
+                        {mat.provided_by && mat.provided_by !== 'either' && <Badge variant="outline" className="text-[9px]">{mat.provided_by}</Badge>}
                         <button onClick={() => handleDeleteMaterial(mat.id)} className="text-muted-foreground hover:text-destructive shrink-0">
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -353,10 +364,31 @@ const AdminRecipes = () => {
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      <Input placeholder="Store" value={newMatStore} onChange={e => setNewMatStore(e.target.value)} className="h-7 text-xs" />
+                    <div className="grid grid-cols-3 gap-1">
+                      <Select value={newMatStoreSection} onValueChange={setNewMatStoreSection}>
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue placeholder="Section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {storeSections.map(s => (
+                            <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Input placeholder="SKU" value={newMatSku} onChange={e => setNewMatSku(e.target.value)} className="h-7 text-xs" />
+                      <Select value={newMatProvidedBy} onValueChange={setNewMatProvidedBy}>
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue placeholder="Provided by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="either">Either</SelectItem>
+                          <SelectItem value="company">Company</SelectItem>
+                          <SelectItem value="contractor">Contractor</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                    <Input placeholder="Vendor URL" value={newMatVendorUrl} onChange={e => setNewMatVendorUrl(e.target.value)} className="h-7 text-xs" />
                   </div>
                 )}
               </div>
