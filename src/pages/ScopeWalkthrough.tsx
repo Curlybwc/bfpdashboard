@@ -273,9 +273,11 @@ const ScopeWalkthrough = () => {
           const qty = item.editedQty ? parseFloat(item.editedQty) : null;
           const unitCost = item.editedUnitCost ? parseFloat(item.editedUnitCost) : null;
           const pricingStatus = unitCost != null ? 'Priced' : 'Needs Pricing';
+          const status = item.editedStatus || 'Get Bid';
           return {
             scope_id: id,
             description: item.editedDescription,
+            status: status === 'Not Checked' ? 'Get Bid' : status,
             notes: item.editedNotes || null,
             qty,
             unit: item.editedUnit || null,
