@@ -419,6 +419,7 @@ export type Database = {
           phase_key: string | null
           pricing_status: Database["public"]["Enums"]["pricing_status"]
           qty: number | null
+          recipe_hint_id: string | null
           scope_id: string
           status: string
           unit: string | null
@@ -436,6 +437,7 @@ export type Database = {
           phase_key?: string | null
           pricing_status?: Database["public"]["Enums"]["pricing_status"]
           qty?: number | null
+          recipe_hint_id?: string | null
           scope_id: string
           status?: string
           unit?: string | null
@@ -453,6 +455,7 @@ export type Database = {
           phase_key?: string | null
           pricing_status?: Database["public"]["Enums"]["pricing_status"]
           qty?: number | null
+          recipe_hint_id?: string | null
           scope_id?: string
           status?: string
           unit?: string | null
@@ -465,6 +468,13 @@ export type Database = {
             columns: ["cost_item_id"]
             isOneToOne: false
             referencedRelation: "cost_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_items_recipe_hint_id_fkey"
+            columns: ["recipe_hint_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipes"
             referencedColumns: ["id"]
           },
           {
@@ -700,6 +710,92 @@ export type Database = {
           },
         ]
       }
+      task_recipe_steps: {
+        Row: {
+          created_at: string
+          id: string
+          is_optional: boolean
+          notes: string | null
+          recipe_id: string
+          sort_order: number
+          title: string
+          trade: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_optional?: boolean
+          notes?: string | null
+          recipe_id: string
+          sort_order: number
+          title: string
+          trade?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_optional?: boolean
+          notes?: string | null
+          recipe_id?: string
+          sort_order?: number
+          title?: string
+          trade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_recipe_steps_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_recipes: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string
+          estimated_cost: number | null
+          id: string
+          is_repeatable: boolean
+          keywords: string[]
+          last_actual_avg: number | null
+          last_actual_count: number
+          name: string
+          trade: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by: string
+          estimated_cost?: number | null
+          id?: string
+          is_repeatable?: boolean
+          keywords?: string[]
+          last_actual_avg?: number | null
+          last_actual_count?: number
+          name: string
+          trade?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string
+          estimated_cost?: number | null
+          id?: string
+          is_repeatable?: boolean
+          keywords?: string[]
+          last_actual_avg?: number | null
+          last_actual_count?: number
+          name?: string
+          trade?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       task_workers: {
         Row: {
           active: boolean
@@ -743,6 +839,7 @@ export type Database = {
           created_at: string
           created_by: string
           due_date: string | null
+          expanded_recipe_id: string | null
           field_capture_id: string | null
           id: string
           lead_user_id: string | null
@@ -752,7 +849,11 @@ export type Database = {
           parent_task_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string
+          recipe_hint_id: string | null
           room_area: string | null
+          sort_order: number | null
+          source_recipe_id: string | null
+          source_recipe_step_id: string | null
           source_scope_item_id: string | null
           stage: Database["public"]["Enums"]["task_stage"]
           started_at: string | null
@@ -771,6 +872,7 @@ export type Database = {
           created_at?: string
           created_by: string
           due_date?: string | null
+          expanded_recipe_id?: string | null
           field_capture_id?: string | null
           id?: string
           lead_user_id?: string | null
@@ -780,7 +882,11 @@ export type Database = {
           parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id: string
+          recipe_hint_id?: string | null
           room_area?: string | null
+          sort_order?: number | null
+          source_recipe_id?: string | null
+          source_recipe_step_id?: string | null
           source_scope_item_id?: string | null
           stage?: Database["public"]["Enums"]["task_stage"]
           started_at?: string | null
@@ -799,6 +905,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           due_date?: string | null
+          expanded_recipe_id?: string | null
           field_capture_id?: string | null
           id?: string
           lead_user_id?: string | null
@@ -808,7 +915,11 @@ export type Database = {
           parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string
+          recipe_hint_id?: string | null
           room_area?: string | null
+          sort_order?: number | null
+          source_recipe_id?: string | null
+          source_recipe_step_id?: string | null
           source_scope_item_id?: string | null
           stage?: Database["public"]["Enums"]["task_stage"]
           started_at?: string | null
@@ -823,6 +934,13 @@ export type Database = {
             columns: ["claimed_by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_expanded_recipe_id_fkey"
+            columns: ["expanded_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipes"
             referencedColumns: ["id"]
           },
           {
@@ -844,6 +962,27 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_recipe_hint_id_fkey"
+            columns: ["recipe_hint_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_source_recipe_id_fkey"
+            columns: ["source_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_source_recipe_step_id_fkey"
+            columns: ["source_recipe_step_id"]
+            isOneToOne: false
+            referencedRelation: "task_recipe_steps"
             referencedColumns: ["id"]
           },
           {
