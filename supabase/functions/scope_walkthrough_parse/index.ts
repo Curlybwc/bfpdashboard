@@ -390,8 +390,12 @@ Return ONLY valid JSON:
         priceSource = 'library';
       }
 
+      // Determine status for new items: use LLM status, default to 'Get Bid'
+      const llmStatus = typeof item.status === 'string' && validStatuses.includes(item.status) ? item.status : 'Get Bid';
+
       return {
         description: desc,
+        status: llmStatus,
         notes: typeof item.notes === 'string' ? item.notes : null,
         qty: finalQty,
         unit: finalUnit || matchedCostItemUnit,
