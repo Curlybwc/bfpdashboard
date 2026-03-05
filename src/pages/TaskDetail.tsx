@@ -68,6 +68,24 @@ const TaskDetail = () => {
 
   useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
 
+  // Recipe suggestion effect
+  useEffect(() => {
+    if (!task || children.length > 0) { setSuggestedRecipe(null); return; }
+    const fetchRecipeSuggestion = async () => {
+      // If task has recipe_hint_id, use that directly
+      if (task.recipe_hint_id) {
+        const { data } = await supabase.from('task_recipes').select('id, name').eq('id', task.recipe_hint_id).eq('active', true).single();
+        if (data) { setSuggestedRecipe(data); return; }
+      }
+      // Fallback: keyword matching
+      const { data: recipes } = await supabase.from('task_recipes').select('id, name, keywords').eq('active', true);
+      if (!recipes || recipes.length === 0) { setSuggestedRecipe(null); return; }
+      const suggestions = suggestRecipes(task.task, recipes as RecipeForMatch[]);
+      setSuggestedRecipe(suggestions.length > 0 ? { id: suggestions[0].recipe.id, name: suggestions[0].recipe.name } : null);
+    };
+    fetchRecipeSuggestion();
+  }, [task?.id, task?.task, task?.recipe_hint_id, children.length]);
+
   useEffect(() => {
     if (task?.assignment_mode === 'crew') {
       fetchCrewData();
