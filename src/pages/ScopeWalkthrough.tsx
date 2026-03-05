@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Info, BookOpen } from 'lucide-react';
 
 function normalizeForLibrary(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, ' ');
