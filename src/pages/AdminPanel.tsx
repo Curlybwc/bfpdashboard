@@ -89,6 +89,7 @@ const AdminPanel = () => {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
             <TabsTrigger value="aliases">Aliases</TabsTrigger>
+            <TabsTrigger value="bundles">Bundles</TabsTrigger>
             <TabsTrigger value="recipes">Recipes</TabsTrigger>
             <TabsTrigger value="rehab">Rehab</TabsTrigger>
             <TabsTrigger value="sections">Sections</TabsTrigger>
