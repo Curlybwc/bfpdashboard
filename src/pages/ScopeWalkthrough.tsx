@@ -338,7 +338,7 @@ const ScopeWalkthrough = () => {
     const memberWarnings = parseResult.member_warnings ?? [];
     const hasMatched = editableMatched.length > 0;
     const hasNew = editableNewItems.length > 0;
-    const hasNeedsReview = parseResult.needs_review_items.length > 0;
+    const hasGetBid = (parseResult.get_bid_items?.length ?? 0) > 0;
     const hasNotAddressed = parseResult.not_addressed_items.length > 0;
     const hasMembers = (parseResult.member_user_ids_to_add?.length ?? 0) > 0;
 
