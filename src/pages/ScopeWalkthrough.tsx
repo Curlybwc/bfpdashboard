@@ -155,6 +155,12 @@ const ScopeWalkthrough = () => {
 
     setLoading(true);
     try {
+      // Fetch rehab templates for detection
+      const { data: rehabTemplates } = await supabase
+        .from('rehab_library')
+        .select('id, name, keywords')
+        .eq('active', true);
+
       const { data, error } = await supabase.functions.invoke('scope_walkthrough_parse', {
         body: { scope_id: id, walkthrough_text: allText },
       });
@@ -162,6 +168,12 @@ const ScopeWalkthrough = () => {
 
       const result = data as ParseResult;
       setParseResult(result);
+
+      // Detect rehab templates
+      if (rehabTemplates && rehabTemplates.length > 0) {
+        const matches = detectRehabTemplates(allText, rehabTemplates as RehabTemplate[]);
+        setDetectedRehabs(matches);
+      }
 
       // Initialize editable new items with structured pricing
       setEditableNewItems((result.new_items || []).map(item => {
