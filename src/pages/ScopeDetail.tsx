@@ -289,7 +289,7 @@ const ScopeDetail = () => {
 
   if (!scope) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
-  const isDraft = scope.status === 'Draft';
+  const isActive = scope.status === 'active';
 
   return (
     <div className="pb-20">
