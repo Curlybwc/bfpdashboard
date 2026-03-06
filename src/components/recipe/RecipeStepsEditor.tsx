@@ -20,6 +20,7 @@ interface RecipeStep {
 
 interface RecipeStepsEditorProps {
   recipeId: string;
+  onStepsChanged?: () => void;
 }
 
 const RecipeStepsEditor = ({ recipeId }: RecipeStepsEditorProps) => {
