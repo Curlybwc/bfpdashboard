@@ -56,32 +56,28 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
-        {user && (
-          <>
-            <Route path="/today" element={<Today />} />
-            <Route path="/today/field-mode" element={<FieldModeCapture />} />
-            <Route path="/today/field-mode/preview" element={<FieldModePreview />} />
-            <Route path="/projects" element={<ProjectList />} />
-            <Route path="/projects/:id" element={<ProjectDetail />} />
-            <Route path="/projects/:id/materials" element={<ProjectMaterials />} />
-            <Route path="/projects/:id/field-mode" element={<FieldModeCapture />} />
-            <Route path="/projects/:id/field-mode/preview" element={<FieldModePreview />} />
-            <Route path="/projects/:id/walkthrough" element={<ProjectWalkthrough />} />
-            <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
-            <Route path="/scopes" element={<ScopeList />} />
-            <Route path="/scopes/:id" element={<ScopeDetail />} />
-            <Route path="/scopes/:id/walkthrough" element={<ScopeWalkthrough />} />
-            <Route path="/shopping" element={<Shopping />} />
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="/admin/recipes" element={<AdminRecipes />} />
-            <Route path="/admin/bundles" element={<AdminMaterialBundles />} />
-            <Route path="/admin/rehab-library" element={<AdminRehabLibrary />} />
-            <Route path="/admin/scope-accuracy" element={<ScopeAccuracy />} />
-            <Route path="/admin/store-sections" element={<AdminStoreSections />} />
-            <Route path="/admin/inventory/tools" element={<ToolInventory />} />
-            <Route path="/admin/inventory/materials" element={<MaterialInventory />} />
-          </>
-        )}
+        <Route path="/today" element={<Today />} />
+        <Route path="/today/field-mode" element={<FieldModeCapture />} />
+        <Route path="/today/field-mode/preview" element={<FieldModePreview />} />
+        <Route path="/projects" element={<ProjectList />} />
+        <Route path="/projects/:id" element={<ProjectDetail />} />
+        <Route path="/projects/:id/materials" element={<ProjectMaterials />} />
+        <Route path="/projects/:id/field-mode" element={<FieldModeCapture />} />
+        <Route path="/projects/:id/field-mode/preview" element={<FieldModePreview />} />
+        <Route path="/projects/:id/walkthrough" element={<ProjectWalkthrough />} />
+        <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
+        <Route path="/scopes" element={<ScopeList />} />
+        <Route path="/scopes/:id" element={<ScopeDetail />} />
+        <Route path="/scopes/:id/walkthrough" element={<ScopeWalkthrough />} />
+        <Route path="/shopping" element={<Shopping />} />
+        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/admin/recipes" element={<AdminRecipes />} />
+        <Route path="/admin/bundles" element={<AdminMaterialBundles />} />
+        <Route path="/admin/rehab-library" element={<AdminRehabLibrary />} />
+        <Route path="/admin/scope-accuracy" element={<ScopeAccuracy />} />
+        <Route path="/admin/store-sections" element={<AdminStoreSections />} />
+        <Route path="/admin/inventory/tools" element={<ToolInventory />} />
+        <Route path="/admin/inventory/materials" element={<MaterialInventory />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}
