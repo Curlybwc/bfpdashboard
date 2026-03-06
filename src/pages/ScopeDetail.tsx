@@ -544,7 +544,7 @@ const ScopeDetail = () => {
                         {item.computed_total != null && <span>• Total: ${item.computed_total}</span>}
                         {item.status && item.status !== 'Not Checked' && <span>• {item.status}</span>}
                       </div>
-                      {isDraft && item.cost_item_id && (
+                      {isActive && item.cost_item_id && (
                         <div className="flex gap-2 mt-2">
                           <Button
                             size="sm"
