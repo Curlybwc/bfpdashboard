@@ -1438,6 +1438,7 @@ export type Database = {
         Args: { p_parent_task_id: string; p_recipe_id: string }
         Returns: Json
       }
+      convert_scope_to_project: { Args: { p_scope_id: string }; Returns: Json }
       expand_recipe: {
         Args: {
           p_parent_task_id: string
