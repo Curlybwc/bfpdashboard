@@ -233,12 +233,9 @@ const ScopeDetail = () => {
 
     const estimatedTotalSnapshot = items.reduce((sum, item) => sum + (item.computed_total ?? 0), 0);
 
+    // Snapshot the estimate on the scope without changing status — scope remains a reusable blueprint
     await supabase.from('scopes').update({
-      status: 'Converted',
-      converted_project_id: project.id,
-      baseline_locked_at: new Date().toISOString(),
       estimated_total_snapshot: estimatedTotalSnapshot,
-      converted_at: new Date().toISOString(),
     }).eq('id', id);
 
     if (convertibleItems.length > 0) {
@@ -368,7 +365,7 @@ const ScopeDetail = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Convert Scope to Project?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will create a new project with {convertibleItems.length} task(s) from {items.length} scope items. Items marked OK or Not Checked will be skipped. The scope will be locked.
+                        This will create a new project with {convertibleItems.length} task(s) copied from {items.length} scope items. Items marked OK or Not Checked will be skipped. The scope will remain unchanged and reusable.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
