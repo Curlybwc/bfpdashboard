@@ -264,7 +264,30 @@ const TaskDetail = () => {
     fetchChildren();
   };
 
-  const handleSaveAsRecipe = async () => {
+  const handleAddSubtask = async () => {
+    if (!newSubtaskTitle.trim() || !user || !projectId || !taskId) return;
+    setAddingSubtask(true);
+    const maxOrder = children.length > 0 ? Math.max(...children.map((c: any) => c.sort_order ?? 0)) : 0;
+    const { error } = await supabase.from('tasks').insert({
+      project_id: projectId,
+      parent_task_id: taskId,
+      task: newSubtaskTitle.trim(),
+      sort_order: maxOrder + 10,
+      trade: task?.trade || null,
+      priority: task?.priority || '2 – This Week',
+      stage: 'Not Ready',
+      materials_on_site: 'No',
+      created_by: user.id,
+    });
+    setAddingSubtask(false);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setNewSubtaskTitle('');
+    fetchChildren();
+  };
+
     if (!user || !saveRecipeName.trim() || children.length === 0) return;
     setSavingRecipe(true);
     const { data: recipe, error: recipeErr } = await supabase.from('task_recipes').insert({
