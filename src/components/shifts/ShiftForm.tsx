@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -9,8 +10,83 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Clock, Hash } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { Loader2, Clock, Hash, AlertCircle, ArrowRight } from 'lucide-react';
 import type { Shift, ShiftAllocation } from '@/hooks/useShifts';
+
+const NoEligibleTasksCard = () => {
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+
+  return (
+    <>
+      <Card className="p-4 border-dashed border-warning">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-2">
+            <p className="text-sm font-medium">No eligible tasks found</p>
+            <p className="text-xs text-muted-foreground">
+              You need to be assigned to or actively working on tasks before you can log hours against them.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+                What do I need to do?
+              </Button>
+              <Button size="sm" variant="default" onClick={() => navigate('/today')}>
+                <ArrowRight className="h-3 w-3 mr-1" />Go to Today
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>How to get eligible tasks</DialogTitle>
+            <DialogDescription>
+              Tasks must be assigned to you or you must join them before you can log shift hours.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="space-y-1">
+              <p className="font-medium">For solo tasks:</p>
+              <ul className="list-disc pl-5 text-muted-foreground space-y-1">
+                <li>Go to the <strong>Today</strong> page and look for available tasks</li>
+                <li>Tap <strong>"Dibs"</strong> on a task to claim it</li>
+                <li>Or ask your manager to assign a task directly to you</li>
+              </ul>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium">For crew tasks:</p>
+              <ul className="list-disc pl-5 text-muted-foreground space-y-1">
+                <li>Go to the <strong>Today</strong> page and find crew tasks you're eligible for</li>
+                <li>Tap <strong>"Join"</strong> to become an active worker on the task</li>
+              </ul>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium">Already working on tasks?</p>
+              <ul className="list-disc pl-5 text-muted-foreground space-y-1">
+                <li>Make sure you've tapped <strong>"Start"</strong> on at least one task</li>
+                <li>Tasks in <strong>"Not Ready"</strong> status won't appear here</li>
+                <li>Tasks completed today will still show up for logging</li>
+              </ul>
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <DialogClose asChild>
+              <Button variant="outline" className="flex-1">Close</Button>
+            </DialogClose>
+            <Button className="flex-1" onClick={() => navigate('/today')}>
+              <ArrowRight className="h-3 w-3 mr-1" />Go to Today
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
 
 interface ShiftFormProps {
   editShift?: Shift | null;
