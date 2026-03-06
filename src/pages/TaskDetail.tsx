@@ -80,24 +80,25 @@ const TaskDetail = () => {
 
   // Recipe suggestion effect
   useEffect(() => {
-    if (!task) { setSuggestedRecipe(null); return; }
-    // If already expanded, show read-only badge
+    if (!task) { setSuggestedRecipe(null); setRecipeSearchDone(false); return; }
     if (task.expanded_recipe_id) {
       supabase.from('task_recipes').select('id, name').eq('id', task.expanded_recipe_id).single().then(({ data }) => {
         setSuggestedRecipe(data ? { id: data.id, name: data.name } : null);
+        setRecipeSearchDone(true);
       });
       return;
     }
-    if (children.length > 0) { setSuggestedRecipe(null); return; }
+    if (children.length > 0) { setSuggestedRecipe(null); setRecipeSearchDone(true); return; }
     const fetchRecipeSuggestion = async () => {
       if (task.recipe_hint_id) {
         const { data } = await supabase.from('task_recipes').select('id, name').eq('id', task.recipe_hint_id).eq('active', true).single();
-        if (data) { setSuggestedRecipe(data); return; }
+        if (data) { setSuggestedRecipe(data); setRecipeSearchDone(true); return; }
       }
       const { data: recipes } = await supabase.from('task_recipes').select('id, name, keywords').eq('active', true);
-      if (!recipes || recipes.length === 0) { setSuggestedRecipe(null); return; }
+      if (!recipes || recipes.length === 0) { setSuggestedRecipe(null); setRecipeSearchDone(true); return; }
       const suggestions = suggestRecipes(task.task, recipes as RecipeForMatch[]);
       setSuggestedRecipe(suggestions.length > 0 ? { id: suggestions[0].recipe.id, name: suggestions[0].recipe.name } : null);
+      setRecipeSearchDone(true);
     };
     fetchRecipeSuggestion();
   }, [task?.id, task?.task, task?.recipe_hint_id, task?.expanded_recipe_id, children.length]);
