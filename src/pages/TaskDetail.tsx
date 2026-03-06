@@ -633,18 +633,61 @@ const TaskDetail = () => {
                   })}
                 </div>
                 {nonCandidateMembers.length > 0 && (
-                  <Select onValueChange={handleAddCandidate}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Add eligible worker..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {nonCandidateMembers.map(m => (
-                        <SelectItem key={m.user_id} value={m.user_id}>
-                          {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Dialog open={addCandidatesOpen} onOpenChange={(o) => { setAddCandidatesOpen(o); if (!o) { setSelectedCandidates([]); setCandidateSearch(''); } }}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="w-full"><Plus className="h-4 w-4 mr-1" />Add Workers</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle>Add Eligible Workers</DialogTitle></DialogHeader>
+                      <div className="space-y-4">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search members..."
+                            value={candidateSearch}
+                            onChange={e => setCandidateSearch(e.target.value)}
+                            className="pl-9"
+                          />
+                        </div>
+                        <div className="max-h-52 overflow-auto border rounded-md">
+                          {nonCandidateMembers
+                            .filter(m => {
+                              if (!candidateSearch.trim()) return true;
+                              const q = candidateSearch.toLowerCase();
+                              return (m.profiles?.full_name || '').toLowerCase().includes(q);
+                            })
+                            .map(m => (
+                              <label
+                                key={m.user_id}
+                                className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0"
+                              >
+                                <Checkbox
+                                  checked={selectedCandidates.includes(m.user_id)}
+                                  onCheckedChange={() =>
+                                    setSelectedCandidates(prev =>
+                                      prev.includes(m.user_id) ? prev.filter(id => id !== m.user_id) : [...prev, m.user_id]
+                                    )
+                                  }
+                                />
+                                <span className="text-sm truncate">{m.profiles?.full_name || 'Unnamed'} ({m.role})</span>
+                              </label>
+                            ))}
+                          {nonCandidateMembers.filter(m => {
+                            if (!candidateSearch.trim()) return true;
+                            return (m.profiles?.full_name || '').toLowerCase().includes(candidateSearch.toLowerCase());
+                          }).length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-4">No members available.</p>
+                          )}
+                        </div>
+                        {selectedCandidates.length > 0 && (
+                          <p className="text-xs text-muted-foreground">{selectedCandidates.length} selected</p>
+                        )}
+                        <Button onClick={handleAddCandidatesBatch} className="w-full" disabled={selectedCandidates.length === 0 || addingCandidates}>
+                          {addingCandidates ? 'Adding...' : `Add ${selectedCandidates.length || ''} Worker${selectedCandidates.length !== 1 ? 's' : ''}`}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 )}
               </div>
             )}
