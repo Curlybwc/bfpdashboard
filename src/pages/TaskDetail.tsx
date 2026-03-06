@@ -383,6 +383,23 @@ const TaskDetail = () => {
     fetchCrewData();
   };
 
+  const handleAddCandidatesBatch = async () => {
+    if (!taskId || selectedCandidates.length === 0) return;
+    setAddingCandidates(true);
+    const inserts = selectedCandidates.map(userId => ({ task_id: taskId, user_id: userId }));
+    const { error } = await supabase.from('task_candidates').upsert(inserts, { onConflict: 'task_id,user_id' });
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: `${selectedCandidates.length} worker(s) added` });
+    }
+    setAddCandidatesOpen(false);
+    setSelectedCandidates([]);
+    setCandidateSearch('');
+    setAddingCandidates(false);
+    fetchCrewData();
+  };
+
   const handleRemoveCandidate = async (userId: string) => {
     if (!taskId) return;
     await Promise.all([
