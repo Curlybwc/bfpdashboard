@@ -56,6 +56,8 @@ const TaskDetail = () => {
   const [newRecipeKeywords, setNewRecipeKeywords] = useState('');
   const [creatingRecipe, setCreatingRecipe] = useState(false);
   const [recipeSearchDone, setRecipeSearchDone] = useState(false);
+  const [recipeEditorOpen, setRecipeEditorOpen] = useState(false);
+  const [linkedRecipeStepCount, setLinkedRecipeStepCount] = useState(0);
 
   // Crew state
   const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
