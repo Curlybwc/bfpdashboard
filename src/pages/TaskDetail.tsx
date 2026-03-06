@@ -863,11 +863,25 @@ const TaskDetail = () => {
               )}
             </div>
             {children.map(c => (
-              <div key={c.id} className="text-sm border rounded px-3 py-2 flex justify-between">
+              <div key={c.id} className="text-sm border rounded px-3 py-2 flex justify-between cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/projects/${projectId}/tasks/${c.id}`)}>
                 <span className="truncate">{c.task}</span>
                 <StatusBadge status={c.stage} />
               </div>
             ))}
+            {(isAdmin || projectRole === 'manager' || projectRole === 'contractor') && (
+              <div className="flex gap-2 pt-1">
+                <Input
+                  placeholder="Add subtask…"
+                  value={newSubtaskTitle}
+                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && newSubtaskTitle.trim()) handleAddSubtask(); }}
+                  className="flex-1"
+                />
+                <Button size="sm" onClick={handleAddSubtask} disabled={!newSubtaskTitle.trim() || addingSubtask}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
