@@ -365,7 +365,7 @@ const ScopeDetail = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Convert Scope to Project?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will create a new project with {convertibleItems.length} task(s) from {items.length} scope items. Items marked OK or Not Checked will be skipped. The scope will be locked.
+                        This will create a new project with {convertibleItems.length} task(s) copied from {items.length} scope items. Items marked OK or Not Checked will be skipped. The scope will remain unchanged and reusable.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
