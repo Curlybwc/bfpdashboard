@@ -49,6 +49,12 @@ const TaskDetail = () => {
   const [saveRecipeName, setSaveRecipeName] = useState('');
   const [saveRecipeTrade, setSaveRecipeTrade] = useState('');
   const [savingRecipe, setSavingRecipe] = useState(false);
+  const [createRecipeOpen, setCreateRecipeOpen] = useState(false);
+  const [newRecipeName, setNewRecipeName] = useState('');
+  const [newRecipeTrade, setNewRecipeTrade] = useState('');
+  const [newRecipeKeywords, setNewRecipeKeywords] = useState('');
+  const [creatingRecipe, setCreatingRecipe] = useState(false);
+  const [recipeSearchDone, setRecipeSearchDone] = useState(false);
 
   // Crew state
   const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
@@ -74,24 +80,25 @@ const TaskDetail = () => {
 
   // Recipe suggestion effect
   useEffect(() => {
-    if (!task) { setSuggestedRecipe(null); return; }
-    // If already expanded, show read-only badge
+    if (!task) { setSuggestedRecipe(null); setRecipeSearchDone(false); return; }
     if (task.expanded_recipe_id) {
       supabase.from('task_recipes').select('id, name').eq('id', task.expanded_recipe_id).single().then(({ data }) => {
         setSuggestedRecipe(data ? { id: data.id, name: data.name } : null);
+        setRecipeSearchDone(true);
       });
       return;
     }
-    if (children.length > 0) { setSuggestedRecipe(null); return; }
+    if (children.length > 0) { setSuggestedRecipe(null); setRecipeSearchDone(true); return; }
     const fetchRecipeSuggestion = async () => {
       if (task.recipe_hint_id) {
         const { data } = await supabase.from('task_recipes').select('id, name').eq('id', task.recipe_hint_id).eq('active', true).single();
-        if (data) { setSuggestedRecipe(data); return; }
+        if (data) { setSuggestedRecipe(data); setRecipeSearchDone(true); return; }
       }
       const { data: recipes } = await supabase.from('task_recipes').select('id, name, keywords').eq('active', true);
-      if (!recipes || recipes.length === 0) { setSuggestedRecipe(null); return; }
+      if (!recipes || recipes.length === 0) { setSuggestedRecipe(null); setRecipeSearchDone(true); return; }
       const suggestions = suggestRecipes(task.task, recipes as RecipeForMatch[]);
       setSuggestedRecipe(suggestions.length > 0 ? { id: suggestions[0].recipe.id, name: suggestions[0].recipe.name } : null);
+      setRecipeSearchDone(true);
     };
     fetchRecipeSuggestion();
   }, [task?.id, task?.task, task?.recipe_hint_id, task?.expanded_recipe_id, children.length]);
@@ -265,6 +272,33 @@ const TaskDetail = () => {
     setSaveRecipeName('');
     setSaveRecipeTrade('');
     toast({ title: 'Recipe saved from tasks' });
+  };
+
+  const handleCreateRecipeAndExpand = async () => {
+    if (!user || !taskId || !newRecipeName.trim()) return;
+    setCreatingRecipe(true);
+    const kwArray = newRecipeKeywords.split(',').map(k => k.trim()).filter(Boolean);
+    const { data: recipe, error: recipeErr } = await supabase.from('task_recipes').insert({
+      name: newRecipeName.trim(),
+      trade: newRecipeTrade.trim() || null,
+      keywords: kwArray,
+      created_by: user.id,
+    }).select('id').single();
+    if (recipeErr || !recipe) {
+      toast({ title: 'Error creating recipe', description: recipeErr?.message, variant: 'destructive' });
+      setCreatingRecipe(false);
+      return;
+    }
+    // Set recipe_hint_id on the task
+    await supabase.from('tasks').update({ recipe_hint_id: recipe.id }).eq('id', taskId);
+    setCreatingRecipe(false);
+    setCreateRecipeOpen(false);
+    setNewRecipeName('');
+    setNewRecipeTrade('');
+    setNewRecipeKeywords('');
+    toast({ title: 'Recipe created! Add steps in Admin > Recipes, then return here to Expand.' });
+    setSuggestedRecipe({ id: recipe.id, name: newRecipeName.trim() });
+    fetchTask();
   };
 
   const fetchMembers = async () => {
@@ -538,13 +572,14 @@ const TaskDetail = () => {
           </Button>
         </div>
 
-        {/* Recipe: read-only badge if already expanded, suggestion banner if expandable */}
+        {/* Recipe: read-only badge if already expanded */}
         {task.expanded_recipe_id && suggestedRecipe && (
           <Card className="p-3 flex items-center gap-2 border-muted">
             <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
           </Card>
         )}
+        {/* Recipe match found — show Expand */}
         {!task.expanded_recipe_id && suggestedRecipe && children.length === 0 && (
           <Card className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
             <div className="flex items-center gap-2 min-w-0">
@@ -555,6 +590,18 @@ const TaskDetail = () => {
             </div>
             <Button size="sm" onClick={() => handleExpandRecipe(suggestedRecipe.id)} disabled={expandingRecipe}>
               {expandingRecipe ? 'Expanding…' : 'Expand'}
+            </Button>
+          </Card>
+        )}
+        {/* No recipe match — offer Create Recipe (admin/manager only) */}
+        {!task.expanded_recipe_id && !suggestedRecipe && children.length === 0 && recipeSearchDone && (isAdmin || projectRole === 'manager') && (
+          <Card className="p-3 flex items-center justify-between border-dashed border-muted-foreground/30">
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+              <p className="text-sm text-muted-foreground">No recipe match</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => { setNewRecipeName(task.task || ''); setNewRecipeTrade(task.trade || ''); setCreateRecipeOpen(true); }}>
+              <Plus className="h-4 w-4 mr-1" />Create Recipe
             </Button>
           </Card>
         )}
@@ -855,6 +902,32 @@ const TaskDetail = () => {
             <p className="text-sm text-muted-foreground">{children.length} step(s) will be saved.</p>
             <Button className="w-full" onClick={handleSaveAsRecipe} disabled={savingRecipe || !saveRecipeName.trim()}>
               {savingRecipe ? 'Saving…' : 'Save Recipe'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createRecipeOpen} onOpenChange={setCreateRecipeOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Create Recipe</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Recipe Name</Label>
+              <Input value={newRecipeName} onChange={(e) => setNewRecipeName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Trade</Label>
+              <Input value={newRecipeTrade} onChange={(e) => setNewRecipeTrade(e.target.value)} placeholder="e.g. Plumbing, Electrical" />
+            </div>
+            <div className="space-y-2">
+              <Label>Keywords (comma-separated)</Label>
+              <Input value={newRecipeKeywords} onChange={(e) => setNewRecipeKeywords(e.target.value)} placeholder="e.g. caulk, seal, bathroom" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This creates an empty recipe linked to this task. Add steps in Admin → Recipes, then return here to Expand.
+            </p>
+            <Button className="w-full" onClick={handleCreateRecipeAndExpand} disabled={creatingRecipe || !newRecipeName.trim()}>
+              {creatingRecipe ? 'Creating…' : 'Create Recipe'}
             </Button>
           </div>
         </DialogContent>
