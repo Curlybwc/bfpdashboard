@@ -266,6 +266,7 @@ export type Database = {
           can_manage_projects: boolean
           created_at: string
           full_name: string | null
+          hourly_rate: number | null
           id: string
           is_admin: boolean
         }
@@ -273,6 +274,7 @@ export type Database = {
           can_manage_projects?: boolean
           created_at?: string
           full_name?: string | null
+          hourly_rate?: number | null
           id: string
           is_admin?: boolean
         }
@@ -280,6 +282,7 @@ export type Database = {
           can_manage_projects?: boolean
           created_at?: string
           full_name?: string | null
+          hourly_rate?: number | null
           id?: string
           is_admin?: boolean
         }
@@ -671,6 +674,108 @@ export type Database = {
             columns: ["converted_project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_task_allocations: {
+        Row: {
+          hours: number
+          id: string
+          shift_id: string
+          task_id: string
+        }
+        Insert: {
+          hours: number
+          id?: string
+          shift_id: string
+          task_id: string
+        }
+        Update: {
+          hours?: number
+          id?: string
+          shift_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_task_allocations_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_task_allocations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          admin_edited_at: string | null
+          admin_edited_by: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string | null
+          hourly_rate_snapshot: number | null
+          id: string
+          project_id: string
+          shift_date: string
+          start_time: string | null
+          total_hours: number
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_edited_at?: string | null
+          admin_edited_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_time?: string | null
+          hourly_rate_snapshot?: number | null
+          id?: string
+          project_id: string
+          shift_date: string
+          start_time?: string | null
+          total_hours: number
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_edited_at?: string | null
+          admin_edited_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_time?: string | null
+          hourly_rate_snapshot?: number | null
+          id?: string
+          project_id?: string
+          shift_date?: string
+          start_time?: string | null
+          total_hours?: number
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1357,6 +1462,20 @@ export type Database = {
       is_scope_member: {
         Args: { _scope_id: string; _user_id: string }
         Returns: boolean
+      }
+      upsert_shift_with_allocations: {
+        Args: {
+          p_allocations?: Json
+          p_end_time?: string
+          p_is_admin_edit?: boolean
+          p_project_id?: string
+          p_shift_date?: string
+          p_shift_id?: string
+          p_start_time?: string
+          p_total_hours?: number
+          p_user_id?: string
+        }
+        Returns: Json
       }
     }
     Enums: {
