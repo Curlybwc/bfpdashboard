@@ -22,6 +22,7 @@ import FinalPassSheet from '@/components/FinalPassSheet';
 import DeduplicateSheet from '@/components/DeduplicateSheet';
 import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
 import { isChecklistCovered } from '@/lib/checklistMatch';
+import { getConvertibleItems, type ConversionResult } from '@/lib/scopeConversion';
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -203,58 +204,26 @@ const ScopeDetail = () => {
   };
 
   // Filter items for conversion
-  const convertibleItems = items.filter(item =>
-    ['Repair', 'Replace', 'Get Bid'].includes(item.status) ||
-    (item.computed_total && item.computed_total > 0)
-  );
+  const convertibleItems = getConvertibleItems(items);
 
   const handleConvert = async () => {
     if (!id || !user || !scope) return;
     setConverting(true);
 
-    const { data: project, error: projErr } = await supabase.from('projects').insert({
-      name: scope.name || 'Converted Project',
-      address: scope.address,
-      scope_id: id,
-    }).select().single();
+    const { data, error } = await supabase.rpc('convert_scope_to_project', {
+      p_scope_id: id,
+    });
 
-    if (projErr || !project) {
-      toast({ title: 'Error creating project', description: projErr?.message, variant: 'destructive' });
-      setConverting(false);
+    setConverting(false);
+
+    if (error) {
+      toast({ title: 'Error converting scope', description: error.message, variant: 'destructive' });
       return;
     }
 
-    const hasMissingEstimates = convertibleItems.some(item => !item.computed_total || item.computed_total === 0);
-    if (hasMissingEstimates) {
-      await supabase.from('projects').update({ has_missing_estimates: true }).eq('id', project.id);
-    }
-
-    await supabase.from('project_members').insert({ project_id: project.id, user_id: user.id, role: 'manager' });
-
-    const estimatedTotalSnapshot = items.reduce((sum, item) => sum + (item.computed_total ?? 0), 0);
-
-    // Snapshot the estimate on the scope without changing status — scope remains a reusable blueprint
-    await supabase.from('scopes').update({
-      estimated_total_snapshot: estimatedTotalSnapshot,
-    }).eq('id', id);
-
-    if (convertibleItems.length > 0) {
-      const taskInserts = convertibleItems.map((item) => ({
-        project_id: project.id,
-        task: item.description,
-        source_scope_item_id: item.id,
-        stage: 'Ready' as const,
-        priority: '2 – This Week' as const,
-        materials_on_site: 'No' as const,
-        created_by: user.id,
-        recipe_hint_id: item.recipe_hint_id || null,
-      }));
-      await supabase.from('tasks').insert(taskInserts);
-    }
-
-    setConverting(false);
+    const result = data as unknown as ConversionResult;
     toast({ title: 'Scope converted to project!' });
-    navigate(`/projects/${project.id}`);
+    navigate(`/projects/${result.project_id}`);
   };
 
   const handleFinalPassUpdate = () => {
