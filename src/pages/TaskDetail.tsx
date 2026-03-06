@@ -106,6 +106,20 @@ const TaskDetail = () => {
     fetchRecipeSuggestion();
   }, [task?.id, task?.task, task?.recipe_hint_id, task?.expanded_recipe_id, children.length]);
 
+  // Fetch step count for linked recipe
+  const fetchLinkedRecipeStepCount = async () => {
+    if (!suggestedRecipe) { setLinkedRecipeStepCount(0); return; }
+    const { count } = await supabase
+      .from('task_recipe_steps')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipe_id', suggestedRecipe.id);
+    setLinkedRecipeStepCount(count ?? 0);
+  };
+
+  useEffect(() => {
+    fetchLinkedRecipeStepCount();
+  }, [suggestedRecipe?.id]);
+
   useEffect(() => {
     if (task?.assignment_mode === 'crew') {
       fetchCrewData();
