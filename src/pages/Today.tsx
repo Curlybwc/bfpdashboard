@@ -6,7 +6,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
 import { Button } from '@/components/ui/button';
-import { Zap } from 'lucide-react';
+import { Zap, Clock } from 'lucide-react';
 
 const Today = () => {
   const { user } = useAuth();
@@ -254,9 +254,14 @@ const Today = () => {
       <PageHeader
         title="Today"
         actions={
-          <Button size="sm" variant="outline" onClick={() => navigate('/today/field-mode')}>
-            <Zap className="h-4 w-4 mr-1" />Field Mode
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate('/shifts')}>
+              <Clock className="h-4 w-4 mr-1" />Log Shift
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/today/field-mode')}>
+              <Zap className="h-4 w-4 mr-1" />Field Mode
+            </Button>
+          </div>
         }
       />
       <div className="p-4">
