@@ -233,12 +233,9 @@ const ScopeDetail = () => {
 
     const estimatedTotalSnapshot = items.reduce((sum, item) => sum + (item.computed_total ?? 0), 0);
 
+    // Snapshot the estimate on the scope without changing status — scope remains a reusable blueprint
     await supabase.from('scopes').update({
-      status: 'Converted',
-      converted_project_id: project.id,
-      baseline_locked_at: new Date().toISOString(),
       estimated_total_snapshot: estimatedTotalSnapshot,
-      converted_at: new Date().toISOString(),
     }).eq('id', id);
 
     if (convertibleItems.length > 0) {
