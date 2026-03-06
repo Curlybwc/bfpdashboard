@@ -378,6 +378,36 @@ const ScopeDetail = () => {
                 </AlertDialog>
               </>
             )}
+            {isActive && isAdmin && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline">Archive</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Archive this scope?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      The scope will be moved to the archived list. You can still view it later.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={async () => {
+                      await supabase.from('scopes').update({ status: 'archived' as any }).eq('id', id!);
+                      setScope((prev: any) => ({ ...prev, status: 'archived' }));
+                      toast({ title: 'Scope archived' });
+                    }}>Archive</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {scope.status === 'archived' && isAdmin && (
+              <Button size="sm" variant="outline" onClick={async () => {
+                await supabase.from('scopes').update({ status: 'active' as any }).eq('id', id!);
+                setScope((prev: any) => ({ ...prev, status: 'active' }));
+                toast({ title: 'Scope reactivated' });
+              }}>Reactivate</Button>
+            )}
           </div>
         }
       />
