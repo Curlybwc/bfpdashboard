@@ -17,6 +17,9 @@ const ALLOWED_DRAFT_KEYS = [
   "assigned_to_display",
   "materials",
   "notes",
+  "assignment_mode",
+  "crew_member_ids",
+  "crew_member_displays",
 ];
 
 const VALID_PRIORITIES = [
@@ -46,6 +49,26 @@ function sanitizeDraft(raw: any) {
       unit: typeof m.unit === "string" ? m.unit : null,
     }));
   }
+
+  // Crew fields
+  if (draft.assignment_mode !== "solo" && draft.assignment_mode !== "crew") {
+    draft.assignment_mode = "solo";
+  }
+  if (!Array.isArray(draft.crew_member_ids)) {
+    draft.crew_member_ids = [];
+  } else {
+    draft.crew_member_ids = [...new Set(
+      draft.crew_member_ids.filter((id: any) => typeof id === "string" && id.trim())
+    )];
+  }
+  if (!Array.isArray(draft.crew_member_displays)) {
+    draft.crew_member_displays = [];
+  } else {
+    draft.crew_member_displays = draft.crew_member_displays.filter(
+      (d: any) => typeof d === "string"
+    );
+  }
+
   return draft;
 }
 
@@ -183,6 +206,15 @@ You MUST use the KNOWN USERS list below for assignment. Do NOT invent user IDs.
 - When assigned, set assigned_to_display to the matched person's full_name.
 - Vendors/company names should be ignored for assignment unless they match a known user.
 
+CREW TASK RULES:
+- If multiple people are assigned to the SAME task, or the user explicitly says "crew task", "two-man crew", "three-man crew", "have Mike and Andrew do this together", "assign this to Mike, Andrew, and Sarah", "they should work on this together", set assignment_mode to "crew".
+- For crew tasks: set assigned_to_user_id = null and assigned_to_display = null.
+- Instead populate crew_member_ids with matched known-user UUIDs and crew_member_displays with their full_name values.
+- Apply the same matching rules as solo assignment for each person mentioned.
+- If any person cannot be confidently matched, omit them from crew_member_ids and add a warning.
+- If only one person is mentioned and there is no crew language, keep assignment_mode = "solo" and use the normal assigned_to fields.
+- Default assignment_mode to "solo" when no crew language is detected.
+
 KNOWN USERS (match assignments against these):
 ${JSON.stringify(knownUsers)}
 
@@ -200,6 +232,9 @@ OUTPUT FORMAT (JSON only):
       "due_date": "YYYY-MM-DD|null",
       "assigned_to_user_id": "uuid|null",
       "assigned_to_display": "string|null",
+      "assignment_mode": "solo|crew",
+      "crew_member_ids": ["uuid"],
+      "crew_member_displays": ["string"],
       "materials": [{ "name": "string", "quantity": null, "unit": null }],
       "notes": "string|null"
     }
@@ -291,14 +326,33 @@ OUTPUT FORMAT (JSON only):
       }
     }
 
-    // Validate assigned_to_user_id against known user IDs
+    // Validate assigned_to_user_id and crew_member_ids against known user IDs
     const validUserIds = new Set(allProfiles.map((p: any) => p.id));
+    const userIdToName = new Map(allProfiles.map((p: any) => [p.id, p.full_name]));
+
     const sanitizedDrafts = parsed.draft_tasks.map((raw: any) => {
       const draft = sanitizeDraft(raw);
+
+      // Validate solo assignment
       if (draft.assigned_to_user_id && !validUserIds.has(draft.assigned_to_user_id)) {
         draft.assigned_to_user_id = null;
         draft.assigned_to_display = null;
       }
+
+      // Validate crew member IDs
+      if (draft.crew_member_ids.length > 0) {
+        const validCrewIds: string[] = [];
+        const validCrewDisplays: string[] = [];
+        for (const cid of draft.crew_member_ids) {
+          if (validUserIds.has(cid)) {
+            validCrewIds.push(cid);
+            validCrewDisplays.push(userIdToName.get(cid) || "Unknown");
+          }
+        }
+        draft.crew_member_ids = validCrewIds;
+        draft.crew_member_displays = validCrewDisplays;
+      }
+
       return draft;
     });
 

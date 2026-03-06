@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
-import { TASK_PRIORITIES, type TaskPriority } from '@/lib/supabase-types';
-import { Loader2, AlertTriangle, X, Plus } from 'lucide-react';
+import { TASK_PRIORITIES, type TaskPriority, type AssignmentMode } from '@/lib/supabase-types';
+import { Loader2, AlertTriangle, X, Plus, Users } from 'lucide-react';
 
 interface DraftMaterial {
   name: string;
@@ -32,6 +33,9 @@ interface DraftTask {
   assigned_to_display: string | null;
   materials: DraftMaterial[];
   notes: string | null;
+  assignment_mode: AssignmentMode;
+  crew_member_ids: string[];
+  crew_member_displays: string[];
 }
 
 interface ProjectMember {
@@ -93,7 +97,12 @@ const ProjectWalkthrough = () => {
         return;
       }
 
-      const tasks = data?.draft_tasks || [];
+      const tasks: DraftTask[] = (data?.draft_tasks || []).map((t: any) => ({
+        ...t,
+        assignment_mode: t.assignment_mode === 'crew' ? 'crew' : 'solo',
+        crew_member_ids: Array.isArray(t.crew_member_ids) ? t.crew_member_ids : [],
+        crew_member_displays: Array.isArray(t.crew_member_displays) ? t.crew_member_displays : [],
+      }));
       setDrafts(tasks);
       setWarnings(data?.warnings || []);
       setSelected(new Set(tasks.map((_: any, i: number) => i)));
@@ -116,6 +125,57 @@ const ProjectWalkthrough = () => {
       else next.add(index);
       return next;
     });
+  };
+
+  const toggleCrewMode = (index: number) => {
+    setDrafts(prev => prev.map((d, i) => {
+      if (i !== index) return d;
+      if (d.assignment_mode === 'solo') {
+        // Solo -> Crew: seed crew with current assignee
+        const crewIds = d.assigned_to_user_id ? [d.assigned_to_user_id] : [];
+        const crewDisplays = d.assigned_to_display ? [d.assigned_to_display] : [];
+        return {
+          ...d,
+          assignment_mode: 'crew' as AssignmentMode,
+          assigned_to_user_id: null,
+          assigned_to_display: null,
+          crew_member_ids: crewIds,
+          crew_member_displays: crewDisplays,
+        };
+      } else {
+        // Crew -> Solo: if exactly 1 crew member, use as assignee
+        const soloId = d.crew_member_ids.length === 1 ? d.crew_member_ids[0] : null;
+        const soloDisplay = d.crew_member_displays.length === 1 ? d.crew_member_displays[0] : null;
+        return {
+          ...d,
+          assignment_mode: 'solo' as AssignmentMode,
+          assigned_to_user_id: soloId,
+          assigned_to_display: soloDisplay,
+          crew_member_ids: [],
+          crew_member_displays: [],
+        };
+      }
+    }));
+  };
+
+  const toggleCrewMember = (draftIndex: number, memberId: string, memberName: string) => {
+    setDrafts(prev => prev.map((d, i) => {
+      if (i !== draftIndex) return d;
+      const idx = d.crew_member_ids.indexOf(memberId);
+      if (idx >= 0) {
+        // Remove
+        const newIds = d.crew_member_ids.filter((_, j) => j !== idx);
+        const newDisplays = d.crew_member_displays.filter((_, j) => j !== idx);
+        return { ...d, crew_member_ids: newIds, crew_member_displays: newDisplays };
+      } else {
+        // Add
+        return {
+          ...d,
+          crew_member_ids: [...d.crew_member_ids, memberId],
+          crew_member_displays: [...d.crew_member_displays, memberName],
+        };
+      }
+    }));
   };
 
   const addMaterial = (draftIndex: number) => {
@@ -162,6 +222,8 @@ const ProjectWalkthrough = () => {
     setInserting(true);
     try {
       for (const draft of approved) {
+        const isCrew = draft.assignment_mode === 'crew';
+
         const { data: task, error: taskError } = await supabase
           .from('tasks')
           .insert({
@@ -173,7 +235,9 @@ const ProjectWalkthrough = () => {
             materials_on_site: 'No' as const,
             room_area: draft.room_area || null,
             trade: draft.trade || null,
-            assigned_to_user_id: draft.assigned_to_user_id || null,
+            assigned_to_user_id: isCrew ? null : (draft.assigned_to_user_id || null),
+            assignment_mode: isCrew ? 'crew' : 'solo',
+            lead_user_id: isCrew ? (draft.crew_member_ids[0] || null) : null,
             notes: draft.notes || null,
             created_by: user.id,
           })
@@ -182,10 +246,21 @@ const ProjectWalkthrough = () => {
 
         if (taskError) {
           toast({ title: 'Insert failed', description: taskError.message, variant: 'destructive' });
-          return; // Stop on error
+          return;
         }
 
         if (task) {
+          // Insert task_candidates for crew tasks
+          if (isCrew && draft.crew_member_ids.length > 0) {
+            const { error: candidateError } = await supabase.from('task_candidates').upsert(
+              draft.crew_member_ids.map(uid => ({ task_id: task.id, user_id: uid })),
+              { onConflict: 'task_id,user_id', ignoreDuplicates: true }
+            );
+            if (candidateError) {
+              console.error('task_candidates insert error:', candidateError.message);
+            }
+          }
+
           const validMaterials = draft.materials.filter(m => m.name.trim());
           if (validMaterials.length > 0) {
             const { error: matError } = await supabase.from('task_materials').insert(
@@ -208,25 +283,27 @@ const ProjectWalkthrough = () => {
         }
       }
 
-      // Auto-add assigned users as project members (conflict-ignore)
-      const assignedIds = [...new Set(approved.map(d => d.assigned_to_user_id).filter(Boolean))] as string[];
-      if (assignedIds.length > 0) {
+      // Auto-add assigned users AND crew members as project members
+      const allUserIds = new Set<string>();
+      for (const d of approved) {
+        if (d.assigned_to_user_id) allUserIds.add(d.assigned_to_user_id);
+        for (const cid of d.crew_member_ids) allUserIds.add(cid);
+      }
+      const userIdsToAdd = [...allUserIds];
+
+      if (userIdsToAdd.length > 0) {
         const { data: existingMembers } = await supabase
           .from('project_members')
           .select('user_id')
           .eq('project_id', id);
         const existingIds = new Set((existingMembers || []).map(m => m.user_id));
-        const newIds = assignedIds.filter(uid => !existingIds.has(uid));
+        const newIds = userIdsToAdd.filter(uid => !existingIds.has(uid));
         if (newIds.length > 0) {
           await supabase.from('project_members').upsert(
             newIds.map(uid => ({ project_id: id, user_id: uid, role: 'contractor' as const })),
             { onConflict: 'project_id,user_id', ignoreDuplicates: true }
           );
-          const newNames = newIds.map(uid => {
-            const draft = approved.find(d => d.assigned_to_user_id === uid);
-            return draft?.assigned_to_display || 'Unknown';
-          });
-          toast({ title: `Added members: ${newNames.join(', ')}` });
+          toast({ title: `Added ${newIds.length} new project member(s)` });
         }
       }
 
@@ -347,27 +424,75 @@ const ProjectWalkthrough = () => {
                   </div>
                 </div>
 
-                {/* Assigned to */}
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Assigned To</Label>
-                  <Select
-                    value={draft.assigned_to_user_id || 'unassigned'}
-                    onValueChange={v => updateDraft(i, {
-                      assigned_to_user_id: v === 'unassigned' ? null : v,
-                      assigned_to_display: v === 'unassigned' ? null : members.find(m => m.user_id === v)?.profiles?.full_name || null,
-                    })}
-                  >
-                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {members.map(m => (
-                        <SelectItem key={m.user_id} value={m.user_id}>
-                          {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {/* Crew Task toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-xs text-muted-foreground">Crew Task</Label>
+                  </div>
+                  <Switch
+                    checked={draft.assignment_mode === 'crew'}
+                    onCheckedChange={() => toggleCrewMode(i)}
+                  />
                 </div>
+
+                {draft.assignment_mode === 'solo' ? (
+                  /* Solo: Assigned To */
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Assigned To</Label>
+                    <Select
+                      value={draft.assigned_to_user_id || 'unassigned'}
+                      onValueChange={v => updateDraft(i, {
+                        assigned_to_user_id: v === 'unassigned' ? null : v,
+                        assigned_to_display: v === 'unassigned' ? null : members.find(m => m.user_id === v)?.profiles?.full_name || null,
+                      })}
+                    >
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {members.map(m => (
+                          <SelectItem key={m.user_id} value={m.user_id}>
+                            {m.profiles?.full_name || 'Unnamed'} ({m.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  /* Crew: Multi-select worker picker */
+                  <div className="space-y-2 rounded-md border border-border p-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">
+                        Eligible Workers ({draft.crew_member_ids.length} selected)
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Crew tasks let multiple eligible workers join the task.
+                    </p>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {members.map(m => {
+                        const isSelected = draft.crew_member_ids.includes(m.user_id);
+                        const name = m.profiles?.full_name || 'Unnamed';
+                        return (
+                          <label
+                            key={m.user_id}
+                            className="flex items-center gap-2 py-1 px-1 rounded hover:bg-accent cursor-pointer text-sm"
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleCrewMember(i, m.user_id, name)}
+                            />
+                            <span>{name}</span>
+                            <span className="text-xs text-muted-foreground">({m.role})</span>
+                          </label>
+                        );
+                      })}
+                      {members.length === 0 && (
+                        <p className="text-xs text-muted-foreground py-2">No project members found.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Notes */}
                 <div className="space-y-1">
