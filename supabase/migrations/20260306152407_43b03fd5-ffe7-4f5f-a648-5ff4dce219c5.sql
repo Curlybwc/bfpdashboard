@@ -1,0 +1,1 @@
+ALTER TABLE public.scopes ALTER COLUMN status SET DEFAULT 'active'::scope_status;
