@@ -20,9 +20,10 @@ interface RecipeStep {
 
 interface RecipeStepsEditorProps {
   recipeId: string;
+  onStepsChanged?: () => void;
 }
 
-const RecipeStepsEditor = ({ recipeId }: RecipeStepsEditorProps) => {
+const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [steps, setSteps] = useState<RecipeStep[]>([]);
@@ -60,6 +61,7 @@ const RecipeStepsEditor = ({ recipeId }: RecipeStepsEditorProps) => {
     setNewStepTitle('');
     setNewStepTrade('');
     fetchSteps();
+    onStepsChanged?.();
   };
 
   const handleDeleteStep = async (stepId: string) => {
@@ -70,6 +72,7 @@ const RecipeStepsEditor = ({ recipeId }: RecipeStepsEditorProps) => {
     }
     if (expandedStepId === stepId) setExpandedStepId(null);
     fetchSteps();
+    onStepsChanged?.();
   };
 
   const handleMoveStep = async (stepId: string, direction: 'up' | 'down') => {
