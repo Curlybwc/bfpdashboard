@@ -76,6 +76,7 @@ const AppRoutes = () => {
             <Route path="/admin/recipes" element={<AdminRecipes />} />
             <Route path="/admin/bundles" element={<AdminMaterialBundles />} />
             <Route path="/admin/rehab-library" element={<AdminRehabLibrary />} />
+            <Route path="/admin/scope-accuracy" element={<ScopeAccuracy />} />
             <Route path="/admin/store-sections" element={<AdminStoreSections />} />
             <Route path="/admin/inventory/tools" element={<ToolInventory />} />
             <Route path="/admin/inventory/materials" element={<MaterialInventory />} />

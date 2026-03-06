@@ -94,6 +94,7 @@ const AdminPanel = () => {
             <TabsTrigger value="recipes">Recipes</TabsTrigger>
             <TabsTrigger value="rehab">Rehab</TabsTrigger>
             <TabsTrigger value="sections">Sections</TabsTrigger>
+            <TabsTrigger value="accuracy">Accuracy</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>
           </TabsList>
