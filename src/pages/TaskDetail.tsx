@@ -16,9 +16,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
-import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save } from 'lucide-react';
+import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
@@ -54,6 +54,10 @@ const TaskDetail = () => {
   const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
   const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
   const [crewToggleLoading, setCrewToggleLoading] = useState(false);
+  const [addCandidatesOpen, setAddCandidatesOpen] = useState(false);
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
+  const [candidateSearch, setCandidateSearch] = useState('');
+  const [addingCandidates, setAddingCandidates] = useState(false);
 
   // Editable fields
   const [taskText, setTaskText] = useState('');
@@ -379,6 +383,23 @@ const TaskDetail = () => {
     fetchCrewData();
   };
 
+  const handleAddCandidatesBatch = async () => {
+    if (!taskId || selectedCandidates.length === 0) return;
+    setAddingCandidates(true);
+    const inserts = selectedCandidates.map(userId => ({ task_id: taskId, user_id: userId }));
+    const { error } = await supabase.from('task_candidates').upsert(inserts, { onConflict: 'task_id,user_id' });
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: `${selectedCandidates.length} worker(s) added` });
+    }
+    setAddCandidatesOpen(false);
+    setSelectedCandidates([]);
+    setCandidateSearch('');
+    setAddingCandidates(false);
+    fetchCrewData();
+  };
+
   const handleRemoveCandidate = async (userId: string) => {
     if (!taskId) return;
     await Promise.all([
@@ -633,18 +654,61 @@ const TaskDetail = () => {
                   })}
                 </div>
                 {nonCandidateMembers.length > 0 && (
-                  <Select onValueChange={handleAddCandidate}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Add eligible worker..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {nonCandidateMembers.map(m => (
-                        <SelectItem key={m.user_id} value={m.user_id}>
-                          {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Dialog open={addCandidatesOpen} onOpenChange={(o) => { setAddCandidatesOpen(o); if (!o) { setSelectedCandidates([]); setCandidateSearch(''); } }}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="w-full"><Plus className="h-4 w-4 mr-1" />Add Workers</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle>Add Eligible Workers</DialogTitle></DialogHeader>
+                      <div className="space-y-4">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search members..."
+                            value={candidateSearch}
+                            onChange={e => setCandidateSearch(e.target.value)}
+                            className="pl-9"
+                          />
+                        </div>
+                        <div className="max-h-52 overflow-auto border rounded-md">
+                          {nonCandidateMembers
+                            .filter(m => {
+                              if (!candidateSearch.trim()) return true;
+                              const q = candidateSearch.toLowerCase();
+                              return (m.profiles?.full_name || '').toLowerCase().includes(q);
+                            })
+                            .map(m => (
+                              <label
+                                key={m.user_id}
+                                className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0"
+                              >
+                                <Checkbox
+                                  checked={selectedCandidates.includes(m.user_id)}
+                                  onCheckedChange={() =>
+                                    setSelectedCandidates(prev =>
+                                      prev.includes(m.user_id) ? prev.filter(id => id !== m.user_id) : [...prev, m.user_id]
+                                    )
+                                  }
+                                />
+                                <span className="text-sm truncate">{m.profiles?.full_name || 'Unnamed'} ({m.role})</span>
+                              </label>
+                            ))}
+                          {nonCandidateMembers.filter(m => {
+                            if (!candidateSearch.trim()) return true;
+                            return (m.profiles?.full_name || '').toLowerCase().includes(candidateSearch.toLowerCase());
+                          }).length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-4">No members available.</p>
+                          )}
+                        </div>
+                        {selectedCandidates.length > 0 && (
+                          <p className="text-xs text-muted-foreground">{selectedCandidates.length} selected</p>
+                        )}
+                        <Button onClick={handleAddCandidatesBatch} className="w-full" disabled={selectedCandidates.length === 0 || addingCandidates}>
+                          {addingCandidates ? 'Adding...' : `Add ${selectedCandidates.length || ''} Worker${selectedCandidates.length !== 1 ? 's' : ''}`}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 )}
               </div>
             )}
