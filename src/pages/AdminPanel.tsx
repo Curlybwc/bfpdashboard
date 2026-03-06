@@ -84,6 +84,7 @@ const AdminPanel = () => {
           if (v === 'recipes') navigate('/admin/recipes');
           if (v === 'rehab') navigate('/admin/rehab-library');
           if (v === 'bundles') navigate('/admin/bundles');
+          if (v === 'accuracy') navigate('/admin/scope-accuracy');
         }}>
           <TabsList className="mb-3">
             <TabsTrigger value="users">Users</TabsTrigger>
