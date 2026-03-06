@@ -62,6 +62,10 @@ const TaskDetail = () => {
   const [linkedRecipeStepCount, setLinkedRecipeStepCount] = useState(0);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [addingSubtask, setAddingSubtask] = useState(false);
+  const [recipeSearchOpen, setRecipeSearchOpen] = useState(false);
+  const [recipeSearchQuery, setRecipeSearchQuery] = useState('');
+  const [recipeSearchResults, setRecipeSearchResults] = useState<{ id: string; name: string; trade: string | null; keywords: string[] | null }[]>([]);
+  const [recipeSearchLoading, setRecipeSearchLoading] = useState(false);
 
   // Crew state
   const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
