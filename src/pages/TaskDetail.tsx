@@ -357,7 +357,31 @@ const TaskDetail = () => {
     fetchLinkedRecipeStepCount();
   };
 
-  const fetchMembers = async () => {
+  const handleRecipeSearch = async (query: string) => {
+    setRecipeSearchQuery(query);
+    if (!query.trim()) { setRecipeSearchResults([]); return; }
+    setRecipeSearchLoading(true);
+    const { data } = await supabase.from('task_recipes')
+      .select('id, name, trade, keywords')
+      .eq('active', true)
+      .ilike('name', `%${query.trim()}%`)
+      .limit(10);
+    setRecipeSearchResults(data || []);
+    setRecipeSearchLoading(false);
+  };
+
+  const handleLinkRecipe = async (recipeId: string, recipeName: string) => {
+    if (!taskId) return;
+    await supabase.from('tasks').update({ recipe_hint_id: recipeId }).eq('id', taskId);
+    setSuggestedRecipe({ id: recipeId, name: recipeName });
+    setRecipeSearchOpen(false);
+    setRecipeSearchQuery('');
+    setRecipeSearchResults([]);
+    toast({ title: 'Recipe linked' });
+    fetchTask();
+    fetchLinkedRecipeStepCount();
+  };
+
     if (!projectId) return;
     const { data } = await supabase.from('project_members').select('user_id, role, profiles(full_name)').eq('project_id', projectId);
     if (data) setProjectMembers(data as any);
