@@ -23,7 +23,7 @@ interface RecipeStepsEditorProps {
   onStepsChanged?: () => void;
 }
 
-const RecipeStepsEditor = ({ recipeId }: RecipeStepsEditorProps) => {
+const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [steps, setSteps] = useState<RecipeStep[]>([]);
