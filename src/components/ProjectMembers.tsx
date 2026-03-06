@@ -6,7 +6,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Plus, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const ROLES = ['contractor', 'manager', 'read_only'] as const;
@@ -18,9 +20,11 @@ const ProjectMembers = ({ projectId }: { projectId: string }) => {
   const [members, setMembers] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>('contractor');
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [adding, setAdding] = useState(false);
 
   const canManage = isAdmin || userRole === 'manager';
 
@@ -61,25 +65,43 @@ const ProjectMembers = ({ projectId }: { projectId: string }) => {
     fetchMembers();
   };
 
-  const addMember = async () => {
-    if (!selectedUser) return;
-    const { error } = await supabase.from('project_members').insert({
+  const addMembers = async () => {
+    if (selectedUsers.length === 0) return;
+    setAdding(true);
+    const inserts = selectedUsers.map(userId => ({
       project_id: projectId,
-      user_id: selectedUser,
+      user_id: userId,
       role: selectedRole as any,
-    });
+    }));
+    const { error } = await supabase.from('project_members').insert(inserts);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setAdding(false);
       return;
     }
+    toast({ title: `${selectedUsers.length} member(s) added` });
     setOpen(false);
-    setSelectedUser('');
+    setSelectedUsers([]);
     setSelectedRole('contractor');
+    setSearchQuery('');
+    setAdding(false);
     fetchMembers();
   };
 
   const existingUserIds = members.map((m: any) => m.user_id);
   const availableProfiles = allProfiles.filter((p) => !existingUserIds.includes(p.id));
+
+  const filteredProfiles = availableProfiles.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (p.full_name && p.full_name.toLowerCase().includes(q)) || p.id.toLowerCase().includes(q);
+  });
+
+  const toggleUser = (userId: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
 
   return (
     <div className="mt-6">
@@ -88,28 +110,55 @@ const ProjectMembers = ({ projectId }: { projectId: string }) => {
           Members ({members.length})
         </h2>
         {canManage && (
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setSelectedUsers([]); setSearchQuery(''); } }}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" />Member</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Add Member</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>Add Members</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <Select value={selectedUser} onValueChange={setSelectedUser}>
-                  <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
-                  <SelectContent>
-                    {availableProfiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.full_name || p.id}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Select value={selectedRole} onValueChange={setSelectedRole}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Role" /></SelectTrigger>
                   <SelectContent>
                     {ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Button onClick={addMember} className="w-full" disabled={!selectedUser}>Add</Button>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                <div className="max-h-52 overflow-auto border rounded-md">
+                  {filteredProfiles.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">No users available.</p>
+                  )}
+                  {filteredProfiles.map((p) => (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0"
+                    >
+                      <Checkbox
+                        checked={selectedUsers.includes(p.id)}
+                        onCheckedChange={() => toggleUser(p.id)}
+                      />
+                      <span className="text-sm truncate">{p.full_name || p.id}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {selectedUsers.length > 0 && (
+                  <p className="text-xs text-muted-foreground">{selectedUsers.length} selected</p>
+                )}
+
+                <Button onClick={addMembers} className="w-full" disabled={selectedUsers.length === 0 || adding}>
+                  {adding ? 'Adding...' : `Add ${selectedUsers.length || ''} Member${selectedUsers.length !== 1 ? 's' : ''}`}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
