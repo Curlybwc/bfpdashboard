@@ -90,7 +90,8 @@ const ScopeAccuracy = () => {
   const rows: AccuracyRow[] = useMemo(() => {
     return scopeItems.map(si => {
       const linked = tasksByItem[si.id] || [];
-      const estimatedCost = si.computed_total ?? ((si.estimated_labor_cost ?? 0) + (si.estimated_material_cost ?? 0)) || null;
+      const fallback = (si.estimated_labor_cost ?? 0) + (si.estimated_material_cost ?? 0);
+      const estimatedCost = si.computed_total ?? (fallback > 0 ? fallback : null);
       const actuals = linked.map(t => t.actual_total_cost as number | null).filter((v): v is number => v != null);
       const totalActual = actuals.reduce((s, v) => s + v, 0);
       const avgActualCost = actuals.length > 0 ? totalActual / actuals.length : null;
