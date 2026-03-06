@@ -54,6 +54,10 @@ const TaskDetail = () => {
   const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
   const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
   const [crewToggleLoading, setCrewToggleLoading] = useState(false);
+  const [addCandidatesOpen, setAddCandidatesOpen] = useState(false);
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
+  const [candidateSearch, setCandidateSearch] = useState('');
+  const [addingCandidates, setAddingCandidates] = useState(false);
 
   // Editable fields
   const [taskText, setTaskText] = useState('');
