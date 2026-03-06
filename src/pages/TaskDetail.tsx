@@ -55,6 +55,8 @@ const TaskDetail = () => {
   const [newRecipeTrade, setNewRecipeTrade] = useState('');
   const [newRecipeKeywords, setNewRecipeKeywords] = useState('');
   const [creatingRecipe, setCreatingRecipe] = useState(false);
+  const [newlyCreatedRecipeId, setNewlyCreatedRecipeId] = useState<string | null>(null);
+  const [newRecipeStepCount, setNewRecipeStepCount] = useState(0);
   const [recipeSearchDone, setRecipeSearchDone] = useState(false);
   const [recipeEditorOpen, setRecipeEditorOpen] = useState(false);
   const [linkedRecipeStepCount, setLinkedRecipeStepCount] = useState(0);
