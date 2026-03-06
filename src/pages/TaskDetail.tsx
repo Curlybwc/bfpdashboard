@@ -274,6 +274,33 @@ const TaskDetail = () => {
     toast({ title: 'Recipe saved from tasks' });
   };
 
+  const handleCreateRecipeAndExpand = async () => {
+    if (!user || !taskId || !newRecipeName.trim()) return;
+    setCreatingRecipe(true);
+    const kwArray = newRecipeKeywords.split(',').map(k => k.trim()).filter(Boolean);
+    const { data: recipe, error: recipeErr } = await supabase.from('task_recipes').insert({
+      name: newRecipeName.trim(),
+      trade: newRecipeTrade.trim() || null,
+      keywords: kwArray,
+      created_by: user.id,
+    }).select('id').single();
+    if (recipeErr || !recipe) {
+      toast({ title: 'Error creating recipe', description: recipeErr?.message, variant: 'destructive' });
+      setCreatingRecipe(false);
+      return;
+    }
+    // Set recipe_hint_id on the task
+    await supabase.from('tasks').update({ recipe_hint_id: recipe.id }).eq('id', taskId);
+    setCreatingRecipe(false);
+    setCreateRecipeOpen(false);
+    setNewRecipeName('');
+    setNewRecipeTrade('');
+    setNewRecipeKeywords('');
+    toast({ title: 'Recipe created! Add steps in Admin > Recipes, then return here to Expand.' });
+    setSuggestedRecipe({ id: recipe.id, name: newRecipeName.trim() });
+    fetchTask();
+  };
+
   const fetchMembers = async () => {
     if (!projectId) return;
     const { data } = await supabase.from('project_members').select('user_id, role, profiles(full_name)').eq('project_id', projectId);
