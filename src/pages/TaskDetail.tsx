@@ -334,16 +334,23 @@ const TaskDetail = () => {
       setCreatingRecipe(false);
       return;
     }
-    // Set recipe_hint_id on the task
     await supabase.from('tasks').update({ recipe_hint_id: recipe.id }).eq('id', taskId);
     setCreatingRecipe(false);
+    setNewlyCreatedRecipeId(recipe.id);
+    setNewRecipeStepCount(0);
+    toast({ title: 'Recipe created — add steps below' });
+    setSuggestedRecipe({ id: recipe.id, name: newRecipeName.trim() });
+    fetchTask();
+  };
+
+  const handleFinishRecipeCreation = () => {
     setCreateRecipeOpen(false);
+    setNewlyCreatedRecipeId(null);
     setNewRecipeName('');
     setNewRecipeTrade('');
     setNewRecipeKeywords('');
-    toast({ title: 'Recipe created! Add steps in Admin > Recipes, then return here to Expand.' });
-    setSuggestedRecipe({ id: recipe.id, name: newRecipeName.trim() });
-    fetchTask();
+    setNewRecipeStepCount(0);
+    fetchLinkedRecipeStepCount();
   };
 
   const fetchMembers = async () => {
