@@ -61,6 +61,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
     setNewStepTitle('');
     setNewStepTrade('');
     fetchSteps();
+    onStepsChanged?.();
   };
 
   const handleDeleteStep = async (stepId: string) => {
@@ -71,6 +72,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
     }
     if (expandedStepId === stepId) setExpandedStepId(null);
     fetchSteps();
+    onStepsChanged?.();
   };
 
   const handleMoveStep = async (stepId: string, direction: 'up' | 'down') => {
