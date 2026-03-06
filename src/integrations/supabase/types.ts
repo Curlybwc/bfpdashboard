@@ -495,6 +495,9 @@ export type Database = {
           cost_item_id: string | null
           created_at: string
           description: string
+          estimated_hours: number | null
+          estimated_labor_cost: number | null
+          estimated_material_cost: number | null
           id: string
           notes: string | null
           phase_key: string | null
@@ -513,6 +516,9 @@ export type Database = {
           cost_item_id?: string | null
           created_at?: string
           description: string
+          estimated_hours?: number | null
+          estimated_labor_cost?: number | null
+          estimated_material_cost?: number | null
           id?: string
           notes?: string | null
           phase_key?: string | null
@@ -531,6 +537,9 @@ export type Database = {
           cost_item_id?: string | null
           created_at?: string
           description?: string
+          estimated_hours?: number | null
+          estimated_labor_cost?: number | null
+          estimated_material_cost?: number | null
           id?: string
           notes?: string | null
           phase_key?: string | null

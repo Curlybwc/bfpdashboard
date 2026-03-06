@@ -20,6 +20,7 @@ import AdminStoreSections from "./pages/AdminStoreSections";
 import AdminRecipes from "./pages/AdminRecipes";
 import AdminMaterialBundles from "./pages/AdminMaterialBundles";
 import AdminRehabLibrary from "./pages/AdminRehabLibrary";
+import ScopeAccuracy from "./pages/ScopeAccuracy";
 import ToolInventory from "./pages/ToolInventory";
 import MaterialInventory from "./pages/MaterialInventory";
 import Today from "./pages/Today";
@@ -75,6 +76,7 @@ const AppRoutes = () => {
             <Route path="/admin/recipes" element={<AdminRecipes />} />
             <Route path="/admin/bundles" element={<AdminMaterialBundles />} />
             <Route path="/admin/rehab-library" element={<AdminRehabLibrary />} />
+            <Route path="/admin/scope-accuracy" element={<ScopeAccuracy />} />
             <Route path="/admin/store-sections" element={<AdminStoreSections />} />
             <Route path="/admin/inventory/tools" element={<ToolInventory />} />
             <Route path="/admin/inventory/materials" element={<MaterialInventory />} />
