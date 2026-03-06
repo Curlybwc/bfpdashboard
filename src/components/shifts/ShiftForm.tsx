@@ -315,7 +315,7 @@ const ShiftForm = ({ editShift, editAllocations, onSaved, onCancel }: ShiftFormP
               <Loader2 className="h-4 w-4 animate-spin mr-2" />Loading tasks...
             </div>
           ) : tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No eligible tasks found for this project.</p>
+            <NoEligibleTasksCard />
           ) : (
             <div className="space-y-1.5">
               {tasks.map(t => (
