@@ -572,13 +572,14 @@ const TaskDetail = () => {
           </Button>
         </div>
 
-        {/* Recipe: read-only badge if already expanded, suggestion banner if expandable */}
+        {/* Recipe: read-only badge if already expanded */}
         {task.expanded_recipe_id && suggestedRecipe && (
           <Card className="p-3 flex items-center gap-2 border-muted">
             <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
           </Card>
         )}
+        {/* Recipe match found — show Expand */}
         {!task.expanded_recipe_id && suggestedRecipe && children.length === 0 && (
           <Card className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
             <div className="flex items-center gap-2 min-w-0">
@@ -589,6 +590,18 @@ const TaskDetail = () => {
             </div>
             <Button size="sm" onClick={() => handleExpandRecipe(suggestedRecipe.id)} disabled={expandingRecipe}>
               {expandingRecipe ? 'Expanding…' : 'Expand'}
+            </Button>
+          </Card>
+        )}
+        {/* No recipe match — offer Create Recipe (admin/manager only) */}
+        {!task.expanded_recipe_id && !suggestedRecipe && children.length === 0 && recipeSearchDone && (isAdmin || projectRole === 'manager') && (
+          <Card className="p-3 flex items-center justify-between border-dashed border-muted-foreground/30">
+            <div className="flex items-center gap-2 min-w-0">
+              <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+              <p className="text-sm text-muted-foreground">No recipe match</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => { setNewRecipeName(task.task || ''); setNewRecipeTrade(task.trade || ''); setCreateRecipeOpen(true); }}>
+              <Plus className="h-4 w-4 mr-1" />Create Recipe
             </Button>
           </Card>
         )}
