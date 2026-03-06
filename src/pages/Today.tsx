@@ -6,7 +6,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
 import { Button } from '@/components/ui/button';
-import { Zap } from 'lucide-react';
+import { Zap, Clock } from 'lucide-react';
 
 const Today = () => {
   const { user } = useAuth();
