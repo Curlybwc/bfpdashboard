@@ -596,18 +596,31 @@ const TaskDetail = () => {
             <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
           </Card>
         )}
-        {/* Recipe match found — show Expand */}
+        {/* Recipe linked but not yet expanded — show edit + expand */}
         {!task.expanded_recipe_id && suggestedRecipe && children.length === 0 && (
-          <Card className="p-3 flex items-center justify-between border-primary/30 bg-primary/5">
-            <div className="flex items-center gap-2 min-w-0">
-              <BookOpen className="h-4 w-4 text-primary shrink-0" />
-              <div className="min-w-0">
+          <Card className="p-3 space-y-3 border-primary/30 bg-primary/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <BookOpen className="h-4 w-4 text-primary shrink-0" />
                 <p className="text-sm font-medium truncate">Recipe: {suggestedRecipe.name}</p>
+                <Badge variant="secondary" className="text-xs">{linkedRecipeStepCount} steps</Badge>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {(isAdmin || projectRole === 'manager') && (
+                  <Button size="sm" variant="ghost" onClick={() => setRecipeEditorOpen(prev => !prev)}>
+                    {recipeEditorOpen ? <ChevronUp className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                  </Button>
+                )}
+                <Button size="sm" onClick={() => handleExpandRecipe(suggestedRecipe.id)} disabled={expandingRecipe || linkedRecipeStepCount === 0}>
+                  {expandingRecipe ? 'Expanding…' : 'Expand'}
+                </Button>
               </div>
             </div>
-            <Button size="sm" onClick={() => handleExpandRecipe(suggestedRecipe.id)} disabled={expandingRecipe}>
-              {expandingRecipe ? 'Expanding…' : 'Expand'}
-            </Button>
+            {recipeEditorOpen && (
+              <div className="border-t pt-3">
+                <RecipeStepsEditor recipeId={suggestedRecipe.id} onStepsChanged={fetchLinkedRecipeStepCount} />
+              </div>
+            )}
           </Card>
         )}
         {/* No recipe match — offer Create Recipe (admin/manager only) */}
