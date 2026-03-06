@@ -1320,6 +1320,10 @@ export type Database = {
     }
     Functions: {
       can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
+      capture_recipe_from_task: {
+        Args: { p_parent_task_id: string; p_recipe_id: string }
+        Returns: Json
+      }
       expand_recipe: {
         Args: {
           p_parent_task_id: string
