@@ -20,6 +20,7 @@ import AdminStoreSections from "./pages/AdminStoreSections";
 import AdminRecipes from "./pages/AdminRecipes";
 import AdminMaterialBundles from "./pages/AdminMaterialBundles";
 import AdminRehabLibrary from "./pages/AdminRehabLibrary";
+import ScopeAccuracy from "./pages/ScopeAccuracy";
 import ToolInventory from "./pages/ToolInventory";
 import MaterialInventory from "./pages/MaterialInventory";
 import Today from "./pages/Today";
