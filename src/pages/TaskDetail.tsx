@@ -382,6 +382,7 @@ const TaskDetail = () => {
     fetchLinkedRecipeStepCount();
   };
 
+  const fetchMembers = async () => {
     if (!projectId) return;
     const { data } = await supabase.from('project_members').select('user_id, role, profiles(full_name)').eq('project_id', projectId);
     if (data) setProjectMembers(data as any);
