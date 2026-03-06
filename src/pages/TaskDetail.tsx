@@ -288,6 +288,7 @@ const TaskDetail = () => {
     fetchChildren();
   };
 
+  const handleSaveAsRecipe = async () => {
     if (!user || !saveRecipeName.trim() || children.length === 0) return;
     setSavingRecipe(true);
     const { data: recipe, error: recipeErr } = await supabase.from('task_recipes').insert({
