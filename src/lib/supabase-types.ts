@@ -13,7 +13,7 @@ export const TASK_STAGES: TaskStage[] = ['Ready', 'In Progress', 'Not Ready', 'H
 export const TASK_PRIORITIES: TaskPriority[] = ['1 – Now', '2 – This Week', '3 – Soon', '4 – When Time', '5 – Later'];
 export const MATERIALS_OPTIONS: MaterialsStatus[] = ['Yes', 'Partial', 'No'];
 export const PROJECT_STATUSES: ProjectStatus[] = ['active', 'paused', 'complete'];
-export const SCOPE_STATUSES: ScopeStatus[] = ['Draft', 'Converted', 'Archived'];
+export const SCOPE_STATUSES: ScopeStatus[] = ['active', 'archived'];
 export const PRICING_STATUSES: PricingStatus[] = ['Priced', 'Needs Pricing'];
 
 export type AssignmentMode = 'solo' | 'crew';

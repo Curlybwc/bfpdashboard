@@ -298,7 +298,7 @@ const ScopeDetail = () => {
         backTo="/scopes"
         actions={
           <div className="flex items-center gap-2">
-            {isDraft && (
+            {isActive && (
               <>
                 <Button size="sm" variant="outline" onClick={() => setDedupeOpen(true)}>
                   <Merge className="h-4 w-4 mr-1" />Deduplicate

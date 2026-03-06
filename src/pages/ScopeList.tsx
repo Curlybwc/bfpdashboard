@@ -58,9 +58,8 @@ const ScopeList = () => {
               onChange={(e) => setFilterStatus(e.target.value as ScopeStatus | 'all')}
               className="text-xs border rounded-md px-2 py-1.5 bg-card text-foreground"
             >
-              <option value="Draft">Draft</option>
-              <option value="Converted">Converted</option>
-              <option value="Archived">Archived</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
               <option value="all">All</option>
             </select>
             {canCreate && (
