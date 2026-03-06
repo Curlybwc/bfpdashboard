@@ -689,14 +689,48 @@ const TaskDetail = () => {
         )}
         {/* No recipe match — offer Create Recipe (admin/manager only) */}
         {!task.expanded_recipe_id && !suggestedRecipe && children.length === 0 && recipeSearchDone && (isAdmin || projectRole === 'manager') && (
-          <Card className="p-3 flex items-center justify-between border-dashed border-muted-foreground/30">
-            <div className="flex items-center gap-2 min-w-0">
-              <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-              <p className="text-sm text-muted-foreground">No recipe match</p>
+          <Card className="p-3 space-y-3 border-dashed border-muted-foreground/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                <p className="text-sm text-muted-foreground">No recipe match</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setRecipeSearchOpen(prev => !prev); setRecipeSearchQuery(''); setRecipeSearchResults([]); }}>
+                  <Search className="h-4 w-4 mr-1" />Find
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setNewRecipeName(task.task || ''); setNewRecipeTrade(task.trade || ''); setCreateRecipeOpen(true); }}>
+                  <Plus className="h-4 w-4 mr-1" />Create
+                </Button>
+              </div>
             </div>
-            <Button size="sm" variant="outline" onClick={() => { setNewRecipeName(task.task || ''); setNewRecipeTrade(task.trade || ''); setCreateRecipeOpen(true); }}>
-              <Plus className="h-4 w-4 mr-1" />Create Recipe
-            </Button>
+            {recipeSearchOpen && (
+              <div className="space-y-2 border-t pt-3">
+                <Input
+                  placeholder="Search recipes by name…"
+                  value={recipeSearchQuery}
+                  onChange={(e) => handleRecipeSearch(e.target.value)}
+                  autoFocus
+                />
+                {recipeSearchLoading && <p className="text-xs text-muted-foreground">Searching…</p>}
+                {recipeSearchResults.length > 0 && (
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {recipeSearchResults.map(r => (
+                      <div key={r.id} className="flex items-center justify-between text-sm border rounded px-3 py-2 hover:bg-muted/50 cursor-pointer" onClick={() => handleLinkRecipe(r.id, r.name)}>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{r.name}</p>
+                          {r.trade && <p className="text-xs text-muted-foreground">{r.trade}</p>}
+                        </div>
+                        <Button size="sm" variant="ghost" className="shrink-0"><Plus className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {recipeSearchQuery.trim() && !recipeSearchLoading && recipeSearchResults.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No recipes found</p>
+                )}
+              </div>
+            )}
           </Card>
         )}
 
