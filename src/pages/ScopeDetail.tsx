@@ -22,6 +22,7 @@ import FinalPassSheet from '@/components/FinalPassSheet';
 import DeduplicateSheet from '@/components/DeduplicateSheet';
 import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
 import { isChecklistCovered } from '@/lib/checklistMatch';
+import { getConvertibleItems, type ConversionResult } from '@/lib/scopeConversion';
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
