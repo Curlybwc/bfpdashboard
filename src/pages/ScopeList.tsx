@@ -24,7 +24,7 @@ const ScopeList = () => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
-  const [filterStatus, setFilterStatus] = useState<ScopeStatus | 'all'>('Draft');
+  const [filterStatus, setFilterStatus] = useState<ScopeStatus | 'all'>('active');
 
   const fetchScopes = async () => {
     let query = supabase.from('scopes').select('*').order('created_at', { ascending: false });
