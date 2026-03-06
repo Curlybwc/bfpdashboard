@@ -289,7 +289,7 @@ const ScopeDetail = () => {
 
   if (!scope) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
-  const isDraft = scope.status === 'Draft';
+  const isActive = scope.status === 'active';
 
   return (
     <div className="pb-20">
@@ -298,7 +298,7 @@ const ScopeDetail = () => {
         backTo="/scopes"
         actions={
           <div className="flex items-center gap-2">
-            {isDraft && (
+            {isActive && (
               <>
                 <Button size="sm" variant="outline" onClick={() => setDedupeOpen(true)}>
                   <Merge className="h-4 w-4 mr-1" />Deduplicate
@@ -377,6 +377,36 @@ const ScopeDetail = () => {
                   </AlertDialogContent>
                 </AlertDialog>
               </>
+            )}
+            {isActive && isAdmin && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline">Archive</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Archive this scope?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      The scope will be moved to the archived list. You can still view it later.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={async () => {
+                      await supabase.from('scopes').update({ status: 'archived' as any }).eq('id', id!);
+                      setScope((prev: any) => ({ ...prev, status: 'archived' }));
+                      toast({ title: 'Scope archived' });
+                    }}>Archive</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            {scope.status === 'archived' && isAdmin && (
+              <Button size="sm" variant="outline" onClick={async () => {
+                await supabase.from('scopes').update({ status: 'active' as any }).eq('id', id!);
+                setScope((prev: any) => ({ ...prev, status: 'active' }));
+                toast({ title: 'Scope reactivated' });
+              }}>Reactivate</Button>
             )}
           </div>
         }
@@ -544,7 +574,7 @@ const ScopeDetail = () => {
                         {item.computed_total != null && <span>• Total: ${item.computed_total}</span>}
                         {item.status && item.status !== 'Not Checked' && <span>• {item.status}</span>}
                       </div>
-                      {isDraft && item.cost_item_id && (
+                      {isActive && item.cost_item_id && (
                         <div className="flex gap-2 mt-2">
                           <Button
                             size="sm"
@@ -571,7 +601,7 @@ const ScopeDetail = () => {
                       {item.pricing_status === 'Needs Pricing' && item.notes && /\$/.test(item.notes) && (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">$ in text</Badge>
                       )}
-                      {isDraft && (
+                      {isActive && (
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => startEdit(item)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
