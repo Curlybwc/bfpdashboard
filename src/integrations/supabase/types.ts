@@ -1356,7 +1356,7 @@ export type Database = {
       project_member_role: "contractor" | "manager" | "read_only"
       project_status: "active" | "paused" | "complete"
       scope_member_role: "viewer" | "editor" | "manager"
-      scope_status: "Draft" | "Converted" | "Archived"
+      scope_status: "Draft" | "Converted" | "Archived" | "active" | "archived"
       task_priority:
         | "1 – Now"
         | "2 – This Week"
@@ -1497,7 +1497,7 @@ export const Constants = {
       project_member_role: ["contractor", "manager", "read_only"],
       project_status: ["active", "paused", "complete"],
       scope_member_role: ["viewer", "editor", "manager"],
-      scope_status: ["Draft", "Converted", "Archived"],
+      scope_status: ["Draft", "Converted", "Archived", "active", "archived"],
       task_priority: [
         "1 – Now",
         "2 – This Week",
