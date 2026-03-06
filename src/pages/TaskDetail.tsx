@@ -986,29 +986,38 @@ const TaskDetail = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={createRecipeOpen} onOpenChange={setCreateRecipeOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Create Recipe</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Recipe Name</Label>
-              <Input value={newRecipeName} onChange={(e) => setNewRecipeName(e.target.value)} />
+      <Dialog open={createRecipeOpen} onOpenChange={(open) => { if (!open) handleFinishRecipeCreation(); else setCreateRecipeOpen(true); }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{newlyCreatedRecipeId ? 'Add Recipe Steps' : 'Create Recipe'}</DialogTitle></DialogHeader>
+          {!newlyCreatedRecipeId ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Recipe Name</Label>
+                <Input value={newRecipeName} onChange={(e) => setNewRecipeName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Trade</Label>
+                <Input value={newRecipeTrade} onChange={(e) => setNewRecipeTrade(e.target.value)} placeholder="e.g. Plumbing, Electrical" />
+              </div>
+              <div className="space-y-2">
+                <Label>Keywords (comma-separated)</Label>
+                <Input value={newRecipeKeywords} onChange={(e) => setNewRecipeKeywords(e.target.value)} placeholder="e.g. caulk, seal, bathroom" />
+              </div>
+              <Button className="w-full" onClick={handleCreateRecipeAndExpand} disabled={creatingRecipe || !newRecipeName.trim()}>
+                {creatingRecipe ? 'Creating…' : 'Create & Add Steps'}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label>Trade</Label>
-              <Input value={newRecipeTrade} onChange={(e) => setNewRecipeTrade(e.target.value)} placeholder="e.g. Plumbing, Electrical" />
+          ) : (
+            <div className="space-y-4">
+              <RecipeStepsEditor recipeId={newlyCreatedRecipeId} onStepsChanged={() => {
+                setNewRecipeStepCount(prev => prev + 1);
+                fetchLinkedRecipeStepCount();
+              }} />
+              <Button className="w-full" onClick={handleFinishRecipeCreation} variant={newRecipeStepCount > 0 ? 'default' : 'outline'}>
+                {newRecipeStepCount > 0 ? 'Done — Ready to Expand' : 'Close'}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label>Keywords (comma-separated)</Label>
-              <Input value={newRecipeKeywords} onChange={(e) => setNewRecipeKeywords(e.target.value)} placeholder="e.g. caulk, seal, bathroom" />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              This creates an empty recipe linked to this task. Add steps in Admin → Recipes, then return here to Expand.
-            </p>
-            <Button className="w-full" onClick={handleCreateRecipeAndExpand} disabled={creatingRecipe || !newRecipeName.trim()}>
-              {creatingRecipe ? 'Creating…' : 'Create Recipe'}
-            </Button>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
