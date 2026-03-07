@@ -10,6 +10,8 @@ import DailyReminders from '@/components/DailyReminders';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Zap, Clock, CalendarDays } from 'lucide-react';
+import { generateAlerts } from '@/lib/alerts';
+import AlertsBanner from '@/components/AlertsBanner';
 import {
   Sheet,
   SheetContent,
