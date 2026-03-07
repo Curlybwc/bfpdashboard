@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Plus, ChevronDown, X, Mic, Zap, Package, Trash2, Loader2, Pencil } from 'lucide-react';
+import { Plus, ChevronDown, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
