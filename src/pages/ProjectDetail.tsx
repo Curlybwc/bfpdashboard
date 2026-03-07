@@ -503,13 +503,13 @@ const ProjectDetail = () => {
                 {isContractor ? (
                   <>
                     {whatNext.myBlocked.length > 0 && (
-                      <Badge variant="destructive" className="text-xs font-normal">🔴 {whatNext.myBlocked.length} My Blocked</Badge>
+                      <Badge variant="destructive" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'myblocked' ? null : 'myblocked')}>🔴 {whatNext.myBlocked.length} My Blocked</Badge>
                     )}
                     {whatNext.myInProgress.length > 0 && (
-                      <Badge variant="secondary" className="text-xs font-normal">🔧 {whatNext.myInProgress.length} My In Progress</Badge>
+                      <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'myprogress' ? null : 'myprogress')}>🔧 {whatNext.myInProgress.length} My In Progress</Badge>
                     )}
                     {whatNext.available.length > 0 && (
-                      <Badge variant="outline" className="text-xs font-normal">👤 {whatNext.available.length} Available</Badge>
+                      <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'available' ? null : 'available')}>👤 {whatNext.available.length} Available</Badge>
                     )}
                   </>
                 ) : (
