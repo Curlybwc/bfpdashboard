@@ -61,10 +61,11 @@ const TaskCard = ({
 
   const isAssignedToMe = task.assigned_to_user_id === userId;
   const isUnassigned = !task.assigned_to_user_id;
+  const isOutsideVendor = task.is_outside_vendor === true;
   const materialsReady = task.materials_on_site === 'Yes';
 
-  // Solo action visibility
-  const showDibs = !isCrewTask && isUnassigned && task.stage === 'Ready';
+  // Solo action visibility — outside vendor tasks are not available for dibs
+  const showDibs = !isCrewTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
   const showStart = !isCrewTask && isAssignedToMe && task.stage === 'Ready';
   const showComplete = !isCrewTask && isAssignedToMe && task.stage === 'In Progress';
 
