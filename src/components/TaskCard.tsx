@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
+import { BLOCKER_REASONS } from '@/lib/supabase-types';
 
 interface TaskCardProps {
   task: any;
@@ -32,6 +33,7 @@ interface TaskCardProps {
   isActiveWorker?: boolean;
   isCandidate?: boolean;
   activeWorkerCount?: number;
+  blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
 }
 
 const TaskCard = ({
@@ -40,6 +42,7 @@ const TaskCard = ({
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
+  blockerInfo,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
@@ -174,15 +177,17 @@ const TaskCard = ({
   };
 
   const priorityBorderClass =
-    context === 'today'
-      ? {
-          '1 – Now': 'border-l-4 border-red-500',
-          '2 – This Week': 'border-l-4 border-orange-500',
-          '3 – Soon': 'border-l-4 border-yellow-500',
-          '4 – When Time': 'border-l-4 border-blue-500',
-          '5 – Later': 'border-l-4 border-gray-300',
-        }[task.priority as string] ?? ''
-      : '';
+    task.is_blocked
+      ? 'border-l-4 border-destructive'
+      : context === 'today'
+        ? {
+            '1 – Now': 'border-l-4 border-red-500',
+            '2 – This Week': 'border-l-4 border-orange-500',
+            '3 – Soon': 'border-l-4 border-yellow-500',
+            '4 – When Time': 'border-l-4 border-blue-500',
+            '5 – Later': 'border-l-4 border-gray-300',
+          }[task.priority as string] ?? ''
+        : '';
 
   return (
     <>
@@ -250,6 +255,14 @@ const TaskCard = ({
               Materials
             </button>
           </div>
+          {task.is_blocked && blockerInfo && (
+            <div className="mt-1 px-2 py-1 bg-destructive/5 rounded text-xs text-destructive">
+              <span className="font-medium">{BLOCKER_REASONS.find(r => r.value === blockerInfo.reason)?.label || blockerInfo.reason}</span>
+              {blockerInfo.needs_from_manager && (
+                <span className="text-muted-foreground ml-1">— {blockerInfo.needs_from_manager.slice(0, 60)}{blockerInfo.needs_from_manager.length > 60 ? '…' : ''}</span>
+              )}
+            </div>
+          )}
         </Link>
 
         {/* Solo actions */}

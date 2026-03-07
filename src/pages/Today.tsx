@@ -6,6 +6,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Zap, Clock } from 'lucide-react';
 
 const Today = () => {
@@ -22,6 +23,7 @@ const Today = () => {
   const [parentTitles, setParentTitles] = useState<Record<string, string>>({});
   const [assigneeMap, setAssigneeMap] = useState<Record<string, string>>({});
   const [isManager, setIsManager] = useState(false);
+  const [blockerMap, setBlockerMap] = useState<Record<string, { reason: string; needs_from_manager?: string | null }>>({});
 
   // Crew task state
   const [crewActiveTaskIds, setCrewActiveTaskIds] = useState<Set<string>>(new Set());
@@ -168,6 +170,21 @@ const Today = () => {
     const blockedIds = new Set(blockedTasks.map(t => t.id));
     setBlocked(blockedTasks);
 
+    // Batch-fetch active blocker info for blocked tasks
+    const blockedTaskIdList = blockedTasks.map(t => t.id);
+    let newBlockerMap: Record<string, { reason: string; needs_from_manager?: string | null }> = {};
+    if (blockedTaskIdList.length > 0) {
+      const { data: blockerRows } = await supabase
+        .from('task_blockers')
+        .select('task_id, reason, needs_from_manager')
+        .in('task_id', blockedTaskIdList)
+        .is('resolved_at', null);
+      (blockerRows || []).forEach(r => {
+        newBlockerMap[r.task_id] = { reason: r.reason, needs_from_manager: r.needs_from_manager };
+      });
+    }
+    setBlockerMap(newBlockerMap);
+
     // Remove blocked tasks from In Progress and Assigned to avoid duplication
     setInProgress(mergedIp.filter(t => !blockedIds.has(t.id)));
     setAssigned((assignedRes.data || []).filter(t => !blockedIds.has(t.id)));
@@ -253,9 +270,12 @@ const Today = () => {
 
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
-  const Section = ({ title, tasks, emptyText }: { title: string; tasks: any[]; emptyText: string }) => (
+  const Section = ({ title, tasks, emptyText, isBlockedSection = false }: { title: string; tasks: any[]; emptyText: string; isBlockedSection?: boolean }) => (
     <div className="mb-6">
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">{title}</h2>
+      <h2 className={cn(
+        "text-sm font-semibold uppercase tracking-wide mb-2",
+        isBlockedSection ? "text-destructive" : "text-muted-foreground"
+      )}>{title}</h2>
       {tasks.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4 text-center">{emptyText}</p>
       ) : (
@@ -276,6 +296,7 @@ const Today = () => {
               isActiveWorker={crewActiveTaskIds.has(t.id)}
               isCandidate={crewCandidateTaskIds.has(t.id)}
               activeWorkerCount={crewWorkerCounts[t.id] || 0}
+              blockerInfo={blockerMap[t.id] || null}
             />
           ))}
         </div>
@@ -302,9 +323,11 @@ const Today = () => {
         {(isAdmin || isManager) && needsReview.length > 0 && (
           <Section title="Needs Review" tasks={needsReview} emptyText="" />
         )}
-        {blocked.length > 0 && (
-          <Section title="Blocked" tasks={blocked} emptyText="" />
-        )}
+        {(isAdmin || isManager) ? (
+          <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
+        ) : blocked.length > 0 ? (
+          <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="" isBlockedSection />
+        ) : null}
         <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
         <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />
         <Section title="Available" tasks={available} emptyText="No tasks available for dibs." />
