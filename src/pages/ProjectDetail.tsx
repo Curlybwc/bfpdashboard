@@ -549,6 +549,16 @@ const ProjectDetail = () => {
               {whatNext.sortedWaitingMaterials.length > 0 && (
                 <WhatNextGroup label="Needs Materials/Tools" count={whatNext.sortedWaitingMaterials.length} tasks={whatNext.sortedWaitingMaterials} projectId={id!} open={openGroup === 'materials'} onToggle={() => setOpenGroup(openGroup === 'materials' ? null : 'materials')} />
               )}
+              {/* Contractor-specific groups */}
+              {isContractor && whatNext.myBlocked.length > 0 && (
+                <WhatNextGroup label="My Blocked" count={whatNext.myBlocked.length} tasks={whatNext.myBlocked} projectId={id!} open={openGroup === 'myblocked'} onToggle={() => setOpenGroup(openGroup === 'myblocked' ? null : 'myblocked')} />
+              )}
+              {isContractor && whatNext.myInProgress.length > 0 && (
+                <WhatNextGroup label="My In Progress" count={whatNext.myInProgress.length} tasks={whatNext.myInProgress} projectId={id!} open={openGroup === 'myprogress'} onToggle={() => setOpenGroup(openGroup === 'myprogress' ? null : 'myprogress')} />
+              )}
+              {isContractor && whatNext.available.length > 0 && (
+                <WhatNextGroup label="Available" count={whatNext.available.length} tasks={whatNext.available} projectId={id!} open={openGroup === 'available'} onToggle={() => setOpenGroup(openGroup === 'available' ? null : 'available')} />
+              )}
             </CardContent>
           </Card>
         )}
