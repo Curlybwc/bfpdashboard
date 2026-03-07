@@ -20,6 +20,7 @@ import AdminPanel from "./pages/AdminPanel";
 import AdminStoreSections from "./pages/AdminStoreSections";
 import AdminRecipes from "./pages/AdminRecipes";
 import AdminMaterialBundles from "./pages/AdminMaterialBundles";
+import AdminAssignmentRules from "./pages/AdminAssignmentRules";
 import AdminRehabLibrary from "./pages/AdminRehabLibrary";
 import ScopeAccuracy from "./pages/ScopeAccuracy";
 import ToolInventory from "./pages/ToolInventory";
