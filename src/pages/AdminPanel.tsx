@@ -48,6 +48,7 @@ const AdminPanel = () => {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>('users');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [impersonating, setImpersonating] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
