@@ -66,6 +66,7 @@ const NextUpCard = ({
           isCandidate={isCandidate}
           activeWorkerCount={activeWorkerCount}
           blockerInfo={blockerInfo}
+          photoCount={photoCount}
         />
       </div>
     </div>

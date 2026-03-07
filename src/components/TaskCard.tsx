@@ -242,6 +242,11 @@ const TaskCard = ({
                 📦 {materialCount}
               </span>
             )}
+            {photoCount > 0 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                📷 {photoCount}
+              </span>
+            )}
             {showNeedsMaterials && (
               <Badge variant="outline" className="text-xs border-warning text-warning">
                 Needs Materials
