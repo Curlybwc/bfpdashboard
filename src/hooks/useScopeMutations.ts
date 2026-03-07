@@ -145,8 +145,8 @@ export function useConvertScope() {
       return data;
     },
     onSuccess: (data) => {
-      const result = data as unknown as ConversionResult;
-      if (!result?.project_id) {
+      const result = parseConversionResult(data);
+      if (!result) {
         toast({ title: 'Conversion succeeded but no project ID returned', variant: 'destructive' });
         return;
       }

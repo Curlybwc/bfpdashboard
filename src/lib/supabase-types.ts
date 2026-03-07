@@ -4,6 +4,7 @@ export type ProjectMemberRole = 'contractor' | 'manager' | 'read_only';
 export type TaskStage = 'Ready' | 'In Progress' | 'Not Ready' | 'Hold' | 'Done';
 export type TaskPriority = '1 – Now' | '2 – This Week' | '3 – Soon' | '4 – When Time' | '5 – Later';
 export type MaterialsStatus = 'Yes' | 'Partial' | 'No';
+/** UI-facing subset of the database scope_status enum (which also includes Draft, Converted, Archived). */
 export type ScopeStatus = 'active' | 'archived';
 export type ScopeMemberRole = 'viewer' | 'editor' | 'manager';
 export type UnitType = 'each' | 'sqft' | 'lf' | 'piece';
