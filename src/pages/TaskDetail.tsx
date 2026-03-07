@@ -1198,6 +1198,63 @@ const TaskDetail = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Report Blocker Sheet */}
+      <Sheet open={blockerSheetOpen} onOpenChange={setBlockerSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Report Blocker
+            </SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>What's blocking this task?</Label>
+              <RadioGroup value={blockerReason} onValueChange={(v) => setBlockerReason(v as BlockerReason)}>
+                {BLOCKER_REASONS.map(r => (
+                  <div key={r.value} className="flex items-center space-x-2">
+                    <RadioGroupItem value={r.value} id={`reason-${r.value}`} />
+                    <Label htmlFor={`reason-${r.value}`} className="font-normal cursor-pointer">{r.label}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+            <div className="space-y-2">
+              <Label>Note (optional)</Label>
+              <Textarea value={blockerNote} onChange={(e) => setBlockerNote(e.target.value)} rows={2} placeholder="Additional details…" />
+            </div>
+            <div className="space-y-2">
+              <Label>What do you need from the manager?</Label>
+              <Textarea value={blockerNeedsFromManager} onChange={(e) => setBlockerNeedsFromManager(e.target.value)} rows={2} placeholder="e.g. Order 2x4s, get key from owner…" />
+            </div>
+            <Button className="w-full" variant="destructive" onClick={handleReportBlocker} disabled={reportingBlocker}>
+              {reportingBlocker ? 'Reporting…' : 'Report Blocker'}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Resolve Blocker Dialog */}
+      <AlertDialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resolve Blocker</AlertDialogTitle>
+            <AlertDialogDescription>
+              Mark this blocker as resolved. Optionally add a note.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Textarea value={resolutionNote} onChange={(e) => setResolutionNote(e.target.value)} rows={2} placeholder="Resolution note (optional)…" />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResolveBlocker} disabled={resolvingBlocker}>
+              {resolvingBlocker ? 'Resolving…' : 'Resolve'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
