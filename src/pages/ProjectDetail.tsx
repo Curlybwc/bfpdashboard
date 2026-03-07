@@ -26,8 +26,8 @@ import { canCreateTask, canEditProject, getProjectRole } from '@/lib/permissions
 import { useQueryClient } from '@tanstack/react-query';
 
 /** Compact collapsible group for the "What next?" section */
-const WhatNextGroup = ({ label, count, tasks, projectId }: { label: string; count: number; tasks: any[]; projectId: string }) => (
-  <Collapsible>
+const WhatNextGroup = ({ label, count, tasks, projectId, open, onToggle }: { label: string; count: number; tasks: any[]; projectId: string; open?: boolean; onToggle?: () => void }) => (
+  <Collapsible open={open} onOpenChange={onToggle}>
     <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-0.5">
       <ChevronRight className="h-3.5 w-3.5 transition-transform [[data-state=open]>&]:rotate-90" />
       {label} ({count})
