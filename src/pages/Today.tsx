@@ -318,6 +318,21 @@ const Today = () => {
         title="Today"
         actions={
           <div className="flex gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <CalendarClock className="h-4 w-4 mr-1" />Availability
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Availability</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4">
+                  <AvailabilityForm />
+                </div>
+              </SheetContent>
+            </Sheet>
             <Button size="sm" variant="outline" onClick={() => navigate('/shifts')}>
               <Clock className="h-4 w-4 mr-1" />Log Shift
             </Button>
