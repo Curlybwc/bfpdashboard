@@ -215,6 +215,47 @@ const TaskDetail = () => {
     fetchTask();
   };
 
+  const handleReportBlocker = async () => {
+    if (!user || !taskId) return;
+    setReportingBlocker(true);
+    const { error: insertErr } = await supabase.from('task_blockers').insert({
+      task_id: taskId,
+      reason: blockerReason,
+      note: blockerNote.trim() || null,
+      needs_from_manager: blockerNeedsFromManager.trim() || null,
+      blocked_by_user_id: user.id,
+    });
+    if (insertErr) {
+      toast({ title: 'Error', description: insertErr.message, variant: 'destructive' });
+      setReportingBlocker(false);
+      return;
+    }
+    await supabase.from('tasks').update({ is_blocked: true }).eq('id', taskId);
+    setReportingBlocker(false);
+    setBlockerSheetOpen(false);
+    setBlockerReason('missing_materials');
+    setBlockerNote('');
+    setBlockerNeedsFromManager('');
+    toast({ title: 'Blocker reported' });
+    fetchTask();
+  };
+
+  const handleResolveBlocker = async () => {
+    if (!user || !activeBlocker) return;
+    setResolvingBlocker(true);
+    await supabase.from('task_blockers').update({
+      resolved_at: new Date().toISOString(),
+      resolved_by_user_id: user.id,
+      resolution_note: resolutionNote.trim() || null,
+    }).eq('id', activeBlocker.id);
+    await supabase.from('tasks').update({ is_blocked: false }).eq('id', activeBlocker.task_id);
+    setResolvingBlocker(false);
+    setResolveDialogOpen(false);
+    setResolutionNote('');
+    toast({ title: 'Blocker resolved' });
+    fetchTask();
+  };
+
   const handleSave = async () => {
     if (!taskId || !task) return;
     setSaving(true);
