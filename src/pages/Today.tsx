@@ -16,6 +16,7 @@ const Today = () => {
   const [assigned, setAssigned] = useState<any[]>([]);
   const [available, setAvailable] = useState<any[]>([]);
   const [needsReview, setNeedsReview] = useState<any[]>([]);
+  const [blocked, setBlocked] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectMap, setProjectMap] = useState<Record<string, { name: string; address?: string }>>({});
   const [parentTitles, setParentTitles] = useState<Record<string, string>>({});
@@ -135,8 +136,41 @@ const Today = () => {
     const availIds = new Set(soloAvail.map(t => t.id));
     crewAvailTasks.forEach(t => { if (!availIds.has(t.id)) mergedAvail.push(t); });
 
-    setInProgress(mergedIp);
-    setAssigned(assignedRes.data || []);
+    // Fetch blocked tasks
+    let blockedTasks: any[] = [];
+    if (isAdmin || hasManagerRole) {
+      // Managers/admins see all blocked tasks across their projects
+      const { data: blockedRes } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('is_blocked', true)
+        .neq('stage', 'Done')
+        .in('project_id', memberProjectIds.length > 0 ? memberProjectIds : ['00000000-0000-0000-0000-000000000000'])
+        .order('created_at', { ascending: false })
+        .limit(30);
+      blockedTasks = blockedRes || [];
+    } else {
+      // Contractors see their own blocked tasks (assigned or active crew worker)
+      const myBlockedIds = new Set<string>();
+      // From solo assigned
+      mergedIp.concat(assignedRes.data || []).forEach(t => {
+        if (t.is_blocked) myBlockedIds.add(t.id);
+      });
+      // From crew active
+      crewIpTasks.forEach(t => {
+        if (t.is_blocked) myBlockedIds.add(t.id);
+      });
+      blockedTasks = [...mergedIp, ...(assignedRes.data || []), ...crewIpTasks].filter(t => myBlockedIds.has(t.id));
+      // Dedupe
+      const seen = new Set<string>();
+      blockedTasks = blockedTasks.filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
+    }
+    const blockedIds = new Set(blockedTasks.map(t => t.id));
+    setBlocked(blockedTasks);
+
+    // Remove blocked tasks from In Progress and Assigned to avoid duplication
+    setInProgress(mergedIp.filter(t => !blockedIds.has(t.id)));
+    setAssigned((assignedRes.data || []).filter(t => !blockedIds.has(t.id)));
     setAvailable(mergedAvail);
 
     // Fetch needs_manager_review tasks (for admins and managers)
@@ -153,7 +187,7 @@ const Today = () => {
     }
     setNeedsReview(reviewTasks);
 
-    const allTasks = [...mergedIp, ...(assignedRes.data || []), ...mergedAvail, ...reviewTasks];
+    const allTasks = [...mergedIp, ...(assignedRes.data || []), ...mergedAvail, ...reviewTasks, ...blockedTasks];
 
     // Fetch active worker counts for all crew tasks
     const crewTaskIds = allTasks.filter(t => t.assignment_mode === 'crew').map(t => t.id);
@@ -267,6 +301,9 @@ const Today = () => {
       <div className="p-4">
         {(isAdmin || isManager) && needsReview.length > 0 && (
           <Section title="Needs Review" tasks={needsReview} emptyText="" />
+        )}
+        {blocked.length > 0 && (
+          <Section title="Blocked" tasks={blocked} emptyText="" />
         )}
         <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
         <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />

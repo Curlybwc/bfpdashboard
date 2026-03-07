@@ -1,197 +1,97 @@
 
 
-## Blocked / Need Something — Implementation Plan
+## Plan: Crew Tasks (Multi-Person, Multi-Day)
 
 ### 1. Database Migration
 
-**New enum:**
-```sql
-CREATE TYPE public.blocker_reason AS ENUM (
-  'missing_materials', 'access_issue', 'waiting_on_approval',
-  'hidden_damage', 'tool_equipment', 'waiting_on_trade', 'other'
-);
-```
+Single migration adding columns, tables, indexes, RLS, and a helper function.
 
-**New table: `task_blockers`**
+**New columns on `tasks`:**
+- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
+- `lead_user_id uuid NULL`
+
+**New table `task_candidates` (eligibility pool):**
 ```sql
-CREATE TABLE public.task_blockers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+CREATE TABLE public.task_candidates (
   task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  reason blocker_reason NOT NULL,
-  note text,
-  needs_from_manager text,          -- "what is needed" field
-  blocked_by_user_id uuid NOT NULL,
-  blocked_at timestamptz NOT NULL DEFAULT now(),
-  resolved_at timestamptz,
-  resolved_by_user_id uuid,
-  resolution_note text,
-  created_at timestamptz NOT NULL DEFAULT now()
+  user_id uuid NOT NULL,
+  PRIMARY KEY (task_id, user_id)
 );
-
-ALTER TABLE public.task_blockers ENABLE ROW LEVEL SECURITY;
-CREATE INDEX idx_task_blockers_task_id ON public.task_blockers(task_id);
+CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
 ```
 
-**Denormalized column on `tasks`:**
+**New table `task_workers` (active crew):**
 ```sql
-ALTER TABLE public.tasks ADD COLUMN is_blocked boolean NOT NULL DEFAULT false;
-```
-
-### 2. RLS Policies on `task_blockers`
-
-All policies follow the existing pattern of `is_admin()`, `is_project_member()`, `get_project_role()`.
-
-**SELECT** — admin or project member (via task):
-```sql
-CREATE POLICY "View task blockers" ON public.task_blockers FOR SELECT
-USING (EXISTS (
-  SELECT 1 FROM tasks t
-  WHERE t.id = task_blockers.task_id
-    AND (is_admin(auth.uid()) OR is_project_member(auth.uid(), t.project_id))
-));
-```
-
-**INSERT** — must be the `blocked_by_user_id`, must be admin or contractor/manager on the project:
-```sql
-CREATE POLICY "Insert task blockers" ON public.task_blockers FOR INSERT
-WITH CHECK (
-  blocked_by_user_id = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM tasks t
-    WHERE t.id = task_blockers.task_id
-      AND (is_admin(auth.uid())
-           OR get_project_role(auth.uid(), t.project_id) IN ('manager','contractor'))
-  )
+CREATE TABLE public.task_workers (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz NULL,
+  PRIMARY KEY (task_id, user_id)
 );
+CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
+CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
 ```
 
-**UPDATE** — admin or manager (for resolving):
-```sql
-CREATE POLICY "Update task blockers" ON public.task_blockers FOR UPDATE
-USING (EXISTS (
-  SELECT 1 FROM tasks t
-  WHERE t.id = task_blockers.task_id
-    AND (is_admin(auth.uid())
-         OR get_project_role(auth.uid(), t.project_id) = 'manager')
-));
-```
+**RLS on `task_candidates`:**
+- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
+- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
 
-**DELETE** — admin only:
-```sql
-CREATE POLICY "Delete task blockers" ON public.task_blockers FOR DELETE
-USING (is_admin(auth.uid()));
-```
+**RLS on `task_workers`:**
+- SELECT: same as task_candidates SELECT
+- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
+- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
+- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
 
-**Note on INSERT scope tightening:** The RLS INSERT policy allows any contractor/manager on the project to insert. The stricter "only if assigned or active worker" check is enforced in the UI (see section 5). Enforcing it in RLS would require a complex subquery joining `tasks.assigned_to_user_id` and `task_workers`, which is possible but fragile. The UI-level gate is the narrowest safe version given the current schema; the RLS ensures only project participants can insert, which is consistent with how task updates work (same UPDATE policy allows any contractor/manager).
+### 2. Today Tab (`src/pages/Today.tsx`)
 
-### 3. Types (`src/lib/supabase-types.ts`)
+Add two additional queries in `fetchTasks` after existing solo queries:
 
-Add:
-```typescript
-export type BlockerReason =
-  | 'missing_materials' | 'access_issue' | 'waiting_on_approval'
-  | 'hidden_damage' | 'tool_equipment' | 'waiting_on_trade' | 'other';
+**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
 
-export const BLOCKER_REASONS: { value: BlockerReason; label: string }[] = [
-  { value: 'missing_materials', label: 'Missing Materials' },
-  { value: 'access_issue', label: 'Access Issue' },
-  { value: 'waiting_on_approval', label: 'Waiting on Approval' },
-  { value: 'hidden_damage', label: 'Hidden Damage / Unexpected' },
-  { value: 'tool_equipment', label: 'Tool / Equipment Issue' },
-  { value: 'waiting_on_trade', label: 'Waiting on Another Trade' },
-  { value: 'other', label: 'Other' },
-];
-```
+**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
 
-### 4. Permissions (`src/lib/permissions.ts`)
+Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
 
-Add two helpers:
-```typescript
-/** Can report a blocker. Admins, managers, and contractors. UI further gates on task relevance. */
-export function canReportBlocker(isAdmin: boolean, projectRole: string | null): boolean {
-  return isAdmin || projectRole === 'manager' || projectRole === 'contractor';
-}
+### 3. TaskCard (`src/components/TaskCard.tsx`)
 
-/** Can resolve a blocker. Admins and managers only. */
-export function canResolveBlocker(isAdmin: boolean, projectRole: string | null): boolean {
-  return isAdmin || projectRole === 'manager';
-}
-```
+Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
 
-### 5. TaskDetail UI — Reporting a Blocker
+When `isCrewTask`:
+- Show a small crew icon + "N active" badge next to status
+- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
+- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
+- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
+- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
 
-**Who sees the "Blocked" button:** The button appears when ALL of:
-- `canReportBlocker(isAdmin, projectRole)` is true
-- Task is not already blocked (`!task.is_blocked`)
-- Task stage is `Ready` or `In Progress`
-- User has task relevance: `isAssignedToMe || meIsActiveWorker || isAdmin || projectRole === 'manager'`
+### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
 
-This matches the existing participation model: solo tasks require assignment, crew tasks require active worker status, admins/managers can always act.
+**Crew toggle** (visible to admin/manager only, below Assigned To):
+- Switch labeled "Crew Task"
+- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
+- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
 
-**UI flow:**
-- Button labeled "Blocked" with a red/warning icon, placed in the lifecycle actions row alongside Dibs/Start/Complete
-- Opens a Sheet (bottom, mobile-friendly) containing:
-  - Radio group for reason (from `BLOCKER_REASONS`)
-  - Optional textarea: "Note (optional)"
-  - Optional textarea: "What do you need from the manager?" (`needs_from_manager`)
-  - Submit button: "Report Blocker"
-- On submit:
-  1. Insert into `task_blockers` with `blocked_by_user_id = user.id`
-  2. Update `tasks` set `is_blocked = true` where `id = taskId`
-  3. Refresh task data
+**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
+- "Active Crew" list showing names from `task_workers` joined to `profiles`
+- Join/Leave button for current user
+- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
 
-**TaskDetail — Blocker display card:** When `task.is_blocked`, show a red-bordered Card at the top of the detail view (before lifecycle buttons) showing:
-- Red "Blocked" badge + reason label
-- Blocked by (name from profiles) + timestamp
-- Note (if present)
-- "Needs from manager" (if present)
-- For managers/admins (`canResolveBlocker`): "Resolve" button opening an inline dialog with optional resolution note textarea + "Resolve Blocker" button
-- On resolve:
-  1. Update `task_blockers` set `resolved_at = now()`, `resolved_by_user_id = user.id`, `resolution_note`
-  2. Update `tasks` set `is_blocked = false`
-  3. Refresh
+**Solo mode**: keep existing Assigned To UI unchanged.
 
-### 6. StatusBadge + TaskCard
+### 5. Files to Modify
 
-**StatusBadge:** Add entry to colorMap:
-```typescript
-Blocked: 'bg-destructive/15 text-destructive',
-```
+1. **Migration SQL** — new columns, tables, indexes, RLS
+2. `src/pages/Today.tsx` — crew task queries merged into sections
+3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
+4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
+5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
 
-**TaskCard:** When `task.is_blocked`:
-- Show a separate `<StatusBadge status="Blocked" />` badge next to the existing stage badge
-- The stage badge remains (Ready, In Progress, etc.) — blocked is orthogonal
-- New prop: `isBlocked?: boolean` (derived from `task.is_blocked`)
+### 6. Key Edge Cases
 
-### 7. Today — Blocked Section
-
-**For managers/admins:**
-- New section titled "Blocked" shown between "Needs Review" and "In Progress"
-- Query: `tasks` where `is_blocked = true` AND `project_id IN memberProjectIds` AND `stage != 'Done'`
-- Shows all blocked tasks across the user's projects
-
-**For contractors:**
-- New section titled "Blocked" shown between "Needs Review" (if visible) and "In Progress"
-- Query: tasks where `is_blocked = true` AND either:
-  - `assigned_to_user_id = user.id`, OR
-  - task ID is in `myActiveTaskIds` (crew worker)
-- Blocked tasks are also **removed** from the In Progress / Assigned sections to avoid duplication
-
-**Implementation:** Add `blocked` state array in `fetchTasks`. For managers, a dedicated query. For contractors, filter from already-fetched tasks. Deduplicate: tasks shown in Blocked section are excluded from In Progress and Assigned.
-
-### 8. `needs_manager_review` Stays Separate
-
-No changes to the review flow. Blockers and review-required are independent orthogonal flags on a task.
-
-### 9. Files Changed
-
-| File | Action |
-|------|--------|
-| New migration SQL | enum, table, column, index, 4 RLS policies |
-| `src/lib/supabase-types.ts` | Add `BlockerReason`, `BLOCKER_REASONS` |
-| `src/lib/permissions.ts` | Add `canReportBlocker`, `canResolveBlocker` |
-| `src/components/StatusBadge.tsx` | Add `Blocked` to colorMap |
-| `src/components/TaskCard.tsx` | Show Blocked badge when `task.is_blocked` |
-| `src/pages/TaskDetail.tsx` | Blocker report sheet, blocker display card, resolve flow |
-| `src/pages/Today.tsx` | Add Blocked section for both managers and contractors |
+- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
+- Crew Available shows even when task is 'In Progress' (multiple people can join)
+- Upsert PK on `task_workers` prevents duplicate joins
+- Done tasks filtered out everywhere by existing stage checks
+- Crew→Solo cleanup deletes both tables to prevent orphan rows
 

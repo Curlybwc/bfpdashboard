@@ -17,8 +17,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
-import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, type TaskStage, type TaskPriority, type BlockerReason } from '@/lib/supabase-types';
+import { canReportBlocker, canResolveBlocker } from '@/lib/permissions';
+import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
@@ -42,6 +45,18 @@ const TaskDetail = () => {
   const [projectMembers, setProjectMembers] = useState<{ user_id: string; role: string; profiles: { full_name: string | null } | null }[]>([]);
   const [fieldCapture, setFieldCapture] = useState<any>(null);
   const [markingReviewed, setMarkingReviewed] = useState(false);
+
+  // Blocker state
+  const [blockerSheetOpen, setBlockerSheetOpen] = useState(false);
+  const [blockerReason, setBlockerReason] = useState<BlockerReason>('missing_materials');
+  const [blockerNote, setBlockerNote] = useState('');
+  const [blockerNeedsFromManager, setBlockerNeedsFromManager] = useState('');
+  const [reportingBlocker, setReportingBlocker] = useState(false);
+  const [activeBlocker, setActiveBlocker] = useState<any>(null);
+  const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [resolvingBlocker, setResolvingBlocker] = useState(false);
+  const [blockerReporterName, setBlockerReporterName] = useState('');
 
   // Recipe state
   const [suggestedRecipe, setSuggestedRecipe] = useState<{ id: string; name: string } | null>(null);
@@ -88,6 +103,28 @@ const TaskDetail = () => {
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
 
   useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
+
+  // Fetch active blocker when task loads
+  useEffect(() => {
+    if (!taskId || !task?.is_blocked) { setActiveBlocker(null); setBlockerReporterName(''); return; }
+    const fetchBlocker = async () => {
+      const { data } = await supabase
+        .from('task_blockers')
+        .select('*')
+        .eq('task_id', taskId)
+        .is('resolved_at', null)
+        .order('blocked_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setActiveBlocker(data);
+      if (data?.blocked_by_user_id) {
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', data.blocked_by_user_id).single();
+        setBlockerReporterName(profile?.full_name || 'Unknown');
+      }
+    };
+    fetchBlocker();
+  }, [taskId, task?.is_blocked]);
+
 
   // Recipe suggestion effect
   useEffect(() => {
@@ -175,6 +212,47 @@ const TaskDetail = () => {
     await supabase.from('tasks').update({ needs_manager_review: false }).eq('id', taskId);
     setMarkingReviewed(false);
     toast({ title: 'Marked as reviewed' });
+    fetchTask();
+  };
+
+  const handleReportBlocker = async () => {
+    if (!user || !taskId) return;
+    setReportingBlocker(true);
+    const { error: insertErr } = await supabase.from('task_blockers').insert({
+      task_id: taskId,
+      reason: blockerReason,
+      note: blockerNote.trim() || null,
+      needs_from_manager: blockerNeedsFromManager.trim() || null,
+      blocked_by_user_id: user.id,
+    });
+    if (insertErr) {
+      toast({ title: 'Error', description: insertErr.message, variant: 'destructive' });
+      setReportingBlocker(false);
+      return;
+    }
+    await supabase.from('tasks').update({ is_blocked: true }).eq('id', taskId);
+    setReportingBlocker(false);
+    setBlockerSheetOpen(false);
+    setBlockerReason('missing_materials');
+    setBlockerNote('');
+    setBlockerNeedsFromManager('');
+    toast({ title: 'Blocker reported' });
+    fetchTask();
+  };
+
+  const handleResolveBlocker = async () => {
+    if (!user || !activeBlocker) return;
+    setResolvingBlocker(true);
+    await supabase.from('task_blockers').update({
+      resolved_at: new Date().toISOString(),
+      resolved_by_user_id: user.id,
+      resolution_note: resolutionNote.trim() || null,
+    }).eq('id', activeBlocker.id);
+    await supabase.from('tasks').update({ is_blocked: false }).eq('id', activeBlocker.task_id);
+    setResolvingBlocker(false);
+    setResolveDialogOpen(false);
+    setResolutionNote('');
+    toast({ title: 'Blocker resolved' });
     fetchTask();
   };
 
@@ -537,6 +615,8 @@ const TaskDetail = () => {
   const materialsReady = task?.materials_on_site === 'Yes';
   const meIsCandidate = user ? crewCandidates.includes(user.id) : false;
   const meIsActiveWorker = user ? crewWorkers.some(w => w.user_id === user.id && w.active) : false;
+  const hasTaskRelevance = isAssignedToMe || meIsActiveWorker || isAdmin || projectRole === 'manager';
+  const showBlockerButton = !task?.is_blocked && (task?.stage === 'Ready' || task?.stage === 'In Progress') && canReportBlocker(isAdmin, projectRole) && hasTaskRelevance;
 
   const handleDibs = async (force = false) => {
     if (!user || !taskId) return;
@@ -647,11 +727,46 @@ const TaskDetail = () => {
           {isCrewMode && meIsActiveWorker && (
             <Button variant="outline" onClick={handleLeaveCrew} disabled={actionLoading}>Leave</Button>
           )}
+          {showBlockerButton && (
+            <Button variant="destructive" size="sm" onClick={() => setBlockerSheetOpen(true)} disabled={actionLoading}>
+              <AlertTriangle className="h-4 w-4 mr-1" />Blocked
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setMaterialsOpen(true)}>
             <Package className="h-4 w-4" />
             Materials
           </Button>
         </div>
+
+        {/* Active blocker display card */}
+        {task.is_blocked && activeBlocker && (
+          <Card className="p-3 space-y-2 border-destructive/50 bg-destructive/5">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+              <StatusBadge status="Blocked" />
+              <span className="text-sm font-medium">
+                {BLOCKER_REASONS.find(r => r.value === activeBlocker.reason)?.label || activeBlocker.reason}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Reported by {blockerReporterName} · {new Date(activeBlocker.blocked_at).toLocaleDateString()}
+            </p>
+            {activeBlocker.note && (
+              <p className="text-sm">{activeBlocker.note}</p>
+            )}
+            {activeBlocker.needs_from_manager && (
+              <div className="text-sm border-l-2 border-destructive/30 pl-2">
+                <span className="text-xs font-medium text-muted-foreground">Needs from manager:</span>
+                <p>{activeBlocker.needs_from_manager}</p>
+              </div>
+            )}
+            {canResolveBlocker(isAdmin, projectRole) && (
+              <Button size="sm" variant="outline" onClick={() => setResolveDialogOpen(true)}>
+                <CheckCircle2 className="h-4 w-4 mr-1" />Resolve
+              </Button>
+            )}
+          </Card>
+        )}
 
         {/* Recipe: read-only badge if already expanded */}
         {task.expanded_recipe_id && suggestedRecipe && (
@@ -1083,6 +1198,63 @@ const TaskDetail = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Report Blocker Sheet */}
+      <Sheet open={blockerSheetOpen} onOpenChange={setBlockerSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Report Blocker
+            </SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>What's blocking this task?</Label>
+              <RadioGroup value={blockerReason} onValueChange={(v) => setBlockerReason(v as BlockerReason)}>
+                {BLOCKER_REASONS.map(r => (
+                  <div key={r.value} className="flex items-center space-x-2">
+                    <RadioGroupItem value={r.value} id={`reason-${r.value}`} />
+                    <Label htmlFor={`reason-${r.value}`} className="font-normal cursor-pointer">{r.label}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+            <div className="space-y-2">
+              <Label>Note (optional)</Label>
+              <Textarea value={blockerNote} onChange={(e) => setBlockerNote(e.target.value)} rows={2} placeholder="Additional details…" />
+            </div>
+            <div className="space-y-2">
+              <Label>What do you need from the manager?</Label>
+              <Textarea value={blockerNeedsFromManager} onChange={(e) => setBlockerNeedsFromManager(e.target.value)} rows={2} placeholder="e.g. Order 2x4s, get key from owner…" />
+            </div>
+            <Button className="w-full" variant="destructive" onClick={handleReportBlocker} disabled={reportingBlocker}>
+              {reportingBlocker ? 'Reporting…' : 'Report Blocker'}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Resolve Blocker Dialog */}
+      <AlertDialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resolve Blocker</AlertDialogTitle>
+            <AlertDialogDescription>
+              Mark this blocker as resolved. Optionally add a note.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Textarea value={resolutionNote} onChange={(e) => setResolutionNote(e.target.value)} rows={2} placeholder="Resolution note (optional)…" />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResolveBlocker} disabled={resolvingBlocker}>
+              {resolvingBlocker ? 'Resolving…' : 'Resolve'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

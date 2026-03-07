@@ -807,6 +807,56 @@ export type Database = {
         }
         Relationships: []
       }
+      task_blockers: {
+        Row: {
+          blocked_at: string
+          blocked_by_user_id: string
+          created_at: string
+          id: string
+          needs_from_manager: string | null
+          note: string | null
+          reason: Database["public"]["Enums"]["blocker_reason"]
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by_user_id: string | null
+          task_id: string
+        }
+        Insert: {
+          blocked_at?: string
+          blocked_by_user_id: string
+          created_at?: string
+          id?: string
+          needs_from_manager?: string | null
+          note?: string | null
+          reason: Database["public"]["Enums"]["blocker_reason"]
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by_user_id?: string | null
+          task_id: string
+        }
+        Update: {
+          blocked_at?: string
+          blocked_by_user_id?: string
+          created_at?: string
+          id?: string
+          needs_from_manager?: string | null
+          note?: string | null
+          reason?: Database["public"]["Enums"]["blocker_reason"]
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by_user_id?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_blockers_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_candidates: {
         Row: {
           task_id: string
@@ -1188,6 +1238,7 @@ export type Database = {
           expanded_recipe_id: string | null
           field_capture_id: string | null
           id: string
+          is_blocked: boolean
           lead_user_id: string | null
           materials_on_site: Database["public"]["Enums"]["materials_status"]
           needs_manager_review: boolean
@@ -1222,6 +1273,7 @@ export type Database = {
           expanded_recipe_id?: string | null
           field_capture_id?: string | null
           id?: string
+          is_blocked?: boolean
           lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           needs_manager_review?: boolean
@@ -1256,6 +1308,7 @@ export type Database = {
           expanded_recipe_id?: string | null
           field_capture_id?: string | null
           id?: string
+          is_blocked?: boolean
           lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           needs_manager_review?: boolean
@@ -1480,6 +1533,14 @@ export type Database = {
       }
     }
     Enums: {
+      blocker_reason:
+        | "missing_materials"
+        | "access_issue"
+        | "waiting_on_approval"
+        | "hidden_damage"
+        | "tool_equipment"
+        | "waiting_on_trade"
+        | "other"
       materials_status: "Yes" | "Partial" | "No"
       pricing_status: "Priced" | "Needs Pricing"
       project_member_role: "contractor" | "manager" | "read_only"
@@ -1621,6 +1682,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      blocker_reason: [
+        "missing_materials",
+        "access_issue",
+        "waiting_on_approval",
+        "hidden_damage",
+        "tool_equipment",
+        "waiting_on_trade",
+        "other",
+      ],
       materials_status: ["Yes", "Partial", "No"],
       pricing_status: ["Priced", "Needs Pricing"],
       project_member_role: ["contractor", "manager", "read_only"],

@@ -52,6 +52,22 @@ export function canEditScopeTitle(isAdmin: boolean): boolean {
 }
 
 /**
+ * Whether the user can report a blocker on a task.
+ * Admins, managers, and contractors. UI further gates on task relevance.
+ */
+export function canReportBlocker(isAdmin: boolean, projectRole: string | null): boolean {
+  return isAdmin || projectRole === 'manager' || projectRole === 'contractor';
+}
+
+/**
+ * Whether the user can resolve a blocker.
+ * Admins and managers only.
+ */
+export function canResolveBlocker(isAdmin: boolean, projectRole: string | null): boolean {
+  return isAdmin || projectRole === 'manager';
+}
+
+/**
  * Extract the current user's project role from a members list.
  */
 export function getProjectRole(

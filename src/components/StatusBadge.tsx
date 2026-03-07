@@ -20,6 +20,7 @@ const colorMap: Record<string, string> = {
   'Not Checked': 'bg-muted text-muted-foreground',
   Repair: 'bg-orange-100 text-orange-700',
   Replace: 'bg-destructive/15 text-destructive',
+  Blocked: 'bg-destructive/15 text-destructive',
 };
 
 const StatusBadge = ({ status }: { status: string }) => (
