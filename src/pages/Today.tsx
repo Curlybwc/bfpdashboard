@@ -315,6 +315,20 @@ const Today = () => {
       setAssigneeMap({});
     }
 
+    // Batch-fetch photo counts
+    const allTaskIds = [...new Set(allTasks.map(t => t.id))];
+    if (allTaskIds.length > 0) {
+      const { data: photoRows } = await supabase
+        .from('task_photos' as any)
+        .select('task_id')
+        .in('task_id', allTaskIds);
+      const pMap: Record<string, number> = {};
+      (photoRows || []).forEach((r: any) => { pMap[r.task_id] = (pMap[r.task_id] || 0) + 1; });
+      setPhotoCountMap(pMap);
+    } else {
+      setPhotoCountMap({});
+    }
+
     setLoading(false);
   }, [user]);
 
