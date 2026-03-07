@@ -760,7 +760,7 @@ const TaskDetail = () => {
           )}
           {showBlockerButton && (
             <Button variant="destructive" size="sm" onClick={() => setBlockerSheetOpen(true)} disabled={actionLoading}>
-              <AlertTriangle className="h-4 w-4 mr-1" />Blocked
+              <AlertTriangle className="h-4 w-4 mr-1" />Report Issue
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={() => setMaterialsOpen(true)}>
