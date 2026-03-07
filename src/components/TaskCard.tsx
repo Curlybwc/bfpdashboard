@@ -177,15 +177,17 @@ const TaskCard = ({
   };
 
   const priorityBorderClass =
-    context === 'today'
-      ? {
-          '1 – Now': 'border-l-4 border-red-500',
-          '2 – This Week': 'border-l-4 border-orange-500',
-          '3 – Soon': 'border-l-4 border-yellow-500',
-          '4 – When Time': 'border-l-4 border-blue-500',
-          '5 – Later': 'border-l-4 border-gray-300',
-        }[task.priority as string] ?? ''
-      : '';
+    task.is_blocked
+      ? 'border-l-4 border-destructive'
+      : context === 'today'
+        ? {
+            '1 – Now': 'border-l-4 border-red-500',
+            '2 – This Week': 'border-l-4 border-orange-500',
+            '3 – Soon': 'border-l-4 border-yellow-500',
+            '4 – When Time': 'border-l-4 border-blue-500',
+            '5 – Later': 'border-l-4 border-gray-300',
+          }[task.priority as string] ?? ''
+        : '';
 
   return (
     <>
