@@ -25,6 +25,31 @@ import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/usePr
 import { canCreateTask, canEditProject, getProjectRole } from '@/lib/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 
+/** Compact collapsible group for the "What next?" section */
+const WhatNextGroup = ({ label, count, tasks, projectId }: { label: string; count: number; tasks: any[]; projectId: string }) => (
+  <Collapsible>
+    <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-0.5">
+      <ChevronRight className="h-3.5 w-3.5 transition-transform [[data-state=open]>&]:rotate-90" />
+      {label} ({count})
+    </CollapsibleTrigger>
+    <CollapsibleContent className="pt-1 pl-5 space-y-0.5">
+      {tasks.slice(0, 3).map((t: any) => (
+        <Link
+          key={t.id}
+          to={`/projects/${projectId}/tasks/${t.id}`}
+          className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+        >
+          <span className="truncate flex-1">{t.task}</span>
+          <Badge variant="outline" className="text-[10px] shrink-0">{t.priority?.split(' – ')[0] || '?'}</Badge>
+        </Link>
+      ))}
+      {count > 3 && (
+        <p className="text-xs text-muted-foreground px-2">+{count - 3} more</p>
+      )}
+    </CollapsibleContent>
+  </Collapsible>
+);
+
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
