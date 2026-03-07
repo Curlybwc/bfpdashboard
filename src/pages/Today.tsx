@@ -7,7 +7,7 @@ import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Zap, Clock, CalendarClock } from 'lucide-react';
+import { Zap, Clock, CalendarDays } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -321,7 +321,7 @@ const Today = () => {
             <Sheet>
               <SheetTrigger asChild>
                 <Button size="sm" variant="outline">
-                  <CalendarClock className="h-4 w-4 mr-1" />Availability
+                  <CalendarDays className="h-4 w-4 mr-1" />Availability
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
