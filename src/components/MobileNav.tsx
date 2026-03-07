@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { FolderKanban, ClipboardList, LogOut, Shield, CalendarCheck, ShoppingCart } from 'lucide-react';
+import { FolderKanban, ClipboardList, LogOut, Shield, CalendarCheck, ShoppingCart, CalendarClock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 
