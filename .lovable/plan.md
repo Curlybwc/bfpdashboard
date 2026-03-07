@@ -1,97 +1,47 @@
 
 
-## Plan: Crew Tasks (Multi-Person, Multi-Day)
+## Plan: Lightweight In-App Operational Alerts (v1)
 
-### 1. Database Migration
+### Approach
+Purely derived alerts computed from data already fetched on the Today page. No migration, no new table, no MobileNav badge, no global context.
 
-Single migration adding columns, tables, indexes, RLS, and a helper function.
+### New Files
 
-**New columns on `tasks`:**
-- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
-- `lead_user_id uuid NULL`
+**`src/lib/alerts.ts`** — Pure function `generateAlerts()` that takes Today's already-fetched state and returns sorted `OperationalAlert[]`.
 
-**New table `task_candidates` (eligibility pool):**
-```sql
-CREATE TABLE public.task_candidates (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
+```typescript
+interface OperationalAlert {
+  id: string;           // e.g. "blocked-${taskId}"
+  type: 'blocked' | 'review' | 'overdue' | 'shift' | 'photo';
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  subtitle?: string;
+  actionPath: string;
+}
 ```
 
-**New table `task_workers` (active crew):**
-```sql
-CREATE TABLE public.task_workers (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  active boolean NOT NULL DEFAULT true,
-  joined_at timestamptz NOT NULL DEFAULT now(),
-  left_at timestamptz NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
-CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
-```
+Alert types and audience:
 
-**RLS on `task_candidates`:**
-- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
-- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
+| Alert | Audience | Source | Severity |
+|-------|----------|--------|----------|
+| Blocked task | Manager: all; Contractor: mine | `is_blocked` from fetched tasks | high |
+| Needs review | Manager/admin only | `needs_manager_review` from fetched tasks | high |
+| Overdue task | Manager: all; Contractor: mine | `due_date < today`, stage ≠ Done | medium |
+| No shift logged | Contractor only | existing `hasShiftToday` + hour ≥ 10 | medium |
+| Photo reminder | Contractor only | in-progress task with 0 photos | low |
 
-**RLS on `task_workers`:**
-- SELECT: same as task_candidates SELECT
-- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
-- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
-- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
+Sorted by severity (high → low), then by due date.
 
-### 2. Today Tab (`src/pages/Today.tsx`)
+**`src/components/AlertsBanner.tsx`** — Compact banner rendered at top of Today content. Each alert: colored icon + one-line title + project context + tap navigates + X dismisses. Dismissed IDs tracked in `useState<Set<string>>` (session-only). Renders nothing if no alerts. Max 6 shown with "Show all" expand.
 
-Add two additional queries in `fetchTasks` after existing solo queries:
+### Modified Files
 
-**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
+**`src/pages/Today.tsx`** — Import `generateAlerts` and `AlertsBanner`. Call `generateAlerts()` after fetch with existing state (inProgress, assigned, blocked, needsReview, available, photoCountMap, projectMap, hasShiftToday, isAdmin, isManager, isContractor, userId). Render `<AlertsBanner>` above ContractorView/ManagerView. No new queries needed — all data already fetched.
 
-**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
-
-Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
-
-### 3. TaskCard (`src/components/TaskCard.tsx`)
-
-Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
-
-When `isCrewTask`:
-- Show a small crew icon + "N active" badge next to status
-- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
-- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
-- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
-- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
-
-### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
-
-**Crew toggle** (visible to admin/manager only, below Assigned To):
-- Switch labeled "Crew Task"
-- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
-- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
-
-**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
-- "Active Crew" list showing names from `task_workers` joined to `profiles`
-- Join/Leave button for current user
-- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
-
-**Solo mode**: keep existing Assigned To UI unchanged.
-
-### 5. Files to Modify
-
-1. **Migration SQL** — new columns, tables, indexes, RLS
-2. `src/pages/Today.tsx` — crew task queries merged into sections
-3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
-4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
-5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
-
-### 6. Key Edge Cases
-
-- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
-- Crew Available shows even when task is 'In Progress' (multiple people can join)
-- Upsert PK on `task_workers` prevents duplicate joins
-- Done tasks filtered out everywhere by existing stage checks
-- Crew→Solo cleanup deletes both tables to prevent orphan rows
+### What Is NOT Included
+- No MobileNav badge (stale without global provider)
+- No recently completed alerts (deferred)
+- No database table, migration, or persistent dismissals
+- No push/SMS/email
+- No notification preferences
 
