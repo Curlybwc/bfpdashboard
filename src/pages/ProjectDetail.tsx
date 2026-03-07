@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
@@ -10,8 +10,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Plus, ChevronDown, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle, CircleDot, Circle, UserX, Wrench } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
@@ -21,6 +24,31 @@ import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
 import { canCreateTask, canEditProject, getProjectRole } from '@/lib/permissions';
 import { useQueryClient } from '@tanstack/react-query';
+
+/** Compact collapsible group for the "What next?" section */
+const WhatNextGroup = ({ label, count, tasks, projectId }: { label: string; count: number; tasks: any[]; projectId: string }) => (
+  <Collapsible>
+    <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-0.5">
+      <ChevronRight className="h-3.5 w-3.5 transition-transform [[data-state=open]>&]:rotate-90" />
+      {label} ({count})
+    </CollapsibleTrigger>
+    <CollapsibleContent className="pt-1 pl-5 space-y-0.5">
+      {tasks.slice(0, 3).map((t: any) => (
+        <Link
+          key={t.id}
+          to={`/projects/${projectId}/tasks/${t.id}`}
+          className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+        >
+          <span className="truncate flex-1">{t.task}</span>
+          <Badge variant="outline" className="text-[10px] shrink-0">{t.priority?.split(' – ')[0] || '?'}</Badge>
+        </Link>
+      ))}
+      {count > 3 && (
+        <p className="text-xs text-muted-foreground px-2">+{count - 3} more</p>
+      )}
+    </CollapsibleContent>
+  </Collapsible>
+);
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +104,7 @@ const ProjectDetail = () => {
 
   const userCanCreateTask = canCreateTask(isAdmin, projectRole);
   const userCanEditProject = canEditProject(isAdmin, projectRole);
+  const isContractor = !isAdmin && projectRole === 'contractor';
 
   // Build tree
   const rootTasks = useMemo(() => tasks.filter((t) => !t.parent_task_id), [tasks]);
@@ -89,6 +118,85 @@ const ProjectDetail = () => {
     });
     return map;
   }, [tasks]);
+
+  // "What next?" derivation — leaf tasks only (no double-counting parents)
+  const whatNext = useMemo(() => {
+    const leafTasks = tasks.filter((t) => !(childrenMap[t.id]?.length) && t.stage !== 'Done');
+    const blocked = leafTasks.filter((t) => t.is_blocked);
+    const inProgress = leafTasks.filter((t) => !t.is_blocked && t.stage === 'In Progress');
+    const ready = leafTasks.filter((t) => !t.is_blocked && t.stage === 'Ready');
+    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id);
+    const waitingMaterials = ready.filter((t) => t.materials_on_site === 'No');
+
+    const sortByPriority = (a: any, b: any) => {
+      const pa = a.priority || '5 – Later';
+      const pb = b.priority || '5 – Later';
+      if (pa !== pb) return pa.localeCompare(pb);
+      const sa = a.sort_order ?? 999999;
+      const sb = b.sort_order ?? 999999;
+      if (sa !== sb) return sa - sb;
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    };
+
+    const sortedReady = [...ready].sort(sortByPriority);
+    const sortedBlocked = [...blocked].sort(sortByPriority);
+    const sortedUnassigned = [...readyUnassigned].sort(sortByPriority);
+
+    // Recommendation — contractor filters to own tasks
+    let recommendation = '';
+    let recommendationType: 'blocked' | 'unassigned' | 'ready' | 'progress' | 'done' = 'done';
+
+    if (isContractor) {
+      const myBlocked = blocked.filter((t) => t.assigned_to_user_id === user?.id);
+      const myInProgress = inProgress.filter((t) => t.assigned_to_user_id === user?.id);
+      const myReady = sortedReady.filter((t) => t.assigned_to_user_id === user?.id);
+      const available = sortedReady.filter((t) => !t.assigned_to_user_id);
+      if (myBlocked.length > 0) {
+        recommendation = `Needs action: ${myBlocked.length} blocked task${myBlocked.length !== 1 ? 's' : ''}`;
+        recommendationType = 'blocked';
+      } else if (myReady.length > 0) {
+        recommendation = `Start next: ${myReady[0].task}`;
+        recommendationType = 'ready';
+      } else if (available.length > 0) {
+        recommendation = `Available: ${available[0].task}`;
+        recommendationType = 'ready';
+      } else if (myInProgress.length > 0) {
+        recommendation = `${myInProgress.length} task${myInProgress.length !== 1 ? 's' : ''} in progress`;
+        recommendationType = 'progress';
+      } else {
+        recommendation = 'All caught up';
+        recommendationType = 'done';
+      }
+    } else {
+      if (blocked.length > 0) {
+        recommendation = `Needs action: ${blocked.length} blocked task${blocked.length !== 1 ? 's' : ''}`;
+        recommendationType = 'blocked';
+      } else if (readyUnassigned.length > 0) {
+        recommendation = `Assign next: ${readyUnassigned.length} ready task${readyUnassigned.length !== 1 ? 's' : ''} unassigned`;
+        recommendationType = 'unassigned';
+      } else if (sortedReady.length > 0) {
+        recommendation = `Start next: ${sortedReady[0].task}`;
+        recommendationType = 'ready';
+      } else if (inProgress.length > 0) {
+        recommendation = `${inProgress.length} task${inProgress.length !== 1 ? 's' : ''} in progress`;
+        recommendationType = 'progress';
+      } else {
+        recommendation = 'All caught up';
+        recommendationType = 'done';
+      }
+    }
+
+    return {
+      blocked, inProgress, ready, readyUnassigned, waitingMaterials,
+      sortedBlocked, sortedReady, sortedUnassigned,
+      recommendation, recommendationType,
+      hasAnyWork: leafTasks.length > 0,
+      // Contractor-specific counts
+      myBlocked: blocked.filter((t) => t.assigned_to_user_id === user?.id),
+      myInProgress: inProgress.filter((t) => t.assigned_to_user_id === user?.id),
+      available: ready.filter((t) => !t.assigned_to_user_id),
+    };
+  }, [tasks, childrenMap, isContractor, user?.id]);
 
   const getTaskActual = (t: any): number => {
     const children = childrenMap[t.id];
@@ -363,15 +471,77 @@ const ProjectDetail = () => {
             <span className="ml-auto text-sm font-medium">Actual: ${projectTotalActual.toFixed(2)}</span>
           )}
         </div>
-        {(() => {
-          const blockedCount = rootTasks.filter(t => t.is_blocked).length + tasks.filter(t => t.parent_task_id && t.is_blocked).length;
-          return blockedCount > 0 ? (
-            <div className="mb-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>{blockedCount} task{blockedCount !== 1 ? 's' : ''} blocked</span>
-            </div>
-          ) : null;
-        })()}
+
+        {/* What next? section */}
+        {whatNext.hasAnyWork && (
+          <Card className="mb-4 border-primary/15">
+            <CardContent className="p-3 space-y-3">
+              <p className="text-sm font-semibold text-foreground">What next?</p>
+
+              {/* Highlighted recommendation */}
+              <div className={cn(
+                'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium',
+                whatNext.recommendationType === 'blocked' && 'bg-destructive/10 text-destructive',
+                whatNext.recommendationType === 'unassigned' && 'bg-accent text-accent-foreground',
+                whatNext.recommendationType === 'ready' && 'bg-primary/10 text-primary',
+                whatNext.recommendationType === 'progress' && 'bg-muted text-muted-foreground',
+                whatNext.recommendationType === 'done' && 'bg-muted text-muted-foreground',
+              )}>
+                {whatNext.recommendationType === 'blocked' && <AlertTriangle className="h-4 w-4 shrink-0" />}
+                {whatNext.recommendationType === 'unassigned' && <UserX className="h-4 w-4 shrink-0" />}
+                {whatNext.recommendationType === 'ready' && <Circle className="h-4 w-4 shrink-0" />}
+                {whatNext.recommendationType === 'progress' && <CircleDot className="h-4 w-4 shrink-0" />}
+                <span className="truncate">{whatNext.recommendation}</span>
+              </div>
+
+              {/* Stat chips — role-specific */}
+              <div className="flex flex-wrap gap-1.5">
+                {isContractor ? (
+                  <>
+                    {whatNext.myBlocked.length > 0 && (
+                      <Badge variant="destructive" className="text-xs font-normal">🔴 {whatNext.myBlocked.length} My Blocked</Badge>
+                    )}
+                    {whatNext.myInProgress.length > 0 && (
+                      <Badge variant="secondary" className="text-xs font-normal">🔧 {whatNext.myInProgress.length} My In Progress</Badge>
+                    )}
+                    {whatNext.available.length > 0 && (
+                      <Badge variant="outline" className="text-xs font-normal">👤 {whatNext.available.length} Available</Badge>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {whatNext.blocked.length > 0 && (
+                      <Badge variant="destructive" className="text-xs font-normal">🔴 {whatNext.blocked.length} Blocked</Badge>
+                    )}
+                    {whatNext.ready.length > 0 && (
+                      <Badge variant="secondary" className="text-xs font-normal">🟢 {whatNext.ready.length} Ready</Badge>
+                    )}
+                    {whatNext.readyUnassigned.length > 0 && (
+                      <Badge variant="outline" className="text-xs font-normal">👤 {whatNext.readyUnassigned.length} Unassigned</Badge>
+                    )}
+                    {whatNext.inProgress.length > 0 && (
+                      <Badge variant="secondary" className="text-xs font-normal">🔧 {whatNext.inProgress.length} In Progress</Badge>
+                    )}
+                    {whatNext.waitingMaterials.length > 0 && (
+                      <Badge variant="outline" className="text-xs font-normal"><Wrench className="h-3 w-3 mr-1" />{whatNext.waitingMaterials.length} Needs Materials/Tools</Badge>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Collapsible groups */}
+              {whatNext.sortedBlocked.length > 0 && (
+                <WhatNextGroup label="Blocked" count={whatNext.sortedBlocked.length} tasks={whatNext.sortedBlocked} projectId={id!} />
+              )}
+              {whatNext.sortedReady.length > 0 && (
+                <WhatNextGroup label="Ready to Start" count={whatNext.sortedReady.length} tasks={whatNext.sortedReady} projectId={id!} />
+              )}
+              {whatNext.sortedUnassigned.length > 0 && (
+                <WhatNextGroup label="Unassigned" count={whatNext.sortedUnassigned.length} tasks={whatNext.sortedUnassigned} projectId={id!} />
+              )}
+            </CardContent>
+          </Card>
+        )}
         <div className="space-y-2">
            {rootTasks.length === 0 ? (
              <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
