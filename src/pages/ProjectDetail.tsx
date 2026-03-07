@@ -59,11 +59,13 @@ const ProjectDetail = () => {
   const queryClient = useQueryClient();
 
   // Server state via React Query
-  const { data, isLoading } = useProjectDetail(id);
+  const { data, isLoading } = useProjectDetail(id, user?.id);
   const project = data?.project;
-  const tasks = data?.tasks ?? [];
+  const allTasks = data?.tasks ?? [];
   const photoCountMap = data?.photoCountMap ?? {};
   const projectMembers = data?.members ?? [];
+  const myActiveWorkerTaskIds = new Set(data?.myActiveWorkerTaskIds ?? []);
+  const myCandidateTaskIds = new Set(data?.myCandidateTaskIds ?? []);
 
   // Mutations
   const createTaskMutation = useCreateTask(id);
