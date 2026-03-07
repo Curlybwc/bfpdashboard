@@ -515,19 +515,19 @@ const ProjectDetail = () => {
                 ) : (
                   <>
                     {whatNext.blocked.length > 0 && (
-                      <Badge variant="destructive" className="text-xs font-normal">🔴 {whatNext.blocked.length} Blocked</Badge>
+                      <Badge variant="destructive" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'blocked' ? null : 'blocked')}>🔴 {whatNext.blocked.length} Blocked</Badge>
                     )}
                     {whatNext.ready.length > 0 && (
-                      <Badge variant="secondary" className="text-xs font-normal">🟢 {whatNext.ready.length} Ready</Badge>
+                      <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'ready' ? null : 'ready')}>🟢 {whatNext.ready.length} Ready</Badge>
                     )}
                     {whatNext.readyUnassigned.length > 0 && (
-                      <Badge variant="outline" className="text-xs font-normal">👤 {whatNext.readyUnassigned.length} Unassigned</Badge>
+                      <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'unassigned' ? null : 'unassigned')}>👤 {whatNext.readyUnassigned.length} Unassigned</Badge>
                     )}
                     {whatNext.inProgress.length > 0 && (
-                      <Badge variant="secondary" className="text-xs font-normal">🔧 {whatNext.inProgress.length} In Progress</Badge>
+                      <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'progress' ? null : 'progress')}>🔧 {whatNext.inProgress.length} In Progress</Badge>
                     )}
                     {whatNext.waitingMaterials.length > 0 && (
-                      <Badge variant="outline" className="text-xs font-normal"><Wrench className="h-3 w-3 mr-1" />{whatNext.waitingMaterials.length} Needs Materials/Tools</Badge>
+                      <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'materials' ? null : 'materials')}><Wrench className="h-3 w-3 mr-1" />{whatNext.waitingMaterials.length} Needs Materials/Tools</Badge>
                     )}
                   </>
                 )}
@@ -535,13 +535,19 @@ const ProjectDetail = () => {
 
               {/* Collapsible groups */}
               {whatNext.sortedBlocked.length > 0 && (
-                <WhatNextGroup label="Blocked" count={whatNext.sortedBlocked.length} tasks={whatNext.sortedBlocked} projectId={id!} />
+                <WhatNextGroup label="Blocked" count={whatNext.sortedBlocked.length} tasks={whatNext.sortedBlocked} projectId={id!} open={openGroup === 'blocked'} onToggle={() => setOpenGroup(openGroup === 'blocked' ? null : 'blocked')} />
               )}
               {whatNext.sortedReady.length > 0 && (
-                <WhatNextGroup label="Ready to Start" count={whatNext.sortedReady.length} tasks={whatNext.sortedReady} projectId={id!} />
+                <WhatNextGroup label="Ready to Start" count={whatNext.sortedReady.length} tasks={whatNext.sortedReady} projectId={id!} open={openGroup === 'ready'} onToggle={() => setOpenGroup(openGroup === 'ready' ? null : 'ready')} />
               )}
               {whatNext.sortedUnassigned.length > 0 && (
-                <WhatNextGroup label="Unassigned" count={whatNext.sortedUnassigned.length} tasks={whatNext.sortedUnassigned} projectId={id!} />
+                <WhatNextGroup label="Unassigned" count={whatNext.sortedUnassigned.length} tasks={whatNext.sortedUnassigned} projectId={id!} open={openGroup === 'unassigned'} onToggle={() => setOpenGroup(openGroup === 'unassigned' ? null : 'unassigned')} />
+              )}
+              {whatNext.inProgress.length > 0 && (
+                <WhatNextGroup label="In Progress" count={whatNext.inProgress.length} tasks={whatNext.inProgress} projectId={id!} open={openGroup === 'progress'} onToggle={() => setOpenGroup(openGroup === 'progress' ? null : 'progress')} />
+              )}
+              {whatNext.sortedWaitingMaterials.length > 0 && (
+                <WhatNextGroup label="Needs Materials/Tools" count={whatNext.sortedWaitingMaterials.length} tasks={whatNext.sortedWaitingMaterials} projectId={id!} open={openGroup === 'materials'} onToggle={() => setOpenGroup(openGroup === 'materials' ? null : 'materials')} />
               )}
             </CardContent>
           </Card>
