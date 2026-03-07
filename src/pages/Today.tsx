@@ -322,9 +322,11 @@ const Today = () => {
         {(isAdmin || isManager) && needsReview.length > 0 && (
           <Section title="Needs Review" tasks={needsReview} emptyText="" />
         )}
-        {blocked.length > 0 && (
-          <Section title="Blocked" tasks={blocked} emptyText="" />
-        )}
+        {(isAdmin || isManager) ? (
+          <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
+        ) : blocked.length > 0 ? (
+          <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="" isBlockedSection />
+        ) : null}
         <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
         <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />
         <Section title="Available" tasks={available} emptyText="No tasks available for dibs." />
