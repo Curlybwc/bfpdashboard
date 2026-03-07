@@ -7,9 +7,33 @@ import PageHeader from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import CostLibrary from '@/components/CostLibrary';
 import AdminAliases from '@/components/AdminAliases';
+import {
+  Menubar,
+  MenubarMenu,
+  MenubarTrigger,
+  MenubarContent,
+  MenubarItem,
+} from '@/components/ui/menubar';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Menu } from 'lucide-react';
+
+type ActiveView = 'users' | 'cost-library' | 'aliases';
+
+const VIEW_LABELS: Record<ActiveView, string> = {
+  users: 'Users',
+  'cost-library': 'Cost Library',
+  aliases: 'Aliases',
+};
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -17,6 +41,9 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [activeView, setActiveView] = useState<ActiveView>('users');
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!adminLoading && !isAdmin) {
@@ -35,19 +62,16 @@ const AdminPanel = () => {
 
   const toggleAdmin = async (profileId: string, currentValue: boolean) => {
     if (currentValue) {
-      // Removing admin — check if last
       const adminCount = profiles.filter((p) => p.is_admin).length;
       if (adminCount <= 1) {
         toast({ title: 'Cannot remove last admin', variant: 'destructive' });
         return;
       }
     }
-
     const { error } = await supabase
       .from('profiles')
       .update({ is_admin: !currentValue })
       .eq('id', profileId);
-
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
@@ -73,80 +97,164 @@ const AdminPanel = () => {
 
   if (!isAdmin) return null;
 
+  const handleLocal = (view: ActiveView) => {
+    setActiveView(view);
+    setSheetOpen(false);
+  };
+
+  const handleNav = (path: string) => {
+    setSheetOpen(false);
+    navigate(path);
+  };
+
+  // Shared menu group definitions
+  const menuGroups = [
+    {
+      label: 'Libraries',
+      items: [
+        { label: 'Cost Library', action: () => handleLocal('cost-library') },
+        { label: 'Recipes', action: () => handleNav('/admin/recipes') },
+        { label: 'Rehab Library', action: () => handleNav('/admin/rehab-library') },
+        { label: 'Bundles', action: () => handleNav('/admin/bundles') },
+        { label: 'Store Sections', action: () => handleNav('/admin/store-sections') },
+      ],
+    },
+    {
+      label: 'Operations',
+      items: [
+        { label: 'Shifts', action: () => handleNav('/shifts') },
+      ],
+    },
+    {
+      label: 'Inventory',
+      items: [
+        { label: 'Tools', action: () => handleNav('/admin/inventory/tools') },
+        { label: 'Materials', action: () => handleNav('/admin/inventory/materials') },
+      ],
+    },
+    {
+      label: 'Reports',
+      items: [
+        { label: 'Scope Accuracy', action: () => handleNav('/admin/scope-accuracy') },
+      ],
+    },
+    {
+      label: 'Access',
+      items: [
+        { label: 'Users', action: () => handleLocal('users') },
+        { label: 'Aliases', action: () => handleLocal('aliases') },
+      ],
+    },
+  ];
+
+  const usersContent = (
+    <>
+      <h2 className="text-sm font-medium text-muted-foreground mb-3">
+        User Management ({profiles.length})
+      </h2>
+      {profiles.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">No users found.</p>
+      ) : (
+        <div className="space-y-2">
+          {profiles.map((profile) => (
+            <Card key={profile.id} className="p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm truncate">
+                    {profile.full_name || 'Unnamed User'}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Manager</span>
+                    <Switch
+                      checked={profile.can_manage_projects}
+                      onCheckedChange={() => toggleField(profile.id, 'can_manage_projects', profile.can_manage_projects)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Admin</span>
+                    <Switch
+                      checked={profile.is_admin}
+                      onCheckedChange={() => toggleAdmin(profile.id, profile.is_admin)}
+                      disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="pb-20">
       <PageHeader title="Admin Panel" backTo="/projects" />
       <div className="p-4">
-        <Tabs defaultValue="users" onValueChange={(v) => {
-          if (v === 'tools') navigate('/admin/inventory/tools');
-          if (v === 'materials') navigate('/admin/inventory/materials');
-          if (v === 'sections') navigate('/admin/store-sections');
-          if (v === 'recipes') navigate('/admin/recipes');
-          if (v === 'rehab') navigate('/admin/rehab-library');
-          if (v === 'bundles') navigate('/admin/bundles');
-          if (v === 'accuracy') navigate('/admin/scope-accuracy');
-          if (v === 'shifts') navigate('/shifts');
-        }}>
-          <TabsList className="mb-3">
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="cost-library">Cost Library</TabsTrigger>
-            <TabsTrigger value="aliases">Aliases</TabsTrigger>
-            <TabsTrigger value="bundles">Bundles</TabsTrigger>
-            <TabsTrigger value="recipes">Recipes</TabsTrigger>
-            <TabsTrigger value="rehab">Rehab</TabsTrigger>
-            <TabsTrigger value="sections">Sections</TabsTrigger>
-            <TabsTrigger value="accuracy">Accuracy</TabsTrigger>
-            <TabsTrigger value="shifts">Shifts</TabsTrigger>
-            <TabsTrigger value="tools">Tools</TabsTrigger>
-            <TabsTrigger value="materials">Materials</TabsTrigger>
-          </TabsList>
-          <TabsContent value="users">
-            <h2 className="text-sm font-medium text-muted-foreground mb-3">
-              User Management ({profiles.length})
-            </h2>
-            {profiles.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No users found.</p>
-            ) : (
-              <div className="space-y-2">
-                {profiles.map((profile) => (
-                  <Card key={profile.id} className="p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">
-                          {profile.full_name || 'Unnamed User'}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted-foreground">Manager</span>
-                          <Switch
-                            checked={profile.can_manage_projects}
-                            onCheckedChange={() => toggleField(profile.id, 'can_manage_projects', profile.can_manage_projects)}
-                          />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted-foreground">Admin</span>
-                          <Switch
-                            checked={profile.is_admin}
-                            onCheckedChange={() => toggleAdmin(profile.id, profile.is_admin)}
-                            disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
-                          />
-                        </div>
-                      </div>
+        {/* Desktop Menubar */}
+        {!isMobile ? (
+          <Menubar className="mb-2">
+            {menuGroups.map((group) => (
+              <MenubarMenu key={group.label}>
+                <MenubarTrigger>{group.label}</MenubarTrigger>
+                <MenubarContent>
+                  {group.items.map((item) => (
+                    <MenubarItem key={item.label} onClick={item.action}>
+                      {item.label}
+                    </MenubarItem>
+                  ))}
+                </MenubarContent>
+              </MenubarMenu>
+            ))}
+          </Menubar>
+        ) : (
+          /* Mobile Sheet */
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="mb-2 w-full justify-start gap-2">
+                <Menu className="h-4 w-4" />
+                Admin Menu
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Admin Menu</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 space-y-5">
+                {menuGroups.map((group) => (
+                  <div key={group.label}>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                      {group.label}
+                    </p>
+                    <div className="space-y-0.5">
+                      {group.items.map((item) => (
+                        <button
+                          key={item.label}
+                          onClick={item.action}
+                          className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
                     </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
-            )}
-          </TabsContent>
-          <TabsContent value="cost-library">
-            <CostLibrary />
-          </TabsContent>
-          <TabsContent value="aliases">
-            <AdminAliases />
-          </TabsContent>
-        </Tabs>
+            </SheetContent>
+          </Sheet>
+        )}
+
+        <p className="text-xs text-muted-foreground mb-4">
+          Viewing: <span className="font-medium text-foreground">{VIEW_LABELS[activeView]}</span>
+        </p>
+
+        {/* Content */}
+        {activeView === 'users' && usersContent}
+        {activeView === 'cost-library' && <CostLibrary />}
+        {activeView === 'aliases' && <AdminAliases />}
       </div>
     </div>
   );
