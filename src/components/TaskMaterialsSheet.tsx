@@ -111,6 +111,8 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     const items = allItems.filter(i => i.is_active !== false);
     
     if (items.length === 0) {
+      // No active materials — nothing is needed, so mark as ready
+      await supabase.from('tasks').update({ materials_on_site: 'Yes' }).eq('id', taskId);
       onMaterialsChange();
       return;
     }

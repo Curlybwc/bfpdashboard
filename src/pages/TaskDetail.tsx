@@ -884,7 +884,9 @@ const TaskDetail = () => {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label>Materials On Site</Label>
-            <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">{task.materials_on_site}</p>
+            <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+              {task.materials_on_site === 'No' && materialsOpen === false ? task.materials_on_site : task.materials_on_site}
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Due Date</Label>
