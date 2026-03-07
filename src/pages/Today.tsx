@@ -17,8 +17,6 @@ const Today = () => {
   const [available, setAvailable] = useState<any[]>([]);
   const [needsReview, setNeedsReview] = useState<any[]>([]);
   const [blocked, setBlocked] = useState<any[]>([]);
-  const [available, setAvailable] = useState<any[]>([]);
-  const [needsReview, setNeedsReview] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectMap, setProjectMap] = useState<Record<string, { name: string; address?: string }>>({});
   const [parentTitles, setParentTitles] = useState<Record<string, string>>({});
