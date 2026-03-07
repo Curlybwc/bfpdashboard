@@ -218,6 +218,7 @@ const TaskDetail = () => {
   const handleReportBlocker = async () => {
     if (!user || !taskId) return;
     setReportingBlocker(true);
+    // Single write — trigger keeps tasks.is_blocked in sync
     const { error: insertErr } = await supabase.from('task_blockers').insert({
       task_id: taskId,
       reason: blockerReason,
@@ -225,13 +226,16 @@ const TaskDetail = () => {
       needs_from_manager: blockerNeedsFromManager.trim() || null,
       blocked_by_user_id: user.id,
     });
+    setReportingBlocker(false);
     if (insertErr) {
-      toast({ title: 'Error', description: insertErr.message, variant: 'destructive' });
-      setReportingBlocker(false);
+      const isDuplicate = insertErr.code === '23505';
+      toast({
+        title: isDuplicate ? 'Already blocked' : 'Failed to report blocker',
+        description: isDuplicate ? 'This task already has an active blocker.' : insertErr.message,
+        variant: 'destructive',
+      });
       return;
     }
-    await supabase.from('tasks').update({ is_blocked: true }).eq('id', taskId);
-    setReportingBlocker(false);
     setBlockerSheetOpen(false);
     setBlockerReason('missing_materials');
     setBlockerNote('');
@@ -243,13 +247,17 @@ const TaskDetail = () => {
   const handleResolveBlocker = async () => {
     if (!user || !activeBlocker) return;
     setResolvingBlocker(true);
-    await supabase.from('task_blockers').update({
+    // Single write — trigger keeps tasks.is_blocked in sync
+    const { error: updateErr } = await supabase.from('task_blockers').update({
       resolved_at: new Date().toISOString(),
       resolved_by_user_id: user.id,
       resolution_note: resolutionNote.trim() || null,
     }).eq('id', activeBlocker.id);
-    await supabase.from('tasks').update({ is_blocked: false }).eq('id', activeBlocker.task_id);
     setResolvingBlocker(false);
+    if (updateErr) {
+      toast({ title: 'Failed to resolve blocker', description: updateErr.message, variant: 'destructive' });
+      return;
+    }
     setResolveDialogOpen(false);
     setResolutionNote('');
     toast({ title: 'Blocker resolved' });
