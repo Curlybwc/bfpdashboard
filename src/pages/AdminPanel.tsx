@@ -95,6 +95,28 @@ const AdminPanel = () => {
     fetchProfiles();
   };
 
+  const handleImpersonate = async (targetUserId: string) => {
+    if (impersonating) return;
+    setImpersonating(targetUserId);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin_impersonate', {
+        body: { target_user_id: targetUserId },
+      });
+      if (error || data?.error) {
+        toast({ title: 'Impersonate failed', description: data?.error || error?.message, variant: 'destructive' });
+        return;
+      }
+      if (data?.url) {
+        window.open(data.url, '_blank');
+        toast({ title: 'Impersonation link opened', description: `Logged in as ${data.email} in a new tab.` });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setImpersonating(null);
+    }
+  };
+
   if (adminLoading) {
     return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
   }
