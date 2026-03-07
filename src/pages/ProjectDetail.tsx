@@ -59,11 +59,13 @@ const ProjectDetail = () => {
   const queryClient = useQueryClient();
 
   // Server state via React Query
-  const { data, isLoading } = useProjectDetail(id);
+  const { data, isLoading } = useProjectDetail(id, user?.id);
   const project = data?.project;
-  const tasks = data?.tasks ?? [];
+  const allTasks = data?.tasks ?? [];
   const photoCountMap = data?.photoCountMap ?? {};
   const projectMembers = data?.members ?? [];
+  const myActiveWorkerTaskIds = new Set(data?.myActiveWorkerTaskIds ?? []);
+  const myCandidateTaskIds = new Set(data?.myCandidateTaskIds ?? []);
 
   // Mutations
   const createTaskMutation = useCreateTask(id);
@@ -108,8 +110,44 @@ const ProjectDetail = () => {
   const userCanEditProject = canEditProject(isAdmin, projectRole);
   const isContractor = !isAdmin && projectRole === 'contractor';
 
+  // For contractors, filter tasks to only show relevant ones
+  const tasks = useMemo(() => {
+    if (!isContractor || !user) return allTasks;
+    return allTasks.filter((t) => {
+      // Assigned to me
+      if (t.assigned_to_user_id === user.id) return true;
+      // I'm an active crew worker
+      if (myActiveWorkerTaskIds.has(t.id)) return true;
+      // I'm a candidate for this crew task
+      if (myCandidateTaskIds.has(t.id)) return true;
+      // Unassigned solo tasks that are Ready (available to pick up)
+      if (!t.assigned_to_user_id && t.assignment_mode === 'solo' && t.stage === 'Ready') return true;
+      // Parent task whose children I should see
+      if (t.parent_task_id) {
+        // Show if parent is visible (handled by parent filter)
+        return false;
+      }
+      return false;
+    });
+  }, [allTasks, isContractor, user, myActiveWorkerTaskIds, myCandidateTaskIds]);
+
+  // For contractors, also include parent tasks if any of their children are visible
+  const visibleTaskIds = useMemo(() => new Set(tasks.map(t => t.id)), [tasks]);
+  const tasksWithParents = useMemo(() => {
+    if (!isContractor) return tasks;
+    const parentIds = new Set<string>();
+    tasks.forEach(t => {
+      if (t.parent_task_id && !visibleTaskIds.has(t.parent_task_id)) {
+        parentIds.add(t.parent_task_id);
+      }
+    });
+    if (parentIds.size === 0) return tasks;
+    const parents = allTasks.filter(t => parentIds.has(t.id));
+    return [...parents, ...tasks];
+  }, [tasks, allTasks, isContractor, visibleTaskIds]);
+
   // Build tree
-  const rootTasks = useMemo(() => tasks.filter((t) => !t.parent_task_id), [tasks]);
+  const rootTasks = useMemo(() => tasksWithParents.filter((t) => !t.parent_task_id), [tasksWithParents]);
   const childrenMap = useMemo(() => {
     const map: Record<string, any[]> = {};
     tasks.forEach((t) => {

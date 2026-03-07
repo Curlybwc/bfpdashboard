@@ -7,7 +7,7 @@ export interface ProjectMember {
   profiles: { full_name: string | null } | null;
 }
 
-export function useProjectDetail(projectId: string | undefined) {
+export function useProjectDetail(projectId: string | undefined, userId?: string) {
   return useQuery({
     queryKey: ['project-detail', projectId],
     queryFn: async () => {
@@ -32,14 +32,45 @@ export function useProjectDetail(projectId: string | undefined) {
       // Batch-fetch photo counts
       const taskIds = (tasks ?? []).map(t => t.id);
       let photoCountMap: Record<string, number> = {};
+      let myActiveWorkerTaskIds: string[] = [];
+      let myCandidateTaskIds: string[] = [];
+
       if (taskIds.length > 0) {
-        const { data: photoRows } = await supabase
+        const photoPromise = supabase
           .from('task_photos' as any)
           .select('task_id')
           .in('task_id', taskIds);
+
+        // Fetch crew membership for current user if userId provided
+        const workerPromise = userId
+          ? supabase
+              .from('task_workers')
+              .select('task_id')
+              .in('task_id', taskIds)
+              .eq('user_id', userId)
+              .eq('active', true)
+          : Promise.resolve({ data: [] });
+
+        const candidatePromise = userId
+          ? supabase
+              .from('task_candidates')
+              .select('task_id')
+              .in('task_id', taskIds)
+              .eq('user_id', userId)
+          : Promise.resolve({ data: [] });
+
+        const [{ data: photoRows }, workerResult, candidateResult] = await Promise.all([
+          photoPromise,
+          workerPromise,
+          candidatePromise,
+        ]);
+
         (photoRows || []).forEach((r: any) => {
           photoCountMap[r.task_id] = (photoCountMap[r.task_id] || 0) + 1;
         });
+
+        myActiveWorkerTaskIds = ((workerResult as any)?.data || []).map((r: any) => r.task_id);
+        myCandidateTaskIds = ((candidateResult as any)?.data || []).map((r: any) => r.task_id);
       }
 
       return {
@@ -47,6 +78,8 @@ export function useProjectDetail(projectId: string | undefined) {
         tasks: tasks ?? [],
         members: (members ?? []) as unknown as ProjectMember[],
         photoCountMap,
+        myActiveWorkerTaskIds,
+        myCandidateTaskIds,
       };
     },
     enabled: !!projectId,
