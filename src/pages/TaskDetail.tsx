@@ -670,6 +670,11 @@ const TaskDetail = () => {
     }).eq('id', taskId);
     setActionLoading(false);
     fetchTask();
+    // Nudge for before photos
+    const hasBeforePhoto = photos.some((p: any) => p.phase === 'before');
+    if (!hasBeforePhoto) {
+      toast({ title: '📷 Add a before photo', description: 'Document starting conditions for this task.' });
+    }
   };
 
   const handleComplete = async () => {
