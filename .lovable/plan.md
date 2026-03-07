@@ -1,97 +1,95 @@
 
 
-## Plan: Crew Tasks (Multi-Person, Multi-Day)
+## Plan: Surface Blocked State in TaskCard, Today, and ProjectDetail
 
-### 1. Database Migration
+### 1. TaskCard Changes (`src/components/TaskCard.tsx`)
 
-Single migration adding columns, tables, indexes, RLS, and a helper function.
-
-**New columns on `tasks`:**
-- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
-- `lead_user_id uuid NULL`
-
-**New table `task_candidates` (eligibility pool):**
-```sql
-CREATE TABLE public.task_candidates (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
+**New prop:**
+```typescript
+blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
 ```
 
-**New table `task_workers` (active crew):**
-```sql
-CREATE TABLE public.task_workers (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  active boolean NOT NULL DEFAULT true,
-  joined_at timestamptz NOT NULL DEFAULT now(),
-  left_at timestamptz NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
-CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
+**Visual changes when `task.is_blocked && blockerInfo`:**
+- Override the left border to `border-l-4 border-red-500` (replacing the priority border when blocked)
+- Below the badge row (after line 252's closing `</div>`), render a compact blocker summary:
+
+```tsx
+{task.is_blocked && blockerInfo && (
+  <div className="mt-1 px-2 py-1 bg-destructive/5 rounded text-xs text-destructive">
+    <span className="font-medium">{BLOCKER_REASONS.find(r => r.value === blockerInfo.reason)?.label || blockerInfo.reason}</span>
+    {blockerInfo.needs_from_manager && (
+      <span className="text-muted-foreground ml-1">— {blockerInfo.needs_from_manager.slice(0, 60)}{blockerInfo.needs_from_manager.length > 60 ? '…' : ''}</span>
+    )}
+  </div>
+)}
 ```
 
-**RLS on `task_candidates`:**
-- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
-- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
+- Import `BLOCKER_REASONS` from `@/lib/supabase-types`
+- Priority border logic: if `task.is_blocked`, force `border-l-4 border-red-500` regardless of priority
+- No resolve action on card. No new dialogs.
 
-**RLS on `task_workers`:**
-- SELECT: same as task_candidates SELECT
-- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
-- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
-- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
+### 2. Today Changes (`src/pages/Today.tsx`)
 
-### 2. Today Tab (`src/pages/Today.tsx`)
+**Batch-fetch blocker info** — after all tasks are loaded and blocked task IDs are known, add one query:
 
-Add two additional queries in `fetchTasks` after existing solo queries:
+```typescript
+const blockedTaskIds = blockedTasks.map(t => t.id);
+let blockerMap: Record<string, { reason: string; needs_from_manager?: string | null }> = {};
+if (blockedTaskIds.length > 0) {
+  const { data: blockerRows } = await supabase
+    .from('task_blockers')
+    .select('task_id, reason, needs_from_manager')
+    .in('task_id', blockedTaskIds)
+    .is('resolved_at', null);
+  (blockerRows || []).forEach(r => {
+    blockerMap[r.task_id] = { reason: r.reason, needs_from_manager: r.needs_from_manager };
+  });
+}
+```
 
-**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
+Store in state: `const [blockerMap, setBlockerMap] = useState<Record<string, { reason: string; needs_from_manager?: string | null }>>({});`
 
-**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
+**Pass to TaskCard:** Add `blockerInfo={blockerMap[t.id] || null}` in the Section renderer's TaskCard.
 
-Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
+**Section header changes:**
+- Blocked section title becomes `Blocked (${blocked.length})` with count
+- Add red accent: the `<h2>` gets `text-destructive` class when title starts with "Blocked"
+- For managers/admins, always render the Blocked section (even when empty), showing "No blocked tasks — all clear."
+- For contractors, keep current behavior (hide when empty)
 
-### 3. TaskCard (`src/components/TaskCard.tsx`)
+### 3. ProjectDetail Changes (`src/pages/ProjectDetail.tsx`)
 
-Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+**Blocked summary banner** — add a lightweight banner above the task list (before `<div className="space-y-2">` at line 366):
 
-When `isCrewTask`:
-- Show a small crew icon + "N active" badge next to status
-- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
-- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
-- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
-- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+```tsx
+const blockedCount = useMemo(() => tasks.filter(t => t.is_blocked).length, [tasks]);
 
-### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+{blockedCount > 0 && (
+  <div className="mb-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive flex items-center gap-2">
+    <AlertTriangle className="h-4 w-4 shrink-0" />
+    <span>{blockedCount} task{blockedCount !== 1 ? 's' : ''} blocked</span>
+  </div>
+)}
+```
 
-**Crew toggle** (visible to admin/manager only, below Assigned To):
-- Switch labeled "Crew Task"
-- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
-- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+- Import `AlertTriangle` from lucide-react
+- No blocker info fetching in ProjectDetail (keeps it lightweight — just a count from existing task data)
+- No `blockerInfo` prop passed to TaskCards in ProjectDetail (they already show the red "Blocked" badge)
 
-**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
-- "Active Crew" list showing names from `task_workers` joined to `profiles`
-- Join/Leave button for current user
-- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+### 4. Files Changed
 
-**Solo mode**: keep existing Assigned To UI unchanged.
+| File | Change |
+|------|--------|
+| `src/components/TaskCard.tsx` | New `blockerInfo` prop, blocker summary line, blocked border override |
+| `src/pages/Today.tsx` | Batch-fetch blockers into map, pass `blockerInfo` to cards, section count + prominence |
+| `src/pages/ProjectDetail.tsx` | `blockedCount` memo + banner above task list |
 
-### 5. Files to Modify
+### 5. What is NOT changing
 
-1. **Migration SQL** — new columns, tables, indexes, RLS
-2. `src/pages/Today.tsx` — crew task queries merged into sections
-3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
-4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
-5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
-
-### 6. Key Edge Cases
-
-- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
-- Crew Available shows even when task is 'In Progress' (multiple people can join)
-- Upsert PK on `task_workers` prevents duplicate joins
-- Done tasks filtered out everywhere by existing stage checks
-- Crew→Solo cleanup deletes both tables to prevent orphan rows
+- No resolve action on TaskCard
+- No new components
+- No schema/migration changes
+- StatusBadge unchanged
+- TaskDetail unchanged
+- permissions.ts unchanged
 
