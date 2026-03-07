@@ -255,6 +255,14 @@ const TaskCard = ({
               Materials
             </button>
           </div>
+          {task.is_blocked && blockerInfo && (
+            <div className="mt-1 px-2 py-1 bg-destructive/5 rounded text-xs text-destructive">
+              <span className="font-medium">{BLOCKER_REASONS.find(r => r.value === blockerInfo.reason)?.label || blockerInfo.reason}</span>
+              {blockerInfo.needs_from_manager && (
+                <span className="text-muted-foreground ml-1">— {blockerInfo.needs_from_manager.slice(0, 60)}{blockerInfo.needs_from_manager.length > 60 ? '…' : ''}</span>
+              )}
+            </div>
+          )}
         </Link>
 
         {/* Solo actions */}
