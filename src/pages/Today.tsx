@@ -389,6 +389,7 @@ const Today = () => {
               isCandidate={crewCandidateTaskIds.has(t.id)}
               activeWorkerCount={crewWorkerCounts[t.id] || 0}
               blockerInfo={blockerMap[t.id] || null}
+              photoCount={photoCountMap[t.id] || 0}
             />
           ))}
         </div>
