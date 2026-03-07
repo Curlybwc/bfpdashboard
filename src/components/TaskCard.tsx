@@ -214,6 +214,7 @@ const TaskCard = ({
           )}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <StatusBadge status={task.stage} />
+            {task.is_blocked && <StatusBadge status="Blocked" />}
             {isCrewTask && (
               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                 <Users className="h-3 w-3" />

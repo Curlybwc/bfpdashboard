@@ -46,6 +46,18 @@ const TaskDetail = () => {
   const [fieldCapture, setFieldCapture] = useState<any>(null);
   const [markingReviewed, setMarkingReviewed] = useState(false);
 
+  // Blocker state
+  const [blockerSheetOpen, setBlockerSheetOpen] = useState(false);
+  const [blockerReason, setBlockerReason] = useState<BlockerReason>('missing_materials');
+  const [blockerNote, setBlockerNote] = useState('');
+  const [blockerNeedsFromManager, setBlockerNeedsFromManager] = useState('');
+  const [reportingBlocker, setReportingBlocker] = useState(false);
+  const [activeBlocker, setActiveBlocker] = useState<any>(null);
+  const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [resolvingBlocker, setResolvingBlocker] = useState(false);
+  const [blockerReporterName, setBlockerReporterName] = useState('');
+
   // Recipe state
   const [suggestedRecipe, setSuggestedRecipe] = useState<{ id: string; name: string } | null>(null);
   const [expandingRecipe, setExpandingRecipe] = useState(false);
