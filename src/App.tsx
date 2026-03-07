@@ -35,11 +35,19 @@ import MobileNav from "./components/MobileNav";
 
 const queryClient = new QueryClient();
 
-/** Redirects contractors away from manager/admin-only routes */
+/** Redirects contractors away from manager/admin-only routes (scopes) */
 const ManagerGuard = ({ children }: { children: ReactNode }) => {
   const { isAdmin, canManageProjects, loading } = useAdmin();
   if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;
   if (!isAdmin && !canManageProjects) return <Navigate to="/today" replace />;
+  return <>{children}</>;
+};
+
+/** Redirects non-admins away from admin-only routes */
+const AdminGuard = ({ children }: { children: ReactNode }) => {
+  const { isAdmin, loading } = useAdmin();
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;
+  if (!isAdmin) return <Navigate to="/today" replace />;
   return <>{children}</>;
 };
 
@@ -83,14 +91,14 @@ const AppRoutes = () => {
         <Route path="/shopping" element={<Shopping />} />
         <Route path="/shifts" element={<Shifts />} />
         <Route path="/availability" element={<Availability />} />
-        <Route path="/admin" element={<AdminPanel />} />
-        <Route path="/admin/recipes" element={<AdminRecipes />} />
-        <Route path="/admin/bundles" element={<AdminMaterialBundles />} />
-        <Route path="/admin/rehab-library" element={<AdminRehabLibrary />} />
-        <Route path="/admin/scope-accuracy" element={<ScopeAccuracy />} />
-        <Route path="/admin/store-sections" element={<AdminStoreSections />} />
-        <Route path="/admin/inventory/tools" element={<ToolInventory />} />
-        <Route path="/admin/inventory/materials" element={<MaterialInventory />} />
+        <Route path="/admin" element={<AdminGuard><AdminPanel /></AdminGuard>} />
+        <Route path="/admin/recipes" element={<AdminGuard><AdminRecipes /></AdminGuard>} />
+        <Route path="/admin/bundles" element={<AdminGuard><AdminMaterialBundles /></AdminGuard>} />
+        <Route path="/admin/rehab-library" element={<AdminGuard><AdminRehabLibrary /></AdminGuard>} />
+        <Route path="/admin/scope-accuracy" element={<AdminGuard><ScopeAccuracy /></AdminGuard>} />
+        <Route path="/admin/store-sections" element={<AdminGuard><AdminStoreSections /></AdminGuard>} />
+        <Route path="/admin/inventory/tools" element={<AdminGuard><ToolInventory /></AdminGuard>} />
+        <Route path="/admin/inventory/materials" element={<AdminGuard><MaterialInventory /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}

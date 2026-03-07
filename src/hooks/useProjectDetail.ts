@@ -49,7 +49,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
               .in('task_id', taskIds)
               .eq('user_id', userId)
               .eq('active', true)
-          : Promise.resolve({ data: [] });
+          : Promise.resolve({ data: [] as { task_id: string }[], error: null });
 
         const candidatePromise = userId
           ? supabase
@@ -57,7 +57,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
               .select('task_id')
               .in('task_id', taskIds)
               .eq('user_id', userId)
-          : Promise.resolve({ data: [] });
+          : Promise.resolve({ data: [] as { task_id: string }[], error: null });
 
         const [{ data: photoRows }, workerResult, candidateResult] = await Promise.all([
           photoPromise,
@@ -69,8 +69,15 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
           photoCountMap[r.task_id] = (photoCountMap[r.task_id] || 0) + 1;
         });
 
-        myActiveWorkerTaskIds = ((workerResult as any)?.data || []).map((r: any) => r.task_id);
-        myCandidateTaskIds = ((candidateResult as any)?.data || []).map((r: any) => r.task_id);
+        // Explicitly check for errors — if crew queries fail, throw so the
+        // UI shows an error state rather than silently hiding contractor tasks
+        const wRes = workerResult as { data: any[] | null; error: any };
+        const cRes = candidateResult as { data: any[] | null; error: any };
+        if (wRes.error) throw new Error(`Failed to load crew membership: ${wRes.error.message}`);
+        if (cRes.error) throw new Error(`Failed to load task candidates: ${cRes.error.message}`);
+
+        myActiveWorkerTaskIds = (wRes.data || []).map((r: any) => r.task_id);
+        myCandidateTaskIds = (cRes.data || []).map((r: any) => r.task_id);
       }
 
       return {

@@ -313,6 +313,8 @@ const ProjectDetail = () => {
 
   if (isLoading || !project) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
+  const isManager = isAdmin || projectRole === 'manager';
+
   return (
     <div className="pb-20">
       <PageHeader
@@ -329,12 +331,17 @@ const ProjectDetail = () => {
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
                  <Package className="h-4 w-4 mr-1" />Materials
                </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
-                <Zap className="h-4 w-4 mr-1" />Field Mode
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
-                <Mic className="h-4 w-4 mr-1" />Walkthrough
-              </Button>
+              {/* Field Mode & Walkthrough are manager/admin workflows */}
+              {isManager && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
+                    <Zap className="h-4 w-4 mr-1" />Field Mode
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
+                    <Mic className="h-4 w-4 mr-1" />Walkthrough
+                  </Button>
+                </>
+              )}
               <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" />Task</Button>
@@ -643,7 +650,8 @@ const ProjectDetail = () => {
              })
            )}
         </div>
-        <ProjectMembers projectId={id!} />
+        {/* ProjectMembers is a manager/admin concern — hide from contractors */}
+        {isManager && <ProjectMembers projectId={id!} />}
       </div>
     </div>
   );
