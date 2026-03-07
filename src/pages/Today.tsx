@@ -10,6 +10,8 @@ import DailyReminders from '@/components/DailyReminders';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Zap, Clock, CalendarDays } from 'lucide-react';
+import { generateAlerts } from '@/lib/alerts';
+import AlertsBanner from '@/components/AlertsBanner';
 import {
   Sheet,
   SheetContent,
@@ -359,6 +361,15 @@ const Today = () => {
   // Shift reminder: only for contractors, after 10am, no shift logged
   const showShiftReminder = isContractor && !hasShiftToday && new Date().getHours() >= 10;
 
+  // ── Derived alerts ──
+  const alerts = useMemo(() => generateAlerts({
+    inProgress, assigned, blocked, needsReview, available,
+    isAdmin, isManager, isContractor,
+    hasShiftToday, photoCountMap, projectMap,
+    userId: user!.id,
+    crewActiveTaskIds,
+  }), [inProgress, assigned, blocked, needsReview, available, isAdmin, isManager, isContractor, hasShiftToday, photoCountMap, projectMap, user, crewActiveTaskIds]);
+
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   /* ── Shared section renderer ── */
@@ -482,6 +493,7 @@ const Today = () => {
         }
       />
       <div className="p-4">
+        <AlertsBanner alerts={alerts} />
         {isContractor ? <ContractorView /> : <ManagerView />}
       </div>
     </div>
