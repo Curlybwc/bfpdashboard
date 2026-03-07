@@ -33,6 +33,7 @@ interface TaskCardProps {
   isActiveWorker?: boolean;
   isCandidate?: boolean;
   activeWorkerCount?: number;
+  blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
 }
 
 const TaskCard = ({
