@@ -615,6 +615,8 @@ const TaskDetail = () => {
   const materialsReady = task?.materials_on_site === 'Yes';
   const meIsCandidate = user ? crewCandidates.includes(user.id) : false;
   const meIsActiveWorker = user ? crewWorkers.some(w => w.user_id === user.id && w.active) : false;
+  const hasTaskRelevance = isAssignedToMe || meIsActiveWorker || isAdmin || projectRole === 'manager';
+  const showBlockerButton = !task?.is_blocked && (task?.stage === 'Ready' || task?.stage === 'In Progress') && canReportBlocker(isAdmin, projectRole) && hasTaskRelevance;
 
   const handleDibs = async (force = false) => {
     if (!user || !taskId) return;
