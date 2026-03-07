@@ -85,6 +85,7 @@ const AdminPanel = () => {
           if (v === 'rehab') navigate('/admin/rehab-library');
           if (v === 'bundles') navigate('/admin/bundles');
           if (v === 'accuracy') navigate('/admin/scope-accuracy');
+          if (v === 'shifts') navigate('/shifts');
         }}>
           <TabsList className="mb-3">
             <TabsTrigger value="users">Users</TabsTrigger>
@@ -95,6 +96,7 @@ const AdminPanel = () => {
             <TabsTrigger value="rehab">Rehab</TabsTrigger>
             <TabsTrigger value="sections">Sections</TabsTrigger>
             <TabsTrigger value="accuracy">Accuracy</TabsTrigger>
+            <TabsTrigger value="shifts">Shifts</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>
           </TabsList>
