@@ -169,6 +169,21 @@ const Today = () => {
     const blockedIds = new Set(blockedTasks.map(t => t.id));
     setBlocked(blockedTasks);
 
+    // Batch-fetch active blocker info for blocked tasks
+    const blockedTaskIdList = blockedTasks.map(t => t.id);
+    let newBlockerMap: Record<string, { reason: string; needs_from_manager?: string | null }> = {};
+    if (blockedTaskIdList.length > 0) {
+      const { data: blockerRows } = await supabase
+        .from('task_blockers')
+        .select('task_id, reason, needs_from_manager')
+        .in('task_id', blockedTaskIdList)
+        .is('resolved_at', null);
+      (blockerRows || []).forEach(r => {
+        newBlockerMap[r.task_id] = { reason: r.reason, needs_from_manager: r.needs_from_manager };
+      });
+    }
+    setBlockerMap(newBlockerMap);
+
     // Remove blocked tasks from In Progress and Assigned to avoid duplication
     setInProgress(mergedIp.filter(t => !blockedIds.has(t.id)));
     setAssigned((assignedRes.data || []).filter(t => !blockedIds.has(t.id)));
