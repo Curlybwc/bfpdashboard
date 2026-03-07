@@ -172,6 +172,15 @@ const ProjectDetail = () => {
     };
   }, [tasks, childrenMap, isContractor, user?.id]);
 
+  const getTaskActual = (t: any): number => {
+    const children = childrenMap[t.id];
+    if (children && children.length > 0) {
+      return children.reduce((sum: number, c: any) => sum + (c.actual_total_cost ?? 0), 0);
+    }
+    return t.actual_total_cost ?? 0;
+  };
+  const projectTotalActual = rootTasks.reduce((sum, t) => sum + getTaskActual(t), 0);
+
   const toggleExpanded = (taskId: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
