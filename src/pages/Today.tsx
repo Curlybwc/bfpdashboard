@@ -7,7 +7,7 @@ import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Zap, Clock, CalendarClock } from 'lucide-react';
+import { Zap, Clock, CalendarDays } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
