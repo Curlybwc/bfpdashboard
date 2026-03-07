@@ -22,6 +22,7 @@ const Today = () => {
   const [parentTitles, setParentTitles] = useState<Record<string, string>>({});
   const [assigneeMap, setAssigneeMap] = useState<Record<string, string>>({});
   const [isManager, setIsManager] = useState(false);
+  const [blockerMap, setBlockerMap] = useState<Record<string, { reason: string; needs_from_manager?: string | null }>>({});
 
   // Crew task state
   const [crewActiveTaskIds, setCrewActiveTaskIds] = useState<Set<string>>(new Set());
