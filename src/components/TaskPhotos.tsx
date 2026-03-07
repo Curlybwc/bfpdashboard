@@ -1,3 +1,18 @@
+/**
+ * TaskPhotos — Photo-first task documentation (before / progress / after).
+ *
+ * STORAGE MODEL (v1):
+ *   - Bucket: `task-photos` (PUBLIC). Anyone with the file URL can view/download.
+ *     This is an intentional simplicity & shareability tradeoff, NOT a privacy-hardened model.
+ *   - Upload path: `${taskId}/${phase}/${crypto.randomUUID()}.jpg`
+ *   - Storage INSERT policy: any authenticated user may upload to the bucket.
+ *     This is deliberately broader than the `task_photos` TABLE INSERT policy
+ *     (which requires project membership). The mismatch means orphan files
+ *     can exist in storage without a corresponding metadata row — these are
+ *     harmless blobs that consume minimal storage.
+ *   - Images are compressed client-side (max 1400px edge, JPEG 0.82 quality)
+ *     before upload to keep payloads in the 200KB–800KB range.
+ */
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
