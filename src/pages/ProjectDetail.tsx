@@ -62,6 +62,7 @@ const ProjectDetail = () => {
   const { data, isLoading } = useProjectDetail(id);
   const project = data?.project;
   const tasks = data?.tasks ?? [];
+  const photoCountMap = data?.photoCountMap ?? {};
   const projectMembers = data?.members ?? [];
 
   // Mutations
@@ -552,31 +553,33 @@ const ProjectDetail = () => {
                const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
                return (
                  <div key={t.id}>
-                    <TaskCard
-                      task={t}
-                      projectName={project.name}
-                      userId={user?.id ?? ''}
-                      isAdmin={isAdmin}
-                      onUpdate={invalidateProject}
-                      showProjectName={false}
-                      childCount={children.length}
-                      expanded={isExpanded}
-                      onToggle={() => toggleExpanded(t.id)}
-                      allChildrenDone={allChildrenDone}
-                      assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined}
-                    />
+                     <TaskCard
+                       task={t}
+                       projectName={project.name}
+                       userId={user?.id ?? ''}
+                       isAdmin={isAdmin}
+                       onUpdate={invalidateProject}
+                       showProjectName={false}
+                       childCount={children.length}
+                       expanded={isExpanded}
+                       onToggle={() => toggleExpanded(t.id)}
+                       allChildrenDone={allChildrenDone}
+                       assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined}
+                       photoCount={photoCountMap[t.id] || 0}
+                     />
                    {isExpanded && children.map((child: any) => (
-                      <TaskCard
-                        key={child.id}
-                        task={child}
-                        projectName={project.name}
-                        userId={user?.id ?? ''}
-                        isAdmin={isAdmin}
-                        onUpdate={invalidateProject}
-                        showProjectName={false}
-                        isChild
-                        assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined}
-                      />
+                       <TaskCard
+                         key={child.id}
+                         task={child}
+                         projectName={project.name}
+                         userId={user?.id ?? ''}
+                         isAdmin={isAdmin}
+                         onUpdate={invalidateProject}
+                         showProjectName={false}
+                         isChild
+                         assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined}
+                         photoCount={photoCountMap[child.id] || 0}
+                       />
                    ))}
                  </div>
                );

@@ -34,6 +34,7 @@ interface TaskCardProps {
   isCandidate?: boolean;
   activeWorkerCount?: number;
   blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
+  photoCount?: number;
 }
 
 const TaskCard = ({
@@ -42,7 +43,7 @@ const TaskCard = ({
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
-  blockerInfo,
+  blockerInfo, photoCount = 0,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
@@ -239,6 +240,11 @@ const TaskCard = ({
             {materialCount > 0 && (
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                 📦 {materialCount}
+              </span>
+            )}
+            {photoCount > 0 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                📷 {photoCount}
               </span>
             )}
             {showNeedsMaterials && (

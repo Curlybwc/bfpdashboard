@@ -75,6 +75,7 @@ const Today = () => {
   const [crewActiveTaskIds, setCrewActiveTaskIds] = useState<Set<string>>(new Set());
   const [crewCandidateTaskIds, setCrewCandidateTaskIds] = useState<Set<string>>(new Set());
   const [crewWorkerCounts, setCrewWorkerCounts] = useState<Record<string, number>>({});
+  const [photoCountMap, setPhotoCountMap] = useState<Record<string, number>>({});
 
   const fetchTasks = useCallback(async () => {
     if (!user) return;
@@ -314,6 +315,20 @@ const Today = () => {
       setAssigneeMap({});
     }
 
+    // Batch-fetch photo counts
+    const allTaskIds = [...new Set(allTasks.map(t => t.id))];
+    if (allTaskIds.length > 0) {
+      const { data: photoRows } = await supabase
+        .from('task_photos' as any)
+        .select('task_id')
+        .in('task_id', allTaskIds);
+      const pMap: Record<string, number> = {};
+      (photoRows || []).forEach((r: any) => { pMap[r.task_id] = (pMap[r.task_id] || 0) + 1; });
+      setPhotoCountMap(pMap);
+    } else {
+      setPhotoCountMap({});
+    }
+
     setLoading(false);
   }, [user]);
 
@@ -374,6 +389,7 @@ const Today = () => {
               isCandidate={crewCandidateTaskIds.has(t.id)}
               activeWorkerCount={crewWorkerCounts[t.id] || 0}
               blockerInfo={blockerMap[t.id] || null}
+              photoCount={photoCountMap[t.id] || 0}
             />
           ))}
         </div>
@@ -399,6 +415,7 @@ const Today = () => {
           isCandidate={nextUpTask ? crewCandidateTaskIds.has(nextUpTask.id) : false}
           activeWorkerCount={nextUpTask ? (crewWorkerCounts[nextUpTask.id] || 0) : 0}
           blockerInfo={nextUpTask ? (blockerMap[nextUpTask.id] || null) : null}
+          photoCount={nextUpTask ? (photoCountMap[nextUpTask.id] || 0) : 0}
         />
       </div>
 

@@ -1,112 +1,97 @@
 
 
-## Plan: Photo-First Task Update Workflow + Download/Share
+## Plan: Crew Tasks (Multi-Person, Multi-Day)
 
-### Migration SQL
+### 1. Database Migration
 
-Create `task_photos` table and `task-photos` public storage bucket with RLS:
+Single migration adding columns, tables, indexes, RLS, and a helper function.
 
+**New columns on `tasks`:**
+- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
+- `lead_user_id uuid NULL`
+
+**New table `task_candidates` (eligibility pool):**
 ```sql
--- Public storage bucket
-INSERT INTO storage.buckets (id, name, public) VALUES ('task-photos', 'task-photos', true);
-
--- Storage policies
-CREATE POLICY "Authenticated users can upload task photos"
-ON storage.objects FOR INSERT TO authenticated
-WITH CHECK (bucket_id = 'task-photos');
-
-CREATE POLICY "Anyone can view task photos"
-ON storage.objects FOR SELECT TO public
-USING (bucket_id = 'task-photos');
-
-CREATE POLICY "Admins can delete task photos"
-ON storage.objects FOR DELETE TO authenticated
-USING (bucket_id = 'task-photos' AND is_admin(auth.uid()));
-
--- task_photos table
-CREATE TABLE public.task_photos (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+CREATE TABLE public.task_candidates (
   task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  phase text NOT NULL CHECK (phase IN ('before', 'progress', 'after')),
-  storage_path text NOT NULL,
-  caption text,
-  uploaded_by uuid NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  user_id uuid NOT NULL,
+  PRIMARY KEY (task_id, user_id)
 );
-
-ALTER TABLE public.task_photos ENABLE ROW LEVEL SECURITY;
-
--- RLS: view if admin or project member
-CREATE POLICY "View task photos"
-ON public.task_photos FOR SELECT TO authenticated
-USING (
-  is_admin(auth.uid()) OR EXISTS (
-    SELECT 1 FROM tasks t WHERE t.id = task_photos.task_id AND is_project_member(auth.uid(), t.project_id)
-  )
-);
-
--- RLS: insert if admin or contractor/manager on project
-CREATE POLICY "Insert task photos"
-ON public.task_photos FOR INSERT TO authenticated
-WITH CHECK (
-  uploaded_by = auth.uid() AND (
-    is_admin(auth.uid()) OR EXISTS (
-      SELECT 1 FROM tasks t WHERE t.id = task_photos.task_id
-      AND get_project_role(auth.uid(), t.project_id) IN ('manager', 'contractor')
-    )
-  )
-);
-
--- RLS: delete admin only
-CREATE POLICY "Delete task photos"
-ON public.task_photos FOR DELETE TO authenticated
-USING (is_admin(auth.uid()));
+CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
 ```
 
-### Files Changed
+**New table `task_workers` (active crew):**
+```sql
+CREATE TABLE public.task_workers (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
+CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
+```
 
-| File | Change |
-|------|--------|
-| `src/components/TaskPhotos.tsx` | **New** — grouped photo sections with client-side compression, upload, enlarged viewer with Download + Share (Web Share API with clipboard fallback) |
-| `src/pages/TaskDetail.tsx` | Add photo state, fetch, upload handler with error handling + cleanup, place `<TaskPhotos/>` after blocker card, toast nudges on Start/Complete |
-| `src/components/TaskCard.tsx` | Add `photoCount?: number` prop, show 📷 icon when > 0 |
-| `src/components/NextUpCard.tsx` | Pass through `photoCount` prop |
-| `src/hooks/useProjectDetail.ts` | Batch-fetch photo counts after tasks load, return `photoCountMap` |
-| `src/pages/ProjectDetail.tsx` | Pass `photoCount` from batch map into TaskCard instances |
-| `src/pages/Today.tsx` | Batch-fetch photo counts for all displayed tasks, pass into TaskCard and NextUpCard |
+**RLS on `task_candidates`:**
+- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
+- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
 
-### Key Implementation Details
+**RLS on `task_workers`:**
+- SELECT: same as task_candidates SELECT
+- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
+- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
+- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
 
-**Client-side compression** (in TaskPhotos.tsx):
-- Canvas-based resize: max 1400px longest edge, JPEG quality 0.82
-- Typical output 200KB–800KB
-- Uses `createImageBitmap` with `Image` fallback
+### 2. Today Tab (`src/pages/Today.tsx`)
 
-**Upload handler** (in TaskDetail.tsx):
-- Path: `${taskId}/${phase}/${crypto.randomUUID()}.jpg`
-- If storage upload fails → toast error, stop
-- If metadata insert fails → attempt `storage.remove([path])`, toast error
-- On success → re-fetch photos
+Add two additional queries in `fetchTasks` after existing solo queries:
 
-**Photo viewer dialog** (in TaskPhotos.tsx):
-- Tap thumbnail → Dialog with large image, caption, timestamp
-- **Download** button: `<a href={publicUrl} download>` 
-- **Share** button: `navigator.share({ url })` on mobile, clipboard fallback on desktop
+**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
 
-**Batch photo counts**:
-- `useProjectDetail`: after tasks load, query `task_photos.select('task_id').in('task_id', taskIds)`, build count map
-- `Today.tsx`: same pattern after all task lists assembled
-- Pass `photoCount` prop down — no per-card queries
+**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
 
-**Toast nudges**:
-- `handleStart`: if no "before" photos → toast "Add a before photo to document starting conditions"
-- `handleComplete`: if no "after" photos → toast "Add an after photo to document completed work"
-- Non-blocking, informational only
+Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
 
-### Implementation Notes
-- **Public bucket (v1)**: Task photos are stored in a public storage bucket. Anyone with the file URL can view the image. This is an intentional simplicity tradeoff, not a hardened privacy model. The `task_photos` metadata table still has project-membership RLS, so the app UI only surfaces photos to authorized users.
-- **No user-facing delete** in v1 — admin can remove via backend
-- **Orphan cleanup** on metadata insert failure is best-effort; if cleanup fails, orphan file remains harmlessly
-- **No image editing/cropping** — native camera/file picker only
-- **Compression uses canvas API** — works in all modern mobile browsers
+### 3. TaskCard (`src/components/TaskCard.tsx`)
+
+Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+
+When `isCrewTask`:
+- Show a small crew icon + "N active" badge next to status
+- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
+- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
+- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
+- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+
+### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+
+**Crew toggle** (visible to admin/manager only, below Assigned To):
+- Switch labeled "Crew Task"
+- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
+- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+
+**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
+- "Active Crew" list showing names from `task_workers` joined to `profiles`
+- Join/Leave button for current user
+- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+
+**Solo mode**: keep existing Assigned To UI unchanged.
+
+### 5. Files to Modify
+
+1. **Migration SQL** — new columns, tables, indexes, RLS
+2. `src/pages/Today.tsx` — crew task queries merged into sections
+3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
+4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
+5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
+
+### 6. Key Edge Cases
+
+- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
+- Crew Available shows even when task is 'In Progress' (multiple people can join)
+- Upsert PK on `task_workers` prevents duplicate joins
+- Done tasks filtered out everywhere by existing stage checks
+- Crew→Solo cleanup deletes both tables to prevent orphan rows
 

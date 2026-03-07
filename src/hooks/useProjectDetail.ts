@@ -28,10 +28,25 @@ export function useProjectDetail(projectId: string | undefined) {
       if (tErr) throw tErr;
       if (mErr) throw mErr;
       if (!project) throw new Error('Project not found');
+
+      // Batch-fetch photo counts
+      const taskIds = (tasks ?? []).map(t => t.id);
+      let photoCountMap: Record<string, number> = {};
+      if (taskIds.length > 0) {
+        const { data: photoRows } = await supabase
+          .from('task_photos' as any)
+          .select('task_id')
+          .in('task_id', taskIds);
+        (photoRows || []).forEach((r: any) => {
+          photoCountMap[r.task_id] = (photoCountMap[r.task_id] || 0) + 1;
+        });
+      }
+
       return {
         project,
         tasks: tasks ?? [],
         members: (members ?? []) as unknown as ProjectMember[],
+        photoCountMap,
       };
     },
     enabled: !!projectId,

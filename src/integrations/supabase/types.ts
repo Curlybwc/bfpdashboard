@@ -1049,6 +1049,44 @@ export type Database = {
           },
         ]
       }
+      task_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          phase: string
+          storage_path: string
+          task_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          phase: string
+          storage_path: string
+          task_id: string
+          uploaded_by: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          phase?: string
+          storage_path?: string
+          task_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_photos_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_recipe_step_materials: {
         Row: {
           created_at: string

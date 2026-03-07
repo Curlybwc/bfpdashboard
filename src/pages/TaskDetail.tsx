@@ -23,6 +23,7 @@ import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, type TaskStage, type Tas
 import { canReportBlocker, canResolveBlocker } from '@/lib/permissions';
 import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
+import TaskPhotos from '@/components/TaskPhotos';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
 import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
@@ -91,6 +92,8 @@ const TaskDetail = () => {
   const [candidateSearch, setCandidateSearch] = useState('');
   const [addingCandidates, setAddingCandidates] = useState(false);
 
+  // Photo state
+  const [photos, setPhotos] = useState<any[]>([]);
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
@@ -102,7 +105,7 @@ const TaskDetail = () => {
   const [actualCost, setActualCost] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
 
-  useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
+  useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); fetchPhotos(); }, [taskId]);
 
   // Fetch active blocker when task loads
   useEffect(() => {
@@ -335,6 +338,16 @@ const TaskDetail = () => {
       .order('sort_order', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
     setChildren(data || []);
+  };
+
+  const fetchPhotos = async () => {
+    if (!taskId) return;
+    const { data } = await supabase
+      .from('task_photos' as any)
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+    setPhotos(data || []);
   };
 
   const handleExpandRecipe = async (recipeId: string) => {
@@ -657,6 +670,11 @@ const TaskDetail = () => {
     }).eq('id', taskId);
     setActionLoading(false);
     fetchTask();
+    // Nudge for before photos
+    const hasBeforePhoto = photos.some((p: any) => p.phase === 'before');
+    if (!hasBeforePhoto) {
+      toast({ title: '📷 Add a before photo', description: 'Document starting conditions for this task.' });
+    }
   };
 
   const handleComplete = async () => {
@@ -684,6 +702,11 @@ const TaskDetail = () => {
 
     setActionLoading(false);
     fetchTask();
+    // Nudge for after photos
+    const hasAfterPhoto = photos.some((p: any) => p.phase === 'after');
+    if (!hasAfterPhoto) {
+      toast({ title: '📷 Add an after photo', description: 'Document the completed work for this task.' });
+    }
   };
 
   const canComplete = hasChildren ? allChildrenDone : true;
@@ -775,6 +798,15 @@ const TaskDetail = () => {
             )}
           </Card>
         )}
+
+        {/* Task Photos */}
+        <TaskPhotos
+          taskId={taskId!}
+          photos={photos}
+          userId={user!.id}
+          onPhotosChange={fetchPhotos}
+          canUpload={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
+        />
 
         {/* Recipe: read-only badge if already expanded */}
         {task.expanded_recipe_id && suggestedRecipe && (
