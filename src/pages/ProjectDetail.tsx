@@ -187,9 +187,11 @@ const ProjectDetail = () => {
       }
     }
 
+    const sortedWaitingMaterials = [...waitingMaterials].sort(sortByPriority);
+
     return {
       blocked, inProgress, ready, readyUnassigned, waitingMaterials,
-      sortedBlocked, sortedReady, sortedUnassigned,
+      sortedBlocked, sortedReady, sortedUnassigned, sortedWaitingMaterials,
       recommendation, recommendationType,
       hasAnyWork: leafTasks.length > 0,
       // Contractor-specific counts
