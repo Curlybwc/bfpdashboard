@@ -147,7 +147,7 @@ const ProjectDetail = () => {
   }, [tasks, allTasks, isContractor, visibleTaskIds]);
 
   // Build tree
-  const rootTasks = useMemo(() => tasks.filter((t) => !t.parent_task_id), [tasks]);
+  const rootTasks = useMemo(() => tasksWithParents.filter((t) => !t.parent_task_id), [tasksWithParents]);
   const childrenMap = useMemo(() => {
     const map: Record<string, any[]> = {};
     tasks.forEach((t) => {
