@@ -799,6 +799,15 @@ const TaskDetail = () => {
           </Card>
         )}
 
+        {/* Task Photos */}
+        <TaskPhotos
+          taskId={taskId!}
+          photos={photos}
+          userId={user!.id}
+          onPhotosChange={fetchPhotos}
+          canUpload={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
+        />
+
         {/* Recipe: read-only badge if already expanded */}
         {task.expanded_recipe_id && suggestedRecipe && (
           <Card className="p-3 flex items-center gap-2 border-muted">
