@@ -15,8 +15,9 @@ describe('normalizeForChecklistMatch', () => {
     expect(normalizeForChecklistMatch('  HELLO World  ')).toBe('hello world');
   });
 
-  it('strips punctuation', () => {
-    expect(normalizeForChecklistMatch('furnace/ac')).toBe('hvac');
+  it('strips punctuation and applies synonyms per-token', () => {
+    // "furnace/ac" → punctuation stripped → "furnace ac" → synonym replaces "furnace" → "hvac ac"
+    expect(normalizeForChecklistMatch('furnace/ac')).toBe('hvac ac');
   });
 
   it('collapses whitespace', () => {
