@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify caller is authenticated
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -25,11 +24,10 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify caller with anon client
+    // Verify caller identity
     const anonClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } =
       await anonClient.auth.getClaims(token);
@@ -42,7 +40,7 @@ Deno.serve(async (req) => {
 
     const callerId = claimsData.claims.sub as string;
 
-    // Check caller is admin using service role
+    // Verify caller is admin
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const { data: callerProfile } = await adminClient
       .from("profiles")
@@ -57,7 +55,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get target user id
     const { target_user_id } = await req.json();
     if (!target_user_id) {
       return new Response(
@@ -69,7 +66,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get target user's email
+    // Get target user email
     const {
       data: { user: targetUser },
       error: userError,
@@ -85,18 +82,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate a magic link for the target user
-    const {
-      data: linkData,
-      error: linkError,
-    } = await adminClient.auth.admin.generateLink({
-      type: "magiclink",
-      email: targetUser.email,
-    });
+    // Generate magic link
+    const { data: linkData, error: linkError } =
+      await adminClient.auth.admin.generateLink({
+        type: "magiclink",
+        email: targetUser.email,
+      });
 
     if (linkError || !linkData) {
       return new Response(
-        JSON.stringify({ error: linkError?.message || "Failed to generate link" }),
+        JSON.stringify({
+          error: linkError?.message || "Failed to generate link",
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -104,14 +101,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build the token hash URL that auto-logs in
-    // The hashed_token from generateLink needs to be used with the verify endpoint
-    const redirectUrl = `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink&redirect_to=${encodeURIComponent(supabaseUrl.replace('.supabase.co', '.lovableproject.com').replace('https://fuwjacbhgkgibdvjwryr.supabase.co', '') + '/today')}`;
+    // Build verification URL
+    const verifyUrl = `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink`;
 
     return new Response(
       JSON.stringify({
-        // Return the verification URL that will log the admin in as the target user
-        url: `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink`,
+        url: verifyUrl,
         email: targetUser.email,
       }),
       {
