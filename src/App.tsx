@@ -20,6 +20,7 @@ import AdminPanel from "./pages/AdminPanel";
 import AdminStoreSections from "./pages/AdminStoreSections";
 import AdminRecipes from "./pages/AdminRecipes";
 import AdminMaterialBundles from "./pages/AdminMaterialBundles";
+import AdminAssignmentRules from "./pages/AdminAssignmentRules";
 import AdminRehabLibrary from "./pages/AdminRehabLibrary";
 import ScopeAccuracy from "./pages/ScopeAccuracy";
 import ToolInventory from "./pages/ToolInventory";
@@ -94,6 +95,7 @@ const AppRoutes = () => {
         <Route path="/admin" element={<AdminGuard><AdminPanel /></AdminGuard>} />
         <Route path="/admin/recipes" element={<AdminGuard><AdminRecipes /></AdminGuard>} />
         <Route path="/admin/bundles" element={<AdminGuard><AdminMaterialBundles /></AdminGuard>} />
+        <Route path="/admin/assignment-rules" element={<AdminGuard><AdminAssignmentRules /></AdminGuard>} />
         <Route path="/admin/rehab-library" element={<AdminGuard><AdminRehabLibrary /></AdminGuard>} />
         <Route path="/admin/scope-accuracy" element={<AdminGuard><ScopeAccuracy /></AdminGuard>} />
         <Route path="/admin/store-sections" element={<AdminGuard><AdminStoreSections /></AdminGuard>} />

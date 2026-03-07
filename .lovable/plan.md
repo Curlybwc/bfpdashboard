@@ -1,217 +1,97 @@
 
 
-## Plan: Default Assignment Library (Revised)
+## Plan: Crew Tasks (Multi-Person, Multi-Day)
 
 ### 1. Database Migration
 
-**New table: `assignment_rules`**
+Single migration adding columns, tables, indexes, RLS, and a helper function.
+
+**New columns on `tasks`:**
+- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
+- `lead_user_id uuid NULL`
+
+**New table `task_candidates` (eligibility pool):**
 ```sql
-CREATE TABLE public.assignment_rules (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  keywords text[] NOT NULL DEFAULT '{}',
-  match_mode text NOT NULL DEFAULT 'contains',  -- 'exact' | 'contains'
-  priority integer NOT NULL DEFAULT 100,
-  active boolean NOT NULL DEFAULT true,
-  outcome_type text NOT NULL,                    -- 'assign_user' | 'outside_vendor' | 'crew'
-  outcome_user_id uuid,                          -- for 'assign_user'
-  created_by uuid NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+CREATE TABLE public.task_candidates (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  PRIMARY KEY (task_id, user_id)
 );
-ALTER TABLE public.assignment_rules ENABLE ROW LEVEL SECURITY;
--- RLS: same pattern as task_material_bundles
--- SELECT: authenticated
--- INSERT/UPDATE: admin or can_manage_projects
--- DELETE: admin only
+CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
 ```
 
-**New column on `tasks`:**
+**New table `task_workers` (active crew):**
 ```sql
-ALTER TABLE public.tasks ADD COLUMN is_outside_vendor boolean NOT NULL DEFAULT false;
+CREATE TABLE public.task_workers (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
+CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
 ```
 
-No `outcome_crew_candidates` in v1 — crew outcome just sets `assignment_mode = 'crew'`.
+**RLS on `task_candidates`:**
+- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
+- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
 
----
+**RLS on `task_workers`:**
+- SELECT: same as task_candidates SELECT
+- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
+- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
+- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
 
-### 2. Matching Logic: `src/lib/assignmentRuleMatch.ts`
+### 2. Today Tab (`src/pages/Today.tsx`)
 
-Conservative, deterministic matching. No Jaccard/fuzzy scoring.
+Add two additional queries in `fetchTasks` after existing solo queries:
 
-```typescript
-function normalizeForRuleMatch(s: string): string {
-  return s.toLowerCase().trim().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
-}
+**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
 
-// Rules sorted by priority ASC (first-match-wins)
-for each rule (sorted by priority):
-  for each keyword in rule.keywords:
-    if match_mode === 'exact':
-      match if normalizeForRuleMatch(task) === normalizeForRuleMatch(keyword)
-    if match_mode === 'contains':
-      match if normalizeForRuleMatch(task).includes(normalizeForRuleMatch(keyword))
-  return first matching rule, or null
-```
+**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
 
-This is strict normalized string matching only. No synonym expansion, no Jaccard, no fuzzy scoring.
+Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
 
----
+### 3. TaskCard (`src/components/TaskCard.tsx`)
 
-### 3. Shared Apply Mechanism: Database Function
+Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
 
-Create a **SQL function** `apply_assignment_rules(p_task_id uuid)` that runs server-side. This is called from all three creation paths so tasks never briefly exist in the wrong state.
+When `isCrewTask`:
+- Show a small crew icon + "N active" badge next to status
+- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
+- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
+- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
+- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
 
-```sql
-CREATE OR REPLACE FUNCTION public.apply_assignment_rules(p_task_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-DECLARE
-  v_task RECORD;
-  v_rule RECORD;
-  v_task_norm text;
-  v_kw text;
-  v_kw_norm text;
-  v_matched boolean;
-  v_is_member boolean;
-BEGIN
-  SELECT id, task, project_id, assigned_to_user_id, assignment_mode, is_outside_vendor
-  INTO v_task FROM tasks WHERE id = p_task_id;
-  
-  IF NOT FOUND THEN RETURN; END IF;
-  -- Skip if already assigned manually
-  IF v_task.assigned_to_user_id IS NOT NULL THEN RETURN; END IF;
-  
-  v_task_norm := lower(trim(regexp_replace(regexp_replace(v_task.task, '[^\w\s]', ' ', 'g'), '\s+', ' ', 'g')));
-  
-  FOR v_rule IN
-    SELECT * FROM assignment_rules WHERE active = true ORDER BY priority ASC
-  LOOP
-    v_matched := false;
-    FOREACH v_kw IN ARRAY v_rule.keywords LOOP
-      v_kw_norm := lower(trim(regexp_replace(regexp_replace(v_kw, '[^\w\s]', ' ', 'g'), '\s+', ' ', 'g')));
-      IF v_kw_norm = '' THEN CONTINUE; END IF;
-      
-      IF v_rule.match_mode = 'exact' AND v_task_norm = v_kw_norm THEN
-        v_matched := true; EXIT;
-      ELSIF v_rule.match_mode = 'contains' AND v_task_norm LIKE '%' || v_kw_norm || '%' THEN
-        v_matched := true; EXIT;
-      END IF;
-    END LOOP;
-    
-    IF NOT v_matched THEN CONTINUE; END IF;
-    
-    -- Apply first matching rule
-    IF v_rule.outcome_type = 'outside_vendor' THEN
-      UPDATE tasks SET is_outside_vendor = true WHERE id = p_task_id;
-    ELSIF v_rule.outcome_type = 'crew' THEN
-      UPDATE tasks SET assignment_mode = 'crew' WHERE id = p_task_id;
-    ELSIF v_rule.outcome_type = 'assign_user' AND v_rule.outcome_user_id IS NOT NULL THEN
-      -- Only assign if user is a project member
-      SELECT EXISTS(
-        SELECT 1 FROM project_members
-        WHERE project_id = v_task.project_id AND user_id = v_rule.outcome_user_id
-      ) INTO v_is_member;
-      IF v_is_member THEN
-        UPDATE tasks SET assigned_to_user_id = v_rule.outcome_user_id WHERE id = p_task_id;
-      END IF;
-      -- If not a member, silently skip (task stays unassigned)
-    END IF;
-    
-    RETURN; -- first-match-wins, done
-  END LOOP;
-END;
-$$;
-```
+### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
 
----
+**Crew toggle** (visible to admin/manager only, below Assigned To):
+- Switch labeled "Crew Task"
+- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
+- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
 
-### 4. Integration Points
+**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
+- "Active Crew" list showing names from `task_workers` joined to `profiles`
+- Join/Leave button for current user
+- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
 
-**A. Manual task creation (`useCreateTask` in `src/hooks/useProjectMutations.ts`)**
-After inserting the task and applying bundles, call:
-```typescript
-await supabase.rpc('apply_assignment_rules', { p_task_id: data.id });
-```
-Only when `assigned_to_user_id` was not set by the user (the SQL function also checks this, but skip the RPC call entirely for efficiency).
+**Solo mode**: keep existing Assigned To UI unchanged.
 
-**B. Scope conversion (`convert_scope_to_project` RPC)**
-Add a loop at the end of the existing `convert_scope_to_project` function body that calls `apply_assignment_rules` for each created task. This requires a migration to `CREATE OR REPLACE` the function with the added loop. Tasks are created in the same transaction, so rules apply atomically.
+### 5. Files to Modify
 
-**C. Field mode submit (`supabase/functions/field_mode_submit/index.ts`)**
-After inserting each task (and after bundle application), call `apply_assignment_rules` via the admin client:
-```typescript
-await adminClient.rpc('apply_assignment_rules', { p_task_id: taskRow.id });
-```
+1. **Migration SQL** — new columns, tables, indexes, RLS
+2. `src/pages/Today.tsx` — crew task queries merged into sections
+3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
+4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
+5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
 
----
+### 6. Key Edge Cases
 
-### 5. ProjectDetail Filtering Update
-
-In `src/pages/ProjectDetail.tsx`, update the contractor "available for dibs" filter to exclude outside vendor tasks:
-```typescript
-// Current
-!t.assigned_to_user_id && t.assignment_mode === 'solo' && t.stage === 'Ready'
-// Updated
-!t.assigned_to_user_id && t.assignment_mode === 'solo' && t.stage === 'Ready' && !t.is_outside_vendor
-```
-
-Show an "Outside Vendor" badge in TaskCard when `is_outside_vendor === true`.
-
----
-
-### 6. Admin UI: `src/pages/AdminAssignmentRules.tsx`
-
-New page following the exact pattern of `AdminMaterialBundles.tsx`:
-- List view: rule name, keyword badges, priority, outcome badge ("→ John Smith" / "→ Outside Vendor" / "→ Crew"), active toggle
-- Create dialog: name, keywords (comma-separated), match mode (exact/contains), priority, outcome type, user picker (when assign_user)
-- Detail/edit view: same fields, save/delete
-- Route: `/admin/assignment-rules` with `AdminGuard`
-
----
-
-### 7. AdminPanel Menu Update
-
-Add to the Libraries group in `src/pages/AdminPanel.tsx`:
-```typescript
-{ label: 'Assignment Rules', action: () => handleNav('/admin/assignment-rules') },
-```
-
----
-
-### 8. Type Update
-
-Add to `src/lib/supabase-types.ts`:
-```typescript
-export type AssignmentOutcome = 'assign_user' | 'outside_vendor' | 'crew';
-```
-
----
-
-### 9. Files Changed
-
-| File | Change |
-|------|--------|
-| Migration SQL | `assignment_rules` table, `is_outside_vendor` column, `apply_assignment_rules` function, updated `convert_scope_to_project` |
-| **New** `src/pages/AdminAssignmentRules.tsx` | Admin library page |
-| `src/App.tsx` | Add `/admin/assignment-rules` route with AdminGuard |
-| `src/pages/AdminPanel.tsx` | Add "Assignment Rules" to Libraries menu |
-| `src/hooks/useProjectMutations.ts` | Call `apply_assignment_rules` RPC after task creation |
-| `src/pages/ProjectDetail.tsx` | Exclude `is_outside_vendor` from dibs filter, show badge |
-| `src/components/TaskCard.tsx` | Show "Outside Vendor" badge |
-| `src/lib/supabase-types.ts` | Add `AssignmentOutcome` type |
-| `supabase/functions/field_mode_submit/index.ts` | Call `apply_assignment_rules` RPC after task insert |
-
----
-
-### 10. Known Limitations
-
-- **No crew candidates in v1**: crew outcome only sets `assignment_mode = 'crew'`. Candidates must be added manually.
-- **Rules are global**: no per-project rule overrides. A rule targeting a specific user silently skips if that user is not a project member.
-- **No retroactive application**: rules only apply to newly created tasks.
-- **Match mode is simple**: `contains` checks if keyword appears as substring in normalized task text. No word-boundary enforcement — "paint" matches "painting" and "repaint". This is intentional for v1 conservatism.
-- **`convert_scope_to_project` becomes slightly larger**: the function gains a loop calling `apply_assignment_rules` per task. This is the cleanest way to keep it transactional.
+- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
+- Crew Available shows even when task is 'In Progress' (multiple people can join)
+- Upsert PK on `task_workers` prevents duplicate joins
+- Done tasks filtered out everywhere by existing stage checks
+- Crew→Solo cleanup deletes both tables to prevent orphan rows
 

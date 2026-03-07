@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignment_rules: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string
+          id: string
+          keywords: string[]
+          match_mode: string
+          name: string
+          outcome_type: string
+          outcome_user_id: string | null
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by: string
+          id?: string
+          keywords?: string[]
+          match_mode?: string
+          name: string
+          outcome_type: string
+          outcome_user_id?: string | null
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string
+          id?: string
+          keywords?: string[]
+          match_mode?: string
+          name?: string
+          outcome_type?: string
+          outcome_user_id?: string | null
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       checklist_items: {
         Row: {
           active: boolean
@@ -1277,6 +1319,7 @@ export type Database = {
           field_capture_id: string | null
           id: string
           is_blocked: boolean
+          is_outside_vendor: boolean
           lead_user_id: string | null
           materials_on_site: Database["public"]["Enums"]["materials_status"]
           needs_manager_review: boolean
@@ -1312,6 +1355,7 @@ export type Database = {
           field_capture_id?: string | null
           id?: string
           is_blocked?: boolean
+          is_outside_vendor?: boolean
           lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           needs_manager_review?: boolean
@@ -1347,6 +1391,7 @@ export type Database = {
           field_capture_id?: string | null
           id?: string
           is_blocked?: boolean
+          is_outside_vendor?: boolean
           lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           needs_manager_review?: boolean
@@ -1565,6 +1610,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_assignment_rules: {
+        Args: { p_task_id: string }
+        Returns: undefined
+      }
       can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
       capture_recipe_from_task: {
         Args: { p_parent_task_id: string; p_recipe_id: string }
