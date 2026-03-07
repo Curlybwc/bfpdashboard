@@ -363,6 +363,15 @@ const ProjectDetail = () => {
             <span className="ml-auto text-sm font-medium">Actual: ${projectTotalActual.toFixed(2)}</span>
           )}
         </div>
+        {(() => {
+          const blockedCount = rootTasks.filter(t => t.is_blocked).length + tasks.filter(t => t.parent_task_id && t.is_blocked).length;
+          return blockedCount > 0 ? (
+            <div className="mb-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>{blockedCount} task{blockedCount !== 1 ? 's' : ''} blocked</span>
+            </div>
+          ) : null;
+        })()}
         <div className="space-y-2">
            {rootTasks.length === 0 ? (
              <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
