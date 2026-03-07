@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CostLibrary from '@/components/CostLibrary';
 import AdminAliases from '@/components/AdminAliases';
+import AdminAvailability from '@/components/admin/AdminAvailability';
 import {
   Menubar,
   MenubarMenu,
