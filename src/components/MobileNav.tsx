@@ -6,12 +6,13 @@ import { useAdmin } from '@/hooks/useAdmin';
 const MobileNav = () => {
   const location = useLocation();
   const { signOut } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, canManageProjects } = useAdmin();
+  const isContractor = !isAdmin && !canManageProjects;
   
   const links = [
     { to: '/today', icon: CalendarCheck, label: 'Today' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
-    { to: '/scopes', icon: ClipboardList, label: 'Scopes' },
+    ...(!isContractor ? [{ to: '/scopes', icon: ClipboardList, label: 'Scopes' }] : []),
     { to: '/shopping', icon: ShoppingCart, label: 'Shopping' },
   ];
 

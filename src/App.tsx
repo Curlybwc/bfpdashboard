@@ -2,9 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
+import { useAdmin } from "@/hooks/useAdmin";
+import { useEffect, ReactNode } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import ProjectList from "./pages/ProjectList";
@@ -33,6 +34,14 @@ import NotFound from "./pages/NotFound";
 import MobileNav from "./components/MobileNav";
 
 const queryClient = new QueryClient();
+
+/** Redirects contractors away from manager/admin-only routes */
+const ManagerGuard = ({ children }: { children: ReactNode }) => {
+  const { isAdmin, canManageProjects, loading } = useAdmin();
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;
+  if (!isAdmin && !canManageProjects) return <Navigate to="/today" replace />;
+  return <>{children}</>;
+};
 
 const AppRoutes = () => {
   const { user, loading } = useAuth();
@@ -68,9 +77,9 @@ const AppRoutes = () => {
         <Route path="/projects/:id/field-mode/preview" element={<FieldModePreview />} />
         <Route path="/projects/:id/walkthrough" element={<ProjectWalkthrough />} />
         <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
-        <Route path="/scopes" element={<ScopeList />} />
-        <Route path="/scopes/:id" element={<ScopeDetail />} />
-        <Route path="/scopes/:id/walkthrough" element={<ScopeWalkthrough />} />
+        <Route path="/scopes" element={<ManagerGuard><ScopeList /></ManagerGuard>} />
+        <Route path="/scopes/:id" element={<ManagerGuard><ScopeDetail /></ManagerGuard>} />
+        <Route path="/scopes/:id/walkthrough" element={<ManagerGuard><ScopeWalkthrough /></ManagerGuard>} />
         <Route path="/shopping" element={<Shopping />} />
         <Route path="/shifts" element={<Shifts />} />
         <Route path="/availability" element={<Availability />} />
