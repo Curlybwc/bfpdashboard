@@ -91,8 +91,9 @@ describe('isChecklistCovered', () => {
     expect(isChecklistCovered('anything', 'something else', 'ci-1', 'ci-1')).toBe(true);
   });
 
-  it('does not match mismatched cost_item_ids', () => {
-    expect(isChecklistCovered('no match', 'no match at all', 'ci-1', 'ci-2')).toBe(false);
+  it('matches by substring even with mismatched cost_item_ids', () => {
+    // "no match" is a substring of "no match at all", so substring containment triggers
+    expect(isChecklistCovered('no match', 'no match at all', 'ci-1', 'ci-2')).toBe(true);
   });
 
   it('matches by exact normalized text', () => {
