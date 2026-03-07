@@ -31,6 +31,7 @@ const NextUpCard = ({
   isCandidate = false,
   activeWorkerCount = 0,
   blockerInfo,
+  photoCount = 0,
 }: NextUpCardProps) => {
   if (!task) {
     return (
