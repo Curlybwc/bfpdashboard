@@ -43,7 +43,7 @@ const TaskCard = ({
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
-  blockerInfo,
+  blockerInfo, photoCount = 0,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
