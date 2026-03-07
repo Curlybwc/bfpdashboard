@@ -269,9 +269,12 @@ const Today = () => {
 
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
-  const Section = ({ title, tasks, emptyText }: { title: string; tasks: any[]; emptyText: string }) => (
+  const Section = ({ title, tasks, emptyText, isBlockedSection = false }: { title: string; tasks: any[]; emptyText: string; isBlockedSection?: boolean }) => (
     <div className="mb-6">
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">{title}</h2>
+      <h2 className={cn(
+        "text-sm font-semibold uppercase tracking-wide mb-2",
+        isBlockedSection ? "text-destructive" : "text-muted-foreground"
+      )}>{title}</h2>
       {tasks.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4 text-center">{emptyText}</p>
       ) : (
@@ -292,6 +295,7 @@ const Today = () => {
               isActiveWorker={crewActiveTaskIds.has(t.id)}
               isCandidate={crewCandidateTaskIds.has(t.id)}
               activeWorkerCount={crewWorkerCounts[t.id] || 0}
+              blockerInfo={blockerMap[t.id] || null}
             />
           ))}
         </div>
