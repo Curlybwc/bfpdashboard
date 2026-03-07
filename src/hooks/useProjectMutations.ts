@@ -25,11 +25,12 @@ export function useCreateTask(projectId: string | undefined) {
   return useMutation({
     mutationFn: async (input: CreateTaskInput) => {
       const { pendingMaterials, ...taskFields } = input;
+      const hasMaterials = pendingMaterials.length > 0;
       const { data, error } = await supabase
         .from('tasks')
         .insert({
           ...taskFields,
-          materials_on_site: 'No' as const,
+          materials_on_site: hasMaterials ? ('No' as const) : ('Yes' as const),
         })
         .select('id')
         .single();

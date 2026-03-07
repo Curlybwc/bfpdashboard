@@ -231,7 +231,10 @@ const ProjectMaterials = () => {
       .select('delivered, item_type, confirmed_on_site')
       .eq('task_id', taskId);
     const items = (data as any[]) || [];
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      await supabase.from('tasks').update({ materials_on_site: 'Yes' }).eq('id', taskId);
+      return;
+    }
     const mats = items.filter(i => (i.item_type ?? 'material') === 'material');
     const tools = items.filter(i => (i.item_type ?? 'material') === 'tool');
     const allMatsDelivered = mats.length === 0 || mats.every(m => m.delivered);
