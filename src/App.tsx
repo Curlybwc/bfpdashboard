@@ -95,6 +95,7 @@ const AppRoutes = () => {
         <Route path="/admin" element={<AdminGuard><AdminPanel /></AdminGuard>} />
         <Route path="/admin/recipes" element={<AdminGuard><AdminRecipes /></AdminGuard>} />
         <Route path="/admin/bundles" element={<AdminGuard><AdminMaterialBundles /></AdminGuard>} />
+        <Route path="/admin/assignment-rules" element={<AdminGuard><AdminAssignmentRules /></AdminGuard>} />
         <Route path="/admin/rehab-library" element={<AdminGuard><AdminRehabLibrary /></AdminGuard>} />
         <Route path="/admin/scope-accuracy" element={<AdminGuard><ScopeAccuracy /></AdminGuard>} />
         <Route path="/admin/store-sections" element={<AdminGuard><AdminStoreSections /></AdminGuard>} />

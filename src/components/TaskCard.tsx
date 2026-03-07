@@ -216,6 +216,9 @@ const TaskCard = ({
           {projectAddress && (
             <p className="text-xs text-muted-foreground truncate">{projectAddress}</p>
           )}
+          {isOutsideVendor && !assigneeName && (
+            <p className="text-xs text-muted-foreground">Outside Vendor</p>
+          )}
           {assigneeName && (
             <p className="text-xs text-muted-foreground">Assigned to {assigneeName}</p>
           )}

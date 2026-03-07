@@ -120,8 +120,8 @@ const ProjectDetail = () => {
       if (myActiveWorkerTaskIds.has(t.id)) return true;
       // I'm a candidate for this crew task
       if (myCandidateTaskIds.has(t.id)) return true;
-      // Unassigned solo tasks that are Ready (available to pick up)
-      if (!t.assigned_to_user_id && t.assignment_mode === 'solo' && t.stage === 'Ready') return true;
+      // Unassigned solo tasks that are Ready (available to pick up) — exclude outside vendor
+      if (!t.assigned_to_user_id && t.assignment_mode === 'solo' && t.stage === 'Ready' && !t.is_outside_vendor) return true;
       // Parent task whose children I should see
       if (t.parent_task_id) {
         // Show if parent is visible (handled by parent filter)

@@ -35,3 +35,5 @@ export const BLOCKER_REASONS: { value: BlockerReason; label: string }[] = [
 
 export type ScopeItemStatus = 'Not Checked' | 'OK' | 'Repair' | 'Replace' | 'Get Bid';
 export const SCOPE_ITEM_STATUSES: ScopeItemStatus[] = ['Not Checked', 'OK', 'Repair', 'Replace', 'Get Bid'];
+
+export type AssignmentOutcome = 'assign_user' | 'outside_vendor' | 'crew';

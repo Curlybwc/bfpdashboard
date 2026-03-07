@@ -143,6 +143,7 @@ const AdminPanel = () => {
         { label: 'Rehab Library', action: () => handleNav('/admin/rehab-library') },
         { label: 'Bundles', action: () => handleNav('/admin/bundles') },
         { label: 'Store Sections', action: () => handleNav('/admin/store-sections') },
+        { label: 'Assignment Rules', action: () => handleNav('/admin/assignment-rules') },
       ],
     },
     {

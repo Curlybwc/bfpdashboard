@@ -269,6 +269,11 @@ serve(async (req) => {
       }
     }
 
+    // Apply assignment rules to all created tasks
+    for (const taskId of createdTaskIds) {
+      await adminClient.rpc('apply_assignment_rules', { p_task_id: taskId });
+    }
+
     return new Response(
       JSON.stringify({ field_capture_id: capture.id, created_task_ids: createdTaskIds }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
