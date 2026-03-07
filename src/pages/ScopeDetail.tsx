@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
@@ -22,7 +21,21 @@ import FinalPassSheet from '@/components/FinalPassSheet';
 import DeduplicateSheet from '@/components/DeduplicateSheet';
 import { SCOPE_ITEM_STATUSES, type ScopeItemStatus } from '@/lib/supabase-types';
 import { isChecklistCovered } from '@/lib/checklistMatch';
-import { getConvertibleItems, type ConversionResult } from '@/lib/scopeConversion';
+import { getConvertibleItems } from '@/lib/scopeConversion';
+import { useScopeDetail } from '@/hooks/useScopeDetail';
+import { useScopeChecklistCoverage } from '@/hooks/useScopeChecklistCoverage';
+import {
+  useAddScopeItem,
+  useUpdateScopeItem,
+  useDeleteScopeItem,
+  useUpdateScopeTitle,
+  useArchiveScope,
+  useConvertScope,
+  useUpdateLibraryPrice,
+  useResetToLibraryPrice,
+} from '@/hooks/useScopeMutations';
+import { canArchiveScope, canDeleteScopeItem, canEditScopeTitle } from '@/lib/permissions';
+import { useQueryClient } from '@tanstack/react-query';
 
 const ScopeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,23 +43,36 @@ const ScopeDetail = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { isAdmin } = useAdmin();
-  const [scope, setScope] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+
+  // Server state via React Query
+  const { data: scopeData, isLoading } = useScopeDetail(id);
+  const scope = scopeData?.scope;
+  const items = scopeData?.items ?? [];
+  const { data: checklistData } = useScopeChecklistCoverage(id);
+  const checklistItems = checklistData?.checklistItems ?? [];
+  const reviews = checklistData?.reviews ?? [];
+
+  // Mutations
+  const addItemMutation = useAddScopeItem(id);
+  const updateItemMutation = useUpdateScopeItem(id);
+  const deleteItemMutation = useDeleteScopeItem(id);
+  const updateTitleMutation = useUpdateScopeTitle(id);
+  const archiveMutation = useArchiveScope(id);
+  const convertMutation = useConvertScope();
+  const updateLibraryPriceMutation = useUpdateLibraryPrice(id);
+  const resetToLibraryMutation = useResetToLibraryPrice(id);
+
+  // Local UI state
   const [open, setOpen] = useState(false);
-  const [converting, setConverting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [finalPassOpen, setFinalPassOpen] = useState(false);
   const [dedupeOpen, setDedupeOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
 
-  // Checklist coverage state
-  const [checklistItems, setChecklistItems] = useState<any[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-
-  // New item fields
+  // New item form fields
   const [desc, setDesc] = useState('');
   const [qty, setQty] = useState('');
   const [unit, setUnit] = useState('');
@@ -54,38 +80,6 @@ const ScopeDetail = () => {
   const [phaseKey, setPhaseKey] = useState('');
   const [itemStatus, setItemStatus] = useState<ScopeItemStatus>('Not Checked');
   const [itemNotes, setItemNotes] = useState('');
-
-  const fetchData = async () => {
-    if (!id) return;
-    const [{ data: s }, { data: si }] = await Promise.all([
-      supabase.from('scopes').select('*').eq('id', id).single(),
-      supabase.from('scope_items').select('*').eq('scope_id', id).order('created_at'),
-    ]);
-    if (s) setScope(s);
-    if (si) setItems(si);
-  };
-
-  const fetchChecklistCoverage = async () => {
-    if (!id) return;
-    const { data: templates } = await supabase
-      .from('checklist_templates')
-      .select('id')
-      .eq('active', true)
-      .limit(1);
-    const templateId = templates?.[0]?.id;
-    if (!templateId) return;
-
-    const [{ data: ci }, { data: rev }] = await Promise.all([
-      supabase.from('checklist_items').select('id, label, normalized_label, category, default_cost_item_id, sort_order')
-        .eq('template_id', templateId).eq('active', true).order('sort_order'),
-      supabase.from('scope_checklist_reviews').select('checklist_item_id, state')
-        .eq('scope_id', id),
-    ]);
-    setChecklistItems(ci || []);
-    setReviews(rev || []);
-  };
-
-  useEffect(() => { fetchData(); fetchChecklistCoverage(); }, [id]);
 
   // Computed totals
   const estimatedTotal = useMemo(() =>
@@ -109,28 +103,34 @@ const ScopeDetail = () => {
     }).length;
   }, [checklistItems, items, reviews]);
 
+  const convertibleItems = getConvertibleItems(items);
+
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
     const qtyVal = qty ? parseFloat(qty) : null;
     const ucVal = unitCostNew ? parseFloat(unitCostNew) : null;
     const computedTotal = qtyVal != null && ucVal != null ? qtyVal * ucVal : null;
-    const { error } = await supabase.from('scope_items').insert({
-      scope_id: id,
-      description: desc,
-      qty: qtyVal,
-      unit: unit || null,
-      unit_cost_override: ucVal,
-      computed_total: computedTotal,
-      phase_key: phaseKey || null,
-      pricing_status: ucVal != null ? 'Priced' : 'Needs Pricing',
-      status: itemStatus,
-      notes: itemNotes || null,
-    });
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    setDesc(''); setQty(''); setUnit(''); setUnitCostNew(''); setPhaseKey(''); setItemStatus('Not Checked'); setItemNotes('');
-    setOpen(false);
-    fetchData();
+    addItemMutation.mutate(
+      {
+        scope_id: id,
+        description: desc,
+        qty: qtyVal,
+        unit: unit || null,
+        unit_cost_override: ucVal,
+        computed_total: computedTotal,
+        phase_key: phaseKey || null,
+        pricing_status: ucVal != null ? 'Priced' : 'Needs Pricing',
+        status: itemStatus,
+        notes: itemNotes || null,
+      },
+      {
+        onSuccess: () => {
+          setDesc(''); setQty(''); setUnit(''); setUnitCostNew(''); setPhaseKey(''); setItemStatus('Not Checked'); setItemNotes('');
+          setOpen(false);
+        },
+      },
+    );
   };
 
   const startEdit = (item: any) => {
@@ -152,111 +152,51 @@ const ScopeDetail = () => {
     const unitCost = editForm.unit_cost_override ? parseFloat(editForm.unit_cost_override) : null;
     const computedTotal = qtyVal != null && unitCost != null ? qtyVal * unitCost : null;
 
-    const { error } = await supabase.from('scope_items').update({
-      description: editForm.description,
-      qty: qtyVal,
-      unit: editForm.unit || null,
-      unit_cost_override: unitCost,
-      computed_total: computedTotal,
-      notes: editForm.notes || null,
-      status: editForm.status,
-      phase_key: editForm.phase_key || null,
-      pricing_status: unitCost != null ? 'Priced' : 'Needs Pricing',
-    }).eq('id', editingId);
-
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return;
-    }
-    setEditingId(null);
-    fetchData();
+    updateItemMutation.mutate(
+      {
+        id: editingId,
+        description: editForm.description,
+        qty: qtyVal,
+        unit: editForm.unit || null,
+        unit_cost_override: unitCost,
+        computed_total: computedTotal,
+        notes: editForm.notes || null,
+        status: editForm.status,
+        phase_key: editForm.phase_key || null,
+        pricing_status: unitCost != null ? 'Priced' : 'Needs Pricing',
+      },
+      { onSuccess: () => setEditingId(null) },
+    );
   };
 
-  const handleUpdateLibraryPrice = async (item: any) => {
+  const handleUpdateLibraryPrice = (item: any) => {
     if (!item.cost_item_id || item.unit_cost_override == null) return;
-    const { error } = await supabase.from('cost_items').update({
-      default_total_cost: item.unit_cost_override,
-    }).eq('id', item.cost_item_id);
-    if (error) {
-      toast({ title: 'Error updating library', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Library price updated' });
-    }
+    updateLibraryPriceMutation.mutate({ costItemId: item.cost_item_id, price: item.unit_cost_override });
   };
 
-  const handleResetToLibrary = async (item: any) => {
+  const handleResetToLibrary = (item: any) => {
     if (!item.cost_item_id) return;
-    const { data: costItem } = await supabase.from('cost_items').select('default_total_cost').eq('id', item.cost_item_id).single();
-    if (!costItem) return;
-    const qtyVal = item.qty || null;
-    const computedTotal = qtyVal != null ? qtyVal * costItem.default_total_cost : null;
-    const { error } = await supabase.from('scope_items').update({
-      unit_cost_override: costItem.default_total_cost,
-      computed_total: computedTotal,
-      pricing_status: 'Priced',
-    }).eq('id', item.id);
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Reset to library price' });
-      fetchData();
-    }
+    resetToLibraryMutation.mutate({ id: item.id, cost_item_id: item.cost_item_id, qty: item.qty });
   };
 
-  // Filter items for conversion
-  const convertibleItems = getConvertibleItems(items);
-
-  const handleConvert = async () => {
+  const handleConvert = () => {
     if (!id || !user || !scope) return;
-    setConverting(true);
+    convertMutation.mutate(id);
+  };
 
-    const { data, error } = await supabase.rpc('convert_scope_to_project', {
-      p_scope_id: id,
+  const handleSaveTitle = () => {
+    if (!id) return;
+    updateTitleMutation.mutate(titleDraft, {
+      onSuccess: () => setEditingTitle(false),
     });
-
-    setConverting(false);
-
-    if (error) {
-      toast({ title: 'Error converting scope', description: error.message, variant: 'destructive' });
-      return;
-    }
-
-    const result = data as unknown as ConversionResult;
-    toast({ title: 'Scope converted to project!' });
-    navigate(`/projects/${result.project_id}`);
   };
 
   const handleFinalPassUpdate = () => {
-    fetchData();
-    fetchChecklistCoverage();
+    queryClient.invalidateQueries({ queryKey: ['scope-detail', id] });
+    queryClient.invalidateQueries({ queryKey: ['scope-checklist', id] });
   };
 
-  const handleDeleteItem = async (itemId: string) => {
-    setDeletingId(itemId);
-    const { error } = await supabase.from('scope_items').delete().eq('id', itemId).eq('scope_id', id!);
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      setDeletingId(null);
-      return;
-    }
-    toast({ title: 'Item deleted' });
-    setItems(prev => prev.filter(i => i.id !== itemId));
-    setDeletingId(null);
-  };
-
-  const handleSaveTitle = async () => {
-    if (!id) return;
-    const { error } = await supabase.from('scopes').update({ name: titleDraft }).eq('id', id);
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      return;
-    }
-    setScope((prev: any) => ({ ...prev, name: titleDraft }));
-    setEditingTitle(false);
-    toast({ title: 'Title updated' });
-  };
-
-  if (!scope) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
+  if (isLoading || !scope) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   const isActive = scope.status === 'active';
 
@@ -320,7 +260,7 @@ const ScopeDetail = () => {
                         <Label>Notes</Label>
                         <Textarea value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} rows={2} />
                       </div>
-                      <Button type="submit" className="w-full">Add Item</Button>
+                      <Button type="submit" className="w-full" disabled={addItemMutation.isPending}>Add Item</Button>
                     </form>
                   </DialogContent>
                 </Dialog>
@@ -339,15 +279,15 @@ const ScopeDetail = () => {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleConvert} disabled={converting}>
-                        {converting ? 'Converting...' : 'Convert'}
+                      <AlertDialogAction onClick={handleConvert} disabled={convertMutation.isPending}>
+                        {convertMutation.isPending ? 'Converting...' : 'Convert'}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               </>
             )}
-            {isActive && isAdmin && (
+            {isActive && canArchiveScope(isAdmin) && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button size="sm" variant="outline">Archive</Button>
@@ -361,21 +301,13 @@ const ScopeDetail = () => {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={async () => {
-                      await supabase.from('scopes').update({ status: 'archived' as any }).eq('id', id!);
-                      setScope((prev: any) => ({ ...prev, status: 'archived' }));
-                      toast({ title: 'Scope archived' });
-                    }}>Archive</AlertDialogAction>
+                    <AlertDialogAction onClick={() => archiveMutation.mutate('archived')}>Archive</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            {scope.status === 'archived' && isAdmin && (
-              <Button size="sm" variant="outline" onClick={async () => {
-                await supabase.from('scopes').update({ status: 'active' as any }).eq('id', id!);
-                setScope((prev: any) => ({ ...prev, status: 'active' }));
-                toast({ title: 'Scope reactivated' });
-              }}>Reactivate</Button>
+            {scope.status === 'archived' && canArchiveScope(isAdmin) && (
+              <Button size="sm" variant="outline" onClick={() => archiveMutation.mutate('active')}>Reactivate</Button>
             )}
           </div>
         }
@@ -383,7 +315,7 @@ const ScopeDetail = () => {
       <div className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <StatusBadge status={scope.status} />
-          {isAdmin && editingTitle ? (
+          {canEditScopeTitle(isAdmin) && editingTitle ? (
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
               <Input
                 value={titleDraft}
@@ -402,7 +334,7 @@ const ScopeDetail = () => {
           ) : (
             <>
               <span className="text-sm text-muted-foreground">{scope.address}</span>
-              {isAdmin && (
+              {canEditScopeTitle(isAdmin) && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -524,7 +456,7 @@ const ScopeDetail = () => {
                       className="h-8 text-xs"
                     />
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={handleSaveEdit} className="flex-1">
+                      <Button size="sm" onClick={handleSaveEdit} className="flex-1" disabled={updateItemMutation.isPending}>
                         <Check className="h-3.5 w-3.5 mr-1" />Save
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
@@ -575,7 +507,7 @@ const ScopeDetail = () => {
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                      {isAdmin && (
+                      {canDeleteScopeItem(isAdmin) && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive">
@@ -592,11 +524,11 @@ const ScopeDetail = () => {
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => handleDeleteItem(item.id)}
-                                disabled={deletingId === item.id}
+                                onClick={() => deleteItemMutation.mutate(item.id)}
+                                disabled={deleteItemMutation.isPending}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
-                                {deletingId === item.id ? 'Deleting...' : 'Delete'}
+                                {deleteItemMutation.isPending ? 'Deleting...' : 'Delete'}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -623,7 +555,7 @@ const ScopeDetail = () => {
         scopeId={id!}
         open={dedupeOpen}
         onOpenChange={setDedupeOpen}
-        onUpdate={() => { fetchData(); fetchChecklistCoverage(); }}
+        onUpdate={handleFinalPassUpdate}
       />
     </div>
   );

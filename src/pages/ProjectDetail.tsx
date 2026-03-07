@@ -1,11 +1,9 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,13 +17,10 @@ import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
 import TaskCard from '@/components/TaskCard';
 import { useAdmin } from '@/hooks/useAdmin';
-import { applyBundles } from '@/lib/applyBundles';
-
-interface ProjectMember {
-  user_id: string;
-  role: string;
-  profiles: { full_name: string | null } | null;
-}
+import { useProjectDetail } from '@/hooks/useProjectDetail';
+import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
+import { canCreateTask, canEditProject, getProjectRole } from '@/lib/permissions';
+import { useQueryClient } from '@tanstack/react-query';
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,8 +28,20 @@ const ProjectDetail = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { isAdmin } = useAdmin();
-  const [project, setProject] = useState<any>(null);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+
+  // Server state via React Query
+  const { data, isLoading } = useProjectDetail(id);
+  const project = data?.project;
+  const tasks = data?.tasks ?? [];
+  const projectMembers = data?.members ?? [];
+
+  // Mutations
+  const createTaskMutation = useCreateTask(id);
+  const updateProjectMutation = useUpdateProject(id);
+  const deleteProjectMutation = useDeleteProject();
+
+  // Local UI state
   const [open, setOpen] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
@@ -43,46 +50,63 @@ const ProjectDetail = () => {
   const [trade, setTrade] = useState('');
   const [notes, setNotes] = useState('');
   const [assignedTo, setAssignedTo] = useState('unassigned');
-  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const [pendingMaterials, setPendingMaterials] = useState<{ name: string; quantity: string; unit: string }[]>([]);
   const [matName, setMatName] = useState('');
   const [matQty, setMatQty] = useState('');
   const [matUnit, setMatUnit] = useState('');
-  const [projectRole, setProjectRole] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
-  const [editSaving, setEditSaving] = useState(false);
 
-  const fetchData = async () => {
-    if (!id) return;
-    const [{ data: proj }, { data: t }, { data: members }] = await Promise.all([
-      supabase.from('projects').select('*').eq('id', id).single(),
-      supabase.from('tasks').select('*').eq('project_id', id).order('sort_order', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false }),
-      supabase.from('project_members').select('user_id, role, profiles(full_name)').eq('project_id', id),
-    ]);
-    if (proj) setProject(proj);
-    if (t) setTasks(t);
-    if (members) {
-      setProjectMembers(members as unknown as ProjectMember[]);
-      const myRole = (members as unknown as ProjectMember[]).find(m => m.user_id === user?.id);
-      setProjectRole(myRole?.role ?? null);
-    }
-  };
+  // Derived
+  const projectRole = useMemo(
+    () => (user ? getProjectRole(projectMembers, user.id) : null),
+    [projectMembers, user],
+  );
 
   const assigneeMap = useMemo(() => {
     const map: Record<string, string> = {};
-    projectMembers.forEach(m => {
+    projectMembers.forEach((m) => {
       map[m.user_id] = m.profiles?.full_name || 'Unnamed';
     });
     return map;
   }, [projectMembers]);
 
-  const canCreateTask = isAdmin || projectRole === 'manager' || projectRole === 'contractor';
-  const canEditProject = isAdmin || projectRole === 'manager';
+  const userCanCreateTask = canCreateTask(isAdmin, projectRole);
+  const userCanEditProject = canEditProject(isAdmin, projectRole);
+
+  // Build tree
+  const rootTasks = useMemo(() => tasks.filter((t) => !t.parent_task_id), [tasks]);
+  const childrenMap = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    tasks.forEach((t) => {
+      if (t.parent_task_id) {
+        if (!map[t.parent_task_id]) map[t.parent_task_id] = [];
+        map[t.parent_task_id].push(t);
+      }
+    });
+    return map;
+  }, [tasks]);
+
+  const getTaskActual = (t: any): number => {
+    const children = childrenMap[t.id];
+    if (children && children.length > 0) {
+      return children.reduce((sum: number, c: any) => sum + (c.actual_total_cost ?? 0), 0);
+    }
+    return t.actual_total_cost ?? 0;
+  };
+  const projectTotalActual = rootTasks.reduce((sum, t) => sum + getTaskActual(t), 0);
+
+  const toggleExpanded = (taskId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
 
   const openEditDialog = () => {
     setEditName(project?.name || '');
@@ -93,107 +117,51 @@ const ProjectDetail = () => {
   const handleEditProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !editName.trim()) return;
-    setEditSaving(true);
-    const { error } = await supabase.from('projects').update({
-      name: editName.trim(),
-      address: editAddress.trim() || null,
-    }).eq('id', id);
-    setEditSaving(false);
-    if (error) {
-      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
-      return;
-    }
-    setEditOpen(false);
-    toast({ title: 'Project updated' });
-    fetchData();
+    updateProjectMutation.mutate(
+      { name: editName.trim(), address: editAddress.trim() || null },
+      { onSuccess: () => setEditOpen(false) },
+    );
   };
-
-  useEffect(() => { fetchData(); }, [id]);
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !id) return;
-    const { data, error } = await supabase.from('tasks').insert({
-      project_id: id,
-      task: taskName,
-      stage,
-      priority,
-      materials_on_site: 'No' as const,
-      room_area: roomArea || null,
-      trade: trade || null,
-      notes: notes || null,
-      created_by: user.id,
-      assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
-    }).select('id').single();
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    if (data) {
-      // Insert manually added materials
-      if (pendingMaterials.length > 0) {
-        await supabase.from('task_materials').insert(
-          pendingMaterials.map(m => ({
-            task_id: data.id,
-            name: m.name,
-            quantity: m.quantity ? parseFloat(m.quantity) : null,
-            unit: m.unit || null,
-            purchased: false,
-            delivered: false,
-          }))
-        );
-      }
-      // Apply material bundles (no recipe expansion here)
-      await applyBundles(data.id, taskName);
-    }
-    setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
-    setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
-    setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
-    setOpen(false);
-    fetchData();
+    createTaskMutation.mutate(
+      {
+        project_id: id,
+        task: taskName,
+        stage,
+        priority,
+        room_area: roomArea || null,
+        trade: trade || null,
+        notes: notes || null,
+        created_by: user.id,
+        assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
+        pendingMaterials,
+      },
+      {
+        onSuccess: () => {
+          setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
+          setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
+          setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
+          setOpen(false);
+        },
+      },
+    );
   };
-
-  // Build tree structure
-  const rootTasks = tasks.filter(t => !t.parent_task_id);
-  const childrenMap: Record<string, any[]> = {};
-  tasks.forEach(t => {
-    if (t.parent_task_id) {
-      if (!childrenMap[t.parent_task_id]) childrenMap[t.parent_task_id] = [];
-      childrenMap[t.parent_task_id].push(t);
-    }
-  });
-
-  const toggleExpanded = (taskId: string) => {
-    setExpandedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) next.delete(taskId);
-      else next.add(taskId);
-      return next;
-    });
-  };
-
-  // Cost rollup
-  const getTaskActual = (t: any): number => {
-    const children = childrenMap[t.id];
-    if (children && children.length > 0) {
-      return children.reduce((sum: number, c: any) => sum + (c.actual_total_cost ?? 0), 0);
-    }
-    return t.actual_total_cost ?? 0;
-  };
-  const projectTotalActual = rootTasks.reduce((sum, t) => sum + getTaskActual(t), 0);
 
   const handleDeleteProject = async () => {
     if (!id) return;
-    setDeleting(true);
-    const { error } = await supabase.from('projects').delete().eq('id', id);
-    if (error) {
-      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
-      setDeleting(false);
-      return;
-    }
-    setDeleteDialogOpen(false);
-    toast({ title: 'Project deleted' });
-    navigate('/projects');
+    deleteProjectMutation.mutate(id, {
+      onSettled: () => setDeleteDialogOpen(false),
+    });
   };
 
-  if (!project) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
+  const invalidateProject = () => {
+    queryClient.invalidateQueries({ queryKey: ['project-detail', id] });
+  };
+
+  if (isLoading || !project) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   return (
     <div className="pb-20">
@@ -201,9 +169,9 @@ const ProjectDetail = () => {
         title={project.name}
         backTo="/projects"
         actions={
-          canCreateTask ? (
+          userCanCreateTask ? (
             <div className="flex gap-2">
-              {canEditProject && (
+              {userCanEditProject && (
                 <Button size="sm" variant="outline" onClick={openEditDialog}>
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -336,7 +304,7 @@ const ProjectDetail = () => {
                     )}
                   </CollapsibleContent>
                 </Collapsible>
-                <Button type="submit" className="w-full">Create Task</Button>
+                <Button type="submit" className="w-full" disabled={createTaskMutation.isPending}>Create Task</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -365,13 +333,13 @@ const ProjectDetail = () => {
               <Label>Address (optional)</Label>
               <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="e.g. 123 Main St" />
             </div>
-            <Button type="submit" className="w-full" disabled={editSaving || !editName.trim()}>
-              {editSaving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : 'Save'}
+            <Button type="submit" className="w-full" disabled={updateProjectMutation.isPending || !editName.trim()}>
+              {updateProjectMutation.isPending ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : 'Save'}
             </Button>
           </form>
         </DialogContent>
       </Dialog>
-      <AlertDialog open={deleteDialogOpen} onOpenChange={(nextOpen) => { if (deleting) return; setDeleteDialogOpen(nextOpen); }}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(nextOpen) => { if (deleteProjectMutation.isPending) return; setDeleteDialogOpen(nextOpen); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project</AlertDialogTitle>
@@ -380,9 +348,9 @@ const ProjectDetail = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <Button variant="destructive" disabled={deleting} onClick={handleDeleteProject}>
-              {deleting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Deleting…</> : 'Delete Project'}
+            <AlertDialogCancel disabled={deleteProjectMutation.isPending}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" disabled={deleteProjectMutation.isPending} onClick={handleDeleteProject}>
+              {deleteProjectMutation.isPending ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Deleting…</> : 'Delete Project'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -410,7 +378,7 @@ const ProjectDetail = () => {
                       projectName={project.name}
                       userId={user?.id ?? ''}
                       isAdmin={isAdmin}
-                      onUpdate={fetchData}
+                      onUpdate={invalidateProject}
                       showProjectName={false}
                       childCount={children.length}
                       expanded={isExpanded}
@@ -425,7 +393,7 @@ const ProjectDetail = () => {
                         projectName={project.name}
                         userId={user?.id ?? ''}
                         isAdmin={isAdmin}
-                        onUpdate={fetchData}
+                        onUpdate={invalidateProject}
                         showProjectName={false}
                         isChild
                         assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined}
