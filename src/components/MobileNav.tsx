@@ -13,7 +13,6 @@ const MobileNav = () => {
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/scopes', icon: ClipboardList, label: 'Scopes' },
     { to: '/shopping', icon: ShoppingCart, label: 'Shopping' },
-    { to: '/shifts', icon: Clock, label: 'Shifts' },
   ];
 
   return (
