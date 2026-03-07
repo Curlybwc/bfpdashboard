@@ -126,7 +126,7 @@ const ProjectDetail = () => {
     const blocked = leafTasks.filter((t) => t.is_blocked);
     const inProgress = leafTasks.filter((t) => !t.is_blocked && t.stage === 'In Progress');
     const ready = leafTasks.filter((t) => !t.is_blocked && t.stage === 'Ready');
-    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id);
+    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id && t.assignment_mode !== 'crew');
     const waitingMaterials = ready.filter((t) => t.materials_on_site === 'No');
 
     const sortByPriority = (a: any, b: any) => {
