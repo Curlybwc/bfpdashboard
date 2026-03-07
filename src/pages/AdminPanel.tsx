@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import CostLibrary from '@/components/CostLibrary';
 import AdminAliases from '@/components/AdminAliases';
 import AdminAvailability from '@/components/admin/AdminAvailability';
+import { LogIn } from 'lucide-react';
 import {
   Menubar,
   MenubarMenu,
@@ -45,6 +46,7 @@ const AdminPanel = () => {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>('users');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [impersonating, setImpersonating] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -91,6 +93,28 @@ const AdminPanel = () => {
       return;
     }
     fetchProfiles();
+  };
+
+  const handleImpersonate = async (targetUserId: string) => {
+    if (impersonating) return;
+    setImpersonating(targetUserId);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin_impersonate', {
+        body: { target_user_id: targetUserId },
+      });
+      if (error || data?.error) {
+        toast({ title: 'Impersonate failed', description: data?.error || error?.message, variant: 'destructive' });
+        return;
+      }
+      if (data?.url) {
+        window.open(data.url, '_blank');
+        toast({ title: 'Impersonation link opened', description: `Logged in as ${data.email} in a new tab.` });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setImpersonating(null);
+    }
   };
 
   if (adminLoading) {
@@ -184,6 +208,17 @@ const AdminPanel = () => {
                       disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
                     />
                   </div>
+                  {profile.id !== user?.id && (
+                    <button
+                      onClick={() => handleImpersonate(profile.id)}
+                      disabled={impersonating === profile.id}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                      title={`Log in as ${profile.full_name || 'this user'}`}
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      {impersonating === profile.id ? '...' : 'Impersonate'}
+                    </button>
+                  )}
                 </div>
               </div>
             </Card>
