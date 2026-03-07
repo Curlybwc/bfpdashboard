@@ -208,6 +208,17 @@ const AdminPanel = () => {
                       disabled={profile.id === user?.id && profiles.filter(p => p.is_admin).length <= 1}
                     />
                   </div>
+                  {profile.id !== user?.id && (
+                    <button
+                      onClick={() => handleImpersonate(profile.id)}
+                      disabled={impersonating === profile.id}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                      title={`Log in as ${profile.full_name || 'this user'}`}
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      {impersonating === profile.id ? '...' : 'Impersonate'}
+                    </button>
+                  )}
                 </div>
               </div>
             </Card>
