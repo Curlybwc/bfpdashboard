@@ -37,7 +37,7 @@ export function useCreateTask(projectId: string | undefined) {
 
       // Insert manually added materials
       if (pendingMaterials.length > 0) {
-        await supabase.from('task_materials').insert(
+        const { error: matError } = await supabase.from('task_materials').insert(
           pendingMaterials.map((m) => ({
             task_id: data.id,
             name: m.name,
@@ -47,6 +47,7 @@ export function useCreateTask(projectId: string | undefined) {
             delivered: false,
           })),
         );
+        if (matError) throw matError;
       }
 
       // Apply material bundles

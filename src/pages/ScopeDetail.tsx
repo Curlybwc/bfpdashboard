@@ -70,6 +70,7 @@ const ScopeDetail = () => {
   const [finalPassOpen, setFinalPassOpen] = useState(false);
   const [dedupeOpen, setDedupeOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState('');
 
   // New item form fields
@@ -524,11 +525,16 @@ const ScopeDetail = () => {
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => deleteItemMutation.mutate(item.id)}
-                                disabled={deleteItemMutation.isPending}
+                                onClick={() => {
+                                  setDeletingId(item.id);
+                                  deleteItemMutation.mutate(item.id, {
+                                    onSettled: () => setDeletingId(null),
+                                  });
+                                }}
+                                disabled={deletingId === item.id}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
-                                {deleteItemMutation.isPending ? 'Deleting...' : 'Delete'}
+                                {deletingId === item.id ? 'Deleting...' : 'Delete'}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
