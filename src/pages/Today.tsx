@@ -493,6 +493,7 @@ const Today = () => {
         }
       />
       <div className="p-4">
+        <AlertsBanner alerts={alerts} />
         {isContractor ? <ContractorView /> : <ManagerView />}
       </div>
     </div>
