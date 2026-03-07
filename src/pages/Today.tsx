@@ -321,7 +321,7 @@ const Today = () => {
             <Sheet>
               <SheetTrigger asChild>
                 <Button size="sm" variant="outline">
-                  <CalendarClock className="h-4 w-4 mr-1" />Availability
+                  <CalendarDays className="h-4 w-4 mr-1" />Availability
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
