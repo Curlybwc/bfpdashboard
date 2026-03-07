@@ -702,6 +702,11 @@ const TaskDetail = () => {
 
     setActionLoading(false);
     fetchTask();
+    // Nudge for after photos
+    const hasAfterPhoto = photos.some((p: any) => p.phase === 'after');
+    if (!hasAfterPhoto) {
+      toast({ title: '📷 Add an after photo', description: 'Document the completed work for this task.' });
+    }
   };
 
   const canComplete = hasChildren ? allChildrenDone : true;
