@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
+import { BLOCKER_REASONS } from '@/lib/supabase-types';
 
 interface TaskCardProps {
   task: any;
