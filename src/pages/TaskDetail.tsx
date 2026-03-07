@@ -92,6 +92,8 @@ const TaskDetail = () => {
   const [candidateSearch, setCandidateSearch] = useState('');
   const [addingCandidates, setAddingCandidates] = useState(false);
 
+  // Photo state
+  const [photos, setPhotos] = useState<any[]>([]);
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
