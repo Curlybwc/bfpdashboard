@@ -650,7 +650,8 @@ const ProjectDetail = () => {
              })
            )}
         </div>
-        <ProjectMembers projectId={id!} />
+        {/* ProjectMembers is a manager/admin concern — hide from contractors */}
+        {isManager && <ProjectMembers projectId={id!} />}
       </div>
     </div>
   );

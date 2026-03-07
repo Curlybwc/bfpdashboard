@@ -91,14 +91,14 @@ const AppRoutes = () => {
         <Route path="/shopping" element={<Shopping />} />
         <Route path="/shifts" element={<Shifts />} />
         <Route path="/availability" element={<Availability />} />
-        <Route path="/admin" element={<AdminPanel />} />
-        <Route path="/admin/recipes" element={<AdminRecipes />} />
-        <Route path="/admin/bundles" element={<AdminMaterialBundles />} />
-        <Route path="/admin/rehab-library" element={<AdminRehabLibrary />} />
-        <Route path="/admin/scope-accuracy" element={<ScopeAccuracy />} />
-        <Route path="/admin/store-sections" element={<AdminStoreSections />} />
-        <Route path="/admin/inventory/tools" element={<ToolInventory />} />
-        <Route path="/admin/inventory/materials" element={<MaterialInventory />} />
+        <Route path="/admin" element={<AdminGuard><AdminPanel /></AdminGuard>} />
+        <Route path="/admin/recipes" element={<AdminGuard><AdminRecipes /></AdminGuard>} />
+        <Route path="/admin/bundles" element={<AdminGuard><AdminMaterialBundles /></AdminGuard>} />
+        <Route path="/admin/rehab-library" element={<AdminGuard><AdminRehabLibrary /></AdminGuard>} />
+        <Route path="/admin/scope-accuracy" element={<AdminGuard><ScopeAccuracy /></AdminGuard>} />
+        <Route path="/admin/store-sections" element={<AdminGuard><AdminStoreSections /></AdminGuard>} />
+        <Route path="/admin/inventory/tools" element={<AdminGuard><ToolInventory /></AdminGuard>} />
+        <Route path="/admin/inventory/materials" element={<AdminGuard><MaterialInventory /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}
