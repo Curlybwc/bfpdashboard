@@ -361,6 +361,15 @@ const Today = () => {
   // Shift reminder: only for contractors, after 10am, no shift logged
   const showShiftReminder = isContractor && !hasShiftToday && new Date().getHours() >= 10;
 
+  // ── Derived alerts ──
+  const alerts = useMemo(() => generateAlerts({
+    inProgress, assigned, blocked, needsReview, available,
+    isAdmin, isManager, isContractor,
+    hasShiftToday, photoCountMap, projectMap,
+    userId: user!.id,
+    crewActiveTaskIds,
+  }), [inProgress, assigned, blocked, needsReview, available, isAdmin, isManager, isContractor, hasShiftToday, photoCountMap, projectMap, user, crewActiveTaskIds]);
+
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   /* ── Shared section renderer ── */
