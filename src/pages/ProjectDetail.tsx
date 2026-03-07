@@ -78,6 +78,7 @@ const ProjectDetail = () => {
 
   const userCanCreateTask = canCreateTask(isAdmin, projectRole);
   const userCanEditProject = canEditProject(isAdmin, projectRole);
+  const isContractor = !isAdmin && projectRole === 'contractor';
 
   // Build tree
   const rootTasks = useMemo(() => tasks.filter((t) => !t.parent_task_id), [tasks]);
@@ -92,14 +93,84 @@ const ProjectDetail = () => {
     return map;
   }, [tasks]);
 
-  const getTaskActual = (t: any): number => {
-    const children = childrenMap[t.id];
-    if (children && children.length > 0) {
-      return children.reduce((sum: number, c: any) => sum + (c.actual_total_cost ?? 0), 0);
+  // "What next?" derivation — leaf tasks only (no double-counting parents)
+  const whatNext = useMemo(() => {
+    const leafTasks = tasks.filter((t) => !(childrenMap[t.id]?.length) && t.stage !== 'Done');
+    const blocked = leafTasks.filter((t) => t.is_blocked);
+    const inProgress = leafTasks.filter((t) => !t.is_blocked && t.stage === 'In Progress');
+    const ready = leafTasks.filter((t) => !t.is_blocked && t.stage === 'Ready');
+    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id);
+    const waitingMaterials = ready.filter((t) => t.materials_on_site === 'No');
+
+    const sortByPriority = (a: any, b: any) => {
+      const pa = a.priority || '5 – Later';
+      const pb = b.priority || '5 – Later';
+      if (pa !== pb) return pa.localeCompare(pb);
+      const sa = a.sort_order ?? 999999;
+      const sb = b.sort_order ?? 999999;
+      if (sa !== sb) return sa - sb;
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    };
+
+    const sortedReady = [...ready].sort(sortByPriority);
+    const sortedBlocked = [...blocked].sort(sortByPriority);
+    const sortedUnassigned = [...readyUnassigned].sort(sortByPriority);
+
+    // Recommendation — contractor filters to own tasks
+    let recommendation = '';
+    let recommendationType: 'blocked' | 'unassigned' | 'ready' | 'progress' | 'done' = 'done';
+
+    if (isContractor) {
+      const myBlocked = blocked.filter((t) => t.assigned_to_user_id === user?.id);
+      const myInProgress = inProgress.filter((t) => t.assigned_to_user_id === user?.id);
+      const myReady = sortedReady.filter((t) => t.assigned_to_user_id === user?.id);
+      const available = sortedReady.filter((t) => !t.assigned_to_user_id);
+      if (myBlocked.length > 0) {
+        recommendation = `Needs action: ${myBlocked.length} blocked task${myBlocked.length !== 1 ? 's' : ''}`;
+        recommendationType = 'blocked';
+      } else if (myReady.length > 0) {
+        recommendation = `Start next: ${myReady[0].task}`;
+        recommendationType = 'ready';
+      } else if (available.length > 0) {
+        recommendation = `Available: ${available[0].task}`;
+        recommendationType = 'ready';
+      } else if (myInProgress.length > 0) {
+        recommendation = `${myInProgress.length} task${myInProgress.length !== 1 ? 's' : ''} in progress`;
+        recommendationType = 'progress';
+      } else {
+        recommendation = 'All caught up';
+        recommendationType = 'done';
+      }
+    } else {
+      if (blocked.length > 0) {
+        recommendation = `Needs action: ${blocked.length} blocked task${blocked.length !== 1 ? 's' : ''}`;
+        recommendationType = 'blocked';
+      } else if (readyUnassigned.length > 0) {
+        recommendation = `Assign next: ${readyUnassigned.length} ready task${readyUnassigned.length !== 1 ? 's' : ''} unassigned`;
+        recommendationType = 'unassigned';
+      } else if (sortedReady.length > 0) {
+        recommendation = `Start next: ${sortedReady[0].task}`;
+        recommendationType = 'ready';
+      } else if (inProgress.length > 0) {
+        recommendation = `${inProgress.length} task${inProgress.length !== 1 ? 's' : ''} in progress`;
+        recommendationType = 'progress';
+      } else {
+        recommendation = 'All caught up';
+        recommendationType = 'done';
+      }
     }
-    return t.actual_total_cost ?? 0;
-  };
-  const projectTotalActual = rootTasks.reduce((sum, t) => sum + getTaskActual(t), 0);
+
+    return {
+      blocked, inProgress, ready, readyUnassigned, waitingMaterials,
+      sortedBlocked, sortedReady, sortedUnassigned,
+      recommendation, recommendationType,
+      hasAnyWork: leafTasks.length > 0,
+      // Contractor-specific counts
+      myBlocked: blocked.filter((t) => t.assigned_to_user_id === user?.id),
+      myInProgress: inProgress.filter((t) => t.assigned_to_user_id === user?.id),
+      available: ready.filter((t) => !t.assigned_to_user_id),
+    };
+  }, [tasks, childrenMap, isContractor, user?.id]);
 
   const toggleExpanded = (taskId: string) => {
     setExpandedIds((prev) => {
