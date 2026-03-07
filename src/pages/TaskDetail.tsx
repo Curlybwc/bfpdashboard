@@ -105,7 +105,7 @@ const TaskDetail = () => {
   const [actualCost, setActualCost] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
 
-  useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
+  useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); fetchPhotos(); }, [taskId]);
 
   // Fetch active blocker when task loads
   useEffect(() => {
