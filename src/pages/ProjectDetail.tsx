@@ -482,7 +482,7 @@ const ProjectDetail = () => {
               <div className={cn(
                 'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium',
                 whatNext.recommendationType === 'blocked' && 'bg-destructive/10 text-destructive',
-                whatNext.recommendationType === 'unassigned' && 'bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400',
+                whatNext.recommendationType === 'unassigned' && 'bg-accent text-accent-foreground',
                 whatNext.recommendationType === 'ready' && 'bg-primary/10 text-primary',
                 whatNext.recommendationType === 'progress' && 'bg-muted text-muted-foreground',
                 whatNext.recommendationType === 'done' && 'bg-muted text-muted-foreground',
