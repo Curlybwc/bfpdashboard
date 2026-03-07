@@ -340,6 +340,16 @@ const TaskDetail = () => {
     setChildren(data || []);
   };
 
+  const fetchPhotos = async () => {
+    if (!taskId) return;
+    const { data } = await supabase
+      .from('task_photos' as any)
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+    setPhotos(data || []);
+  };
+
   const handleExpandRecipe = async (recipeId: string) => {
     if (!taskId || !task || !user) return;
     setExpandingRecipe(true);
