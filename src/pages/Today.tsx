@@ -75,6 +75,7 @@ const Today = () => {
   const [crewActiveTaskIds, setCrewActiveTaskIds] = useState<Set<string>>(new Set());
   const [crewCandidateTaskIds, setCrewCandidateTaskIds] = useState<Set<string>>(new Set());
   const [crewWorkerCounts, setCrewWorkerCounts] = useState<Record<string, number>>({});
+  const [photoCountMap, setPhotoCountMap] = useState<Record<string, number>>({});
 
   const fetchTasks = useCallback(async () => {
     if (!user) return;
