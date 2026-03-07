@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CostLibrary from '@/components/CostLibrary';
 import AdminAliases from '@/components/AdminAliases';
+import AdminAvailability from '@/components/admin/AdminAvailability';
 import {
   Menubar,
   MenubarMenu,
@@ -27,12 +28,13 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
 
-type ActiveView = 'users' | 'cost-library' | 'aliases';
+type ActiveView = 'users' | 'cost-library' | 'aliases' | 'availability';
 
 const VIEW_LABELS: Record<ActiveView, string> = {
   users: 'Users',
   'cost-library': 'Cost Library',
   aliases: 'Aliases',
+  availability: 'Availability',
 };
 
 const AdminPanel = () => {
@@ -123,6 +125,7 @@ const AdminPanel = () => {
       label: 'Operations',
       items: [
         { label: 'Shifts', action: () => handleNav('/shifts') },
+        { label: 'Availability', action: () => handleLocal('availability') },
       ],
     },
     {
@@ -255,6 +258,7 @@ const AdminPanel = () => {
         {activeView === 'users' && usersContent}
         {activeView === 'cost-library' && <CostLibrary />}
         {activeView === 'aliases' && <AdminAliases />}
+        {activeView === 'availability' && <AdminAvailability />}
       </div>
     </div>
   );
