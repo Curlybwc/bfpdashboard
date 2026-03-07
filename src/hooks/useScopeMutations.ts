@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import type { ConversionResult } from '@/lib/scopeConversion';
+import { parseConversionResult } from '@/lib/scopeConversion';
 import type { ScopeItemStatus } from '@/lib/supabase-types';
 
 interface AddScopeItemInput {
