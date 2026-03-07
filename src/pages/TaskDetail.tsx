@@ -104,6 +104,28 @@ const TaskDetail = () => {
 
   useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); }, [taskId]);
 
+  // Fetch active blocker when task loads
+  useEffect(() => {
+    if (!taskId || !task?.is_blocked) { setActiveBlocker(null); setBlockerReporterName(''); return; }
+    const fetchBlocker = async () => {
+      const { data } = await supabase
+        .from('task_blockers')
+        .select('*')
+        .eq('task_id', taskId)
+        .is('resolved_at', null)
+        .order('blocked_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setActiveBlocker(data);
+      if (data?.blocked_by_user_id) {
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', data.blocked_by_user_id).single();
+        setBlockerReporterName(profile?.full_name || 'Unknown');
+      }
+    };
+    fetchBlocker();
+  }, [taskId, task?.is_blocked]);
+
+
   // Recipe suggestion effect
   useEffect(() => {
     if (!task) { setSuggestedRecipe(null); setRecipeSearchDone(false); return; }
