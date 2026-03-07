@@ -1,100 +1,97 @@
 
 
-## Plan: Refactor Today into Role-Specific Daily Dashboard
+## Plan: Crew Tasks (Multi-Person, Multi-Day)
 
-### Files Changed
+### 1. Database Migration
 
-1. **`src/pages/Today.tsx`** — primary refactor (section layout, labels, ranking, shift check)
-2. **`src/components/NextUpCard.tsx`** — new, presentational only
-3. **`src/components/DailyReminders.tsx`** — new, presentational only
+Single migration adding columns, tables, indexes, RLS, and a helper function.
 
----
+**New columns on `tasks`:**
+- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
+- `lead_user_id uuid NULL`
 
-### 1. `src/components/NextUpCard.tsx` (new)
-
-Pure presentational component. Receives a single task object plus the same metadata props TaskCard uses (projectMap, parentTitles, etc.).
-
-**Props:**
-```typescript
-{ task: any | null; projectName: string; projectAddress?: string;
-  parentTitle?: string; userId: string; isAdmin: boolean;
-  onUpdate: () => void; crewProps: { isCrewTask; isActiveWorker; isCandidate; activeWorkerCount }; }
+**New table `task_candidates` (eligibility pool):**
+```sql
+CREATE TABLE public.task_candidates (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
 ```
 
-**Renders:**
-- If `task` is null: a compact Card with "You're all caught up — nothing queued right now."
-- If task exists: a slightly emphasized Card (e.g. `bg-primary/5 border-primary/20`) containing a single TaskCard with a small label "Suggested next" above it. No extra logic — just wrapping and styling.
-
-### 2. `src/components/DailyReminders.tsx` (new)
-
-Pure presentational. Receives pre-computed flags.
-
-**Props:**
-```typescript
-{ showShiftReminder: boolean; onLogShift: () => void; }
+**New table `task_workers` (active crew):**
+```sql
+CREATE TABLE public.task_workers (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
+CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
 ```
 
-**Renders:**
-- If `showShiftReminder`: a compact alert-style card — "You haven't logged a shift today" with a "Log Shift" button calling `onLogShift`.
-- If no reminders apply: renders nothing.
-- No photo reminders (repo has no photo tracking). This is a documented future gap.
+**RLS on `task_candidates`:**
+- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
+- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
 
-### 3. `src/pages/Today.tsx` — Refactor
+**RLS on `task_workers`:**
+- SELECT: same as task_candidates SELECT
+- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
+- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
+- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
 
-**Data fetching additions** (inside existing `fetchTasks`):
-- Add one parallel query to check if current user has a shift today:
-  ```typescript
-  supabase.from('shifts').select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id).eq('shift_date', todayStr)
-  ```
-- Store result as `hasShiftToday` boolean state.
+### 2. Today Tab (`src/pages/Today.tsx`)
 
-**Next Up ranking** (computed after state is set, before render):
-- Combine `inProgress` + `assigned` (non-blocked tasks already assigned to me).
-- Sort by: stage (`'In Progress'` before `'Ready'`) → priority (ascending) → sort_order (nulls last) → due_date (ascending, nulls last) → created_at (ascending).
-- First result = `nextUpTask`. This is a simple deterministic pick from existing data, not a recommendation engine.
+Add two additional queries in `fetchTasks` after existing solo queries:
 
-**Role check:** `const isContractor = !isAdmin && !isManager;`
+**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
 
-**Section labels by role:**
+**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
 
-| Section | Contractor Label | Manager/Admin Label |
-|---------|-----------------|-------------------|
-| Blocked | Blocked (count) | Blocked (count) |
-| Needs Review | *(not shown)* | Needs Review |
-| In Progress | Working Now | In Progress |
-| Assigned | Up Next | Assigned |
-| Available | Available to Take | Available |
+Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
 
-**Contractor layout order:**
-```
-NextUpCard (hero — shows nextUpTask, or empty state)
-DailyReminders (shift nudge if applicable)
-Blocked (only if count > 0)
-Working Now (inProgress, filtered to exclude nextUpTask)
-Up Next (assigned)
-Available to Take (available)
-```
+### 3. TaskCard (`src/components/TaskCard.tsx`)
 
-**Manager/Admin layout order:**
-```
-Needs Review (always shown, with empty state "No tasks pending review.")
-Blocked (always shown, with count)
-In Progress
-Assigned
-Available
-```
+Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
 
-**Shift reminder condition** (computed in Today.tsx, passed as prop):
-- `showShiftReminder = !hasShiftToday && new Date().getHours() >= 10`
+When `isCrewTask`:
+- Show a small crew icon + "N active" badge next to status
+- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
+- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
+- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
+- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
 
-**NextUpCard exclusion**: When the nextUpTask is rendered in the hero card, filter it out of the "Working Now" or "Up Next" section list to avoid duplication.
+### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
 
-**No other changes**: fetchTasks queries, TaskCard component, crew logic, blocker logic, header actions (Availability sheet, Log Shift, Field Mode) all remain identical.
+**Crew toggle** (visible to admin/manager only, below Assigned To):
+- Switch labeled "Crew Task"
+- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
+- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
 
-### Summary of What Doesn't Change
-- No database/schema/RLS changes
-- No changes to TaskCard, MobileNav, routes, or any other page
-- No changes to task assignment, crew eligibility, or blocker logic
-- Header action buttons preserved as-is
+**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
+- "Active Crew" list showing names from `task_workers` joined to `profiles`
+- Join/Leave button for current user
+- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+
+**Solo mode**: keep existing Assigned To UI unchanged.
+
+### 5. Files to Modify
+
+1. **Migration SQL** — new columns, tables, indexes, RLS
+2. `src/pages/Today.tsx` — crew task queries merged into sections
+3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
+4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
+5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
+
+### 6. Key Edge Cases
+
+- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
+- Crew Available shows even when task is 'In Progress' (multiple people can join)
+- Upsert PK on `task_workers` prevents duplicate joins
+- Done tasks filtered out everywhere by existing stage checks
+- Crew→Solo cleanup deletes both tables to prevent orphan rows
 

@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
+import NextUpCard from '@/components/NextUpCard';
+import DailyReminders from '@/components/DailyReminders';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Zap, Clock, CalendarDays } from 'lucide-react';
@@ -16,6 +18,41 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import AvailabilityForm from '@/components/AvailabilityForm';
+
+/* ── Priority sort helpers ── */
+const PRIORITY_ORDER: Record<string, number> = {
+  '1 – Now': 1,
+  '2 – This Week': 2,
+  '3 – Soon': 3,
+  '4 – When Time': 4,
+  '5 – Later': 5,
+};
+
+const STAGE_ORDER: Record<string, number> = {
+  'In Progress': 0,
+  'Ready': 1,
+};
+
+function rankTasks(a: any, b: any): number {
+  // Stage: In Progress before Ready
+  const sa = STAGE_ORDER[a.stage] ?? 9;
+  const sb = STAGE_ORDER[b.stage] ?? 9;
+  if (sa !== sb) return sa - sb;
+  // Priority ascending
+  const pa = PRIORITY_ORDER[a.priority] ?? 9;
+  const pb = PRIORITY_ORDER[b.priority] ?? 9;
+  if (pa !== pb) return pa - pb;
+  // sort_order ascending, nulls last
+  const oa = a.sort_order ?? 999999;
+  const ob = b.sort_order ?? 999999;
+  if (oa !== ob) return oa - ob;
+  // due_date ascending, nulls last
+  const da = a.due_date ?? '9999-12-31';
+  const db = b.due_date ?? '9999-12-31';
+  if (da !== db) return da < db ? -1 : 1;
+  // created_at ascending
+  return (a.created_at || '') < (b.created_at || '') ? -1 : 1;
+}
 
 const Today = () => {
   const { user } = useAuth();
@@ -32,6 +69,7 @@ const Today = () => {
   const [assigneeMap, setAssigneeMap] = useState<Record<string, string>>({});
   const [isManager, setIsManager] = useState(false);
   const [blockerMap, setBlockerMap] = useState<Record<string, { reason: string; needs_from_manager?: string | null }>>({});
+  const [hasShiftToday, setHasShiftToday] = useState(true); // default true to suppress flash
 
   // Crew task state
   const [crewActiveTaskIds, setCrewActiveTaskIds] = useState<Set<string>>(new Set());
@@ -41,6 +79,8 @@ const Today = () => {
   const fetchTasks = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+
+    const todayStr = new Date().toISOString().slice(0, 10);
 
     const { data: memberships } = await supabase
       .from('project_members')
@@ -62,8 +102,8 @@ const Today = () => {
     }
     setIsManager(hasManagerRole);
 
-    // Solo queries + crew membership queries in parallel
-    const [ipRes, assignedRes, availRes, myWorkerRows, myCandidateRows] = await Promise.all([
+    // Solo queries + crew membership queries + shift check in parallel
+    const [ipRes, assignedRes, availRes, myWorkerRows, myCandidateRows, shiftCheck] = await Promise.all([
       supabase
         .from('tasks')
         .select('*')
@@ -103,7 +143,15 @@ const Today = () => {
         .from('task_candidates')
         .select('task_id')
         .eq('user_id', user.id),
+      // Shift check for today
+      supabase
+        .from('shifts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('shift_date', todayStr),
     ]);
+
+    setHasShiftToday((shiftCheck.count ?? 0) > 0);
 
     const myActiveTaskIds = new Set((myWorkerRows.data || []).map(r => r.task_id));
     const myCandidateIds = new Set((myCandidateRows.data || []).map(r => r.task_id));
@@ -149,7 +197,6 @@ const Today = () => {
     // Fetch blocked tasks
     let blockedTasks: any[] = [];
     if (isAdmin || hasManagerRole) {
-      // Managers/admins see all blocked tasks across their projects
       const { data: blockedRes } = await supabase
         .from('tasks')
         .select('*')
@@ -160,18 +207,14 @@ const Today = () => {
         .limit(30);
       blockedTasks = blockedRes || [];
     } else {
-      // Contractors see their own blocked tasks (assigned or active crew worker)
       const myBlockedIds = new Set<string>();
-      // From solo assigned
       mergedIp.concat(assignedRes.data || []).forEach(t => {
         if (t.is_blocked) myBlockedIds.add(t.id);
       });
-      // From crew active
       crewIpTasks.forEach(t => {
         if (t.is_blocked) myBlockedIds.add(t.id);
       });
       blockedTasks = [...mergedIp, ...(assignedRes.data || []), ...crewIpTasks].filter(t => myBlockedIds.has(t.id));
-      // Dedupe
       const seen = new Set<string>();
       blockedTasks = blockedTasks.filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
     }
@@ -276,8 +319,34 @@ const Today = () => {
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
+  /* ── Derived state ── */
+  const isContractor = !isAdmin && !isManager;
+
+  // Next Up: deterministic pick from contractor's non-blocked assigned work
+  const nextUpTask = useMemo(() => {
+    if (!isContractor) return null;
+    const candidates = [...inProgress, ...assigned].filter(t => !t.is_blocked);
+    candidates.sort(rankTasks);
+    return candidates[0] || null;
+  }, [isContractor, inProgress, assigned]);
+
+  // Filter nextUpTask out of its source section to avoid duplication
+  const filteredInProgress = useMemo(() => {
+    if (!nextUpTask) return inProgress;
+    return inProgress.filter(t => t.id !== nextUpTask.id);
+  }, [inProgress, nextUpTask]);
+
+  const filteredAssigned = useMemo(() => {
+    if (!nextUpTask) return assigned;
+    return assigned.filter(t => t.id !== nextUpTask.id);
+  }, [assigned, nextUpTask]);
+
+  // Shift reminder: only for contractors, after 10am, no shift logged
+  const showShiftReminder = isContractor && !hasShiftToday && new Date().getHours() >= 10;
+
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
+  /* ── Shared section renderer ── */
   const Section = ({ title, tasks, emptyText, isBlockedSection = false }: { title: string; tasks: any[]; emptyText: string; isBlockedSection?: boolean }) => (
     <div className="mb-6">
       <h2 className={cn(
@@ -312,6 +381,59 @@ const Today = () => {
     </div>
   );
 
+  /* ── Contractor layout ── */
+  const ContractorView = () => (
+    <>
+      {/* Next Up hero */}
+      <div className="mb-6">
+        <NextUpCard
+          task={nextUpTask}
+          projectName={nextUpTask ? (projectMap[nextUpTask.project_id]?.name || '') : ''}
+          projectAddress={nextUpTask ? projectMap[nextUpTask.project_id]?.address : undefined}
+          parentTitle={nextUpTask?.parent_task_id ? parentTitles[nextUpTask.parent_task_id] : undefined}
+          userId={user!.id}
+          isAdmin={isAdmin}
+          onUpdate={fetchTasks}
+          isCrewTask={nextUpTask?.assignment_mode === 'crew'}
+          isActiveWorker={nextUpTask ? crewActiveTaskIds.has(nextUpTask.id) : false}
+          isCandidate={nextUpTask ? crewCandidateTaskIds.has(nextUpTask.id) : false}
+          activeWorkerCount={nextUpTask ? (crewWorkerCounts[nextUpTask.id] || 0) : 0}
+          blockerInfo={nextUpTask ? (blockerMap[nextUpTask.id] || null) : null}
+        />
+      </div>
+
+      {/* Shift reminder */}
+      {showShiftReminder && (
+        <div className="mb-6">
+          <DailyReminders
+            showShiftReminder={showShiftReminder}
+            onLogShift={() => navigate('/shifts')}
+          />
+        </div>
+      )}
+
+      {/* Blocked — only when present */}
+      {blocked.length > 0 && (
+        <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="" isBlockedSection />
+      )}
+
+      <Section title="Working Now" tasks={filteredInProgress} emptyText="No tasks in progress." />
+      <Section title="Up Next" tasks={filteredAssigned} emptyText="No assigned tasks." />
+      <Section title="Available to Take" tasks={available} emptyText="No tasks available for dibs." />
+    </>
+  );
+
+  /* ── Manager / Admin layout ── */
+  const ManagerView = () => (
+    <>
+      <Section title="Needs Review" tasks={needsReview} emptyText="No tasks pending review." />
+      <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
+      <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
+      <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />
+      <Section title="Available" tasks={available} emptyText="No tasks available for dibs." />
+    </>
+  );
+
   return (
     <div className="pb-20">
       <PageHeader
@@ -343,17 +465,7 @@ const Today = () => {
         }
       />
       <div className="p-4">
-        {(isAdmin || isManager) && needsReview.length > 0 && (
-          <Section title="Needs Review" tasks={needsReview} emptyText="" />
-        )}
-        {(isAdmin || isManager) ? (
-          <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
-        ) : blocked.length > 0 ? (
-          <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="" isBlockedSection />
-        ) : null}
-        <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
-        <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />
-        <Section title="Available" tasks={available} emptyText="No tasks available for dibs." />
+        {isContractor ? <ContractorView /> : <ManagerView />}
       </div>
     </div>
   );
