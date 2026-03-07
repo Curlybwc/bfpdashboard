@@ -76,14 +76,14 @@ const AppRoutes = () => {
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
         <Route path="/today" element={<Today />} />
-        <Route path="/today/field-mode" element={<FieldModeCapture />} />
-        <Route path="/today/field-mode/preview" element={<FieldModePreview />} />
+        <Route path="/today/field-mode" element={<ManagerGuard><FieldModeCapture /></ManagerGuard>} />
+        <Route path="/today/field-mode/preview" element={<ManagerGuard><FieldModePreview /></ManagerGuard>} />
         <Route path="/projects" element={<ProjectList />} />
         <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/projects/:id/materials" element={<ProjectMaterials />} />
-        <Route path="/projects/:id/field-mode" element={<FieldModeCapture />} />
-        <Route path="/projects/:id/field-mode/preview" element={<FieldModePreview />} />
-        <Route path="/projects/:id/walkthrough" element={<ProjectWalkthrough />} />
+        <Route path="/projects/:id/field-mode" element={<ManagerGuard><FieldModeCapture /></ManagerGuard>} />
+        <Route path="/projects/:id/field-mode/preview" element={<ManagerGuard><FieldModePreview /></ManagerGuard>} />
+        <Route path="/projects/:id/walkthrough" element={<ManagerGuard><ProjectWalkthrough /></ManagerGuard>} />
         <Route path="/projects/:projectId/tasks/:taskId" element={<TaskDetail />} />
         <Route path="/scopes" element={<ManagerGuard><ScopeList /></ManagerGuard>} />
         <Route path="/scopes/:id" element={<ManagerGuard><ScopeDetail /></ManagerGuard>} />
