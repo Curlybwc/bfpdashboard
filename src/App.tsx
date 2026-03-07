@@ -26,6 +26,7 @@ import MaterialInventory from "./pages/MaterialInventory";
 import Today from "./pages/Today";
 import Shopping from "./pages/Shopping";
 import Shifts from "./pages/Shifts";
+import Availability from "./pages/Availability";
 import FieldModeCapture from "./pages/FieldModeCapture";
 import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
