@@ -62,6 +62,7 @@ const ProjectDetail = () => {
   const { data, isLoading } = useProjectDetail(id);
   const project = data?.project;
   const tasks = data?.tasks ?? [];
+  const photoCountMap = data?.photoCountMap ?? {};
   const projectMembers = data?.members ?? [];
 
   // Mutations
