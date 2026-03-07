@@ -23,6 +23,7 @@ import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, type TaskStage, type Tas
 import { canReportBlocker, canResolveBlocker } from '@/lib/permissions';
 import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
+import TaskPhotos from '@/components/TaskPhotos';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
 import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
