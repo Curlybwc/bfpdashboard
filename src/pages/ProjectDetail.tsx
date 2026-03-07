@@ -84,6 +84,7 @@ const ProjectDetail = () => {
   const [matQty, setMatQty] = useState('');
   const [matUnit, setMatUnit] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
