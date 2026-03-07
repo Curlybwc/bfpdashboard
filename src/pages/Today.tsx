@@ -302,6 +302,9 @@ const Today = () => {
         {(isAdmin || isManager) && needsReview.length > 0 && (
           <Section title="Needs Review" tasks={needsReview} emptyText="" />
         )}
+        {blocked.length > 0 && (
+          <Section title="Blocked" tasks={blocked} emptyText="" />
+        )}
         <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
         <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />
         <Section title="Available" tasks={available} emptyText="No tasks available for dibs." />
