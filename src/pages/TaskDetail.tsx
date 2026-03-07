@@ -727,11 +727,46 @@ const TaskDetail = () => {
           {isCrewMode && meIsActiveWorker && (
             <Button variant="outline" onClick={handleLeaveCrew} disabled={actionLoading}>Leave</Button>
           )}
+          {showBlockerButton && (
+            <Button variant="destructive" size="sm" onClick={() => setBlockerSheetOpen(true)} disabled={actionLoading}>
+              <AlertTriangle className="h-4 w-4 mr-1" />Blocked
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setMaterialsOpen(true)}>
             <Package className="h-4 w-4" />
             Materials
           </Button>
         </div>
+
+        {/* Active blocker display card */}
+        {task.is_blocked && activeBlocker && (
+          <Card className="p-3 space-y-2 border-destructive/50 bg-destructive/5">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+              <StatusBadge status="Blocked" />
+              <span className="text-sm font-medium">
+                {BLOCKER_REASONS.find(r => r.value === activeBlocker.reason)?.label || activeBlocker.reason}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Reported by {blockerReporterName} · {new Date(activeBlocker.blocked_at).toLocaleDateString()}
+            </p>
+            {activeBlocker.note && (
+              <p className="text-sm">{activeBlocker.note}</p>
+            )}
+            {activeBlocker.needs_from_manager && (
+              <div className="text-sm border-l-2 border-destructive/30 pl-2">
+                <span className="text-xs font-medium text-muted-foreground">Needs from manager:</span>
+                <p>{activeBlocker.needs_from_manager}</p>
+              </div>
+            )}
+            {canResolveBlocker(isAdmin, projectRole) && (
+              <Button size="sm" variant="outline" onClick={() => setResolveDialogOpen(true)}>
+                <CheckCircle2 className="h-4 w-4 mr-1" />Resolve
+              </Button>
+            )}
+          </Card>
+        )}
 
         {/* Recipe: read-only badge if already expanded */}
         {task.expanded_recipe_id && suggestedRecipe && (
