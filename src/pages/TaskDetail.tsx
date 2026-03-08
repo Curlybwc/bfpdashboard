@@ -351,6 +351,8 @@ const TaskDetail = () => {
         setDueDate(data.due_date || '');
         setActualCost(data.actual_total_cost?.toString() || '');
         setAssignedTo(data.assigned_to_user_id || 'unassigned');
+        setIsRecurring(data.is_recurring || false);
+        setRecurrenceFrequency((data.recurrence_frequency as RecurrenceFrequency) || 'weekly');
       }
     });
   };
