@@ -389,6 +389,23 @@ const TaskCard = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleComplete(true); }}>
+              Complete Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
