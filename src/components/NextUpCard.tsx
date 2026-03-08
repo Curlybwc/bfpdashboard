@@ -16,6 +16,7 @@ interface NextUpCardProps {
   activeWorkerCount?: number;
   blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
   photoCount?: number;
+  materialCount?: number;
 }
 
 const NextUpCard = ({
@@ -32,6 +33,7 @@ const NextUpCard = ({
   activeWorkerCount = 0,
   blockerInfo,
   photoCount = 0,
+  materialCount = 0,
 }: NextUpCardProps) => {
   if (!task) {
     return (
@@ -67,6 +69,7 @@ const NextUpCard = ({
           activeWorkerCount={activeWorkerCount}
           blockerInfo={blockerInfo}
           photoCount={photoCount}
+          materialCount={materialCount}
         />
       </div>
     </div>

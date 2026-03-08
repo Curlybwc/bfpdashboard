@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
@@ -10,11 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle, CircleDot, Circle, UserX, Wrench, CheckSquare, CalendarDays } from 'lucide-react';
+import { Plus, ChevronDown, X, Mic, Zap, Package, Trash2, Loader2, Pencil, CalendarDays, CheckSquare } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type RecurrenceFrequency } from '@/lib/supabase-types';
@@ -28,31 +25,9 @@ import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
 import { canCreateTask, canEditProject, getProjectRole } from '@/lib/permissions';
 import { useQueryClient } from '@tanstack/react-query';
-
-/** Compact collapsible group for the "What next?" section */
-const WhatNextGroup = ({ label, count, tasks, projectId, open, onToggle }: { label: string; count: number; tasks: any[]; projectId: string; open?: boolean; onToggle?: () => void }) => (
-  <Collapsible open={open} onOpenChange={onToggle}>
-    <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-0.5">
-      <ChevronRight className="h-3.5 w-3.5 transition-transform [[data-state=open]>&]:rotate-90" />
-      {label} ({count})
-    </CollapsibleTrigger>
-    <CollapsibleContent className="pt-1 pl-5 space-y-0.5">
-      {tasks.slice(0, 3).map((t: any) => (
-        <Link
-          key={t.id}
-          to={`/projects/${projectId}/tasks/${t.id}`}
-          className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors"
-        >
-          <span className="truncate flex-1">{t.task}</span>
-          <Badge variant="outline" className="text-[10px] shrink-0">{t.priority?.split(' – ')[0] || '?'}</Badge>
-        </Link>
-      ))}
-      {count > 3 && (
-        <p className="text-xs text-muted-foreground px-2">+{count - 3} more</p>
-      )}
-    </CollapsibleContent>
-  </Collapsible>
-);
+import WhatNextCard from '@/components/WhatNextCard';
+import { computeWhatNext, computeProjectTotalActual } from '@/lib/projectSummary';
+import { filterContractorTasks, includeParentTasks, buildChildrenMap, buildAssigneeMap } from '@/lib/projectTaskFiltering';
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -67,9 +42,10 @@ const ProjectDetail = () => {
   const project = data?.project;
   const allTasks = data?.tasks ?? [];
   const photoCountMap = data?.photoCountMap ?? {};
+  const materialCountMap = data?.materialCountMap ?? {};
   const projectMembers = data?.members ?? [];
-  const myActiveWorkerTaskIds = new Set(data?.myActiveWorkerTaskIds ?? []);
-  const myCandidateTaskIds = new Set(data?.myCandidateTaskIds ?? []);
+  const myActiveWorkerTaskIds = useMemo(() => new Set(data?.myActiveWorkerTaskIds ?? []), [data?.myActiveWorkerTaskIds]);
+  const myCandidateTaskIds = useMemo(() => new Set(data?.myCandidateTaskIds ?? []), [data?.myCandidateTaskIds]);
 
   // Mutations
   const createTaskMutation = useCreateTask(id);
@@ -101,163 +77,44 @@ const ProjectDetail = () => {
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
 
-  // Derived
+  // Derived role & permissions
   const projectRole = useMemo(
     () => (user ? getProjectRole(projectMembers, user.id) : null),
     [projectMembers, user],
   );
-
-  const assigneeMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    projectMembers.forEach((m) => {
-      map[m.user_id] = m.profiles?.full_name || 'Unnamed';
-    });
-    return map;
-  }, [projectMembers]);
-
+  const assigneeMap = useMemo(() => buildAssigneeMap(projectMembers), [projectMembers]);
   const userCanCreateTask = canCreateTask(isAdmin, projectRole);
   const userCanEditProject = canEditProject(isAdmin, projectRole);
   const isContractor = !isAdmin && projectRole === 'contractor';
+  const isManager = isAdmin || projectRole === 'manager';
 
-  // For contractors, filter tasks to only show relevant ones
+  // Task filtering (contractor vs full view)
   const tasks = useMemo(() => {
     if (!isContractor || !user) return allTasks;
-    return allTasks.filter((t) => {
-      // Assigned to me
-      if (t.assigned_to_user_id === user.id) return true;
-      // I'm an active crew worker
-      if (myActiveWorkerTaskIds.has(t.id)) return true;
-      // I'm a candidate for this crew task
-      if (myCandidateTaskIds.has(t.id)) return true;
-      // Unassigned solo tasks that are Ready (available to pick up) — exclude outside vendor
-      if (!t.assigned_to_user_id && t.assignment_mode === 'solo' && t.stage === 'Ready' && !t.is_outside_vendor) return true;
-      // Parent task whose children I should see
-      if (t.parent_task_id) {
-        // Show if parent is visible (handled by parent filter)
-        return false;
-      }
-      return false;
-    });
+    return filterContractorTasks(allTasks, user.id, myActiveWorkerTaskIds, myCandidateTaskIds);
   }, [allTasks, isContractor, user, myActiveWorkerTaskIds, myCandidateTaskIds]);
 
-  // For contractors, also include parent tasks if any of their children are visible
-  const visibleTaskIds = useMemo(() => new Set(tasks.map(t => t.id)), [tasks]);
   const tasksWithParents = useMemo(() => {
     if (!isContractor) return tasks;
-    const parentIds = new Set<string>();
-    tasks.forEach(t => {
-      if (t.parent_task_id && !visibleTaskIds.has(t.parent_task_id)) {
-        parentIds.add(t.parent_task_id);
-      }
-    });
-    if (parentIds.size === 0) return tasks;
-    const parents = allTasks.filter(t => parentIds.has(t.id));
-    return [...parents, ...tasks];
-  }, [tasks, allTasks, isContractor, visibleTaskIds]);
+    return includeParentTasks(tasks, allTasks);
+  }, [tasks, allTasks, isContractor]);
 
   // Build tree
   const rootTasks = useMemo(() => tasksWithParents.filter((t) => !t.parent_task_id), [tasksWithParents]);
-  const childrenMap = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    tasks.forEach((t) => {
-      if (t.parent_task_id) {
-        if (!map[t.parent_task_id]) map[t.parent_task_id] = [];
-        map[t.parent_task_id].push(t);
-      }
-    });
-    return map;
-  }, [tasks]);
+  const childrenMap = useMemo(() => buildChildrenMap(tasks), [tasks]);
 
-  // "What next?" derivation — leaf tasks only (no double-counting parents)
-  const whatNext = useMemo(() => {
-    const leafTasks = tasks.filter((t) => !(childrenMap[t.id]?.length) && t.stage !== 'Done');
-    const blocked = leafTasks.filter((t) => t.is_blocked);
-    const inProgress = leafTasks.filter((t) => !t.is_blocked && t.stage === 'In Progress');
-    const ready = leafTasks.filter((t) => !t.is_blocked && t.stage === 'Ready');
-    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id && t.assignment_mode !== 'crew' && !t.is_outside_vendor);
-    const waitingMaterials = ready.filter((t) => t.materials_on_site === 'No');
+  // "What next?" summary
+  const whatNext = useMemo(
+    () => computeWhatNext(tasks, childrenMap, isContractor, user?.id),
+    [tasks, childrenMap, isContractor, user?.id],
+  );
 
-    const sortByPriority = (a: any, b: any) => {
-      const pa = a.priority || '5 – Later';
-      const pb = b.priority || '5 – Later';
-      if (pa !== pb) return pa.localeCompare(pb);
-      const sa = a.sort_order ?? 999999;
-      const sb = b.sort_order ?? 999999;
-      if (sa !== sb) return sa - sb;
-      return (a.created_at || '').localeCompare(b.created_at || '');
-    };
+  const projectTotalActual = useMemo(
+    () => computeProjectTotalActual(rootTasks, childrenMap),
+    [rootTasks, childrenMap],
+  );
 
-    const sortedReady = [...ready].sort(sortByPriority);
-    const sortedBlocked = [...blocked].sort(sortByPriority);
-    const sortedUnassigned = [...readyUnassigned].sort(sortByPriority);
-
-    // Recommendation — contractor filters to own tasks
-    let recommendation = '';
-    let recommendationType: 'blocked' | 'unassigned' | 'ready' | 'progress' | 'done' = 'done';
-
-    if (isContractor) {
-      const myBlocked = blocked.filter((t) => t.assigned_to_user_id === user?.id);
-      const myInProgress = inProgress.filter((t) => t.assigned_to_user_id === user?.id);
-      const myReady = sortedReady.filter((t) => t.assigned_to_user_id === user?.id);
-      const available = sortedReady.filter((t) => !t.assigned_to_user_id);
-      if (myBlocked.length > 0) {
-        recommendation = `Needs action: ${myBlocked.length} blocked task${myBlocked.length !== 1 ? 's' : ''}`;
-        recommendationType = 'blocked';
-      } else if (myReady.length > 0) {
-        recommendation = `Start next: ${myReady[0].task}`;
-        recommendationType = 'ready';
-      } else if (available.length > 0) {
-        recommendation = `Available: ${available[0].task}`;
-        recommendationType = 'ready';
-      } else if (myInProgress.length > 0) {
-        recommendation = `${myInProgress.length} task${myInProgress.length !== 1 ? 's' : ''} in progress`;
-        recommendationType = 'progress';
-      } else {
-        recommendation = 'All caught up';
-        recommendationType = 'done';
-      }
-    } else {
-      if (blocked.length > 0) {
-        recommendation = `Needs action: ${blocked.length} blocked task${blocked.length !== 1 ? 's' : ''}`;
-        recommendationType = 'blocked';
-      } else if (readyUnassigned.length > 0) {
-        recommendation = `Assign next: ${readyUnassigned.length} ready task${readyUnassigned.length !== 1 ? 's' : ''} unassigned`;
-        recommendationType = 'unassigned';
-      } else if (sortedReady.length > 0) {
-        recommendation = `Start next: ${sortedReady[0].task}`;
-        recommendationType = 'ready';
-      } else if (inProgress.length > 0) {
-        recommendation = `${inProgress.length} task${inProgress.length !== 1 ? 's' : ''} in progress`;
-        recommendationType = 'progress';
-      } else {
-        recommendation = 'All caught up';
-        recommendationType = 'done';
-      }
-    }
-
-    const sortedWaitingMaterials = [...waitingMaterials].sort(sortByPriority);
-
-    return {
-      blocked, inProgress, ready, readyUnassigned, waitingMaterials,
-      sortedBlocked, sortedReady, sortedUnassigned, sortedWaitingMaterials,
-      recommendation, recommendationType,
-      hasAnyWork: leafTasks.length > 0,
-      // Contractor-specific counts
-      myBlocked: blocked.filter((t) => t.assigned_to_user_id === user?.id),
-      myInProgress: inProgress.filter((t) => t.assigned_to_user_id === user?.id),
-      available: ready.filter((t) => !t.assigned_to_user_id),
-    };
-  }, [tasks, childrenMap, isContractor, user?.id]);
-
-  const getTaskActual = (t: any): number => {
-    const children = childrenMap[t.id];
-    if (children && children.length > 0) {
-      return children.reduce((sum: number, c: any) => sum + (c.actual_total_cost ?? 0), 0);
-    }
-    return t.actual_total_cost ?? 0;
-  };
-  const projectTotalActual = rootTasks.reduce((sum, t) => sum + getTaskActual(t), 0);
-
+  // UI helpers
   const toggleExpanded = (taskId: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -346,8 +203,6 @@ const ProjectDetail = () => {
 
   if (isLoading || !project) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
-  const isManager = isAdmin || projectRole === 'manager';
-
   return (
     <div className="pb-20">
       <PageHeader
@@ -376,6 +231,9 @@ const ProjectDetail = () => {
                  </Button>
               )}
               {/* Field Mode & Walkthrough are manager/admin workflows */}
+              <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
+                 <CalendarDays className="h-4 w-4 mr-1" />Calendar
+               </Button>
               {isManager && (
                 <>
                   <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
@@ -621,91 +479,14 @@ const ProjectDetail = () => {
         </div>
 
         {/* What next? section */}
-        {whatNext.hasAnyWork && (
-          <Card className="mb-4 border-primary/15">
-            <CardContent className="p-3 space-y-3">
-              <p className="text-sm font-semibold text-foreground">What next?</p>
+        <WhatNextCard
+          whatNext={whatNext}
+          projectId={id!}
+          isContractor={isContractor}
+          openGroup={openGroup}
+          setOpenGroup={setOpenGroup}
+        />
 
-              {/* Highlighted recommendation */}
-              <div className={cn(
-                'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium',
-                whatNext.recommendationType === 'blocked' && 'bg-destructive/10 text-destructive',
-                whatNext.recommendationType === 'unassigned' && 'bg-accent text-accent-foreground',
-                whatNext.recommendationType === 'ready' && 'bg-primary/10 text-primary',
-                whatNext.recommendationType === 'progress' && 'bg-muted text-muted-foreground',
-                whatNext.recommendationType === 'done' && 'bg-muted text-muted-foreground',
-              )}>
-                {whatNext.recommendationType === 'blocked' && <AlertTriangle className="h-4 w-4 shrink-0" />}
-                {whatNext.recommendationType === 'unassigned' && <UserX className="h-4 w-4 shrink-0" />}
-                {whatNext.recommendationType === 'ready' && <Circle className="h-4 w-4 shrink-0" />}
-                {whatNext.recommendationType === 'progress' && <CircleDot className="h-4 w-4 shrink-0" />}
-                <span className="truncate">{whatNext.recommendation}</span>
-              </div>
-
-              {/* Stat chips — role-specific */}
-              <div className="flex flex-wrap gap-1.5">
-                {isContractor ? (
-                  <>
-                    {whatNext.myBlocked.length > 0 && (
-                      <Badge variant="destructive" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'myblocked' ? null : 'myblocked')}>🔴 {whatNext.myBlocked.length} My Blocked</Badge>
-                    )}
-                    {whatNext.myInProgress.length > 0 && (
-                      <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'myprogress' ? null : 'myprogress')}>🔧 {whatNext.myInProgress.length} My In Progress</Badge>
-                    )}
-                    {whatNext.available.length > 0 && (
-                      <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'available' ? null : 'available')}>👤 {whatNext.available.length} Available</Badge>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {whatNext.blocked.length > 0 && (
-                      <Badge variant="destructive" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'blocked' ? null : 'blocked')}>🔴 {whatNext.blocked.length} Blocked</Badge>
-                    )}
-                    {whatNext.ready.length > 0 && (
-                      <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'ready' ? null : 'ready')}>🟢 {whatNext.ready.length} Ready</Badge>
-                    )}
-                    {whatNext.readyUnassigned.length > 0 && (
-                      <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'unassigned' ? null : 'unassigned')}>👤 {whatNext.readyUnassigned.length} Unassigned</Badge>
-                    )}
-                    {whatNext.inProgress.length > 0 && (
-                      <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'progress' ? null : 'progress')}>🔧 {whatNext.inProgress.length} In Progress</Badge>
-                    )}
-                    {whatNext.waitingMaterials.length > 0 && (
-                      <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => setOpenGroup(openGroup === 'materials' ? null : 'materials')}><Wrench className="h-3 w-3 mr-1" />{whatNext.waitingMaterials.length} Needs Materials/Tools</Badge>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Collapsible groups */}
-              {whatNext.sortedBlocked.length > 0 && (
-                <WhatNextGroup label="Blocked" count={whatNext.sortedBlocked.length} tasks={whatNext.sortedBlocked} projectId={id!} open={openGroup === 'blocked'} onToggle={() => setOpenGroup(openGroup === 'blocked' ? null : 'blocked')} />
-              )}
-              {whatNext.sortedReady.length > 0 && (
-                <WhatNextGroup label="Ready to Start" count={whatNext.sortedReady.length} tasks={whatNext.sortedReady} projectId={id!} open={openGroup === 'ready'} onToggle={() => setOpenGroup(openGroup === 'ready' ? null : 'ready')} />
-              )}
-              {whatNext.sortedUnassigned.length > 0 && (
-                <WhatNextGroup label="Unassigned" count={whatNext.sortedUnassigned.length} tasks={whatNext.sortedUnassigned} projectId={id!} open={openGroup === 'unassigned'} onToggle={() => setOpenGroup(openGroup === 'unassigned' ? null : 'unassigned')} />
-              )}
-              {whatNext.inProgress.length > 0 && (
-                <WhatNextGroup label="In Progress" count={whatNext.inProgress.length} tasks={whatNext.inProgress} projectId={id!} open={openGroup === 'progress'} onToggle={() => setOpenGroup(openGroup === 'progress' ? null : 'progress')} />
-              )}
-              {whatNext.sortedWaitingMaterials.length > 0 && (
-                <WhatNextGroup label="Needs Materials/Tools" count={whatNext.sortedWaitingMaterials.length} tasks={whatNext.sortedWaitingMaterials} projectId={id!} open={openGroup === 'materials'} onToggle={() => setOpenGroup(openGroup === 'materials' ? null : 'materials')} />
-              )}
-              {/* Contractor-specific groups */}
-              {isContractor && whatNext.myBlocked.length > 0 && (
-                <WhatNextGroup label="My Blocked" count={whatNext.myBlocked.length} tasks={whatNext.myBlocked} projectId={id!} open={openGroup === 'myblocked'} onToggle={() => setOpenGroup(openGroup === 'myblocked' ? null : 'myblocked')} />
-              )}
-              {isContractor && whatNext.myInProgress.length > 0 && (
-                <WhatNextGroup label="My In Progress" count={whatNext.myInProgress.length} tasks={whatNext.myInProgress} projectId={id!} open={openGroup === 'myprogress'} onToggle={() => setOpenGroup(openGroup === 'myprogress' ? null : 'myprogress')} />
-              )}
-              {isContractor && whatNext.available.length > 0 && (
-                <WhatNextGroup label="Available" count={whatNext.available.length} tasks={whatNext.available} projectId={id!} open={openGroup === 'available'} onToggle={() => setOpenGroup(openGroup === 'available' ? null : 'available')} />
-              )}
-            </CardContent>
-          </Card>
-        )}
         {bulkMode && (
           <BulkTaskBar
             selectedIds={selectedTaskIds}
@@ -732,14 +513,14 @@ const ProjectDetail = () => {
                       className="mt-4 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                      <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
                     </div>
                   </div>
                   {isExpanded && children.map((child: any) => (
                     <div key={child.id} className="flex items-start gap-2">
                       <Checkbox checked={selectedTaskIds.has(child.id)} onCheckedChange={() => toggleTaskSelection(child.id)} className="mt-4 ml-6 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                        <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} materialCount={materialCountMap[child.id] || 0} />
                       </div>
                     </div>
                   ))}
@@ -763,10 +544,10 @@ const ProjectDetail = () => {
               const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
               return (
                 <SortableTaskItem key={t.id} id={t.id}>
-                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
                   {isExpanded && children.map((child: any) => (
                     <div key={child.id} className="mt-2">
-                      <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                      <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} materialCount={materialCountMap[child.id] || 0} />
                     </div>
                   ))}
                 </SortableTaskItem>
@@ -782,16 +563,15 @@ const ProjectDetail = () => {
               const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
               return (
                 <div key={t.id}>
-                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
                   {isExpanded && children.map((child: any) => (
-                    <TaskCard key={child.id} task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                    <TaskCard key={child.id} task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} materialCount={materialCountMap[child.id] || 0} />
                   ))}
                 </div>
               );
             })}
           </div>
         )}
-        {/* ProjectMembers is a manager/admin concern — hide from contractors */}
         {isManager && <ProjectMembers projectId={id!} />}
       </div>
     </div>
