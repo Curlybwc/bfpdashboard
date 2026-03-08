@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
@@ -35,6 +35,7 @@ interface TaskCardProps {
   activeWorkerCount?: number;
   blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
   photoCount?: number;
+  materialCount?: number;
 }
 
 const TaskCard = ({
@@ -43,22 +44,13 @@ const TaskCard = ({
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
-  blockerInfo, photoCount = 0,
+  blockerInfo, photoCount = 0, materialCount = 0,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
-  const [materialCount, setMaterialCount] = useState(0);
-
-  useEffect(() => {
-    supabase
-      .from('task_materials')
-      .select('id', { count: 'exact', head: true })
-      .eq('task_id', task.id)
-      .then(({ count }) => setMaterialCount(count ?? 0));
-  }, [task.id, materialsOpen]);
 
   const isAssignedToMe = task.assigned_to_user_id === userId;
   const isUnassigned = !task.assigned_to_user_id;

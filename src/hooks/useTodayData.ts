@@ -16,6 +16,7 @@ export interface TodayData {
   crewCandidateTaskIds: Set<string>;
   crewWorkerCounts: Record<string, number>;
   photoCountMap: Record<string, number>;
+  materialCountMap: Record<string, number>;
   hasShiftToday: boolean;
   isManager: boolean;
 }
@@ -34,6 +35,7 @@ const EMPTY_DATA: TodayData = {
   crewCandidateTaskIds: new Set(),
   crewWorkerCounts: {},
   photoCountMap: {},
+  materialCountMap: {},
   hasShiftToday: true, // default true to suppress flash
   isManager: false,
 };
@@ -208,7 +210,7 @@ async function fetchEnrichment(allTasks: any[], userId: string) {
   const allTaskIds = [...new Set(allTasks.map(t => t.id))];
 
   // Run all enrichment queries in parallel
-  const [projectsRes, parentsRes, assigneesRes, crewWorkerRes, photoRes] = await Promise.all([
+  const [projectsRes, parentsRes, assigneesRes, crewWorkerRes, photoRes, materialRes] = await Promise.all([
     projectIds.length > 0
       ? supabase.from('projects').select('id, name, address').in('id', projectIds)
       : Promise.resolve({ data: [], error: null }),
@@ -223,6 +225,9 @@ async function fetchEnrichment(allTasks: any[], userId: string) {
       : Promise.resolve({ data: [], error: null }),
     allTaskIds.length > 0
       ? supabase.from('task_photos' as any).select('task_id').in('task_id', allTaskIds)
+      : Promise.resolve({ data: [], error: null }),
+    allTaskIds.length > 0
+      ? supabase.from('task_materials').select('task_id').in('task_id', allTaskIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -251,7 +256,12 @@ async function fetchEnrichment(allTasks: any[], userId: string) {
     photoCountMap[r.task_id] = (photoCountMap[r.task_id] || 0) + 1;
   });
 
-  return { projectMap, parentTitles, assigneeMap, crewWorkerCounts, photoCountMap };
+  const materialCountMap: Record<string, number> = {};
+  (unwrap(materialRes, 'Materials') as any[]).forEach((r: any) => {
+    materialCountMap[r.task_id] = (materialCountMap[r.task_id] || 0) + 1;
+  });
+
+  return { projectMap, parentTitles, assigneeMap, crewWorkerCounts, photoCountMap, materialCountMap };
 }
 
 /* ── Merge helpers ── */

@@ -71,7 +71,7 @@ const Today = () => {
     inProgress, assigned, available, needsReview, blocked,
     projectMap, parentTitles, assigneeMap, blockerMap,
     crewActiveTaskIds, crewCandidateTaskIds, crewWorkerCounts,
-    photoCountMap, hasShiftToday, isManager,
+    photoCountMap, materialCountMap, hasShiftToday, isManager,
   } = data;
 
   /* ── Derived state ── */
@@ -155,6 +155,7 @@ const Today = () => {
               activeWorkerCount={crewWorkerCounts[t.id] || 0}
               blockerInfo={blockerMap[t.id] || null}
               photoCount={photoCountMap[t.id] || 0}
+              materialCount={materialCountMap[t.id] || 0}
             />
           ))}
         </div>
@@ -180,6 +181,7 @@ const Today = () => {
           activeWorkerCount={nextUpTask ? (crewWorkerCounts[nextUpTask.id] || 0) : 0}
           blockerInfo={nextUpTask ? (blockerMap[nextUpTask.id] || null) : null}
           photoCount={nextUpTask ? (photoCountMap[nextUpTask.id] || 0) : 0}
+          materialCount={nextUpTask ? (materialCountMap[nextUpTask.id] || 0) : 0}
         />
       </div>
 
