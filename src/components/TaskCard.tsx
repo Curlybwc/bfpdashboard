@@ -119,6 +119,16 @@ const TaskCard = ({
 
   const handleComplete = async () => {
     setLoading(true);
+
+    // Use RPC for recurring tasks to atomically spawn next occurrence
+    if (task.is_recurring) {
+      const { error } = await supabase.rpc('complete_recurring_task', { p_task_id: task.id });
+      setLoading(false);
+      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      else onUpdate();
+      return;
+    }
+
     const { error } = await supabase.from('tasks').update({
       stage: 'Done',
       completed_at: new Date().toISOString(),
