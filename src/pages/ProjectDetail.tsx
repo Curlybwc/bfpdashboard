@@ -737,7 +737,7 @@ const ProjectDetail = () => {
                     <div key={child.id} className="flex items-start gap-2">
                       <Checkbox checked={selectedTaskIds.has(child.id)} onCheckedChange={() => toggleTaskSelection(child.id)} className="mt-4 ml-6 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                        <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} materialCount={materialCountMap[child.id] || 0} />
                       </div>
                     </div>
                   ))}
