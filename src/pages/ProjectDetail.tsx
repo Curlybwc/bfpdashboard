@@ -88,6 +88,9 @@ const ProjectDetail = () => {
   const [matUnit, setMatUnit] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newIsRecurring, setNewIsRecurring] = useState(false);
+  const [newRecurrenceFrequency, setNewRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
