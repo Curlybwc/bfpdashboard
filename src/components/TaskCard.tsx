@@ -47,6 +47,7 @@ const TaskCard = ({
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
+  const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [materialCount, setMaterialCount] = useState(0);
