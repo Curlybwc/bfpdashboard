@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle, CircleDot, Circle, UserX, Wrench } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle, CircleDot, Circle, UserX, Wrench, CheckSquare } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,8 @@ import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type RecurrenceFrequency } from '@/lib/supabase-types';
 import { Switch } from '@/components/ui/switch';
 import TaskCard from '@/components/TaskCard';
+import BulkTaskBar from '@/components/BulkTaskBar';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
@@ -92,6 +94,8 @@ const ProjectDetail = () => {
   const [newIsRecurring, setNewIsRecurring] = useState(false);
   const [newRecurrenceFrequency, setNewRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
@@ -262,6 +266,25 @@ const ProjectDetail = () => {
     });
   };
 
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const exitBulkMode = () => {
+    setBulkMode(false);
+    setSelectedTaskIds(new Set());
+  };
+
+  const handleBulkDone = () => {
+    exitBulkMode();
+    invalidateProject();
+  };
+
   const openEditDialog = () => {
     setEditName(project?.name || '');
     setEditAddress(project?.address || '');
@@ -335,6 +358,11 @@ const ProjectDetail = () => {
               {userCanEditProject && (
                 <Button size="sm" variant="outline" onClick={openEditDialog}>
                   <Pencil className="h-4 w-4" />
+                </Button>
+               )}
+              {isManager && (
+                <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
+                  <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
                 </Button>
               )}
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
@@ -640,6 +668,14 @@ const ProjectDetail = () => {
             </CardContent>
           </Card>
         )}
+        {bulkMode && (
+          <BulkTaskBar
+            selectedIds={selectedTaskIds}
+            members={projectMembers}
+            onClear={exitBulkMode}
+            onDone={handleBulkDone}
+          />
+        )}
         <div className="space-y-2">
            {rootTasks.length === 0 ? (
              <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
@@ -650,33 +686,54 @@ const ProjectDetail = () => {
                const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
                return (
                  <div key={t.id}>
-                     <TaskCard
-                       task={t}
-                       projectName={project.name}
-                       userId={user?.id ?? ''}
-                       isAdmin={isAdmin}
-                       onUpdate={invalidateProject}
-                       showProjectName={false}
-                       childCount={children.length}
-                       expanded={isExpanded}
-                       onToggle={() => toggleExpanded(t.id)}
-                       allChildrenDone={allChildrenDone}
-                       assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined}
-                       photoCount={photoCountMap[t.id] || 0}
-                     />
-                   {isExpanded && children.map((child: any) => (
+                   <div className={cn("flex items-start gap-2", bulkMode && "")}>
+                     {bulkMode && (
+                       <Checkbox
+                         checked={selectedTaskIds.has(t.id)}
+                         onCheckedChange={() => toggleTaskSelection(t.id)}
+                         className="mt-4 shrink-0"
+                       />
+                     )}
+                     <div className="flex-1 min-w-0">
                        <TaskCard
-                         key={child.id}
-                         task={child}
+                         task={t}
                          projectName={project.name}
                          userId={user?.id ?? ''}
                          isAdmin={isAdmin}
                          onUpdate={invalidateProject}
                          showProjectName={false}
-                         isChild
-                         assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined}
-                         photoCount={photoCountMap[child.id] || 0}
+                         childCount={children.length}
+                         expanded={isExpanded}
+                         onToggle={() => toggleExpanded(t.id)}
+                         allChildrenDone={allChildrenDone}
+                         assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined}
+                         photoCount={photoCountMap[t.id] || 0}
                        />
+                     </div>
+                   </div>
+                   {isExpanded && children.map((child: any) => (
+                     <div key={child.id} className={cn("flex items-start gap-2", bulkMode && "")}>
+                       {bulkMode && (
+                         <Checkbox
+                           checked={selectedTaskIds.has(child.id)}
+                           onCheckedChange={() => toggleTaskSelection(child.id)}
+                           className="mt-4 ml-6 shrink-0"
+                         />
+                       )}
+                       <div className="flex-1 min-w-0">
+                         <TaskCard
+                           task={child}
+                           projectName={project.name}
+                           userId={user?.id ?? ''}
+                           isAdmin={isAdmin}
+                           onUpdate={invalidateProject}
+                           showProjectName={false}
+                           isChild={!bulkMode}
+                           assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined}
+                           photoCount={photoCountMap[child.id] || 0}
+                         />
+                       </div>
+                     </div>
                    ))}
                  </div>
                );
