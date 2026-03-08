@@ -90,8 +90,8 @@ const TaskCard = ({
     try {
       await claimTask(task.id, userId);
       onUpdate();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
