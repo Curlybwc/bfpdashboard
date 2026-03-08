@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useAdmin } from "@/hooks/useAdmin";
+import { useGlobalPermissions } from "@/hooks/useAdmin";
 import { useEffect, ReactNode } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -32,21 +32,24 @@ import Availability from "./pages/Availability";
 import FieldModeCapture from "./pages/FieldModeCapture";
 import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
+import Analytics from "./pages/Analytics";
+import CalendarView from "./pages/CalendarView";
 import MobileNav from "./components/MobileNav";
 
 const queryClient = new QueryClient();
 
-/** Redirects contractors away from manager/admin-only routes (scopes) */
+/** Redirects contractors away from manager/admin-only routes — uses GLOBAL flags */
 const ManagerGuard = ({ children }: { children: ReactNode }) => {
-  const { isAdmin, canManageProjects, loading } = useAdmin();
+  const { isAdmin, canManageProjects, loading } = useGlobalPermissions();
   if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;
   if (!isAdmin && !canManageProjects) return <Navigate to="/today" replace />;
   return <>{children}</>;
 };
 
-/** Redirects non-admins away from admin-only routes */
+/** Redirects non-admins away from admin-only routes — uses GLOBAL flags */
 const AdminGuard = ({ children }: { children: ReactNode }) => {
-  const { isAdmin, loading } = useAdmin();
+  const { isAdmin, loading } = useGlobalPermissions();
   if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;
   if (!isAdmin) return <Navigate to="/today" replace />;
   return <>{children}</>;
@@ -62,7 +65,8 @@ const AppRoutes = () => {
     if (user && (location.pathname === '/login' || location.pathname === '/')) {
       navigate('/today', { replace: true });
     }
-    if (!user && location.pathname !== '/login' && location.pathname !== '/') {
+    const publicRoutes = ['/login', '/', '/reset-password'];
+    if (!user && !publicRoutes.includes(location.pathname)) {
       navigate('/login', { replace: true });
     }
   }, [user, loading, location.pathname, navigate]);
@@ -76,6 +80,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/today" element={<Today />} />
         <Route path="/today/field-mode" element={<ManagerGuard><FieldModeCapture /></ManagerGuard>} />
         <Route path="/today/field-mode/preview" element={<ManagerGuard><FieldModePreview /></ManagerGuard>} />
@@ -101,6 +106,8 @@ const AppRoutes = () => {
         <Route path="/admin/store-sections" element={<AdminGuard><AdminStoreSections /></AdminGuard>} />
         <Route path="/admin/inventory/tools" element={<AdminGuard><ToolInventory /></AdminGuard>} />
         <Route path="/admin/inventory/materials" element={<AdminGuard><MaterialInventory /></AdminGuard>} />
+        <Route path="/admin/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
+        <Route path="/admin/calendar" element={<AdminGuard><CalendarView /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}

@@ -32,6 +32,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
       // Batch-fetch photo counts
       const taskIds = (tasks ?? []).map(t => t.id);
       let photoCountMap: Record<string, number> = {};
+      let materialCountMap: Record<string, number> = {};
       let myActiveWorkerTaskIds: string[] = [];
       let myCandidateTaskIds: string[] = [];
 
@@ -59,14 +60,23 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
               .eq('user_id', userId)
           : Promise.resolve({ data: [] as { task_id: string }[], error: null });
 
-        const [{ data: photoRows }, workerResult, candidateResult] = await Promise.all([
+        const materialPromise = supabase
+          .from('task_materials')
+          .select('task_id')
+          .in('task_id', taskIds);
+
+        const [{ data: photoRows }, { data: materialRows }, workerResult, candidateResult] = await Promise.all([
           photoPromise,
+          materialPromise,
           workerPromise,
           candidatePromise,
         ]);
 
         (photoRows || []).forEach((r: any) => {
           photoCountMap[r.task_id] = (photoCountMap[r.task_id] || 0) + 1;
+        });
+        (materialRows || []).forEach((r: any) => {
+          materialCountMap[r.task_id] = (materialCountMap[r.task_id] || 0) + 1;
         });
 
         // Explicitly check for errors — if crew queries fail, throw so the
@@ -85,6 +95,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
         tasks: tasks ?? [],
         members: (members ?? []) as unknown as ProjectMember[],
         photoCountMap,
+        materialCountMap,
         myActiveWorkerTaskIds,
         myCandidateTaskIds,
       };

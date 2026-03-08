@@ -163,6 +163,8 @@ const AdminPanel = () => {
     {
       label: 'Reports',
       items: [
+        { label: 'Analytics', action: () => handleNav('/admin/analytics') },
+        { label: 'Calendar', action: () => handleNav('/admin/calendar') },
         { label: 'Scope Accuracy', action: () => handleNav('/admin/scope-accuracy') },
       ],
     },

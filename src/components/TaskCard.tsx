@@ -7,11 +7,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users } from 'lucide-react';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS } from '@/lib/supabase-types';
+import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 
 interface TaskCardProps {
   task: any;
@@ -35,6 +36,7 @@ interface TaskCardProps {
   activeWorkerCount?: number;
   blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
   photoCount?: number;
+  materialCount?: number;
 }
 
 const TaskCard = ({
@@ -43,21 +45,13 @@ const TaskCard = ({
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
-  blockerInfo, photoCount = 0,
+  blockerInfo, photoCount = 0, materialCount = 0,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
+  const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
-  const [materialCount, setMaterialCount] = useState(0);
-
-  useEffect(() => {
-    supabase
-      .from('task_materials')
-      .select('id', { count: 'exact', head: true })
-      .eq('task_id', task.id)
-      .then(({ count }) => setMaterialCount(count ?? 0));
-  }, [task.id, materialsOpen]);
 
   const isAssignedToMe = task.assigned_to_user_id === userId;
   const isUnassigned = !task.assigned_to_user_id;
@@ -93,56 +87,56 @@ const TaskCard = ({
     }
 
     setLoading(true);
-    const { error } = await supabase.from('tasks').update({
-      assigned_to_user_id: userId,
-      claimed_by_user_id: userId,
-      claimed_at: new Date().toISOString(),
-    }).eq('id', task.id);
-    setLoading(false);
-
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else onUpdate();
+    try {
+      await claimTask(task.id, userId);
+      onUpdate();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStart = async () => {
     setLoading(true);
-    const { error } = await supabase.from('tasks').update({
-      stage: 'In Progress',
-      started_at: new Date().toISOString(),
-      started_by_user_id: userId,
-    }).eq('id', task.id);
-    setLoading(false);
-
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else onUpdate();
+    try {
+      await startTask(task.id, userId);
+      onUpdate();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleComplete = async () => {
-    setLoading(true);
-    const { error } = await supabase.from('tasks').update({
-      stage: 'Done',
-      completed_at: new Date().toISOString(),
-    }).eq('id', task.id);
+  const handleComplete = async (skipPhotoCheck = false) => {
+    // Photo nudge: check for "after" photo, prompt but allow override
+    if (!skipPhotoCheck) {
+      const { count: afterCount } = await supabase
+        .from('task_photos')
+        .select('id', { count: 'exact', head: true })
+        .eq('task_id', task.id)
+        .eq('phase', 'after');
 
-    if (!error && task.parent_task_id) {
-      const { data: siblings } = await supabase
-        .from('tasks')
-        .select('id, stage')
-        .eq('parent_task_id', task.parent_task_id)
-        .neq('id', task.id);
-
-      const allSiblingsDone = (siblings || []).every(s => s.stage === 'Done');
-      if (allSiblingsDone) {
-        await supabase.from('tasks').update({
-          stage: 'Done',
-          completed_at: new Date().toISOString(),
-        }).eq('id', task.parent_task_id);
+      if ((afterCount ?? 0) === 0) {
+        setPhotoConfirmOpen(true);
+        return;
       }
     }
 
-    setLoading(false);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else onUpdate();
+    setLoading(true);
+    try {
+      await completeTask({
+        taskId: task.id,
+        parentTaskId: task.parent_task_id,
+        isRecurring: task.is_recurring,
+      });
+      onUpdate();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleJoinCrew = async () => {
@@ -235,11 +229,17 @@ const TaskCard = ({
               <Flag className="h-3 w-3" />
               {task.priority}
             </span>
-            {task.due_date && (
-              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                <Calendar className="h-3 w-3" />
-                {task.due_date}
-              </span>
+            {task.due_date && (() => {
+              const isOverdue = task.stage !== 'Done' && task.due_date < new Date().toISOString().slice(0, 10);
+              return (
+                <span className={cn("text-xs flex items-center gap-0.5", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
+                  <Calendar className={cn("h-3 w-3", isOverdue && "text-destructive")} />
+                  {task.due_date}
+                </span>
+              );
+            })()}
+            {task.stage !== 'Done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10) && (
+              <StatusBadge status="Overdue" />
             )}
             {materialCount > 0 && (
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
@@ -250,6 +250,12 @@ const TaskCard = ({
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                 📷 {photoCount}
               </span>
+            )}
+            {task.is_recurring && task.recurrence_frequency && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                <Repeat className="h-3 w-3" />
+                {task.recurrence_frequency === 'weekly' ? 'Weekly' : task.recurrence_frequency === 'monthly' ? 'Monthly' : 'Yearly'}
+              </Badge>
             )}
             {showNeedsMaterials && (
               <Badge variant="outline" className="text-xs border-warning text-warning">
@@ -301,7 +307,7 @@ const TaskCard = ({
             )}
             {showComplete && (
               canComplete ? (
-                <Button size="sm" onClick={handleComplete} disabled={loading}>
+                <Button size="sm" onClick={() => handleComplete()} disabled={loading}>
                   Complete
                 </Button>
               ) : (
@@ -354,6 +360,23 @@ const TaskCard = ({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setDibsConfirmOpen(false); handleDibs(true); }}>
               Claim Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleComplete(true); }}>
+              Complete Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

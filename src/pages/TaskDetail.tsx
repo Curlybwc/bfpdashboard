@@ -19,14 +19,16 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, type TaskStage, type TaskPriority, type BlockerReason } from '@/lib/supabase-types';
+import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type BlockerReason, type RecurrenceFrequency } from '@/lib/supabase-types';
 import { canReportBlocker, canResolveBlocker } from '@/lib/permissions';
-import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import TaskPhotos from '@/components/TaskPhotos';
+import TaskComments from '@/components/TaskComments';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
 import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
+import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -94,6 +96,7 @@ const TaskDetail = () => {
 
   // Photo state
   const [photos, setPhotos] = useState<any[]>([]);
+  const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
@@ -104,6 +107,8 @@ const TaskDetail = () => {
   const [dueDate, setDueDate] = useState('');
   const [actualCost, setActualCost] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
 
   useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); fetchPhotos(); }, [taskId]);
 
@@ -267,13 +272,29 @@ const TaskDetail = () => {
     fetchTask();
   };
 
-  const handleSave = async () => {
+  const handleSave = async (skipPhotoCheck = false) => {
     if (!taskId || !task) return;
+
+    // Validation: recurring requires due date
+    if (isRecurring && !dueDate) {
+      toast({ title: 'Due date required', description: 'A recurring task must have a due date.', variant: 'destructive' });
+      return;
+    }
+    // Photo nudge: prompt if no "after" photo when marking Done
+    if (!skipPhotoCheck && stage === 'Done' && task.stage !== 'Done') {
+      const hasAfterPhoto = photos.some(p => p.phase === 'after');
+      if (!hasAfterPhoto) {
+        setPhotoConfirmOpen(true);
+        return;
+      }
+    }
+
     setSaving(true);
 
     const oldStage = task.stage;
     const isCrewMode = task.assignment_mode === 'crew';
-    const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' ? null : assignedTo);
+    const isVendor = assignedTo === 'outside_vendor';
+    const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' || isVendor ? null : assignedTo);
 
     const updatePayload: any = {
       task: taskText,
@@ -284,9 +305,26 @@ const TaskDetail = () => {
       notes: notes || null,
       due_date: dueDate || null,
       assigned_to_user_id: newAssignedTo,
+      is_outside_vendor: isVendor,
+      is_recurring: isRecurring,
+      recurrence_frequency: isRecurring ? recurrenceFrequency : null,
+      recurrence_anchor_date: isRecurring && dueDate ? dueDate : null,
     };
     if (isAdmin) {
       updatePayload.actual_total_cost = actualCost ? parseFloat(actualCost) : null;
+    }
+
+    // If transitioning to Done and recurring, use RPC instead
+    if (stage === 'Done' && oldStage !== 'Done' && isRecurring && dueDate) {
+      // First save all other fields
+      const savePay = { ...updatePayload };
+      delete savePay.stage; // RPC will set stage
+      await supabase.from('tasks').update(savePay).eq('id', taskId);
+      const { error: rpcErr } = await supabase.rpc('complete_recurring_task', { p_task_id: taskId });
+      setSaving(false);
+      if (rpcErr) { toast({ title: 'Error', description: rpcErr.message, variant: 'destructive' }); }
+      else { toast({ title: 'Saved — next occurrence created' }); fetchTask(); fetchChildren(); }
+      return;
     }
 
     const { error } = await supabase.from('tasks').update(updatePayload).eq('id', taskId);
@@ -325,7 +363,9 @@ const TaskDetail = () => {
         setNotes(data.notes || '');
         setDueDate(data.due_date || '');
         setActualCost(data.actual_total_cost?.toString() || '');
-        setAssignedTo(data.assigned_to_user_id || 'unassigned');
+        setAssignedTo(data.is_outside_vendor ? 'outside_vendor' : (data.assigned_to_user_id || 'unassigned'));
+        setIsRecurring(data.is_recurring || false);
+        setRecurrenceFrequency((data.recurrence_frequency as RecurrenceFrequency) || 'weekly');
       }
     });
   };
@@ -651,61 +691,53 @@ const TaskDetail = () => {
       if ((count ?? 0) >= 5) { setDibsConfirmOpen(true); return; }
     }
     setActionLoading(true);
-    await supabase.from('tasks').update({
-      assigned_to_user_id: user.id,
-      claimed_by_user_id: user.id,
-      claimed_at: new Date().toISOString(),
-    }).eq('id', taskId);
-    setActionLoading(false);
-    fetchTask();
+    try {
+      await claimTask(taskId, user.id);
+      fetchTask();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleStart = async () => {
     if (!user || !taskId) return;
     setActionLoading(true);
-    await supabase.from('tasks').update({
-      stage: 'In Progress',
-      started_at: new Date().toISOString(),
-      started_by_user_id: user.id,
-    }).eq('id', taskId);
-    setActionLoading(false);
-    fetchTask();
-    // Nudge for before photos
-    const hasBeforePhoto = photos.some((p: any) => p.phase === 'before');
-    if (!hasBeforePhoto) {
-      toast({ title: '📷 Add a before photo', description: 'Document starting conditions for this task.' });
+    try {
+      await startTask(taskId, user.id);
+      fetchTask();
+      // Nudge for before photos
+      const hasBeforePhoto = photos.some((p: any) => p.phase === 'before');
+      if (!hasBeforePhoto) {
+        toast({ title: '📷 Add a before photo', description: 'Document starting conditions for this task.' });
+      }
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleComplete = async () => {
     if (!taskId) return;
     setActionLoading(true);
-    await supabase.from('tasks').update({
-      stage: 'Done',
-      completed_at: new Date().toISOString(),
-    }).eq('id', taskId);
-
-    if (task?.parent_task_id) {
-      const { data: siblings } = await supabase
-        .from('tasks')
-        .select('id, stage')
-        .eq('parent_task_id', task.parent_task_id)
-        .neq('id', taskId);
-      const allSiblingsDone = (siblings || []).every(s => s.stage === 'Done');
-      if (allSiblingsDone) {
-        await supabase.from('tasks').update({
-          stage: 'Done',
-          completed_at: new Date().toISOString(),
-        }).eq('id', task.parent_task_id);
+    try {
+      await completeTask({
+        taskId,
+        parentTaskId: task?.parent_task_id,
+        isRecurring: task?.is_recurring,
+      });
+      fetchTask();
+      // Nudge for after photos
+      const hasAfterPhoto = photos.some((p: any) => p.phase === 'after');
+      if (!hasAfterPhoto) {
+        toast({ title: '📷 Add an after photo', description: 'Document the completed work for this task.' });
       }
-    }
-
-    setActionLoading(false);
-    fetchTask();
-    // Nudge for after photos
-    const hasAfterPhoto = photos.some((p: any) => p.phase === 'after');
-    if (!hasAfterPhoto) {
-      toast({ title: '📷 Add an after photo', description: 'Document the completed work for this task.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -806,6 +838,14 @@ const TaskDetail = () => {
           userId={user!.id}
           onPhotosChange={fetchPhotos}
           canUpload={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
+        />
+
+        {/* Task Comments */}
+        <TaskComments
+          taskId={taskId!}
+          userId={user!.id}
+          isAdmin={isAdmin}
+          canComment={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
         />
 
         {/* Recipe: read-only badge if already expanded */}
@@ -920,8 +960,43 @@ const TaskDetail = () => {
           </div>
           <div className="space-y-2">
             <Label>Due Date</Label>
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <Input type="date" value={dueDate} onChange={(e) => {
+              setDueDate(e.target.value);
+              if (!e.target.value) setIsRecurring(false);
+            }} />
           </div>
+        </div>
+        {/* Recurrence section */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Repeat className="h-4 w-4" />
+              Recurring
+            </Label>
+            <Switch
+              checked={isRecurring}
+              onCheckedChange={(checked) => {
+                if (checked && !dueDate) {
+                  toast({ title: 'Due date required', description: 'Set a due date first to enable recurrence.', variant: 'destructive' });
+                  return;
+                }
+                setIsRecurring(checked);
+              }}
+            />
+          </div>
+          {isRecurring && (
+            <Select value={recurrenceFrequency} onValueChange={(v) => setRecurrenceFrequency(v as RecurrenceFrequency)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {RECURRENCE_FREQUENCIES.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          {task.recurrence_source_task_id && (
+            <p className="text-xs text-muted-foreground">
+              Created from a previous recurring task
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
@@ -1053,6 +1128,7 @@ const TaskDetail = () => {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
+                <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
                 {projectMembers.map((m) => (
                   <SelectItem key={m.user_id} value={m.user_id}>
                     {m.profiles?.full_name || 'Unnamed'} ({m.role})
@@ -1136,7 +1212,7 @@ const TaskDetail = () => {
           </div>
         )}
 
-        <Button onClick={handleSave} disabled={saving} className="w-full">
+        <Button onClick={() => handleSave()} disabled={saving} className="w-full">
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
         {canDelete && (
@@ -1291,6 +1367,24 @@ const TaskDetail = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleResolveBlocker} disabled={resolvingBlocker}>
               {resolvingBlocker ? 'Resolving…' : 'Resolve'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Photo nudge dialog */}
+      <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleSave(true); }}>
+              Complete Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

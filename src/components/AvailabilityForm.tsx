@@ -151,19 +151,19 @@ const AvailabilityForm = () => {
 
             {editing && editing.date === date && (
               <Card className="p-3 mb-1.5 space-y-2 border-primary/30">
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                   <Input
                     type="time"
                     value={editing.start_time}
                     onChange={e => setEditing({ ...editing, start_time: e.target.value })}
-                    className="h-9 w-[120px]"
+                    className="h-9 min-w-0"
                   />
                   <span className="text-sm text-muted-foreground">to</span>
                   <Input
                     type="time"
                     value={editing.end_time}
                     onChange={e => setEditing({ ...editing, end_time: e.target.value })}
-                    className="h-9 w-[120px]"
+                    className="h-9 min-w-0"
                   />
                 </div>
                 <Input
@@ -173,10 +173,10 @@ const AvailabilityForm = () => {
                   className="h-9"
                 />
                 <div className="flex items-center gap-2">
-                  <Button size="sm" className="h-8 gap-1" onClick={handleSave}>
+                  <Button size="sm" className="h-8 gap-1 flex-1" onClick={handleSave}>
                     <Check className="h-3.5 w-3.5" /> Save
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 gap-1" onClick={() => setEditing(null)}>
+                  <Button size="sm" variant="ghost" className="h-8 gap-1 flex-1" onClick={() => setEditing(null)}>
                     <X className="h-3.5 w-3.5" /> Cancel
                   </Button>
                 </div>
