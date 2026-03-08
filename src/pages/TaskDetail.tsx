@@ -1219,7 +1219,7 @@ const TaskDetail = () => {
           </div>
         )}
 
-        <Button onClick={handleSave} disabled={saving} className="w-full">
+        <Button onClick={() => handleSave()} disabled={saving} className="w-full">
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
         {canDelete && (
