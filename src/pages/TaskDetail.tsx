@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getErrorMessage } from '@/lib/utils';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import PageHeader from '@/components/PageHeader';
@@ -694,8 +695,8 @@ const TaskDetail = () => {
     try {
       await claimTask(taskId, user.id);
       fetchTask();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -712,8 +713,8 @@ const TaskDetail = () => {
       if (!hasBeforePhoto) {
         toast({ title: '📷 Add a before photo', description: 'Document starting conditions for this task.' });
       }
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -734,8 +735,8 @@ const TaskDetail = () => {
       if (!hasAfterPhoto) {
         toast({ title: '📷 Add an after photo', description: 'Document the completed work for this task.' });
       }
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }

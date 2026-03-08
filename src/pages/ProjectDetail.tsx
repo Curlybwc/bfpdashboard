@@ -231,9 +231,6 @@ const ProjectDetail = () => {
                  </Button>
               )}
               {/* Field Mode & Walkthrough are manager/admin workflows */}
-              <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
-                 <CalendarDays className="h-4 w-4 mr-1" />Calendar
-               </Button>
               {isManager && (
                 <>
                   <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>

@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/StatusBadge';
@@ -90,8 +90,8 @@ const TaskCard = ({
     try {
       await claimTask(task.id, userId);
       onUpdate();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -102,8 +102,8 @@ const TaskCard = ({
     try {
       await startTask(task.id, userId);
       onUpdate();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -132,8 +132,8 @@ const TaskCard = ({
         isRecurring: task.is_recurring,
       });
       onUpdate();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
