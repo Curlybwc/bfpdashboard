@@ -102,8 +102,8 @@ const TaskCard = ({
     try {
       await startTask(task.id, userId);
       onUpdate();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
