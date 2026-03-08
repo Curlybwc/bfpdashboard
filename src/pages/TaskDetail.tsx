@@ -352,7 +352,7 @@ const TaskDetail = () => {
         setNotes(data.notes || '');
         setDueDate(data.due_date || '');
         setActualCost(data.actual_total_cost?.toString() || '');
-        setAssignedTo(data.assigned_to_user_id || 'unassigned');
+        setAssignedTo(data.is_outside_vendor ? 'outside_vendor' : (data.assigned_to_user_id || 'unassigned'));
         setIsRecurring(data.is_recurring || false);
         setRecurrenceFrequency((data.recurrence_frequency as RecurrenceFrequency) || 'weekly');
       }
