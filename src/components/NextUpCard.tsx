@@ -69,6 +69,7 @@ const NextUpCard = ({
           activeWorkerCount={activeWorkerCount}
           blockerInfo={blockerInfo}
           photoCount={photoCount}
+          materialCount={materialCount}
         />
       </div>
     </div>
