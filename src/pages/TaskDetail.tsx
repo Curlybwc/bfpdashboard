@@ -694,8 +694,8 @@ const TaskDetail = () => {
     try {
       await claimTask(taskId, user.id);
       fetchTask();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
