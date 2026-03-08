@@ -107,6 +107,7 @@ const AppRoutes = () => {
         <Route path="/admin/inventory/tools" element={<AdminGuard><ToolInventory /></AdminGuard>} />
         <Route path="/admin/inventory/materials" element={<AdminGuard><MaterialInventory /></AdminGuard>} />
         <Route path="/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
+        <Route path="/calendar" element={<CalendarView />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}

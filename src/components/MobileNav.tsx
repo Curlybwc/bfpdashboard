@@ -11,6 +11,7 @@ const MobileNav = () => {
   
   const links = [
     { to: '/today', icon: CalendarCheck, label: 'Today' },
+    { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     ...(!isContractor ? [{ to: '/scopes', icon: ClipboardList, label: 'Scopes' }] : []),
     { to: '/shopping', icon: ShoppingCart, label: 'Shopping' },
