@@ -32,6 +32,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
       // Batch-fetch photo counts
       const taskIds = (tasks ?? []).map(t => t.id);
       let photoCountMap: Record<string, number> = {};
+      let materialCountMap: Record<string, number> = {};
       let myActiveWorkerTaskIds: string[] = [];
       let myCandidateTaskIds: string[] = [];
 
