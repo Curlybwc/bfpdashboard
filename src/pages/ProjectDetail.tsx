@@ -359,6 +359,11 @@ const ProjectDetail = () => {
                 <Button size="sm" variant="outline" onClick={openEditDialog}>
                   <Pencil className="h-4 w-4" />
                 </Button>
+               )}
+              {isManager && (
+                <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
+                  <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
+                </Button>
               )}
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
                  <Package className="h-4 w-4 mr-1" />Materials
