@@ -1,106 +1,97 @@
 
 
-## Plan: Recurring Tasks V1
+## Plan: Crew Tasks (Multi-Person, Multi-Day)
 
 ### 1. Database Migration
 
-Add columns to `tasks` using a validation trigger (not CHECK constraint per project guidelines):
+Single migration adding columns, tables, indexes, RLS, and a helper function.
 
+**New columns on `tasks`:**
+- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
+- `lead_user_id uuid NULL`
+
+**New table `task_candidates` (eligibility pool):**
 ```sql
-ALTER TABLE public.tasks
-  ADD COLUMN is_recurring boolean NOT NULL DEFAULT false,
-  ADD COLUMN recurrence_frequency text,
-  ADD COLUMN recurrence_anchor_date date,
-  ADD COLUMN recurrence_source_task_id uuid REFERENCES public.tasks(id);
-
--- Validation trigger instead of CHECK constraint
-CREATE OR REPLACE FUNCTION public.validate_recurrence()
-RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public' AS $$
-BEGIN
-  IF NEW.recurrence_frequency IS NOT NULL AND NEW.recurrence_frequency NOT IN ('weekly','monthly','yearly') THEN
-    RAISE EXCEPTION 'Invalid recurrence_frequency';
-  END IF;
-  IF NEW.is_recurring AND NEW.recurrence_frequency IS NULL THEN
-    RAISE EXCEPTION 'recurrence_frequency required when is_recurring is true';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_validate_recurrence
-  BEFORE INSERT OR UPDATE ON public.tasks
-  FOR EACH ROW EXECUTE FUNCTION public.validate_recurrence();
+CREATE TABLE public.task_candidates (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
 ```
 
-### 2. Server-side RPC: `complete_recurring_task`
+**New table `task_workers` (active crew):**
+```sql
+CREATE TABLE public.task_workers (
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
+CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
+```
 
-A `SECURITY DEFINER` PL/pgSQL function that:
-1. Marks the task Done (sets `stage='Done'`, `completed_at=now()`)
-2. Checks `is_recurring = true` and that no task already exists with `recurrence_source_task_id = p_task_id`
-3. Computes next `due_date`:
-   - weekly: `+ interval '7 days'`
-   - monthly: `due_date + interval '1 month'` (Postgres handles month-end rollover natively)
-   - yearly: `due_date + interval '1 year'`
-4. Inserts next occurrence copying: `project_id, task, priority, trade, room_area, notes, assigned_to_user_id, source_scope_item_id, source_recipe_id, is_recurring, recurrence_frequency, recurrence_anchor_date, assignment_mode, is_outside_vendor`
-5. Sets `recurrence_source_task_id` to the completed task's id
-6. Resets: `stage='Ready', started_at=null, completed_at=null, claimed_by/started_by=null, materials_on_site='No'`
-7. Returns the new task id (or null if not recurring / already spawned)
+**RLS on `task_candidates`:**
+- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
+- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
 
-This is called from both `TaskCard.handleComplete` and `TaskDetail.handleSave` (when stage transitions to Done).
+**RLS on `task_workers`:**
+- SELECT: same as task_candidates SELECT
+- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
+- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
+- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
 
-### 3. Completion paths updated
+### 2. Today Tab (`src/pages/Today.tsx`)
 
-**TaskCard.tsx `handleComplete`**: Instead of direct `supabase.from('tasks').update(...)`, check `task.is_recurring`. If true, call `supabase.rpc('complete_recurring_task', { p_task_id: task.id })`. If false, keep existing logic.
+Add two additional queries in `fetchTasks` after existing solo queries:
 
-**TaskDetail.tsx `handleSave`**: When `stage === 'Done' && oldStage !== 'Done' && task.is_recurring`, call the same RPC after the main save. The save itself still updates all fields; the RPC handles spawning the next occurrence idempotently.
+**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
 
-### 4. CreateTask input extended
+**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
 
-**`useProjectMutations.ts`**: Add `due_date`, `is_recurring`, `recurrence_frequency` to `CreateTaskInput`. Pass them through to the insert. Set `recurrence_anchor_date = due_date` when `is_recurring`.
+Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
 
-### 5. ProjectDetail create dialog
+### 3. TaskCard (`src/components/TaskCard.tsx`)
 
-Add after the Notes field (before Materials collapsible):
-- Due Date input (date type)
-- When due date is set, show a "Recurring" switch
-- When recurring is on, show frequency select (Weekly / Monthly / Yearly)
-- Reset recurrence state when due date is cleared
+Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
 
-### 6. TaskDetail edit form
+When `isCrewTask`:
+- Show a small crew icon + "N active" badge next to status
+- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
+- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
+- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
+- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
 
-After the existing Due Date input (line ~923), add:
-- Recurring toggle (Switch)
-- Frequency select when enabled
-- Initialize from `task.is_recurring`, `task.recurrence_frequency`
-- Include in save payload: `is_recurring`, `recurrence_frequency`, `recurrence_anchor_date`
-- Validation: block save if `is_recurring` and no `dueDate`
-- Show "Source task" link if `task.recurrence_source_task_id` exists
-- Show simple text like "Next: {computed date}" when recurring
+### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
 
-### 7. TaskCard badge
+**Crew toggle** (visible to admin/manager only, below Assigned To):
+- Switch labeled "Crew Task"
+- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
+- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
 
-Show a small badge (e.g. "🔁 Weekly") on recurring tasks in the task card, near the existing priority/date badges.
+**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
+- "Active Crew" list showing names from `task_workers` joined to `profiles`
+- Join/Leave button for current user
+- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
 
-### 8. Type updates
+**Solo mode**: keep existing Assigned To UI unchanged.
 
-**`src/lib/supabase-types.ts`**: Add `RecurrenceFrequency = 'weekly' | 'monthly' | 'yearly'`
+### 5. Files to Modify
 
-### Files changed
+1. **Migration SQL** — new columns, tables, indexes, RLS
+2. `src/pages/Today.tsx` — crew task queries merged into sections
+3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
+4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
+5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
 
-| File | Change |
-|------|--------|
-| Migration SQL | Add columns, trigger, `complete_recurring_task` RPC |
-| `src/lib/supabase-types.ts` | Add `RecurrenceFrequency` type |
-| `src/hooks/useProjectMutations.ts` | Extend `CreateTaskInput` with due_date + recurrence fields |
-| `src/pages/ProjectDetail.tsx` | Add due date + recurrence controls to create dialog |
-| `src/pages/TaskDetail.tsx` | Add recurrence section, call RPC on Done transition |
-| `src/components/TaskCard.tsx` | Call RPC for recurring complete, show recurrence badge |
+### 6. Key Edge Cases
 
-### Known limitations
-
-- Monthly rollover uses Postgres `+ interval '1 month'` which handles short months correctly (e.g. Jan 31 + 1 month = Feb 28)
-- No chain editing ("this and all future")
-- Reopening a Done recurring task does not delete the already-created next occurrence
-- Task materials are not copied to the next occurrence; they start fresh
-- `expanded_recipe_id` is not copied (recipe expansion is a manual step)
+- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
+- Crew Available shows even when task is 'In Progress' (multiple people can join)
+- Upsert PK on `task_workers` prevents duplicate joins
+- Done tasks filtered out everywhere by existing stage checks
+- Crew→Solo cleanup deletes both tables to prevent orphan rows
 

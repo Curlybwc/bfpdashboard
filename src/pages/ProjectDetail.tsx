@@ -17,7 +17,8 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
-import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
+import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type RecurrenceFrequency } from '@/lib/supabase-types';
+import { Switch } from '@/components/ui/switch';
 import TaskCard from '@/components/TaskCard';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
@@ -87,6 +88,9 @@ const ProjectDetail = () => {
   const [matUnit, setMatUnit] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newIsRecurring, setNewIsRecurring] = useState(false);
+  const [newRecurrenceFrequency, setNewRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -288,12 +292,16 @@ const ProjectDetail = () => {
         created_by: user.id,
         assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
         pendingMaterials,
+        due_date: newDueDate || null,
+        is_recurring: newIsRecurring && !!newDueDate,
+        recurrence_frequency: newIsRecurring && newDueDate ? newRecurrenceFrequency : null,
       },
       {
         onSuccess: () => {
           setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
           setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
           setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
+          setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
           setOpen(false);
         },
       },
@@ -401,6 +409,29 @@ const ProjectDetail = () => {
                   <Label>Notes</Label>
                   <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
                 </div>
+                <div className="space-y-2">
+                  <Label>Due Date</Label>
+                  <Input type="date" value={newDueDate} onChange={(e) => {
+                    setNewDueDate(e.target.value);
+                    if (!e.target.value) setNewIsRecurring(false);
+                  }} />
+                </div>
+                {newDueDate && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Recurring</Label>
+                      <Switch checked={newIsRecurring} onCheckedChange={setNewIsRecurring} />
+                    </div>
+                    {newIsRecurring && (
+                      <Select value={newRecurrenceFrequency} onValueChange={(v) => setNewRecurrenceFrequency(v as RecurrenceFrequency)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {RECURRENCE_FREQUENCIES.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                )}
                 <Collapsible>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
                     <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />

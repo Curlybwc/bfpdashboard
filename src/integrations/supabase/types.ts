@@ -1320,6 +1320,7 @@ export type Database = {
           id: string
           is_blocked: boolean
           is_outside_vendor: boolean
+          is_recurring: boolean
           lead_user_id: string | null
           materials_on_site: Database["public"]["Enums"]["materials_status"]
           needs_manager_review: boolean
@@ -1328,6 +1329,9 @@ export type Database = {
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string
           recipe_hint_id: string | null
+          recurrence_anchor_date: string | null
+          recurrence_frequency: string | null
+          recurrence_source_task_id: string | null
           room_area: string | null
           sort_order: number | null
           source_recipe_id: string | null
@@ -1356,6 +1360,7 @@ export type Database = {
           id?: string
           is_blocked?: boolean
           is_outside_vendor?: boolean
+          is_recurring?: boolean
           lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           needs_manager_review?: boolean
@@ -1364,6 +1369,9 @@ export type Database = {
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id: string
           recipe_hint_id?: string | null
+          recurrence_anchor_date?: string | null
+          recurrence_frequency?: string | null
+          recurrence_source_task_id?: string | null
           room_area?: string | null
           sort_order?: number | null
           source_recipe_id?: string | null
@@ -1392,6 +1400,7 @@ export type Database = {
           id?: string
           is_blocked?: boolean
           is_outside_vendor?: boolean
+          is_recurring?: boolean
           lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
           needs_manager_review?: boolean
@@ -1400,6 +1409,9 @@ export type Database = {
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string
           recipe_hint_id?: string | null
+          recurrence_anchor_date?: string | null
+          recurrence_frequency?: string | null
+          recurrence_source_task_id?: string | null
           room_area?: string | null
           sort_order?: number | null
           source_recipe_id?: string | null
@@ -1453,6 +1465,13 @@ export type Database = {
             columns: ["recipe_hint_id"]
             isOneToOne: false
             referencedRelation: "task_recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_recurrence_source_task_id_fkey"
+            columns: ["recurrence_source_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {
@@ -1619,6 +1638,7 @@ export type Database = {
         Args: { p_parent_task_id: string; p_recipe_id: string }
         Returns: Json
       }
+      complete_recurring_task: { Args: { p_task_id: string }; Returns: string }
       convert_scope_to_project: { Args: { p_scope_id: string }; Returns: Json }
       expand_recipe: {
         Args: {

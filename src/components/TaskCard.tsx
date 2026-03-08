@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users } from 'lucide-react';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS } from '@/lib/supabase-types';
 
@@ -119,6 +119,16 @@ const TaskCard = ({
 
   const handleComplete = async () => {
     setLoading(true);
+
+    // Use RPC for recurring tasks to atomically spawn next occurrence
+    if (task.is_recurring) {
+      const { error } = await supabase.rpc('complete_recurring_task', { p_task_id: task.id });
+      setLoading(false);
+      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      else onUpdate();
+      return;
+    }
+
     const { error } = await supabase.from('tasks').update({
       stage: 'Done',
       completed_at: new Date().toISOString(),
@@ -250,6 +260,12 @@ const TaskCard = ({
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                 📷 {photoCount}
               </span>
+            )}
+            {task.is_recurring && task.recurrence_frequency && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                <Repeat className="h-3 w-3" />
+                {task.recurrence_frequency === 'weekly' ? 'Weekly' : task.recurrence_frequency === 'monthly' ? 'Monthly' : 'Yearly'}
+              </Badge>
             )}
             {showNeedsMaterials && (
               <Badge variant="outline" className="text-xs border-warning text-warning">

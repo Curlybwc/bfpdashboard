@@ -16,6 +16,9 @@ interface CreateTaskInput {
   created_by: string;
   assigned_to_user_id: string | null;
   pendingMaterials: { name: string; quantity: string; unit: string }[];
+  due_date?: string | null;
+  is_recurring?: boolean;
+  recurrence_frequency?: string | null;
 }
 
 export function useCreateTask(projectId: string | undefined) {
@@ -24,13 +27,17 @@ export function useCreateTask(projectId: string | undefined) {
 
   return useMutation({
     mutationFn: async (input: CreateTaskInput) => {
-      const { pendingMaterials, ...taskFields } = input;
+      const { pendingMaterials, due_date, is_recurring, recurrence_frequency, ...taskFields } = input;
       const hasMaterials = pendingMaterials.length > 0;
       const { data, error } = await supabase
         .from('tasks')
         .insert({
           ...taskFields,
           materials_on_site: hasMaterials ? ('No' as const) : ('Yes' as const),
+          due_date: due_date || null,
+          is_recurring: is_recurring || false,
+          recurrence_frequency: is_recurring ? recurrence_frequency : null,
+          recurrence_anchor_date: is_recurring && due_date ? due_date : null,
         })
         .select('id')
         .single();
