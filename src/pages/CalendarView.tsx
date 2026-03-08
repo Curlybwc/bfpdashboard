@@ -202,7 +202,7 @@ export default function CalendarView() {
                 {selectedTasks.map((t) => (
                   <button
                     key={t.id}
-                    onClick={() => navigate(`/tasks/${t.id}`)}
+                    onClick={() => navigate(`/projects/${t.project_id}/tasks/${t.id}`)}
                     className="w-full text-left p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors space-y-1"
                   >
                     <div className="flex items-center justify-between gap-2">
