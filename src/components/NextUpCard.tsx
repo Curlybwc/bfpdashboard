@@ -16,6 +16,7 @@ interface NextUpCardProps {
   activeWorkerCount?: number;
   blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
   photoCount?: number;
+  materialCount?: number;
 }
 
 const NextUpCard = ({
