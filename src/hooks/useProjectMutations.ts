@@ -69,15 +69,12 @@ export function useCreateTask(projectId: string | undefined) {
       // Apply material bundles
       await applyBundles(data.id, taskFields.task);
 
-      // Apply assignment rules (only if no manual assignment was set)
-      if (!taskFields.assigned_to_user_id) {
+      // Apply assignment rules (only if no manual assignment and not outside vendor)
+      if (!taskFields.assigned_to_user_id && !is_outside_vendor) {
         const { error: assignmentError } = await supabase.rpc('apply_assignment_rules', {
           p_task_id: data.id,
         });
         if (assignmentError) throw assignmentError;
-      // Apply assignment rules (only if no manual assignment and not outside vendor)
-      if (!taskFields.assigned_to_user_id && !is_outside_vendor) {
-        await supabase.rpc('apply_assignment_rules', { p_task_id: data.id });
       }
 
       return data;
