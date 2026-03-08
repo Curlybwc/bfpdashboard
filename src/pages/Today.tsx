@@ -36,6 +36,11 @@ const STAGE_ORDER: Record<string, number> = {
 };
 
 function rankTasks(a: any, b: any): number {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  // Overdue tasks float to top
+  const aOverdue = a.due_date && a.due_date < todayStr ? 0 : 1;
+  const bOverdue = b.due_date && b.due_date < todayStr ? 0 : 1;
+  if (aOverdue !== bOverdue) return aOverdue - bOverdue;
   // Stage: In Progress before Ready
   const sa = STAGE_ORDER[a.stage] ?? 9;
   const sb = STAGE_ORDER[b.stage] ?? 9;

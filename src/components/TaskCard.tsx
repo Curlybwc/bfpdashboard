@@ -260,11 +260,17 @@ const TaskCard = ({
               <Flag className="h-3 w-3" />
               {task.priority}
             </span>
-            {task.due_date && (
-              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                <Calendar className="h-3 w-3" />
-                {task.due_date}
-              </span>
+            {task.due_date && (() => {
+              const isOverdue = task.stage !== 'Done' && task.due_date < new Date().toISOString().slice(0, 10);
+              return (
+                <span className={cn("text-xs flex items-center gap-0.5", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
+                  <Calendar className={cn("h-3 w-3", isOverdue && "text-destructive")} />
+                  {task.due_date}
+                </span>
+              );
+            })()}
+            {task.stage !== 'Done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10) && (
+              <StatusBadge status="Overdue" />
             )}
             {materialCount > 0 && (
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
