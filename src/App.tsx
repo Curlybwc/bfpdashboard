@@ -34,6 +34,7 @@ import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import Analytics from "./pages/Analytics";
+import CalendarView from "./pages/CalendarView";
 import MobileNav from "./components/MobileNav";
 
 const queryClient = new QueryClient();
