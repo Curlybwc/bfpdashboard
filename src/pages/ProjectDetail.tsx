@@ -67,6 +67,7 @@ const ProjectDetail = () => {
   const project = data?.project;
   const allTasks = data?.tasks ?? [];
   const photoCountMap = data?.photoCountMap ?? {};
+  const materialCountMap = data?.materialCountMap ?? {};
   const projectMembers = data?.members ?? [];
   const myActiveWorkerTaskIds = new Set(data?.myActiveWorkerTaskIds ?? []);
   const myCandidateTaskIds = new Set(data?.myCandidateTaskIds ?? []);
