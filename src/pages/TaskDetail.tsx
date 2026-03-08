@@ -1378,6 +1378,24 @@ const TaskDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Photo nudge dialog */}
+      <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleSave(true); }}>
+              Complete Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
