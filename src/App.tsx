@@ -32,6 +32,7 @@ import Availability from "./pages/Availability";
 import FieldModeCapture from "./pages/FieldModeCapture";
 import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
 import MobileNav from "./components/MobileNav";
 
 const queryClient = new QueryClient();
@@ -62,7 +63,8 @@ const AppRoutes = () => {
     if (user && (location.pathname === '/login' || location.pathname === '/')) {
       navigate('/today', { replace: true });
     }
-    if (!user && location.pathname !== '/login' && location.pathname !== '/') {
+    const publicRoutes = ['/login', '/', '/reset-password'];
+    if (!user && !publicRoutes.includes(location.pathname)) {
       navigate('/login', { replace: true });
     }
   }, [user, loading, location.pathname, navigate]);
@@ -76,6 +78,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/today" element={<Today />} />
         <Route path="/today/field-mode" element={<ManagerGuard><FieldModeCapture /></ManagerGuard>} />
         <Route path="/today/field-mode/preview" element={<ManagerGuard><FieldModePreview /></ManagerGuard>} />
