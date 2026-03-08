@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { FolderKanban, ClipboardList, LogOut, Shield, CalendarCheck, ShoppingCart } from 'lucide-react';
+import { FolderKanban, ClipboardList, LogOut, Shield, CalendarCheck, ShoppingCart, BarChart3, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 
@@ -11,9 +11,11 @@ const MobileNav = () => {
   
   const links = [
     { to: '/today', icon: CalendarCheck, label: 'Today' },
+    { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     ...(!isContractor ? [{ to: '/scopes', icon: ClipboardList, label: 'Scopes' }] : []),
     { to: '/shopping', icon: ShoppingCart, label: 'Shopping' },
+    ...(isAdmin ? [{ to: '/analytics', icon: BarChart3, label: 'Analytics' }] : []),
   ];
 
   return (

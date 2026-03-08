@@ -36,6 +36,11 @@ const STAGE_ORDER: Record<string, number> = {
 };
 
 function rankTasks(a: any, b: any): number {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  // Overdue tasks float to top
+  const aOverdue = a.due_date && a.due_date < todayStr ? 0 : 1;
+  const bOverdue = b.due_date && b.due_date < todayStr ? 0 : 1;
+  if (aOverdue !== bOverdue) return aOverdue - bOverdue;
   // Stage: In Progress before Ready
   const sa = STAGE_ORDER[a.stage] ?? 9;
   const sb = STAGE_ORDER[b.stage] ?? 9;
@@ -53,7 +58,10 @@ function rankTasks(a: any, b: any): number {
   const db = b.due_date ?? '9999-12-31';
   if (da !== db) return da < db ? -1 : 1;
   // created_at ascending
-  return (a.created_at || '') < (b.created_at || '') ? -1 : 1;
+  const ca = a.created_at || '';
+  const cb = b.created_at || '';
+  if (ca === cb) return 0;
+  return ca < cb ? -1 : 1;
 }
 
 const Today = () => {
@@ -130,6 +138,7 @@ const Today = () => {
         .eq('stage', 'Ready')
         .eq('materials_on_site', 'Yes')
         .eq('assignment_mode', 'solo')
+        .eq('is_outside_vendor', false)
         .in('project_id', memberProjectIds.length > 0 ? memberProjectIds : ['00000000-0000-0000-0000-000000000000'])
         .order('due_date', { ascending: true, nullsFirst: false })
         .order('priority', { ascending: true })

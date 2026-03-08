@@ -7,28 +7,66 @@ export const useAdmin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [canManageProjects, setCanManageProjects] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
+    let cancelled = false;
+
+    const resetPermissions = () => {
       setIsAdmin(false);
       setCanManageProjects(false);
-      setLoading(false);
+    };
+
+    if (!user) {
+      if (!cancelled) {
+        resetPermissions();
+        setError(null);
+        setLoading(false);
+      }
       return;
     }
 
-    const fetch = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('is_admin, can_manage_projects')
-        .eq('id', user.id)
-        .single();
-      setIsAdmin(data?.is_admin ?? false);
-      setCanManageProjects(data?.can_manage_projects ?? false);
-      setLoading(false);
+    const fetchPermissions = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('profiles')
+          .select('is_admin, can_manage_projects')
+          .eq('id', user.id)
+          .single();
+
+        if (cancelled) return;
+
+        if (fetchError) {
+          // Missing profile row should not surface as an app error.
+          if (fetchError.code === 'PGRST116') {
+            resetPermissions();
+            return;
+          }
+
+          resetPermissions();
+          setError(fetchError.message);
+          return;
+        }
+
+        setIsAdmin(data?.is_admin ?? false);
+        setCanManageProjects(data?.can_manage_projects ?? false);
+      } catch (err) {
+        if (cancelled) return;
+        resetPermissions();
+        setError(err instanceof Error ? err.message : 'Failed to load permissions');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
 
-    fetch();
+    fetchPermissions();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  return { isAdmin, canManageProjects, loading };
+  return { isAdmin, canManageProjects, loading, error };
 };

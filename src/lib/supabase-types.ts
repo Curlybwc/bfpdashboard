@@ -37,3 +37,10 @@ export type ScopeItemStatus = 'Not Checked' | 'OK' | 'Repair' | 'Replace' | 'Get
 export const SCOPE_ITEM_STATUSES: ScopeItemStatus[] = ['Not Checked', 'OK', 'Repair', 'Replace', 'Get Bid'];
 
 export type AssignmentOutcome = 'assign_user' | 'outside_vendor' | 'crew';
+
+export type RecurrenceFrequency = 'weekly' | 'monthly' | 'yearly';
+export const RECURRENCE_FREQUENCIES: { value: RecurrenceFrequency; label: string }[] = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+];

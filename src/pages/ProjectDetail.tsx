@@ -12,13 +12,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle, CircleDot, Circle, UserX, Wrench } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle, CircleDot, Circle, UserX, Wrench, CheckSquare, CalendarDays } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
-import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
+import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type RecurrenceFrequency } from '@/lib/supabase-types';
+import { Switch } from '@/components/ui/switch';
 import TaskCard from '@/components/TaskCard';
+import BulkTaskBar from '@/components/BulkTaskBar';
+import { SortableTaskList, SortableTaskItem, persistTaskOrder } from '@/components/SortableTaskList';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
@@ -87,7 +91,12 @@ const ProjectDetail = () => {
   const [matUnit, setMatUnit] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newIsRecurring, setNewIsRecurring] = useState(false);
+  const [newRecurrenceFrequency, setNewRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
@@ -165,7 +174,7 @@ const ProjectDetail = () => {
     const blocked = leafTasks.filter((t) => t.is_blocked);
     const inProgress = leafTasks.filter((t) => !t.is_blocked && t.stage === 'In Progress');
     const ready = leafTasks.filter((t) => !t.is_blocked && t.stage === 'Ready');
-    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id && t.assignment_mode !== 'crew');
+    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id && t.assignment_mode !== 'crew' && !t.is_outside_vendor);
     const waitingMaterials = ready.filter((t) => t.materials_on_site === 'No');
 
     const sortByPriority = (a: any, b: any) => {
@@ -258,6 +267,25 @@ const ProjectDetail = () => {
     });
   };
 
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const exitBulkMode = () => {
+    setBulkMode(false);
+    setSelectedTaskIds(new Set());
+  };
+
+  const handleBulkDone = () => {
+    exitBulkMode();
+    invalidateProject();
+  };
+
   const openEditDialog = () => {
     setEditName(project?.name || '');
     setEditAddress(project?.address || '');
@@ -286,14 +314,19 @@ const ProjectDetail = () => {
         trade: trade || null,
         notes: notes || null,
         created_by: user.id,
-        assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
+        assigned_to_user_id: assignedTo === 'unassigned' || assignedTo === 'outside_vendor' ? null : assignedTo,
+        is_outside_vendor: assignedTo === 'outside_vendor',
         pendingMaterials,
+        due_date: newDueDate || null,
+        is_recurring: newIsRecurring && !!newDueDate,
+        recurrence_frequency: newIsRecurring && newDueDate ? newRecurrenceFrequency : null,
       },
       {
         onSuccess: () => {
           setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
           setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
           setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
+          setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
           setOpen(false);
         },
       },
@@ -327,9 +360,17 @@ const ProjectDetail = () => {
                 <Button size="sm" variant="outline" onClick={openEditDialog}>
                   <Pencil className="h-4 w-4" />
                 </Button>
+               )}
+              {isManager && (
+                <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
+                  <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
+                </Button>
               )}
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
                  <Package className="h-4 w-4 mr-1" />Materials
+               </Button>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/calendar?project=${id}`)}>
+                 <CalendarDays className="h-4 w-4 mr-1" />Calendar
                </Button>
               {/* Field Mode & Walkthrough are manager/admin workflows */}
               {isManager && (
@@ -389,6 +430,7 @@ const ProjectDetail = () => {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
                       {projectMembers.map((m) => (
                         <SelectItem key={m.user_id} value={m.user_id}>
                           {m.profiles?.full_name || 'Unnamed'} ({m.role})
@@ -401,6 +443,29 @@ const ProjectDetail = () => {
                   <Label>Notes</Label>
                   <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
                 </div>
+                <div className="space-y-2">
+                  <Label>Due Date</Label>
+                  <Input type="date" value={newDueDate} onChange={(e) => {
+                    setNewDueDate(e.target.value);
+                    if (!e.target.value) setNewIsRecurring(false);
+                  }} />
+                </div>
+                {newDueDate && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Recurring</Label>
+                      <Switch checked={newIsRecurring} onCheckedChange={setNewIsRecurring} />
+                    </div>
+                    {newIsRecurring && (
+                      <Select value={newRecurrenceFrequency} onValueChange={(v) => setNewRecurrenceFrequency(v as RecurrenceFrequency)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {RECURRENCE_FREQUENCIES.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                )}
                 <Collapsible>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
                     <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
@@ -607,49 +672,91 @@ const ProjectDetail = () => {
             </CardContent>
           </Card>
         )}
-        <div className="space-y-2">
-           {rootTasks.length === 0 ? (
-             <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
-           ) : (
-             rootTasks.map((t) => {
-               const children = childrenMap[t.id] || [];
-               const isExpanded = expandedIds.has(t.id);
-               const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
-               return (
-                 <div key={t.id}>
-                     <TaskCard
-                       task={t}
-                       projectName={project.name}
-                       userId={user?.id ?? ''}
-                       isAdmin={isAdmin}
-                       onUpdate={invalidateProject}
-                       showProjectName={false}
-                       childCount={children.length}
-                       expanded={isExpanded}
-                       onToggle={() => toggleExpanded(t.id)}
-                       allChildrenDone={allChildrenDone}
-                       assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined}
-                       photoCount={photoCountMap[t.id] || 0}
-                     />
-                   {isExpanded && children.map((child: any) => (
-                       <TaskCard
-                         key={child.id}
-                         task={child}
-                         projectName={project.name}
-                         userId={user?.id ?? ''}
-                         isAdmin={isAdmin}
-                         onUpdate={invalidateProject}
-                         showProjectName={false}
-                         isChild
-                         assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined}
-                         photoCount={photoCountMap[child.id] || 0}
-                       />
-                   ))}
-                 </div>
-               );
-             })
-           )}
-        </div>
+        {bulkMode && (
+          <BulkTaskBar
+            selectedIds={selectedTaskIds}
+            members={projectMembers}
+            onClear={exitBulkMode}
+            onDone={handleBulkDone}
+          />
+        )}
+        {rootTasks.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
+        ) : bulkMode ? (
+          /* Bulk mode — checkboxes, no drag */
+          <div className="space-y-2">
+            {rootTasks.map((t) => {
+              const children = childrenMap[t.id] || [];
+              const isExpanded = expandedIds.has(t.id);
+              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              return (
+                <div key={t.id}>
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      checked={selectedTaskIds.has(t.id)}
+                      onCheckedChange={() => toggleTaskSelection(t.id)}
+                      className="mt-4 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                    </div>
+                  </div>
+                  {isExpanded && children.map((child: any) => (
+                    <div key={child.id} className="flex items-start gap-2">
+                      <Checkbox checked={selectedTaskIds.has(child.id)} onCheckedChange={() => toggleTaskSelection(child.id)} className="mt-4 ml-6 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        ) : isManager ? (
+          /* Manager/Admin — draggable sort */
+          <SortableTaskList
+            items={rootTasks}
+            onReorder={async (orderedIds) => {
+              const { error } = await persistTaskOrder(orderedIds);
+              if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
+              else invalidateProject();
+            }}
+          >
+            {(t) => {
+              const children = childrenMap[t.id] || [];
+              const isExpanded = expandedIds.has(t.id);
+              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              return (
+                <SortableTaskItem key={t.id} id={t.id}>
+                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                  {isExpanded && children.map((child: any) => (
+                    <div key={child.id} className="mt-2">
+                      <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                    </div>
+                  ))}
+                </SortableTaskItem>
+              );
+            }}
+          </SortableTaskList>
+        ) : (
+          /* Contractor — static list */
+          <div className="space-y-2">
+            {rootTasks.map((t) => {
+              const children = childrenMap[t.id] || [];
+              const isExpanded = expandedIds.has(t.id);
+              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              return (
+                <div key={t.id}>
+                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                  {isExpanded && children.map((child: any) => (
+                    <TaskCard key={child.id} task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {/* ProjectMembers is a manager/admin concern — hide from contractors */}
         {isManager && <ProjectMembers projectId={id!} />}
       </div>

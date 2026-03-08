@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users } from 'lucide-react';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS } from '@/lib/supabase-types';
 
@@ -47,6 +47,7 @@ const TaskCard = ({
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
+  const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [materialCount, setMaterialCount] = useState(0);
@@ -117,8 +118,32 @@ const TaskCard = ({
     else onUpdate();
   };
 
-  const handleComplete = async () => {
+  const handleComplete = async (skipPhotoCheck = false) => {
+    // Photo nudge: check for "after" photo, prompt but allow override
+    if (!skipPhotoCheck) {
+      const { count: afterCount } = await supabase
+        .from('task_photos')
+        .select('id', { count: 'exact', head: true })
+        .eq('task_id', task.id)
+        .eq('phase', 'after');
+
+      if ((afterCount ?? 0) === 0) {
+        setPhotoConfirmOpen(true);
+        return;
+      }
+    }
+
     setLoading(true);
+
+    // Use RPC for recurring tasks to atomically spawn next occurrence
+    if (task.is_recurring) {
+      const { error } = await supabase.rpc('complete_recurring_task', { p_task_id: task.id });
+      setLoading(false);
+      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      else onUpdate();
+      return;
+    }
+
     const { error } = await supabase.from('tasks').update({
       stage: 'Done',
       completed_at: new Date().toISOString(),
@@ -235,11 +260,17 @@ const TaskCard = ({
               <Flag className="h-3 w-3" />
               {task.priority}
             </span>
-            {task.due_date && (
-              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                <Calendar className="h-3 w-3" />
-                {task.due_date}
-              </span>
+            {task.due_date && (() => {
+              const isOverdue = task.stage !== 'Done' && task.due_date < new Date().toISOString().slice(0, 10);
+              return (
+                <span className={cn("text-xs flex items-center gap-0.5", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
+                  <Calendar className={cn("h-3 w-3", isOverdue && "text-destructive")} />
+                  {task.due_date}
+                </span>
+              );
+            })()}
+            {task.stage !== 'Done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10) && (
+              <StatusBadge status="Overdue" />
             )}
             {materialCount > 0 && (
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
@@ -250,6 +281,12 @@ const TaskCard = ({
               <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                 📷 {photoCount}
               </span>
+            )}
+            {task.is_recurring && task.recurrence_frequency && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                <Repeat className="h-3 w-3" />
+                {task.recurrence_frequency === 'weekly' ? 'Weekly' : task.recurrence_frequency === 'monthly' ? 'Monthly' : 'Yearly'}
+              </Badge>
             )}
             {showNeedsMaterials && (
               <Badge variant="outline" className="text-xs border-warning text-warning">
@@ -301,7 +338,7 @@ const TaskCard = ({
             )}
             {showComplete && (
               canComplete ? (
-                <Button size="sm" onClick={handleComplete} disabled={loading}>
+                <Button size="sm" onClick={() => handleComplete()} disabled={loading}>
                   Complete
                 </Button>
               ) : (
@@ -354,6 +391,23 @@ const TaskCard = ({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setDibsConfirmOpen(false); handleDibs(true); }}>
               Claim Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleComplete(true); }}>
+              Complete Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
