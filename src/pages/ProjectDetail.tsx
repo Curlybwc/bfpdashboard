@@ -266,6 +266,25 @@ const ProjectDetail = () => {
     });
   };
 
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const exitBulkMode = () => {
+    setBulkMode(false);
+    setSelectedTaskIds(new Set());
+  };
+
+  const handleBulkDone = () => {
+    exitBulkMode();
+    invalidateProject();
+  };
+
   const openEditDialog = () => {
     setEditName(project?.name || '');
     setEditAddress(project?.address || '');
