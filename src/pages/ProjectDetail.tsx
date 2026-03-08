@@ -21,6 +21,7 @@ import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, t
 import { Switch } from '@/components/ui/switch';
 import TaskCard from '@/components/TaskCard';
 import BulkTaskBar from '@/components/BulkTaskBar';
+import { SortableTaskList, SortableTaskItem, persistTaskOrder } from '@/components/SortableTaskList';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
