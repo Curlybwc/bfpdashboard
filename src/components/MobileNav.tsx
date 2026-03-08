@@ -14,7 +14,7 @@ const MobileNav = () => {
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     ...(!isContractor ? [{ to: '/scopes', icon: ClipboardList, label: 'Scopes' }] : []),
     { to: '/shopping', icon: ShoppingCart, label: 'Shopping' },
-    ...(!isContractor ? [{ to: '/analytics', icon: BarChart3, label: 'Analytics' }] : []),
+    ...(isAdmin ? [{ to: '/analytics', icon: BarChart3, label: 'Analytics' }] : []),
   ];
 
   return (
