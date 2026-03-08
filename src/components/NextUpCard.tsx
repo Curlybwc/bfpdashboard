@@ -33,6 +33,7 @@ const NextUpCard = ({
   activeWorkerCount = 0,
   blockerInfo,
   photoCount = 0,
+  materialCount = 0,
 }: NextUpCardProps) => {
   if (!task) {
     return (
