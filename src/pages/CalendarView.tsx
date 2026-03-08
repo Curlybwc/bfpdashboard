@@ -114,7 +114,7 @@ export default function CalendarView() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <PageHeader title="Calendar" icon={<CalendarDays className="h-6 w-6" />} />
+      <PageHeader title="Calendar" />
 
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
         {/* Month navigation */}
