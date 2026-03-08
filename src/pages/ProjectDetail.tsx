@@ -730,7 +730,7 @@ const ProjectDetail = () => {
                       className="mt-4 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                      <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
                     </div>
                   </div>
                   {isExpanded && children.map((child: any) => (
