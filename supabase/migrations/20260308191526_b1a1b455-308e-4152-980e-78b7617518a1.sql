@@ -1,0 +1,1 @@
+ALTER TYPE public.project_type ADD VALUE 'general';

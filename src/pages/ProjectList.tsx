@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-type ProjectType = 'construction' | 'rental';
+type ProjectType = 'construction' | 'rental' | 'general';
 
 const ProjectList = () => {
   const { user } = useAuth();
@@ -62,7 +62,7 @@ const ProjectList = () => {
     fetchProjects();
   };
 
-  const entityLabel = isRental ? 'Property' : 'Project';
+  const entityLabel = isRental ? 'Property' : activeTab === 'general' ? 'List' : 'Project';
 
   return (
     <div className="pb-20">
@@ -97,6 +97,7 @@ const ProjectList = () => {
           <TabsList className="w-full">
             <TabsTrigger value="construction" className="flex-1">Construction</TabsTrigger>
             <TabsTrigger value="rental" className="flex-1">Rentals</TabsTrigger>
+            <TabsTrigger value="general" className="flex-1">General</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -105,7 +106,7 @@ const ProjectList = () => {
           <p className="text-center text-muted-foreground py-8">Loading...</p>
         ) : projects.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
-            No {isRental ? 'properties' : 'projects'} yet. Create your first one!
+            No {isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'} yet. Create your first one!
           </p>
         ) : (
           projects.map((p) => (
