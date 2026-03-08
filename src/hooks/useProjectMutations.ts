@@ -18,6 +18,11 @@ interface CreateTaskInput {
   pendingMaterials: { name: string; quantity: string; unit: string }[];
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
 export function useCreateTask(projectId: string | undefined) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -35,6 +40,7 @@ export function useCreateTask(projectId: string | undefined) {
         .select('id')
         .single();
       if (error) throw error;
+      if (!data?.id) throw new Error('Task creation did not return an id.');
 
       // Insert manually added materials
       if (pendingMaterials.length > 0) {
@@ -56,7 +62,10 @@ export function useCreateTask(projectId: string | undefined) {
 
       // Apply assignment rules (only if no manual assignment was set)
       if (!taskFields.assigned_to_user_id) {
-        await supabase.rpc('apply_assignment_rules', { p_task_id: data.id });
+        const { error: assignmentError } = await supabase.rpc('apply_assignment_rules', {
+          p_task_id: data.id,
+        });
+        if (assignmentError) throw assignmentError;
       }
 
       return data;
@@ -64,8 +73,12 @@ export function useCreateTask(projectId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-detail', projectId] });
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      toast({
+        title: 'Error',
+        description: getErrorMessage(error, 'Unable to create task.'),
+        variant: 'destructive',
+      });
     },
   });
 }
@@ -86,8 +99,12 @@ export function useUpdateProject(projectId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: ['project-detail', projectId] });
       toast({ title: 'Project updated' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      toast({
+        title: 'Update failed',
+        description: getErrorMessage(error, 'Unable to update project.'),
+        variant: 'destructive',
+      });
     },
   });
 }
@@ -105,8 +122,12 @@ export function useDeleteProject() {
       toast({ title: 'Project deleted' });
       navigate('/projects');
     },
-    onError: (error: any) => {
-      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      toast({
+        title: 'Delete failed',
+        description: getErrorMessage(error, 'Unable to delete project.'),
+        variant: 'destructive',
+      });
     },
   });
 }
