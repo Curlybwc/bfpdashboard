@@ -118,6 +118,22 @@ const TaskCard = ({
   };
 
   const handleComplete = async () => {
+    // Photo enforcement: require at least one "after" photo
+    const { count: afterCount } = await supabase
+      .from('task_photos')
+      .select('id', { count: 'exact', head: true })
+      .eq('task_id', task.id)
+      .eq('phase', 'after');
+
+    if ((afterCount ?? 0) === 0) {
+      toast({
+        title: 'After photo required',
+        description: 'Please add at least one "after" photo before completing this task.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     // Use RPC for recurring tasks to atomically spawn next occurrence
