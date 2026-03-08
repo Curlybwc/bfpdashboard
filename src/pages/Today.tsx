@@ -181,6 +181,7 @@ const Today = () => {
           activeWorkerCount={nextUpTask ? (crewWorkerCounts[nextUpTask.id] || 0) : 0}
           blockerInfo={nextUpTask ? (blockerMap[nextUpTask.id] || null) : null}
           photoCount={nextUpTask ? (photoCountMap[nextUpTask.id] || 0) : 0}
+          materialCount={nextUpTask ? (materialCountMap[nextUpTask.id] || 0) : 0}
         />
       </div>
 
