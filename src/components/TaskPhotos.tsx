@@ -105,7 +105,6 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
 
       if (storageErr) {
         toast({ title: 'Upload failed', description: storageErr.message, variant: 'destructive' });
-        setUploading(null);
         return;
       }
 
@@ -120,7 +119,6 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
         // Best-effort cleanup
         await supabase.storage.from('task-photos').remove([path]);
         toast({ title: 'Failed to save photo record', description: metaErr.message, variant: 'destructive' });
-        setUploading(null);
         return;
       }
 

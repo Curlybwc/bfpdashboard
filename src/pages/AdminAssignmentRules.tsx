@@ -10,18 +10,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, ChevronRight, User, Truck, Users } from 'lucide-react';
+import { Plus, Trash2, ChevronRight, User, Truck, Users, AlertTriangle } from 'lucide-react';
 
 type OutcomeType = 'assign_user' | 'outside_vendor' | 'crew';
+
+type MatchMode = 'contains' | 'exact';
 
 interface Rule {
   id: string;
   name: string;
   keywords: string[];
-  match_mode: string;
+  match_mode: MatchMode;
   priority: number;
   active: boolean;
   outcome_type: OutcomeType;
@@ -55,11 +58,13 @@ const AdminAssignmentRules = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedRule, setSelectedRule] = useState<Rule | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   // Create form
   const [newName, setNewName] = useState('');
   const [newKeywords, setNewKeywords] = useState('');
-  const [newMatchMode, setNewMatchMode] = useState('contains');
+  const [newMatchMode, setNewMatchMode] = useState<MatchMode>('contains');
   const [newPriority, setNewPriority] = useState('100');
   const [newOutcomeType, setNewOutcomeType] = useState<OutcomeType>('outside_vendor');
   const [newOutcomeUserId, setNewOutcomeUserId] = useState('');
@@ -67,7 +72,7 @@ const AdminAssignmentRules = () => {
   // Edit form
   const [editName, setEditName] = useState('');
   const [editKeywords, setEditKeywords] = useState('');
-  const [editMatchMode, setEditMatchMode] = useState('contains');
+  const [editMatchMode, setEditMatchMode] = useState<MatchMode>('contains');
   const [editPriority, setEditPriority] = useState('100');
   const [editOutcomeType, setEditOutcomeType] = useState<OutcomeType>('outside_vendor');
   const [editOutcomeUserId, setEditOutcomeUserId] = useState('');
@@ -81,23 +86,45 @@ const AdminAssignmentRules = () => {
   }, [canAccess, adminLoading, navigate]);
 
   const fetchRules = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('assignment_rules' as any)
       .select('*')
       .order('priority', { ascending: true });
-    if (data) setRules((data as any[]).map(r => ({ ...r, keywords: r.keywords || [] })));
+
+    if (error) throw error;
+
+    setRules((data as any[]).map(r => ({ ...r, keywords: r.keywords || [] })));
   };
 
   const fetchProfiles = async () => {
-    const { data } = await supabase.from('profiles').select('id, full_name').order('full_name');
-    if (data) setProfiles(data as Profile[]);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .order('full_name');
+
+    if (error) throw error;
+
+    setProfiles(data as Profile[]);
+  };
+
+  const loadData = async () => {
+    if (!canAccess) return;
+
+    setPageLoading(true);
+    setPageError(null);
+
+    try {
+      await Promise.all([fetchRules(), fetchProfiles()]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load assignment rule data';
+      setPageError(message);
+    } finally {
+      setPageLoading(false);
+    }
   };
 
   useEffect(() => {
-    if (canAccess) {
-      fetchRules();
-      fetchProfiles();
-    }
+    loadData();
   }, [canAccess]);
 
   const getProfileName = (userId: string | null) => {
@@ -113,31 +140,57 @@ const AdminAssignmentRules = () => {
     return `→ ${OUTCOME_LABELS[rule.outcome_type]}`;
   };
 
+  const parseKeywords = (raw: string) => raw.split(',').map(k => k.trim()).filter(Boolean);
+
+  const validateAssignUserSelection = (outcomeType: OutcomeType, outcomeUserId: string) => {
+    if (outcomeType === 'assign_user' && !outcomeUserId) {
+      toast({
+        title: 'Missing user',
+        description: 'Pick a user when Outcome is "Assign to User".',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !newName.trim()) return;
-    const keywords = newKeywords.split(',').map(k => k.trim()).filter(Boolean);
+
+    const keywords = parseKeywords(newKeywords);
     if (keywords.length === 0) {
       toast({ title: 'Error', description: 'At least one keyword is required', variant: 'destructive' });
       return;
     }
+
+    if (!validateAssignUserSelection(newOutcomeType, newOutcomeUserId)) return;
+
     const { error } = await supabase.from('assignment_rules' as any).insert({
       name: newName.trim(),
       keywords,
       match_mode: newMatchMode,
-      priority: parseInt(newPriority) || 100,
+      priority: parseInt(newPriority, 10) || 100,
       outcome_type: newOutcomeType,
       outcome_user_id: newOutcomeType === 'assign_user' ? (newOutcomeUserId || null) : null,
       created_by: user.id,
     });
+
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewName(''); setNewKeywords(''); setNewMatchMode('contains'); setNewPriority('100');
-    setNewOutcomeType('outside_vendor'); setNewOutcomeUserId('');
+
+    setNewName('');
+    setNewKeywords('');
+    setNewMatchMode('contains');
+    setNewPriority('100');
+    setNewOutcomeType('outside_vendor');
+    setNewOutcomeUserId('');
     setCreateOpen(false);
-    fetchRules();
+
+    await fetchRules();
     toast({ title: 'Rule created' });
   };
 
@@ -153,34 +206,37 @@ const AdminAssignmentRules = () => {
 
   const handleSaveRule = async () => {
     if (!selectedRule) return;
-    const keywords = editKeywords.split(',').map(k => k.trim()).filter(Boolean);
+
+    const keywords = parseKeywords(editKeywords);
     if (keywords.length === 0) {
       toast({ title: 'Error', description: 'At least one keyword is required', variant: 'destructive' });
       return;
     }
-    const { error } = await supabase.from('assignment_rules' as any).update({
+
+    if (!validateAssignUserSelection(editOutcomeType, editOutcomeUserId)) return;
+
+    const updatedRule = {
       name: editName.trim(),
       keywords,
       match_mode: editMatchMode,
-      priority: parseInt(editPriority) || 100,
+      priority: parseInt(editPriority, 10) || 100,
       outcome_type: editOutcomeType,
       outcome_user_id: editOutcomeType === 'assign_user' ? (editOutcomeUserId || null) : null,
-    }).eq('id', selectedRule.id);
+    };
+
+    const { error } = await supabase
+      .from('assignment_rules' as any)
+      .update(updatedRule)
+      .eq('id', selectedRule.id);
+
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
+
     toast({ title: 'Rule updated' });
-    fetchRules();
-    setSelectedRule({
-      ...selectedRule,
-      name: editName.trim(),
-      keywords,
-      match_mode: editMatchMode,
-      priority: parseInt(editPriority) || 100,
-      outcome_type: editOutcomeType,
-      outcome_user_id: editOutcomeType === 'assign_user' ? (editOutcomeUserId || null) : null,
-    });
+    await fetchRules();
+    setSelectedRule({ ...selectedRule, ...updatedRule });
   };
 
   const handleToggleActive = async (rule: Rule) => {
@@ -188,26 +244,37 @@ const AdminAssignmentRules = () => {
       .from('assignment_rules' as any)
       .update({ active: !rule.active })
       .eq('id', rule.id);
+
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    fetchRules();
+
+    await fetchRules();
   };
 
   const handleDeleteRule = async () => {
     if (!selectedRule) return;
-    const { error } = await supabase.from('assignment_rules' as any).delete().eq('id', selectedRule.id);
+
+    const { error } = await supabase
+      .from('assignment_rules' as any)
+      .delete()
+      .eq('id', selectedRule.id);
+
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
+
     toast({ title: 'Rule deleted' });
     setSelectedRule(null);
-    fetchRules();
+    await fetchRules();
   };
 
-  if (adminLoading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
+  if (adminLoading || pageLoading) {
+    return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
+  }
+
   if (!canAccess) return null;
 
   const outcomeFormFields = (
@@ -252,6 +319,13 @@ const AdminAssignmentRules = () => {
           <Button size="sm" variant="ghost" onClick={() => setSelectedRule(null)}>Back to list</Button>
         } />
         <div className="p-4 space-y-4">
+          {pageError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Could not refresh rules</AlertTitle>
+              <AlertDescription>{pageError}</AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label>Name</Label>
             <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
@@ -263,7 +337,7 @@ const AdminAssignmentRules = () => {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Match Mode</Label>
-              <Select value={editMatchMode} onValueChange={setEditMatchMode}>
+              <Select value={editMatchMode} onValueChange={(v) => setEditMatchMode(v as MatchMode)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="contains">Contains</SelectItem>
@@ -291,7 +365,7 @@ const AdminAssignmentRules = () => {
               {editMatchMode === 'contains'
                 ? ' Each keyword is checked as a substring — if the keyword appears anywhere in the task title, it matches.'
                 : ' The entire normalized task title must exactly equal the normalized keyword to match.'}
-              {' '}Rules are checked in priority order (lowest number first). First match wins.
+              {' '}Rules are checked in priority order (lowest number first). First successfully applied match wins.
             </p>
           </Card>
         </div>
@@ -306,9 +380,18 @@ const AdminAssignmentRules = () => {
         <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-1" />Rule</Button>
       } />
       <div className="p-4 space-y-2">
+        {pageError && (
+          <Alert variant="destructive" className="mb-3">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Could not load assignment data</AlertTitle>
+            <AlertDescription>{pageError}</AlertDescription>
+          </Alert>
+        )}
+
         <p className="text-sm text-muted-foreground mb-3">
-          Rules auto-assign tasks based on keyword matching. First match wins by priority. ({rules.length} total)
+          Rules auto-assign tasks based on keyword matching. First successfully applied match wins by priority. ({rules.length} total)
         </p>
+
         {rules.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No assignment rules yet.</p>
         ) : (
@@ -358,7 +441,7 @@ const AdminAssignmentRules = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Match Mode</Label>
-                <Select value={newMatchMode} onValueChange={setNewMatchMode}>
+                <Select value={newMatchMode} onValueChange={(v) => setNewMatchMode(v as MatchMode)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="contains">Contains</SelectItem>

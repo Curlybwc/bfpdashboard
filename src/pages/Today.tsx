@@ -52,6 +52,7 @@ function rankTasks(a: any, b: any): number {
   const da = a.due_date ?? '9999-12-31';
   const db = b.due_date ?? '9999-12-31';
   if (da !== db) return da < db ? -1 : 1;
+  // created_at ascending
   const ca = a.created_at || '';
   const cb = b.created_at || '';
   if (ca === cb) return 0;

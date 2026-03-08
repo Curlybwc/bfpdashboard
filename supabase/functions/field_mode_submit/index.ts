@@ -271,7 +271,10 @@ serve(async (req) => {
 
     // Apply assignment rules to all created tasks
     for (const taskId of createdTaskIds) {
-      await adminClient.rpc('apply_assignment_rules', { p_task_id: taskId });
+      const { error: assignmentError } = await adminClient.rpc('apply_assignment_rules', { p_task_id: taskId });
+      if (assignmentError) {
+        throw new Error(`Failed to apply assignment rules for task ${taskId}: ${assignmentError.message}`);
+      }
     }
 
     return new Response(
