@@ -106,8 +106,8 @@ const AppRoutes = () => {
         <Route path="/admin/store-sections" element={<AdminGuard><AdminStoreSections /></AdminGuard>} />
         <Route path="/admin/inventory/tools" element={<AdminGuard><ToolInventory /></AdminGuard>} />
         <Route path="/admin/inventory/materials" element={<AdminGuard><MaterialInventory /></AdminGuard>} />
-        <Route path="/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
-        <Route path="/calendar" element={<CalendarView />} />
+        <Route path="/admin/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
+        <Route path="/admin/calendar" element={<AdminGuard><CalendarView /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}
