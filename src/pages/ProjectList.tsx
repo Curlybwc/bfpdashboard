@@ -94,10 +94,10 @@ const ProjectList = () => {
       />
       <div className="px-4 pt-2">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="w-full">
-            <TabsTrigger value="construction" className="flex-1">Construction</TabsTrigger>
-            <TabsTrigger value="rental" className="flex-1">Rentals</TabsTrigger>
-            <TabsTrigger value="general" className="flex-1">General</TabsTrigger>
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger value="construction" className="text-xs px-2">Construction</TabsTrigger>
+            <TabsTrigger value="rental" className="text-xs px-2">Rentals</TabsTrigger>
+            <TabsTrigger value="general" className="text-xs px-2">General</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
