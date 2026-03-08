@@ -286,14 +286,7 @@ const ProjectMaterials = () => {
   };
 
   const upsertStock = async (toolTypeId: string, locationType: string, projectId: string | null, delta: number) => {
-    const { data: existing } = await supabase
-      .from('tool_stock')
-      .select('*')
-      .eq('tool_type_id', toolTypeId)
-      .eq('location_type', locationType)
-      .is('project_id', projectId ? undefined as any : null);
-
-    let rows = existing as StockRow[] | null;
+    let rows: StockRow[] | null = null;
     if (projectId) {
       const { data: existingProj } = await supabase
         .from('tool_stock')

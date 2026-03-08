@@ -28,6 +28,7 @@ import TaskComments from '@/components/TaskComments';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
 import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
+import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -690,61 +691,53 @@ const TaskDetail = () => {
       if ((count ?? 0) >= 5) { setDibsConfirmOpen(true); return; }
     }
     setActionLoading(true);
-    await supabase.from('tasks').update({
-      assigned_to_user_id: user.id,
-      claimed_by_user_id: user.id,
-      claimed_at: new Date().toISOString(),
-    }).eq('id', taskId);
-    setActionLoading(false);
-    fetchTask();
+    try {
+      await claimTask(taskId, user.id);
+      fetchTask();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleStart = async () => {
     if (!user || !taskId) return;
     setActionLoading(true);
-    await supabase.from('tasks').update({
-      stage: 'In Progress',
-      started_at: new Date().toISOString(),
-      started_by_user_id: user.id,
-    }).eq('id', taskId);
-    setActionLoading(false);
-    fetchTask();
-    // Nudge for before photos
-    const hasBeforePhoto = photos.some((p: any) => p.phase === 'before');
-    if (!hasBeforePhoto) {
-      toast({ title: '📷 Add a before photo', description: 'Document starting conditions for this task.' });
+    try {
+      await startTask(taskId, user.id);
+      fetchTask();
+      // Nudge for before photos
+      const hasBeforePhoto = photos.some((p: any) => p.phase === 'before');
+      if (!hasBeforePhoto) {
+        toast({ title: '📷 Add a before photo', description: 'Document starting conditions for this task.' });
+      }
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleComplete = async () => {
     if (!taskId) return;
     setActionLoading(true);
-    await supabase.from('tasks').update({
-      stage: 'Done',
-      completed_at: new Date().toISOString(),
-    }).eq('id', taskId);
-
-    if (task?.parent_task_id) {
-      const { data: siblings } = await supabase
-        .from('tasks')
-        .select('id, stage')
-        .eq('parent_task_id', task.parent_task_id)
-        .neq('id', taskId);
-      const allSiblingsDone = (siblings || []).every(s => s.stage === 'Done');
-      if (allSiblingsDone) {
-        await supabase.from('tasks').update({
-          stage: 'Done',
-          completed_at: new Date().toISOString(),
-        }).eq('id', task.parent_task_id);
+    try {
+      await completeTask({
+        taskId,
+        parentTaskId: task?.parent_task_id,
+        isRecurring: task?.is_recurring,
+      });
+      fetchTask();
+      // Nudge for after photos
+      const hasAfterPhoto = photos.some((p: any) => p.phase === 'after');
+      if (!hasAfterPhoto) {
+        toast({ title: '📷 Add an after photo', description: 'Document the completed work for this task.' });
       }
-    }
-
-    setActionLoading(false);
-    fetchTask();
-    // Nudge for after photos
-    const hasAfterPhoto = photos.some((p: any) => p.phase === 'after');
-    if (!hasAfterPhoto) {
-      toast({ title: '📷 Add an after photo', description: 'Document the completed work for this task.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
