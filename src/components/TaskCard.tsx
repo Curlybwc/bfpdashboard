@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS } from '@/lib/supabase-types';
+import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 
 interface TaskCardProps {
   task: any;
@@ -86,28 +87,26 @@ const TaskCard = ({
     }
 
     setLoading(true);
-    const { error } = await supabase.from('tasks').update({
-      assigned_to_user_id: userId,
-      claimed_by_user_id: userId,
-      claimed_at: new Date().toISOString(),
-    }).eq('id', task.id);
-    setLoading(false);
-
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else onUpdate();
+    try {
+      await claimTask(task.id, userId);
+      onUpdate();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStart = async () => {
     setLoading(true);
-    const { error } = await supabase.from('tasks').update({
-      stage: 'In Progress',
-      started_at: new Date().toISOString(),
-      started_by_user_id: userId,
-    }).eq('id', task.id);
-    setLoading(false);
-
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else onUpdate();
+    try {
+      await startTask(task.id, userId);
+      onUpdate();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleComplete = async (skipPhotoCheck = false) => {
@@ -126,40 +125,18 @@ const TaskCard = ({
     }
 
     setLoading(true);
-
-    // Use RPC for recurring tasks to atomically spawn next occurrence
-    if (task.is_recurring) {
-      const { error } = await supabase.rpc('complete_recurring_task', { p_task_id: task.id });
+    try {
+      await completeTask({
+        taskId: task.id,
+        parentTaskId: task.parent_task_id,
+        isRecurring: task.is_recurring,
+      });
+      onUpdate();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
       setLoading(false);
-      if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      else onUpdate();
-      return;
     }
-
-    const { error } = await supabase.from('tasks').update({
-      stage: 'Done',
-      completed_at: new Date().toISOString(),
-    }).eq('id', task.id);
-
-    if (!error && task.parent_task_id) {
-      const { data: siblings } = await supabase
-        .from('tasks')
-        .select('id, stage')
-        .eq('parent_task_id', task.parent_task_id)
-        .neq('id', task.id);
-
-      const allSiblingsDone = (siblings || []).every(s => s.stage === 'Done');
-      if (allSiblingsDone) {
-        await supabase.from('tasks').update({
-          stage: 'Done',
-          completed_at: new Date().toISOString(),
-        }).eq('id', task.parent_task_id);
-      }
-    }
-
-    setLoading(false);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else onUpdate();
   };
 
   const handleJoinCrew = async () => {

@@ -224,6 +224,13 @@ const ProjectDetail = () => {
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
                  <Package className="h-4 w-4 mr-1" />Materials
                </Button>
+              {/* Calendar route is admin-guarded in App routes */}
+              {isAdmin && (
+                <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
+                   <CalendarDays className="h-4 w-4 mr-1" />Calendar
+                 </Button>
+              )}
+              {/* Field Mode & Walkthrough are manager/admin workflows */}
               <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
                  <CalendarDays className="h-4 w-4 mr-1" />Calendar
                </Button>
