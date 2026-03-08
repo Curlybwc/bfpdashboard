@@ -34,6 +34,7 @@ import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import Analytics from "./pages/Analytics";
+import CalendarView from "./pages/CalendarView";
 import MobileNav from "./components/MobileNav";
 
 const queryClient = new QueryClient();
@@ -106,6 +107,7 @@ const AppRoutes = () => {
         <Route path="/admin/inventory/tools" element={<AdminGuard><ToolInventory /></AdminGuard>} />
         <Route path="/admin/inventory/materials" element={<AdminGuard><MaterialInventory /></AdminGuard>} />
         <Route path="/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
+        <Route path="/calendar" element={<CalendarView />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}
