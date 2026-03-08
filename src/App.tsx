@@ -39,17 +39,17 @@ import MobileNav from "./components/MobileNav";
 
 const queryClient = new QueryClient();
 
-/** Redirects contractors away from manager/admin-only routes (scopes) */
+/** Redirects contractors away from manager/admin-only routes — uses GLOBAL flags */
 const ManagerGuard = ({ children }: { children: ReactNode }) => {
-  const { isAdmin, canManageProjects, loading } = useAdmin();
+  const { isAdmin, canManageProjects, loading } = useGlobalPermissions();
   if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;
   if (!isAdmin && !canManageProjects) return <Navigate to="/today" replace />;
   return <>{children}</>;
 };
 
-/** Redirects non-admins away from admin-only routes */
+/** Redirects non-admins away from admin-only routes — uses GLOBAL flags */
 const AdminGuard = ({ children }: { children: ReactNode }) => {
-  const { isAdmin, loading } = useAdmin();
+  const { isAdmin, loading } = useGlobalPermissions();
   if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>;
   if (!isAdmin) return <Navigate to="/today" replace />;
   return <>{children}</>;
