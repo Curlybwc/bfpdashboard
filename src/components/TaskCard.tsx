@@ -261,6 +261,12 @@ const TaskCard = ({
                 📷 {photoCount}
               </span>
             )}
+            {task.is_recurring && task.recurrence_frequency && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                <Repeat className="h-3 w-3" />
+                {task.recurrence_frequency === 'weekly' ? 'Weekly' : task.recurrence_frequency === 'monthly' ? 'Monthly' : 'Yearly'}
+              </Badge>
+            )}
             {showNeedsMaterials && (
               <Badge variant="outline" className="text-xs border-warning text-warning">
                 Needs Materials
