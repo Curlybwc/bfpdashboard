@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, type TaskStage, type TaskPriority, type BlockerReason } from '@/lib/supabase-types';
+import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type BlockerReason, type RecurrenceFrequency } from '@/lib/supabase-types';
 import { canReportBlocker, canResolveBlocker } from '@/lib/permissions';
 import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
