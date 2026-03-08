@@ -106,7 +106,7 @@ const ProjectList = () => {
           <p className="text-center text-muted-foreground py-8">Loading...</p>
         ) : projects.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
-            No {isRental ? 'properties' : 'projects'} yet. Create your first one!
+            No {isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'} yet. Create your first one!
           </p>
         ) : (
           projects.map((p) => (
