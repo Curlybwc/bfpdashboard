@@ -50,6 +50,7 @@ const PHASES: { key: PhotoPhase; label: string }[] = [
 async function compressImage(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
       const MAX = 1400;
       let w = img.width;
@@ -68,13 +69,17 @@ async function compressImage(file: File): Promise<Blob> {
         (blob) => {
           if (blob) resolve(blob);
           else reject(new Error('Compression failed'));
+          URL.revokeObjectURL(objectUrl);
         },
         'image/jpeg',
         0.82
       );
     };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image'));
+    };
+    img.src = objectUrl;
   });
 }
 
@@ -100,7 +105,6 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
 
       if (storageErr) {
         toast({ title: 'Upload failed', description: storageErr.message, variant: 'destructive' });
-        setUploading(null);
         return;
       }
 
@@ -115,15 +119,16 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
         // Best-effort cleanup
         await supabase.storage.from('task-photos').remove([path]);
         toast({ title: 'Failed to save photo record', description: metaErr.message, variant: 'destructive' });
-        setUploading(null);
         return;
       }
 
       onPhotosChange();
-    } catch (err: any) {
-      toast({ title: 'Upload error', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong while uploading';
+      toast({ title: 'Upload error', description: message, variant: 'destructive' });
+    } finally {
+      setUploading(null);
     }
-    setUploading(null);
   };
 
   const handleFileChange = (phase: PhotoPhase) => (e: React.ChangeEvent<HTMLInputElement>) => {

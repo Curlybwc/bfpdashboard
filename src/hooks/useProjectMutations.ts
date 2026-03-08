@@ -56,7 +56,8 @@ export function useCreateTask(projectId: string | undefined) {
 
       // Apply assignment rules (only if no manual assignment was set)
       if (!taskFields.assigned_to_user_id) {
-        await supabase.rpc('apply_assignment_rules', { p_task_id: data.id });
+        const { error: assignmentError } = await supabase.rpc('apply_assignment_rules', { p_task_id: data.id });
+        if (assignmentError) throw assignmentError;
       }
 
       return data;
