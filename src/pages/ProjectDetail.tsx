@@ -369,6 +369,9 @@ const ProjectDetail = () => {
               <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
                  <Package className="h-4 w-4 mr-1" />Materials
                </Button>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/calendar?project=${id}`)}>
+                 <CalendarDays className="h-4 w-4 mr-1" />Calendar
+               </Button>
               {/* Field Mode & Walkthrough are manager/admin workflows */}
               {isManager && (
                 <>
