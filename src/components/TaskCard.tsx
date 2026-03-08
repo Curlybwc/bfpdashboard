@@ -44,22 +44,13 @@ const TaskCard = ({
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
-  blockerInfo, photoCount = 0,
+  blockerInfo, photoCount = 0, materialCount = 0,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
-  const [materialCount, setMaterialCount] = useState(0);
-
-  useEffect(() => {
-    supabase
-      .from('task_materials')
-      .select('id', { count: 'exact', head: true })
-      .eq('task_id', task.id)
-      .then(({ count }) => setMaterialCount(count ?? 0));
-  }, [task.id, materialsOpen]);
 
   const isAssignedToMe = task.assigned_to_user_id === userId;
   const isUnassigned = !task.assigned_to_user_id;
