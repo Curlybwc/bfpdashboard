@@ -282,7 +282,8 @@ const TaskDetail = () => {
 
     const oldStage = task.stage;
     const isCrewMode = task.assignment_mode === 'crew';
-    const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' ? null : assignedTo);
+    const isVendor = assignedTo === 'outside_vendor';
+    const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' || isVendor ? null : assignedTo);
 
     const updatePayload: any = {
       task: taskText,
