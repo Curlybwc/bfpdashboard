@@ -294,6 +294,7 @@ const TaskDetail = () => {
       notes: notes || null,
       due_date: dueDate || null,
       assigned_to_user_id: newAssignedTo,
+      is_outside_vendor: isVendor,
       is_recurring: isRecurring,
       recurrence_frequency: isRecurring ? recurrenceFrequency : null,
       recurrence_anchor_date: isRecurring && dueDate ? dueDate : null,
