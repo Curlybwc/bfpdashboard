@@ -21,6 +21,7 @@ import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, t
 import { Switch } from '@/components/ui/switch';
 import TaskCard from '@/components/TaskCard';
 import BulkTaskBar from '@/components/BulkTaskBar';
+import { SortableTaskList, SortableTaskItem, persistTaskOrder } from '@/components/SortableTaskList';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
@@ -676,70 +677,83 @@ const ProjectDetail = () => {
             onDone={handleBulkDone}
           />
         )}
-        <div className="space-y-2">
-           {rootTasks.length === 0 ? (
-             <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
-           ) : (
-             rootTasks.map((t) => {
-               const children = childrenMap[t.id] || [];
-               const isExpanded = expandedIds.has(t.id);
-               const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
-               return (
-                 <div key={t.id}>
-                   <div className={cn("flex items-start gap-2", bulkMode && "")}>
-                     {bulkMode && (
-                       <Checkbox
-                         checked={selectedTaskIds.has(t.id)}
-                         onCheckedChange={() => toggleTaskSelection(t.id)}
-                         className="mt-4 shrink-0"
-                       />
-                     )}
-                     <div className="flex-1 min-w-0">
-                       <TaskCard
-                         task={t}
-                         projectName={project.name}
-                         userId={user?.id ?? ''}
-                         isAdmin={isAdmin}
-                         onUpdate={invalidateProject}
-                         showProjectName={false}
-                         childCount={children.length}
-                         expanded={isExpanded}
-                         onToggle={() => toggleExpanded(t.id)}
-                         allChildrenDone={allChildrenDone}
-                         assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined}
-                         photoCount={photoCountMap[t.id] || 0}
-                       />
-                     </div>
-                   </div>
-                   {isExpanded && children.map((child: any) => (
-                     <div key={child.id} className={cn("flex items-start gap-2", bulkMode && "")}>
-                       {bulkMode && (
-                         <Checkbox
-                           checked={selectedTaskIds.has(child.id)}
-                           onCheckedChange={() => toggleTaskSelection(child.id)}
-                           className="mt-4 ml-6 shrink-0"
-                         />
-                       )}
-                       <div className="flex-1 min-w-0">
-                         <TaskCard
-                           task={child}
-                           projectName={project.name}
-                           userId={user?.id ?? ''}
-                           isAdmin={isAdmin}
-                           onUpdate={invalidateProject}
-                           showProjectName={false}
-                           isChild={!bulkMode}
-                           assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined}
-                           photoCount={photoCountMap[child.id] || 0}
-                         />
-                       </div>
-                     </div>
-                   ))}
-                 </div>
-               );
-             })
-           )}
-        </div>
+        {rootTasks.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
+        ) : bulkMode ? (
+          /* Bulk mode — checkboxes, no drag */
+          <div className="space-y-2">
+            {rootTasks.map((t) => {
+              const children = childrenMap[t.id] || [];
+              const isExpanded = expandedIds.has(t.id);
+              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              return (
+                <div key={t.id}>
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      checked={selectedTaskIds.has(t.id)}
+                      onCheckedChange={() => toggleTaskSelection(t.id)}
+                      className="mt-4 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                    </div>
+                  </div>
+                  {isExpanded && children.map((child: any) => (
+                    <div key={child.id} className="flex items-start gap-2">
+                      <Checkbox checked={selectedTaskIds.has(child.id)} onCheckedChange={() => toggleTaskSelection(child.id)} className="mt-4 ml-6 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        ) : isManager ? (
+          /* Manager/Admin — draggable sort */
+          <SortableTaskList
+            items={rootTasks}
+            onReorder={async (orderedIds) => {
+              const { error } = await persistTaskOrder(orderedIds);
+              if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
+              else invalidateProject();
+            }}
+          >
+            {(t) => {
+              const children = childrenMap[t.id] || [];
+              const isExpanded = expandedIds.has(t.id);
+              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              return (
+                <SortableTaskItem key={t.id} id={t.id}>
+                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                  {isExpanded && children.map((child: any) => (
+                    <div key={child.id} className="mt-2">
+                      <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                    </div>
+                  ))}
+                </SortableTaskItem>
+              );
+            }}
+          </SortableTaskList>
+        ) : (
+          /* Contractor — static list */
+          <div className="space-y-2">
+            {rootTasks.map((t) => {
+              const children = childrenMap[t.id] || [];
+              const isExpanded = expandedIds.has(t.id);
+              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              return (
+                <div key={t.id}>
+                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} />
+                  {isExpanded && children.map((child: any) => (
+                    <TaskCard key={child.id} task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {/* ProjectMembers is a manager/admin concern — hide from contractors */}
         {isManager && <ProjectMembers projectId={id!} />}
       </div>
