@@ -559,6 +559,32 @@ const ProjectDetail = () => {
               {updateProjectMutation.isPending ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : 'Save'}
             </Button>
           </form>
+          {userCanEditProject && (
+            <div className="border-t pt-3 mt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={updateProjectMutation.isPending}
+                onClick={() => {
+                  const isCurrentlyRental = (project as any).project_type === 'rental';
+                  const newType = isCurrentlyRental ? 'construction' : 'rental';
+                  const label = isCurrentlyRental ? 'Construction' : 'Rentals';
+                  updateProjectMutation.mutate(
+                    { project_type: newType } as any,
+                    {
+                      onSuccess: () => {
+                        setEditOpen(false);
+                        toast({ title: `Moved to ${label}` });
+                      },
+                    },
+                  );
+                }}
+              >
+                Move to {(project as any).project_type === 'rental' ? 'Construction' : 'Rentals'}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
       <AlertDialog open={deleteDialogOpen} onOpenChange={(nextOpen) => { if (deleteProjectMutation.isPending) return; setDeleteDialogOpen(nextOpen); }}>
