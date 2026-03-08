@@ -84,7 +84,7 @@ export function useUpdateProject(projectId: string | undefined) {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (fields: { name: string; address: string | null }) => {
+    mutationFn: async (fields: { name?: string; address?: string | null; project_type?: string }) => {
       const { error } = await supabase
         .from('projects')
         .update(fields)
