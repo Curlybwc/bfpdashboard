@@ -155,6 +155,7 @@ const Today = () => {
               activeWorkerCount={crewWorkerCounts[t.id] || 0}
               blockerInfo={blockerMap[t.id] || null}
               photoCount={photoCountMap[t.id] || 0}
+              materialCount={materialCountMap[t.id] || 0}
             />
           ))}
         </div>
