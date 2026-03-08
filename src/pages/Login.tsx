@@ -77,7 +77,7 @@ const Login = () => {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
             <HardHat className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-xl">{isSignUp ? 'Create Account' : 'Welcome Back'}</CardTitle>
+          <CardTitle className="text-xl">{isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Account' : 'Welcome Back'}</CardTitle>
           <p className="text-sm text-muted-foreground">Contractor Task & Scope Manager</p>
         </CardHeader>
         <CardContent>
