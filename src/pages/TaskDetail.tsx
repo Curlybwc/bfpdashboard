@@ -21,7 +21,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type BlockerReason, type RecurrenceFrequency } from '@/lib/supabase-types';
 import { canReportBlocker, canResolveBlocker } from '@/lib/permissions';
-import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import TaskPhotos from '@/components/TaskPhotos';
 import { Card } from '@/components/ui/card';
