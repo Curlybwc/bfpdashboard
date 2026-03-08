@@ -21,6 +21,7 @@ const colorMap: Record<string, string> = {
   Repair: 'bg-orange-100 text-orange-700',
   Replace: 'bg-destructive/15 text-destructive',
   Blocked: 'bg-destructive/15 text-destructive',
+  Overdue: 'bg-destructive/15 text-destructive',
 };
 
 const StatusBadge = ({ status }: { status: string }) => (
