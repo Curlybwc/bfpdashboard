@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-type ProjectType = 'construction' | 'rental';
+type ProjectType = 'construction' | 'rental' | 'general';
 
 const ProjectList = () => {
   const { user } = useAuth();
