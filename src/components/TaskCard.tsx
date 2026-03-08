@@ -332,7 +332,7 @@ const TaskCard = ({
             )}
             {showComplete && (
               canComplete ? (
-                <Button size="sm" onClick={handleComplete} disabled={loading}>
+                <Button size="sm" onClick={() => handleComplete()} disabled={loading}>
                   Complete
                 </Button>
               ) : (
