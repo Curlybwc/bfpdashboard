@@ -95,6 +95,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
         tasks: tasks ?? [],
         members: (members ?? []) as unknown as ProjectMember[],
         photoCountMap,
+        materialCountMap,
         myActiveWorkerTaskIds,
         myCandidateTaskIds,
       };
