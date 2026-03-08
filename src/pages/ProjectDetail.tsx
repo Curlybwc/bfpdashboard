@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle, CircleDot, Circle, UserX, Wrench, CheckSquare } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, AlertTriangle, CircleDot, Circle, UserX, Wrench, CheckSquare, CalendarDays } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
