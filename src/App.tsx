@@ -63,7 +63,8 @@ const AppRoutes = () => {
     if (user && (location.pathname === '/login' || location.pathname === '/')) {
       navigate('/today', { replace: true });
     }
-    if (!user && location.pathname !== '/login' && location.pathname !== '/') {
+    const publicRoutes = ['/login', '/', '/reset-password'];
+    if (!user && !publicRoutes.includes(location.pathname)) {
       navigate('/login', { replace: true });
     }
   }, [user, loading, location.pathname, navigate]);
