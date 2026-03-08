@@ -35,6 +35,7 @@ const EMPTY_DATA: TodayData = {
   crewCandidateTaskIds: new Set(),
   crewWorkerCounts: {},
   photoCountMap: {},
+  materialCountMap: {},
   hasShiftToday: true, // default true to suppress flash
   isManager: false,
 };
