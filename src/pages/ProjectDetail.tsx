@@ -560,29 +560,34 @@ const ProjectDetail = () => {
             </Button>
           </form>
           {userCanEditProject && (
-            <div className="border-t pt-3 mt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                disabled={updateProjectMutation.isPending}
-                onClick={() => {
-                  const isCurrentlyRental = (project as any).project_type === 'rental';
-                  const newType = isCurrentlyRental ? 'construction' : 'rental';
-                  const label = isCurrentlyRental ? 'Construction' : 'Rentals';
-                  updateProjectMutation.mutate(
-                    { project_type: newType } as any,
-                    {
-                      onSuccess: () => {
-                        setEditOpen(false);
-                        toast({ title: `Moved to ${label}` });
-                      },
-                    },
+            <div className="border-t pt-3 mt-1 flex flex-col gap-2">
+              {(['construction', 'rental', 'general'] as const)
+                .filter((t) => t !== (project as any).project_type)
+                .map((targetType) => {
+                  const labels: Record<string, string> = { construction: 'Construction', rental: 'Rentals', general: 'General' };
+                  return (
+                    <Button
+                      key={targetType}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={updateProjectMutation.isPending}
+                      onClick={() => {
+                        updateProjectMutation.mutate(
+                          { project_type: targetType } as any,
+                          {
+                            onSuccess: () => {
+                              setEditOpen(false);
+                              toast({ title: `Moved to ${labels[targetType]}` });
+                            },
+                          },
+                        );
+                      }}
+                    >
+                      Move to {labels[targetType]}
+                    </Button>
                   );
-                }}
-              >
-                Move to {(project as any).project_type === 'rental' ? 'Construction' : 'Rentals'}
-              </Button>
+                })}
             </div>
           )}
         </DialogContent>
