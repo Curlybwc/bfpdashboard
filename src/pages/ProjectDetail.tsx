@@ -764,7 +764,7 @@ const ProjectDetail = () => {
                   <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
                   {isExpanded && children.map((child: any) => (
                     <div key={child.id} className="mt-2">
-                      <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} />
+                      <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} materialCount={materialCountMap[child.id] || 0} />
                     </div>
                   ))}
                 </SortableTaskItem>
