@@ -1,6 +1,16 @@
 /**
- * Centralized permission helpers for project and scope pages.
- * Uses the existing role model from the database schema.
+ * PROJECT-LEVEL permission helpers.
+ *
+ * These operate on `project_members.role` (per-project) and the global
+ * `isAdmin` flag. They do NOT check global `canManageProjects` — that
+ * flag controls route/nav access, not in-project behavior.
+ *
+ * For global permission checks (route guards, nav visibility), see
+ * `useGlobalPermissions` (src/hooks/useAdmin.tsx).
+ *
+ * Role model summary:
+ *   Global:  isAdmin, canManageProjects  → nav, route access
+ *   Project: projectRole (manager | contractor | read_only) → task actions
  */
 
 /**
@@ -68,7 +78,8 @@ export function canResolveBlocker(isAdmin: boolean, projectRole: string | null):
 }
 
 /**
- * Extract the current user's project role from a members list.
+ * Extract the current user's project-level role from a members list.
+ * Returns null if the user is not a member (global isAdmin still grants access via RLS).
  */
 export function getProjectRole(
   members: Array<{ user_id: string; role: string }>,
