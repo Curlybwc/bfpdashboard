@@ -16,6 +16,7 @@ export interface TodayData {
   crewCandidateTaskIds: Set<string>;
   crewWorkerCounts: Record<string, number>;
   photoCountMap: Record<string, number>;
+  materialCountMap: Record<string, number>;
   hasShiftToday: boolean;
   isManager: boolean;
 }
