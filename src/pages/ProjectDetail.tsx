@@ -94,6 +94,8 @@ const ProjectDetail = () => {
   const [newIsRecurring, setNewIsRecurring] = useState(false);
   const [newRecurrenceFrequency, setNewRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
