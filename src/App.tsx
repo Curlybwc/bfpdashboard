@@ -33,6 +33,7 @@ import FieldModeCapture from "./pages/FieldModeCapture";
 import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import Analytics from "./pages/Analytics";
 import MobileNav from "./components/MobileNav";
 
 const queryClient = new QueryClient();
