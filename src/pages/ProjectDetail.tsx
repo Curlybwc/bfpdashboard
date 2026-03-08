@@ -292,12 +292,16 @@ const ProjectDetail = () => {
         created_by: user.id,
         assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
         pendingMaterials,
+        due_date: newDueDate || null,
+        is_recurring: newIsRecurring && !!newDueDate,
+        recurrence_frequency: newIsRecurring && newDueDate ? newRecurrenceFrequency : null,
       },
       {
         onSuccess: () => {
           setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
           setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
           setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
+          setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
           setOpen(false);
         },
       },
