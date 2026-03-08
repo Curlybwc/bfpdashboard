@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users } from 'lucide-react';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS } from '@/lib/supabase-types';
 
