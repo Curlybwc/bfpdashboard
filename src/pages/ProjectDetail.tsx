@@ -409,6 +409,29 @@ const ProjectDetail = () => {
                   <Label>Notes</Label>
                   <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
                 </div>
+                <div className="space-y-2">
+                  <Label>Due Date</Label>
+                  <Input type="date" value={newDueDate} onChange={(e) => {
+                    setNewDueDate(e.target.value);
+                    if (!e.target.value) setNewIsRecurring(false);
+                  }} />
+                </div>
+                {newDueDate && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Recurring</Label>
+                      <Switch checked={newIsRecurring} onCheckedChange={setNewIsRecurring} />
+                    </div>
+                    {newIsRecurring && (
+                      <Select value={newRecurrenceFrequency} onValueChange={(v) => setNewRecurrenceFrequency(v as RecurrenceFrequency)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {RECURRENCE_FREQUENCIES.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                )}
                 <Collapsible>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
                     <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
