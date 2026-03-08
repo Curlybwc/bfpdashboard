@@ -24,6 +24,7 @@ import { canReportBlocker, canResolveBlocker } from '@/lib/permissions';
 import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import TaskPhotos from '@/components/TaskPhotos';
+import TaskComments from '@/components/TaskComments';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
 import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
@@ -835,6 +836,14 @@ const TaskDetail = () => {
           userId={user!.id}
           onPhotosChange={fetchPhotos}
           canUpload={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
+        />
+
+        {/* Task Comments */}
+        <TaskComments
+          taskId={taskId!}
+          userId={user!.id}
+          isAdmin={isAdmin}
+          canComment={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
         />
 
         {/* Recipe: read-only badge if already expanded */}
