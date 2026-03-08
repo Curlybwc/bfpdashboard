@@ -95,6 +95,7 @@ const TaskDetail = () => {
 
   // Photo state
   const [photos, setPhotos] = useState<any[]>([]);
+  const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
