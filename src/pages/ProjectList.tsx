@@ -97,6 +97,7 @@ const ProjectList = () => {
           <TabsList className="w-full">
             <TabsTrigger value="construction" className="flex-1">Construction</TabsTrigger>
             <TabsTrigger value="rental" className="flex-1">Rentals</TabsTrigger>
+            <TabsTrigger value="general" className="flex-1">General</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
