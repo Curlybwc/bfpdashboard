@@ -71,7 +71,7 @@ const Today = () => {
     inProgress, assigned, available, needsReview, blocked,
     projectMap, parentTitles, assigneeMap, blockerMap,
     crewActiveTaskIds, crewCandidateTaskIds, crewWorkerCounts,
-    photoCountMap, hasShiftToday, isManager,
+    photoCountMap, materialCountMap, hasShiftToday, isManager,
   } = data;
 
   /* ── Derived state ── */
