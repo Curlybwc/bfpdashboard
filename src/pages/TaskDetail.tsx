@@ -282,7 +282,8 @@ const TaskDetail = () => {
 
     const oldStage = task.stage;
     const isCrewMode = task.assignment_mode === 'crew';
-    const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' ? null : assignedTo);
+    const isVendor = assignedTo === 'outside_vendor';
+    const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' || isVendor ? null : assignedTo);
 
     const updatePayload: any = {
       task: taskText,
@@ -293,6 +294,7 @@ const TaskDetail = () => {
       notes: notes || null,
       due_date: dueDate || null,
       assigned_to_user_id: newAssignedTo,
+      is_outside_vendor: isVendor,
       is_recurring: isRecurring,
       recurrence_frequency: isRecurring ? recurrenceFrequency : null,
       recurrence_anchor_date: isRecurring && dueDate ? dueDate : null,
@@ -350,7 +352,7 @@ const TaskDetail = () => {
         setNotes(data.notes || '');
         setDueDate(data.due_date || '');
         setActualCost(data.actual_total_cost?.toString() || '');
-        setAssignedTo(data.assigned_to_user_id || 'unassigned');
+        setAssignedTo(data.is_outside_vendor ? 'outside_vendor' : (data.assigned_to_user_id || 'unassigned'));
         setIsRecurring(data.is_recurring || false);
         setRecurrenceFrequency((data.recurrence_frequency as RecurrenceFrequency) || 'weekly');
       }
@@ -1115,6 +1117,7 @@ const TaskDetail = () => {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
+                <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
                 {projectMembers.map((m) => (
                   <SelectItem key={m.user_id} value={m.user_id}>
                     {m.profiles?.full_name || 'Unnamed'} ({m.role})

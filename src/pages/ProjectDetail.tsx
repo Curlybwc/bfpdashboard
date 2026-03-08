@@ -169,7 +169,7 @@ const ProjectDetail = () => {
     const blocked = leafTasks.filter((t) => t.is_blocked);
     const inProgress = leafTasks.filter((t) => !t.is_blocked && t.stage === 'In Progress');
     const ready = leafTasks.filter((t) => !t.is_blocked && t.stage === 'Ready');
-    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id && t.assignment_mode !== 'crew');
+    const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id && t.assignment_mode !== 'crew' && !t.is_outside_vendor);
     const waitingMaterials = ready.filter((t) => t.materials_on_site === 'No');
 
     const sortByPriority = (a: any, b: any) => {
@@ -290,7 +290,8 @@ const ProjectDetail = () => {
         trade: trade || null,
         notes: notes || null,
         created_by: user.id,
-        assigned_to_user_id: assignedTo === 'unassigned' ? null : assignedTo,
+        assigned_to_user_id: assignedTo === 'unassigned' || assignedTo === 'outside_vendor' ? null : assignedTo,
+        is_outside_vendor: assignedTo === 'outside_vendor',
         pendingMaterials,
         due_date: newDueDate || null,
         is_recurring: newIsRecurring && !!newDueDate,
@@ -397,6 +398,7 @@ const ProjectDetail = () => {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
                       {projectMembers.map((m) => (
                         <SelectItem key={m.user_id} value={m.user_id}>
                           {m.profiles?.full_name || 'Unnamed'} ({m.role})

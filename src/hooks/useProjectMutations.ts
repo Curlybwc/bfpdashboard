@@ -15,6 +15,7 @@ interface CreateTaskInput {
   notes: string | null;
   created_by: string;
   assigned_to_user_id: string | null;
+  is_outside_vendor?: boolean;
   pendingMaterials: { name: string; quantity: string; unit: string }[];
   due_date?: string | null;
   is_recurring?: boolean;
@@ -27,7 +28,7 @@ export function useCreateTask(projectId: string | undefined) {
 
   return useMutation({
     mutationFn: async (input: CreateTaskInput) => {
-      const { pendingMaterials, due_date, is_recurring, recurrence_frequency, ...taskFields } = input;
+      const { pendingMaterials, due_date, is_recurring, recurrence_frequency, is_outside_vendor, ...taskFields } = input;
       const hasMaterials = pendingMaterials.length > 0;
       const { data, error } = await supabase
         .from('tasks')
@@ -38,6 +39,7 @@ export function useCreateTask(projectId: string | undefined) {
           is_recurring: is_recurring || false,
           recurrence_frequency: is_recurring ? recurrence_frequency : null,
           recurrence_anchor_date: is_recurring && due_date ? due_date : null,
+          is_outside_vendor: is_outside_vendor || false,
         })
         .select('id')
         .single();
@@ -61,8 +63,8 @@ export function useCreateTask(projectId: string | undefined) {
       // Apply material bundles
       await applyBundles(data.id, taskFields.task);
 
-      // Apply assignment rules (only if no manual assignment was set)
-      if (!taskFields.assigned_to_user_id) {
+      // Apply assignment rules (only if no manual assignment and not outside vendor)
+      if (!taskFields.assigned_to_user_id && !is_outside_vendor) {
         await supabase.rpc('apply_assignment_rules', { p_task_id: data.id });
       }
 
