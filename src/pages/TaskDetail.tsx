@@ -95,6 +95,7 @@ const TaskDetail = () => {
 
   // Photo state
   const [photos, setPhotos] = useState<any[]>([]);
+  const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
@@ -270,7 +271,7 @@ const TaskDetail = () => {
     fetchTask();
   };
 
-  const handleSave = async () => {
+  const handleSave = async (skipPhotoCheck = false) => {
     if (!taskId || !task) return;
 
     // Validation: recurring requires due date
@@ -278,15 +279,11 @@ const TaskDetail = () => {
       toast({ title: 'Due date required', description: 'A recurring task must have a due date.', variant: 'destructive' });
       return;
     }
-    // Photo enforcement: require "after" photo before marking Done
-    if (stage === 'Done' && task.stage !== 'Done') {
+    // Photo nudge: prompt if no "after" photo when marking Done
+    if (!skipPhotoCheck && stage === 'Done' && task.stage !== 'Done') {
       const hasAfterPhoto = photos.some(p => p.phase === 'after');
       if (!hasAfterPhoto) {
-        toast({
-          title: 'After photo required',
-          description: 'Please add at least one "after" photo before marking this task as done.',
-          variant: 'destructive',
-        });
+        setPhotoConfirmOpen(true);
         return;
       }
     }
@@ -1222,7 +1219,7 @@ const TaskDetail = () => {
           </div>
         )}
 
-        <Button onClick={handleSave} disabled={saving} className="w-full">
+        <Button onClick={() => handleSave()} disabled={saving} className="w-full">
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
         {canDelete && (
@@ -1377,6 +1374,24 @@ const TaskDetail = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleResolveBlocker} disabled={resolvingBlocker}>
               {resolvingBlocker ? 'Resolving…' : 'Resolve'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Photo nudge dialog */}
+      <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleSave(true); }}>
+              Complete Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

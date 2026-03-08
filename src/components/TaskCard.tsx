@@ -47,6 +47,7 @@ const TaskCard = ({
 }: TaskCardProps) => {
   const { toast } = useToast();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
+  const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [materialCount, setMaterialCount] = useState(0);
@@ -117,21 +118,19 @@ const TaskCard = ({
     else onUpdate();
   };
 
-  const handleComplete = async () => {
-    // Photo enforcement: require at least one "after" photo
-    const { count: afterCount } = await supabase
-      .from('task_photos')
-      .select('id', { count: 'exact', head: true })
-      .eq('task_id', task.id)
-      .eq('phase', 'after');
+  const handleComplete = async (skipPhotoCheck = false) => {
+    // Photo nudge: check for "after" photo, prompt but allow override
+    if (!skipPhotoCheck) {
+      const { count: afterCount } = await supabase
+        .from('task_photos')
+        .select('id', { count: 'exact', head: true })
+        .eq('task_id', task.id)
+        .eq('phase', 'after');
 
-    if ((afterCount ?? 0) === 0) {
-      toast({
-        title: 'After photo required',
-        description: 'Please add at least one "after" photo before completing this task.',
-        variant: 'destructive',
-      });
-      return;
+      if ((afterCount ?? 0) === 0) {
+        setPhotoConfirmOpen(true);
+        return;
+      }
     }
 
     setLoading(true);
@@ -333,7 +332,7 @@ const TaskCard = ({
             )}
             {showComplete && (
               canComplete ? (
-                <Button size="sm" onClick={handleComplete} disabled={loading}>
+                <Button size="sm" onClick={() => handleComplete()} disabled={loading}>
                   Complete
                 </Button>
               ) : (
@@ -386,6 +385,23 @@ const TaskCard = ({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setDibsConfirmOpen(false); handleDibs(true); }}>
               Claim Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleComplete(true); }}>
+              Complete Anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
