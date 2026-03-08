@@ -1,12 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
 import { FolderKanban, ClipboardList, LogOut, Shield, CalendarCheck, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useAdmin } from '@/hooks/useAdmin';
+import { useGlobalPermissions } from '@/hooks/useAdmin';
 
 const MobileNav = () => {
   const location = useLocation();
   const { signOut } = useAuth();
-  const { isAdmin, canManageProjects } = useAdmin();
+  // Global flags — controls which nav items are visible (not project-level)
+  const { isAdmin, canManageProjects } = useGlobalPermissions();
   const isContractor = !isAdmin && !canManageProjects;
   
   const links = [
