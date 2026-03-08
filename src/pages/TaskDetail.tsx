@@ -734,8 +734,8 @@ const TaskDetail = () => {
       if (!hasAfterPhoto) {
         toast({ title: '📷 Add an after photo', description: 'Document the completed work for this task.' });
       }
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
