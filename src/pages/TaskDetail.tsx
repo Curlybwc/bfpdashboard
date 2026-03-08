@@ -271,7 +271,7 @@ const TaskDetail = () => {
     fetchTask();
   };
 
-  const handleSave = async () => {
+  const handleSave = async (skipPhotoCheck = false) => {
     if (!taskId || !task) return;
 
     // Validation: recurring requires due date
