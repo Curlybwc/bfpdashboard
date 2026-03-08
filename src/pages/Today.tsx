@@ -130,6 +130,7 @@ const Today = () => {
         .eq('stage', 'Ready')
         .eq('materials_on_site', 'Yes')
         .eq('assignment_mode', 'solo')
+        .eq('is_outside_vendor', false)
         .in('project_id', memberProjectIds.length > 0 ? memberProjectIds : ['00000000-0000-0000-0000-000000000000'])
         .order('due_date', { ascending: true, nullsFirst: false })
         .order('priority', { ascending: true })
