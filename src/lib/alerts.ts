@@ -67,7 +67,7 @@ export function generateAlerts(input: AlertInput): OperationalAlert[] {
           severity: 'high',
           title: `Blocked: ${t.task}`,
           subtitle: projectMap[t.project_id]?.name,
-          actionPath: `/tasks/${t.id}`,
+          actionPath: `/projects/${t.project_id}/tasks/${t.id}`,
           taskId: t.id,
         });
       }
