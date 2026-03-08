@@ -376,6 +376,7 @@ export type Database = {
           has_missing_estimates: boolean
           id: string
           name: string
+          project_type: Database["public"]["Enums"]["project_type"]
           scope_id: string | null
           status: Database["public"]["Enums"]["project_status"]
           updated_at: string
@@ -386,6 +387,7 @@ export type Database = {
           has_missing_estimates?: boolean
           id?: string
           name: string
+          project_type?: Database["public"]["Enums"]["project_type"]
           scope_id?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
@@ -396,6 +398,7 @@ export type Database = {
           has_missing_estimates?: boolean
           id?: string
           name?: string
+          project_type?: Database["public"]["Enums"]["project_type"]
           scope_id?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
@@ -1725,6 +1728,7 @@ export type Database = {
       pricing_status: "Priced" | "Needs Pricing"
       project_member_role: "contractor" | "manager" | "read_only"
       project_status: "active" | "paused" | "complete"
+      project_type: "construction" | "rental"
       scope_member_role: "viewer" | "editor" | "manager"
       scope_status: "Draft" | "Converted" | "Archived" | "active" | "archived"
       task_priority:
@@ -1875,6 +1879,7 @@ export const Constants = {
       pricing_status: ["Priced", "Needs Pricing"],
       project_member_role: ["contractor", "manager", "read_only"],
       project_status: ["active", "paused", "complete"],
+      project_type: ["construction", "rental"],
       scope_member_role: ["viewer", "editor", "manager"],
       scope_status: ["Draft", "Converted", "Archived", "active", "archived"],
       task_priority: [
