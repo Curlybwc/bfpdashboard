@@ -947,8 +947,43 @@ const TaskDetail = () => {
           </div>
           <div className="space-y-2">
             <Label>Due Date</Label>
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <Input type="date" value={dueDate} onChange={(e) => {
+              setDueDate(e.target.value);
+              if (!e.target.value) setIsRecurring(false);
+            }} />
           </div>
+        </div>
+        {/* Recurrence section */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Repeat className="h-4 w-4" />
+              Recurring
+            </Label>
+            <Switch
+              checked={isRecurring}
+              onCheckedChange={(checked) => {
+                if (checked && !dueDate) {
+                  toast({ title: 'Due date required', description: 'Set a due date first to enable recurrence.', variant: 'destructive' });
+                  return;
+                }
+                setIsRecurring(checked);
+              }}
+            />
+          </div>
+          {isRecurring && (
+            <Select value={recurrenceFrequency} onValueChange={(v) => setRecurrenceFrequency(v as RecurrenceFrequency)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {RECURRENCE_FREQUENCIES.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          {task.recurrence_source_task_id && (
+            <p className="text-xs text-muted-foreground">
+              Created from a previous recurring task
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
