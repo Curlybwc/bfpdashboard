@@ -271,6 +271,13 @@ const TaskDetail = () => {
 
   const handleSave = async () => {
     if (!taskId || !task) return;
+
+    // Validation: recurring requires due date
+    if (isRecurring && !dueDate) {
+      toast({ title: 'Due date required', description: 'A recurring task must have a due date.', variant: 'destructive' });
+      return;
+    }
+
     setSaving(true);
 
     const oldStage = task.stage;
@@ -286,9 +293,25 @@ const TaskDetail = () => {
       notes: notes || null,
       due_date: dueDate || null,
       assigned_to_user_id: newAssignedTo,
+      is_recurring: isRecurring,
+      recurrence_frequency: isRecurring ? recurrenceFrequency : null,
+      recurrence_anchor_date: isRecurring && dueDate ? dueDate : null,
     };
     if (isAdmin) {
       updatePayload.actual_total_cost = actualCost ? parseFloat(actualCost) : null;
+    }
+
+    // If transitioning to Done and recurring, use RPC instead
+    if (stage === 'Done' && oldStage !== 'Done' && isRecurring && dueDate) {
+      // First save all other fields
+      const savePay = { ...updatePayload };
+      delete savePay.stage; // RPC will set stage
+      await supabase.from('tasks').update(savePay).eq('id', taskId);
+      const { error: rpcErr } = await supabase.rpc('complete_recurring_task', { p_task_id: taskId });
+      setSaving(false);
+      if (rpcErr) { toast({ title: 'Error', description: rpcErr.message, variant: 'destructive' }); }
+      else { toast({ title: 'Saved — next occurrence created' }); fetchTask(); fetchChildren(); }
+      return;
     }
 
     const { error } = await supabase.from('tasks').update(updatePayload).eq('id', taskId);
