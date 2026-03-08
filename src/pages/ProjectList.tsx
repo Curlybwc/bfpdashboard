@@ -62,7 +62,7 @@ const ProjectList = () => {
     fetchProjects();
   };
 
-  const entityLabel = isRental ? 'Property' : 'Project';
+  const entityLabel = isRental ? 'Property' : activeTab === 'general' ? 'List' : 'Project';
 
   return (
     <div className="pb-20">
