@@ -278,15 +278,11 @@ const TaskDetail = () => {
       toast({ title: 'Due date required', description: 'A recurring task must have a due date.', variant: 'destructive' });
       return;
     }
-    // Photo enforcement: require "after" photo before marking Done
-    if (stage === 'Done' && task.stage !== 'Done') {
+    // Photo nudge: prompt if no "after" photo when marking Done
+    if (!skipPhotoCheck && stage === 'Done' && task.stage !== 'Done') {
       const hasAfterPhoto = photos.some(p => p.phase === 'after');
       if (!hasAfterPhoto) {
-        toast({
-          title: 'After photo required',
-          description: 'Please add at least one "after" photo before marking this task as done.',
-          variant: 'destructive',
-        });
+        setPhotoConfirmOpen(true);
         return;
       }
     }
