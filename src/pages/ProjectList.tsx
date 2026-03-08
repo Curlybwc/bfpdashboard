@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -10,14 +10,21 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+type ProjectType = 'construction' | 'rental';
 
 const ProjectList = () => {
   const { user } = useAuth();
   const { isAdmin, canManageProjects } = useAdmin();
   const { toast } = useToast();
   const canCreate = isAdmin || canManageProjects;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get('tab') as ProjectType) || 'construction';
+  const isRental = activeTab === 'rental';
+
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -25,23 +32,37 @@ const ProjectList = () => {
   const [address, setAddress] = useState('');
 
   const fetchProjects = async () => {
-    const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('project_type', activeTab)
+      .order('created_at', { ascending: false });
     if (!error) setProjects(data || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchProjects(); }, []);
+  useEffect(() => { fetchProjects(); }, [activeTab]);
+
+  const handleTabChange = (tab: string) => {
+    setSearchParams({ tab });
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    const { data: project, error } = await supabase.from('projects').insert({ name, address }).select().single();
+    const { data: project, error } = await supabase
+      .from('projects')
+      .insert({ name, address, project_type: activeTab } as any)
+      .select()
+      .single();
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    // Add creator as manager
     await supabase.from('project_members').insert({ project_id: project.id, user_id: user.id, role: 'manager' });
     setName(''); setAddress(''); setOpen(false);
     fetchProjects();
   };
+
+  const entityLabel = isRental ? 'Property' : 'Project';
 
   return (
     <div className="pb-20">
@@ -51,31 +72,41 @@ const ProjectList = () => {
           canCreate ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" />New</Button>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" />New {entityLabel}</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>New Project</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>New {entityLabel}</DialogTitle></DialogHeader>
               <form onSubmit={handleCreate} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Project Name</Label>
+                  <Label>{entityLabel} Name</Label>
                   <Input value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label>Address</Label>
                   <Input value={address} onChange={(e) => setAddress(e.target.value)} />
                 </div>
-                <Button type="submit" className="w-full">Create Project</Button>
+                <Button type="submit" className="w-full">Create {entityLabel}</Button>
               </form>
             </DialogContent>
           </Dialog>
           ) : undefined
         }
       />
+      <div className="px-4 pt-2">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList className="w-full">
+            <TabsTrigger value="construction" className="flex-1">Construction</TabsTrigger>
+            <TabsTrigger value="rental" className="flex-1">Rentals</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
       <div className="p-4 space-y-3">
         {loading ? (
           <p className="text-center text-muted-foreground py-8">Loading...</p>
         ) : projects.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">No projects yet. Create your first one!</p>
+          <p className="text-center text-muted-foreground py-8">
+            No {isRental ? 'properties' : 'projects'} yet. Create your first one!
+          </p>
         ) : (
           projects.map((p) => (
             <Link key={p.id} to={`/projects/${p.id}`}>
