@@ -186,6 +186,7 @@ const ProjectDetail = () => {
           setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
           setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
           setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
+          setCrewCandidates([]);
           setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
           setOpen(false);
         },
