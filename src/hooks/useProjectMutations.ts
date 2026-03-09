@@ -34,7 +34,7 @@ export function useCreateTask(projectId: string | undefined) {
 
   return useMutation({
     mutationFn: async (input: CreateTaskInput) => {
-      const { pendingMaterials, due_date, is_recurring, recurrence_frequency, is_outside_vendor, ...taskFields } = input;
+      const { pendingMaterials, due_date, is_recurring, recurrence_frequency, is_outside_vendor, assignment_mode, ...taskFields } = input;
       const hasMaterials = pendingMaterials.length > 0;
       const { data, error } = await supabase
         .from('tasks')
@@ -46,6 +46,7 @@ export function useCreateTask(projectId: string | undefined) {
           recurrence_frequency: is_recurring ? recurrence_frequency : null,
           recurrence_anchor_date: is_recurring && due_date ? due_date : null,
           is_outside_vendor: is_outside_vendor || false,
+          assignment_mode: assignment_mode || 'solo',
         })
         .select('id')
         .single();
