@@ -5,13 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/StatusBadge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
-import { BLOCKER_REASONS } from '@/lib/supabase-types';
+import { BLOCKER_REASONS, TASK_STAGES, type TaskStage } from '@/lib/supabase-types';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 
 interface TaskCardProps {
@@ -173,6 +174,37 @@ const TaskCard = ({
     else onUpdate();
   };
 
+  const handleStageChange = async (newStage: TaskStage) => {
+    if (newStage === task.stage) return;
+    setLoading(true);
+    try {
+      // If marking Done, use completeTask for parent auto-complete logic
+      if (newStage === 'Done') {
+        await completeTask({
+          taskId: task.id,
+          parentTaskId: task.parent_task_id,
+          isRecurring: task.is_recurring,
+        });
+      } else {
+        const updates: Record<string, unknown> = { stage: newStage };
+        if (newStage === 'In Progress' && !task.started_at) {
+          updates.started_at = new Date().toISOString();
+          updates.started_by_user_id = userId;
+        }
+        const { error } = await supabase
+          .from('tasks')
+          .update(updates)
+          .eq('id', task.id);
+        if (error) throw error;
+      }
+      onUpdate();
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const priorityBorderClass =
     task.is_blocked
       ? 'border-l-4 border-destructive'
@@ -218,7 +250,25 @@ const TaskCard = ({
             <p className="text-xs text-muted-foreground">Assigned to {assigneeName}</p>
           )}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <StatusBadge status={task.stage} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                <button className="cursor-pointer" aria-label="Change status">
+                  <StatusBadge status={task.stage} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                {TASK_STAGES.map((s) => (
+                  <DropdownMenuItem
+                    key={s}
+                    disabled={s === task.stage || loading}
+                    onSelect={() => handleStageChange(s)}
+                    className={cn(s === task.stage && 'font-semibold')}
+                  >
+                    <StatusBadge status={s} />
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {task.is_blocked && <StatusBadge status="Blocked" />}
             {isCrewTask && (
               <Badge variant="secondary" className="text-xs flex items-center gap-1">
