@@ -5,13 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/StatusBadge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
-import { BLOCKER_REASONS } from '@/lib/supabase-types';
+import { BLOCKER_REASONS, TASK_STAGES, type TaskStage } from '@/lib/supabase-types';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 
 interface TaskCardProps {
