@@ -300,6 +300,7 @@ const AdminPanel = () => {
         {activeView === 'cost-library' && <CostLibrary />}
         {activeView === 'aliases' && <AdminAliases />}
         {activeView === 'availability' && <AdminAvailability />}
+        {activeView === 'crew-groups' && <AdminCrewGroups />}
       </div>
     </div>
   );
