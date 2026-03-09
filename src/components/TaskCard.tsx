@@ -174,7 +174,37 @@ const TaskCard = ({
     else onUpdate();
   };
 
-  const priorityBorderClass =
+  const handleStageChange = async (newStage: TaskStage) => {
+    if (newStage === task.stage) return;
+    setLoading(true);
+    try {
+      // If marking Done, use completeTask for parent auto-complete logic
+      if (newStage === 'Done') {
+        await completeTask({
+          taskId: task.id,
+          parentTaskId: task.parent_task_id,
+          isRecurring: task.is_recurring,
+        });
+      } else {
+        const updates: Record<string, unknown> = { stage: newStage };
+        if (newStage === 'In Progress' && !task.started_at) {
+          updates.started_at = new Date().toISOString();
+          updates.started_by_user_id = userId;
+        }
+        const { error } = await supabase
+          .from('tasks')
+          .update(updates)
+          .eq('id', task.id);
+        if (error) throw error;
+      }
+      onUpdate();
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
     task.is_blocked
       ? 'border-l-4 border-destructive'
       : context === 'today'
