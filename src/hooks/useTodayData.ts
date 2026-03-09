@@ -302,12 +302,13 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
   const [data, setData] = useState<TodayData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
-    // Only show full loading state on initial load (when data is empty).
-    // Subsequent refreshes update in-place without wiping the screen.
-    if (data.inProgress.length === 0 && data.assigned.length === 0 && data.available.length === 0) {
+    // Only show full loading spinner on the very first load.
+    // Subsequent refreshes (e.g. after Dibs/Start/Complete) update in-place.
+    if (!hasLoadedOnce.current) {
       setLoading(true);
     }
     setError(null);
