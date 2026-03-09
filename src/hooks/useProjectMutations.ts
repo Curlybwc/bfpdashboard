@@ -16,6 +16,7 @@ interface CreateTaskInput {
   created_by: string;
   assigned_to_user_id: string | null;
   is_outside_vendor?: boolean;
+  assignment_mode?: 'solo' | 'crew';
   pendingMaterials: { name: string; quantity: string; unit: string }[];
   due_date?: string | null;
   is_recurring?: boolean;
