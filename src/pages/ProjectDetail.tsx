@@ -101,7 +101,14 @@ const ProjectDetail = () => {
   }, [tasks, allTasks, isContractor]);
 
   // Build tree
-  const rootTasks = useMemo(() => tasksWithParents.filter((t) => !t.parent_task_id), [tasksWithParents]);
+  const rootTasks = useMemo(() => {
+    const filtered = tasksWithParents.filter((t) => !t.parent_task_id);
+    return filtered.sort((a, b) => {
+      const aDone = a.stage === 'Done' ? 1 : 0;
+      const bDone = b.stage === 'Done' ? 1 : 0;
+      return aDone - bDone;
+    });
+  }, [tasksWithParents]);
   const childrenMap = useMemo(() => buildChildrenMap(tasks), [tasks]);
 
   // "What next?" summary
