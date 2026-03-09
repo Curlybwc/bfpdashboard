@@ -1,14 +1,115 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, AlertTriangle, CircleDot, Circle, UserX, Wrench } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { ChevronRight, AlertTriangle, CircleDot, Circle, UserX, Wrench, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 import type { WhatNextResult } from '@/lib/projectSummary';
 
+/** Quick-assign popover for unassigned tasks */
+const QuickAssignItem = ({ task, projectId, members, crewGroups, onUpdate }: {
+  task: any;
+  projectId: string;
+  members: { user_id: string; full_name: string | null; role: string }[];
+  crewGroups: { id: string; name: string; members: string[] }[];
+  onUpdate: () => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleAssign = async (userId: string) => {
+    setLoading(true);
+    await supabase.from('tasks').update({ assigned_to_user_id: userId, assignment_mode: 'solo' }).eq('id', task.id);
+    setLoading(false);
+    setOpen(false);
+    onUpdate();
+  };
+
+  const handleCrew = async (memberIds?: string[]) => {
+    setLoading(true);
+    await supabase.from('tasks').update({ assignment_mode: 'crew' }).eq('id', task.id);
+    if (memberIds && memberIds.length > 0) {
+      await supabase.from('task_candidates').insert(
+        memberIds.map((uid) => ({ task_id: task.id, user_id: uid }))
+      );
+    }
+    setLoading(false);
+    setOpen(false);
+    onUpdate();
+  };
+
+  const handleOutsideVendor = async () => {
+    setLoading(true);
+    await supabase.from('tasks').update({ is_outside_vendor: true }).eq('id', task.id);
+    setLoading(false);
+    setOpen(false);
+    onUpdate();
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors w-full text-left">
+          <span className="truncate flex-1">{task.task}</span>
+          <Badge variant="outline" className="text-[10px] shrink-0">{task.priority?.split(' – ')[0] || '?'}</Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-1" align="start">
+        {loading ? (
+          <div className="flex items-center justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+        ) : (
+          <div className="space-y-0.5 max-h-64 overflow-y-auto">
+            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Assign to</p>
+            {members.map((m) => (
+              <button
+                key={m.user_id}
+                onClick={() => handleAssign(m.user_id)}
+                className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors truncate"
+              >
+                {m.full_name || 'Unnamed'} <span className="text-muted-foreground text-xs">({m.role})</span>
+              </button>
+            ))}
+            <div className="h-px bg-border my-1" />
+            <button
+              onClick={() => handleCrew()}
+              className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              🔧 Crew Task
+            </button>
+            {crewGroups.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => handleCrew(g.members)}
+                className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors pl-6 truncate"
+              >
+                ↳ {g.name} ({g.members.length})
+              </button>
+            ))}
+            <div className="h-px bg-border my-1" />
+            <button
+              onClick={handleOutsideVendor}
+              className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+            >
+              🏢 Outside Vendor
+            </button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 /** Compact collapsible group for the "What next?" section */
-const WhatNextGroup = ({ label, count, tasks, projectId, open, onToggle }: {
+const WhatNextGroup = ({ label, count, tasks, projectId, open, onToggle, mode, members, crewGroups, onUpdate }: {
   label: string; count: number; tasks: any[]; projectId: string; open?: boolean; onToggle?: () => void;
+  mode?: 'assign';
+  members?: { user_id: string; full_name: string | null; role: string }[];
+  crewGroups?: { id: string; name: string; members: string[] }[];
+  onUpdate?: () => void;
 }) => (
   <Collapsible open={open} onOpenChange={onToggle}>
     <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-0.5">
@@ -16,16 +117,20 @@ const WhatNextGroup = ({ label, count, tasks, projectId, open, onToggle }: {
       {label} ({count})
     </CollapsibleTrigger>
     <CollapsibleContent className="pt-1 pl-5 space-y-0.5">
-      {tasks.slice(0, 3).map((t: any) => (
-        <Link
-          key={t.id}
-          to={`/projects/${projectId}/tasks/${t.id}`}
-          className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors"
-        >
-          <span className="truncate flex-1">{t.task}</span>
-          <Badge variant="outline" className="text-[10px] shrink-0">{t.priority?.split(' – ')[0] || '?'}</Badge>
-        </Link>
-      ))}
+      {tasks.slice(0, 3).map((t: any) =>
+        mode === 'assign' && members && onUpdate ? (
+          <QuickAssignItem key={t.id} task={t} projectId={projectId} members={members} crewGroups={crewGroups || []} onUpdate={onUpdate} />
+        ) : (
+          <Link
+            key={t.id}
+            to={`/projects/${projectId}/tasks/${t.id}`}
+            className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+          >
+            <span className="truncate flex-1">{t.task}</span>
+            <Badge variant="outline" className="text-[10px] shrink-0">{t.priority?.split(' – ')[0] || '?'}</Badge>
+          </Link>
+        )
+      )}
       {count > 3 && (
         <p className="text-xs text-muted-foreground px-2">+{count - 3} more</p>
       )}
@@ -39,9 +144,12 @@ interface WhatNextCardProps {
   isContractor: boolean;
   openGroup: string | null;
   setOpenGroup: (g: string | null) => void;
+  members?: { user_id: string; full_name: string | null; role: string }[];
+  crewGroups?: { id: string; name: string; members: string[] }[];
+  onUpdate?: () => void;
 }
 
-const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGroup }: WhatNextCardProps) => {
+const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGroup, members, crewGroups, onUpdate }: WhatNextCardProps) => {
   if (!whatNext.hasAnyWork) return null;
 
   const toggle = (key: string) => setOpenGroup(openGroup === key ? null : key);
@@ -110,7 +218,18 @@ const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGro
           <WhatNextGroup label="Ready to Start" count={whatNext.sortedReady.length} tasks={whatNext.sortedReady} projectId={projectId} open={openGroup === 'ready'} onToggle={() => toggle('ready')} />
         )}
         {whatNext.sortedUnassigned.length > 0 && (
-          <WhatNextGroup label="Unassigned" count={whatNext.sortedUnassigned.length} tasks={whatNext.sortedUnassigned} projectId={projectId} open={openGroup === 'unassigned'} onToggle={() => toggle('unassigned')} />
+          <WhatNextGroup
+            label="Unassigned"
+            count={whatNext.sortedUnassigned.length}
+            tasks={whatNext.sortedUnassigned}
+            projectId={projectId}
+            open={openGroup === 'unassigned'}
+            onToggle={() => toggle('unassigned')}
+            mode="assign"
+            members={members}
+            crewGroups={crewGroups}
+            onUpdate={onUpdate}
+          />
         )}
         {whatNext.inProgress.length > 0 && (
           <WhatNextGroup label="In Progress" count={whatNext.inProgress.length} tasks={whatNext.inProgress} projectId={projectId} open={openGroup === 'progress'} onToggle={() => toggle('progress')} />
