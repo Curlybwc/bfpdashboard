@@ -49,26 +49,49 @@ export async function completeTask(params: {
 
   if (error) throw error;
 
+  // Auto-complete parent (and grandparent, etc.) when all children are Done
   if (parentTaskId) {
-    const { data: siblings, error: siblingsError } = await supabase
-      .from('tasks')
-      .select('id, stage')
-      .eq('parent_task_id', parentTaskId)
-      .neq('id', taskId);
+    await tryAutoCompleteParent(parentTaskId, taskId);
+  }
+}
 
-    if (siblingsError) throw siblingsError;
+/**
+ * Recursively auto-complete parent tasks when all their children are Done.
+ * Walks up the hierarchy so grandparent tasks also auto-complete.
+ */
+async function tryAutoCompleteParent(parentTaskId: string, justCompletedChildId: string) {
+  const { data: siblings, error: siblingsError } = await supabase
+    .from('tasks')
+    .select('id, stage')
+    .eq('parent_task_id', parentTaskId)
+    .neq('id', justCompletedChildId);
 
-    const allSiblingsDone = (siblings || []).every((s) => s.stage === 'Done');
-    if (allSiblingsDone) {
-      const { error: parentError } = await supabase
-        .from('tasks')
-        .update({
-          stage: 'Done',
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', parentTaskId);
-      if (parentError) throw parentError;
-    }
+  if (siblingsError) throw siblingsError;
+
+  const allSiblingsDone = (siblings || []).every((s) => s.stage === 'Done');
+  if (!allSiblingsDone) return;
+
+  // Fetch parent to get its own parent_task_id for recursive cascade
+  const { data: parent, error: parentFetchError } = await supabase
+    .from('tasks')
+    .select('id, parent_task_id')
+    .eq('id', parentTaskId)
+    .single();
+
+  if (parentFetchError) throw parentFetchError;
+
+  const { error: parentError } = await supabase
+    .from('tasks')
+    .update({
+      stage: 'Done',
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', parentTaskId);
+  if (parentError) throw parentError;
+
+  // Recurse up the hierarchy
+  if (parent?.parent_task_id) {
+    await tryAutoCompleteParent(parent.parent_task_id, parentTaskId);
   }
 }
 
