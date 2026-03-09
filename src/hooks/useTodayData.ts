@@ -305,7 +305,11 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
 
   const refresh = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+    // Only show full loading state on initial load (when data is empty).
+    // Subsequent refreshes update in-place without wiping the screen.
+    if (data.inProgress.length === 0 && data.assigned.length === 0 && data.available.length === 0) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
