@@ -302,6 +302,32 @@ const ProjectDetail = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                {assignedTo === 'crew' && (
+                  <div className="space-y-2">
+                    <Label>Crew Members</Label>
+                    <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2">
+                      {projectMembers.map((m) => (
+                        <label key={m.user_id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
+                          <Checkbox
+                            checked={crewCandidates.includes(m.user_id)}
+                            onCheckedChange={(checked) => {
+                              setCrewCandidates(prev =>
+                                checked
+                                  ? [...prev, m.user_id]
+                                  : prev.filter(id => id !== m.user_id)
+                              );
+                            }}
+                          />
+                          <span>{m.profiles?.full_name || 'Unnamed'}</span>
+                          <span className="text-muted-foreground">({m.role})</span>
+                        </label>
+                      ))}
+                    </div>
+                    {crewCandidates.length > 0 && (
+                      <p className="text-xs text-muted-foreground">{crewCandidates.length} member{crewCandidates.length !== 1 ? 's' : ''} selected</p>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Notes</Label>
                   <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />

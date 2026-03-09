@@ -80,6 +80,14 @@ export function useCreateTask(projectId: string | undefined) {
         if (assignmentError) throw assignmentError;
       }
 
+      // Insert crew candidates
+      if (assignment_mode === 'crew' && crewCandidates && crewCandidates.length > 0) {
+        const { error: candidateError } = await supabase.from('task_candidates').insert(
+          crewCandidates.map((userId) => ({ task_id: data.id, user_id: userId })),
+        );
+        if (candidateError) throw candidateError;
+      }
+
       return data;
     },
     onSuccess: () => {
