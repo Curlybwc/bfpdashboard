@@ -65,6 +65,7 @@ const ProjectDetail = () => {
   const [matName, setMatName] = useState('');
   const [matQty, setMatQty] = useState('');
   const [matUnit, setMatUnit] = useState('');
+  const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [newDueDate, setNewDueDate] = useState('');
@@ -174,6 +175,7 @@ const ProjectDetail = () => {
         assigned_to_user_id: assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
         is_outside_vendor: assignedTo === 'outside_vendor',
         assignment_mode: assignedTo === 'crew' ? 'crew' : 'solo',
+        crewCandidates: assignedTo === 'crew' ? crewCandidates : [],
         pendingMaterials,
         due_date: newDueDate || null,
         is_recurring: newIsRecurring && !!newDueDate,
@@ -184,6 +186,7 @@ const ProjectDetail = () => {
           setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
           setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
           setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
+          setCrewCandidates([]);
           setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
           setOpen(false);
         },
@@ -299,6 +302,32 @@ const ProjectDetail = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                {assignedTo === 'crew' && (
+                  <div className="space-y-2">
+                    <Label>Crew Members</Label>
+                    <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2">
+                      {projectMembers.map((m) => (
+                        <label key={m.user_id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
+                          <Checkbox
+                            checked={crewCandidates.includes(m.user_id)}
+                            onCheckedChange={(checked) => {
+                              setCrewCandidates(prev =>
+                                checked
+                                  ? [...prev, m.user_id]
+                                  : prev.filter(id => id !== m.user_id)
+                              );
+                            }}
+                          />
+                          <span>{m.profiles?.full_name || 'Unnamed'}</span>
+                          <span className="text-muted-foreground">({m.role})</span>
+                        </label>
+                      ))}
+                    </div>
+                    {crewCandidates.length > 0 && (
+                      <p className="text-xs text-muted-foreground">{crewCandidates.length} member{crewCandidates.length !== 1 ? 's' : ''} selected</p>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Notes</Label>
                   <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />

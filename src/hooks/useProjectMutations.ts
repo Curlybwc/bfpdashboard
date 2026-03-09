@@ -17,6 +17,7 @@ interface CreateTaskInput {
   assigned_to_user_id: string | null;
   is_outside_vendor?: boolean;
   assignment_mode?: 'solo' | 'crew';
+  crewCandidates?: string[];
   pendingMaterials: { name: string; quantity: string; unit: string }[];
   due_date?: string | null;
   is_recurring?: boolean;
@@ -34,7 +35,7 @@ export function useCreateTask(projectId: string | undefined) {
 
   return useMutation({
     mutationFn: async (input: CreateTaskInput) => {
-      const { pendingMaterials, due_date, is_recurring, recurrence_frequency, is_outside_vendor, assignment_mode, ...taskFields } = input;
+      const { pendingMaterials, due_date, is_recurring, recurrence_frequency, is_outside_vendor, assignment_mode, crewCandidates, ...taskFields } = input;
       const hasMaterials = pendingMaterials.length > 0;
       const { data, error } = await supabase
         .from('tasks')
@@ -77,6 +78,14 @@ export function useCreateTask(projectId: string | undefined) {
           p_task_id: data.id,
         });
         if (assignmentError) throw assignmentError;
+      }
+
+      // Insert crew candidates
+      if (assignment_mode === 'crew' && crewCandidates && crewCandidates.length > 0) {
+        const { error: candidateError } = await supabase.from('task_candidates').insert(
+          crewCandidates.map((userId) => ({ task_id: data.id, user_id: userId })),
+        );
+        if (candidateError) throw candidateError;
       }
 
       return data;
