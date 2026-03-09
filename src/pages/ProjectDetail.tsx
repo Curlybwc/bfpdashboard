@@ -92,6 +92,21 @@ const ProjectDetail = () => {
   const isContractor = !isAdmin && projectRole === 'contractor';
   const isManager = isAdmin || projectRole === 'manager';
 
+  // Fetch crew groups
+  useEffect(() => {
+    const fetchCrewGroups = async () => {
+      const { data: groupsData } = await supabase.from('crew_groups').select('id, name');
+      if (!groupsData) return;
+      const { data: membersData } = await supabase.from('crew_group_members').select('crew_group_id, user_id');
+      setCrewGroups(groupsData.map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        members: (membersData || []).filter((m: any) => m.crew_group_id === g.id).map((m: any) => m.user_id),
+      })));
+    };
+    fetchCrewGroups();
+  }, []);
+
   // Task filtering (contractor vs full view)
   const tasks = useMemo(() => {
     if (!isContractor || !user) return allTasks;
