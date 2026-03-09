@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import CostLibrary from '@/components/CostLibrary';
 import AdminAliases from '@/components/AdminAliases';
 import AdminAvailability from '@/components/admin/AdminAvailability';
+import AdminCrewGroups from '@/components/admin/AdminCrewGroups';
 import { LogIn } from 'lucide-react';
 import {
   Menubar,
@@ -29,13 +30,14 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
 
-type ActiveView = 'users' | 'cost-library' | 'aliases' | 'availability';
+type ActiveView = 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups';
 
 const VIEW_LABELS: Record<ActiveView, string> = {
   users: 'Users',
   'cost-library': 'Cost Library',
   aliases: 'Aliases',
   availability: 'Availability',
+  'crew-groups': 'Crew Groups',
 };
 
 const AdminPanel = () => {
@@ -151,6 +153,7 @@ const AdminPanel = () => {
       items: [
         { label: 'Shifts', action: () => handleNav('/shifts') },
         { label: 'Availability', action: () => handleLocal('availability') },
+        { label: 'Crew Groups', action: () => handleLocal('crew-groups') },
       ],
     },
     {
@@ -297,6 +300,7 @@ const AdminPanel = () => {
         {activeView === 'cost-library' && <CostLibrary />}
         {activeView === 'aliases' && <AdminAliases />}
         {activeView === 'availability' && <AdminAvailability />}
+        {activeView === 'crew-groups' && <AdminCrewGroups />}
       </div>
     </div>
   );

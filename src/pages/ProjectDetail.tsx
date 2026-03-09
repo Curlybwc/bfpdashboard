@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
@@ -66,6 +67,9 @@ const ProjectDetail = () => {
   const [matQty, setMatQty] = useState('');
   const [matUnit, setMatUnit] = useState('');
   const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
+  const [crewGroups, setCrewGroups] = useState<{ id: string; name: string; members: string[] }[]>([]);
+  const [saveGroupName, setSaveGroupName] = useState('');
+  const [showSaveGroup, setShowSaveGroup] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [newDueDate, setNewDueDate] = useState('');
@@ -88,6 +92,21 @@ const ProjectDetail = () => {
   const userCanEditProject = canEditProject(isAdmin, projectRole);
   const isContractor = !isAdmin && projectRole === 'contractor';
   const isManager = isAdmin || projectRole === 'manager';
+
+  // Fetch crew groups
+  useEffect(() => {
+    const fetchCrewGroups = async () => {
+      const { data: groupsData } = await supabase.from('crew_groups').select('id, name');
+      if (!groupsData) return;
+      const { data: membersData } = await supabase.from('crew_group_members').select('crew_group_id, user_id');
+      setCrewGroups(groupsData.map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        members: (membersData || []).filter((m: any) => m.crew_group_id === g.id).map((m: any) => m.user_id),
+      })));
+    };
+    fetchCrewGroups();
+  }, []);
 
   // Task filtering (contractor vs full view)
   const tasks = useMemo(() => {
@@ -312,6 +331,19 @@ const ProjectDetail = () => {
                 {assignedTo === 'crew' && (
                   <div className="space-y-2">
                     <Label>Crew Members</Label>
+                    {crewGroups.length > 0 && (
+                      <Select value="" onValueChange={(groupId) => {
+                        const group = crewGroups.find(g => g.id === groupId);
+                        if (group) setCrewCandidates(group.members);
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Load from crew group..." /></SelectTrigger>
+                        <SelectContent>
+                          {crewGroups.map(g => (
+                            <SelectItem key={g.id} value={g.id}>{g.name} ({g.members.length})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2">
                       {projectMembers.map((m) => (
                         <label key={m.user_id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
@@ -321,7 +353,7 @@ const ProjectDetail = () => {
                               setCrewCandidates(prev =>
                                 checked
                                   ? [...prev, m.user_id]
-                                  : prev.filter(id => id !== m.user_id)
+                                  : prev.filter(cid => cid !== m.user_id)
                               );
                             }}
                           />
@@ -331,7 +363,37 @@ const ProjectDetail = () => {
                       ))}
                     </div>
                     {crewCandidates.length > 0 && (
-                      <p className="text-xs text-muted-foreground">{crewCandidates.length} member{crewCandidates.length !== 1 ? 's' : ''} selected</p>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">{crewCandidates.length} member{crewCandidates.length !== 1 ? 's' : ''} selected</p>
+                        {!showSaveGroup ? (
+                          <button type="button" className="text-xs text-primary hover:underline" onClick={() => setShowSaveGroup(true)}>
+                            Save as crew group
+                          </button>
+                        ) : (
+                          <div className="flex gap-1">
+                            <Input
+                              placeholder="Group name"
+                              value={saveGroupName}
+                              onChange={(e) => setSaveGroupName(e.target.value)}
+                              className="h-7 text-xs"
+                            />
+                            <Button type="button" size="sm" className="h-7 text-xs" disabled={!saveGroupName.trim()} onClick={async () => {
+                              if (!user) return;
+                              const { data: newGroup } = await supabase.from('crew_groups').insert({ name: saveGroupName.trim(), created_by: user.id }).select('id').single();
+                              if (newGroup) {
+                                await supabase.from('crew_group_members').insert(crewCandidates.map(uid => ({ crew_group_id: newGroup.id, user_id: uid })));
+                                setCrewGroups(prev => [...prev, { id: newGroup.id, name: saveGroupName.trim(), members: crewCandidates }]);
+                                toast({ title: 'Crew group saved' });
+                              }
+                              setSaveGroupName('');
+                              setShowSaveGroup(false);
+                            }}>Save</Button>
+                            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowSaveGroup(false); setSaveGroupName(''); }}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
