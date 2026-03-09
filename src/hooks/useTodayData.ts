@@ -362,6 +362,7 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
         ...enrichment,
         childTasksByParent,
       });
+      hasLoadedOnce.current = true;
     } catch (err: any) {
       console.error('[Today] Data fetch failed:', err);
       setError(err.message || 'Failed to load today data');
