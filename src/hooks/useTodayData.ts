@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 /* ── Types ── */
@@ -17,6 +17,7 @@ export interface TodayData {
   crewWorkerCounts: Record<string, number>;
   photoCountMap: Record<string, number>;
   materialCountMap: Record<string, number>;
+  childTasksByParent: Record<string, any[]>;
   hasShiftToday: boolean;
   isManager: boolean;
 }
@@ -36,6 +37,7 @@ const EMPTY_DATA: TodayData = {
   crewWorkerCounts: {},
   photoCountMap: {},
   materialCountMap: {},
+  childTasksByParent: {},
   hasShiftToday: true, // default true to suppress flash
   isManager: false,
 };
@@ -264,6 +266,29 @@ async function fetchEnrichment(allTasks: any[], userId: string) {
   return { projectMap, parentTitles, assigneeMap, crewWorkerCounts, photoCountMap, materialCountMap };
 }
 
+
+async function fetchChildrenForParents(parentIds: string[]) {
+  if (parentIds.length === 0) return {};
+
+  const res = await supabase
+    .from('tasks')
+    .select('*')
+    .in('parent_task_id', parentIds)
+    .order('created_at', { ascending: true });
+
+  const childRows = unwrap(res, 'Child tasks') as any[];
+  const childTasksByParent: Record<string, any[]> = {};
+
+  childRows.forEach((child) => {
+    const pid = child.parent_task_id;
+    if (!pid) return;
+    if (!childTasksByParent[pid]) childTasksByParent[pid] = [];
+    childTasksByParent[pid].push(child);
+  });
+
+  return childTasksByParent;
+}
+
 /* ── Merge helpers ── */
 function mergeAndDedupe(primary: any[], secondary: any[]): any[] {
   const ids = new Set(primary.map(t => t.id));
@@ -309,9 +334,13 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
       const inProgress = mergedIp.filter(t => !blockedIds.has(t.id));
       const assigned = core.soloAssigned.filter(t => !blockedIds.has(t.id));
 
-      // Phase 5: enrichment (parallel)
+      // Phase 5: enrichment + visible child tasks
       const allTasks = [...mergedIp, ...core.soloAssigned, ...mergedAvail, ...reviewTasks, ...blockedTasks];
-      const enrichment = await fetchEnrichment(allTasks, userId);
+      const parentIds = [...new Set(allTasks.map(t => t.id))];
+      const [enrichment, childTasksByParent] = await Promise.all([
+        fetchEnrichment(allTasks, userId),
+        fetchChildrenForParents(parentIds),
+      ]);
 
       setData({
         inProgress,
@@ -326,6 +355,7 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
         hasShiftToday: core.hasShiftToday,
         isManager: hasManagerRole,
         ...enrichment,
+        childTasksByParent,
       });
     } catch (err: any) {
       console.error('[Today] Data fetch failed:', err);

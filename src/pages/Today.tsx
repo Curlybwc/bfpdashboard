@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -65,6 +65,7 @@ const Today = () => {
   const navigate = useNavigate();
 
   const { data, loading, error, refresh } = useTodayData(user?.id, isAdmin);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -72,7 +73,7 @@ const Today = () => {
     inProgress, assigned, available, needsReview, blocked,
     projectMap, parentTitles, assigneeMap, blockerMap,
     crewActiveTaskIds, crewCandidateTaskIds, crewWorkerCounts,
-    photoCountMap, materialCountMap, hasShiftToday, isManager,
+    photoCountMap, materialCountMap, childTasksByParent, hasShiftToday, isManager,
   } = data;
 
   /* ── Derived state ── */
@@ -96,6 +97,17 @@ const Today = () => {
   }, [assigned, nextUpTask]);
 
   const showShiftReminder = isContractor && !hasShiftToday && new Date().getHours() >= 10;
+
+
+  const toggleExpanded = (taskId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
 
   const alerts = useMemo(() => {
     if (!user) return [];
@@ -128,41 +140,80 @@ const Today = () => {
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
   /* ── Shared section renderer ── */
-  const Section = ({ title, tasks, emptyText, isBlockedSection = false }: { title: string; tasks: any[]; emptyText: string; isBlockedSection?: boolean }) => (
+  const Section = ({ title, tasks, emptyText, isBlockedSection = false }: { title: string; tasks: any[]; emptyText: string; isBlockedSection?: boolean }) => {
+    const sectionTaskIds = new Set(tasks.map((task) => task.id));
+    const topLevelTasks = tasks.filter((task) => !task.parent_task_id || !sectionTaskIds.has(task.parent_task_id));
+
+    return (
     <div className="mb-6">
       <h2 className={cn(
         "text-sm font-semibold uppercase tracking-wide mb-2",
         isBlockedSection ? "text-destructive" : "text-muted-foreground"
       )}>{title}</h2>
-      {tasks.length === 0 ? (
+      {topLevelTasks.length === 0 ? (
         <p className="text-sm text-muted-foreground py-4 text-center">{emptyText}</p>
       ) : (
         <div className="space-y-2">
-          {tasks.map(t => (
-            <TaskCard
-              key={t.id}
-              task={t}
-              projectName={projectMap[t.project_id]?.name || ''}
-              projectAddress={projectMap[t.project_id]?.address}
-              assigneeName={t.assigned_to_user_id && t.assigned_to_user_id !== user!.id ? assigneeMap[t.assigned_to_user_id] : undefined}
-              userId={user!.id}
-              isAdmin={isAdmin}
-              onUpdate={refresh}
-              parentTitle={t.parent_task_id ? parentTitles[t.parent_task_id] : undefined}
-              context="today"
-              isCrewTask={t.assignment_mode === 'crew'}
-              isActiveWorker={crewActiveTaskIds.has(t.id)}
-              isCandidate={crewCandidateTaskIds.has(t.id)}
-              activeWorkerCount={crewWorkerCounts[t.id] || 0}
-              blockerInfo={blockerMap[t.id] || null}
-              photoCount={photoCountMap[t.id] || 0}
-              materialCount={materialCountMap[t.id] || 0}
-            />
-          ))}
+          {topLevelTasks.map((t) => {
+            const children = childTasksByParent[t.id] || [];
+            const isExpanded = expandedIds.has(t.id);
+            const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+
+            return (
+              <div key={t.id} className="space-y-2">
+                <TaskCard
+                  task={t}
+                  projectName={projectMap[t.project_id]?.name || ''}
+                  projectAddress={projectMap[t.project_id]?.address}
+                  assigneeName={t.assigned_to_user_id && t.assigned_to_user_id !== user!.id ? assigneeMap[t.assigned_to_user_id] : undefined}
+                  userId={user!.id}
+                  isAdmin={isAdmin}
+                  onUpdate={refresh}
+                  parentTitle={t.parent_task_id ? parentTitles[t.parent_task_id] : undefined}
+                  context="today"
+                  childCount={children.length}
+                  expanded={isExpanded}
+                  onToggle={() => toggleExpanded(t.id)}
+                  allChildrenDone={allChildrenDone}
+                  isCrewTask={t.assignment_mode === 'crew'}
+                  isActiveWorker={crewActiveTaskIds.has(t.id)}
+                  isCandidate={crewCandidateTaskIds.has(t.id)}
+                  activeWorkerCount={crewWorkerCounts[t.id] || 0}
+                  blockerInfo={blockerMap[t.id] || null}
+                  photoCount={photoCountMap[t.id] || 0}
+                  materialCount={materialCountMap[t.id] || 0}
+                />
+
+                {isExpanded && children.map((child: any) => (
+                  <TaskCard
+                    key={child.id}
+                    task={child}
+                    projectName={projectMap[child.project_id]?.name || ''}
+                    projectAddress={projectMap[child.project_id]?.address}
+                    assigneeName={child.assigned_to_user_id && child.assigned_to_user_id !== user!.id ? assigneeMap[child.assigned_to_user_id] : undefined}
+                    userId={user!.id}
+                    isAdmin={isAdmin}
+                    onUpdate={refresh}
+                    parentTitle={t.task}
+                    context="today"
+                    isChild
+                    isCrewTask={child.assignment_mode === 'crew'}
+                    isActiveWorker={crewActiveTaskIds.has(child.id)}
+                    isCandidate={crewCandidateTaskIds.has(child.id)}
+                    activeWorkerCount={crewWorkerCounts[child.id] || 0}
+                    blockerInfo={blockerMap[child.id] || null}
+                    photoCount={photoCountMap[child.id] || 0}
+                    materialCount={materialCountMap[child.id] || 0}
+                  />
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
+};
 
   /* ── Contractor layout ── */
   const ContractorView = () => (

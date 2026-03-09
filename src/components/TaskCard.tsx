@@ -59,16 +59,17 @@ const TaskCard = ({
   const materialsReady = task.materials_on_site === 'Yes';
 
   // Solo action visibility — outside vendor tasks are not available for dibs
-  const showDibs = !isCrewTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
-  const showStart = !isCrewTask && isAssignedToMe && task.stage === 'Ready';
-  const showComplete = !isCrewTask && isAssignedToMe && task.stage === 'In Progress';
+  const hasChildren = childCount > 0;
+  const isLeafTask = !hasChildren;
+  const showDibs = !isCrewTask && isLeafTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
+  const showStart = !isCrewTask && isLeafTask && isAssignedToMe && task.stage === 'Ready';
+  const showComplete = !isCrewTask && isLeafTask && isAssignedToMe && (task.stage === 'Ready' || task.stage === 'In Progress');
 
   // Crew action visibility
   const showJoin = isCrewTask && isCandidate && !isActiveWorker;
   const showLeave = isCrewTask && isActiveWorker;
 
   const showNeedsMaterials = !materialsReady && materialCount > 0;
-  const hasChildren = childCount > 0;
   const canComplete = hasChildren ? allChildrenDone : true;
 
   const handleDibs = async (force = false) => {
