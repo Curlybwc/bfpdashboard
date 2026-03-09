@@ -170,6 +170,63 @@ export type Database = {
         }
         Relationships: []
       }
+      crew_group_members: {
+        Row: {
+          created_at: string
+          crew_group_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          crew_group_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          crew_group_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_group_members_crew_group_id_fkey"
+            columns: ["crew_group_id"]
+            isOneToOne: false
+            referencedRelation: "crew_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       field_captures: {
         Row: {
           ai_output: Json | null
