@@ -282,17 +282,17 @@ const TaskCard = ({
           )}
         </Link>
 
-        {/* Solo actions */}
+        {/* Solo actions — stopPropagation prevents the card Link from navigating */}
         {(showDibs || showStart || showComplete) && (
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             {showDibs && (
-              <Button size="sm" variant="outline" onClick={() => handleDibs()} disabled={loading}>
+              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleDibs(); }} disabled={loading}>
                 Dibs
               </Button>
             )}
             {showStart && (
               materialsReady ? (
-                <Button size="sm" onClick={handleStart} disabled={loading}>
+                <Button size="sm" onClick={(e) => { e.stopPropagation(); handleStart(); }} disabled={loading}>
                   Start
                 </Button>
               ) : (
@@ -308,7 +308,7 @@ const TaskCard = ({
             )}
             {showComplete && (
               canComplete ? (
-                <Button size="sm" onClick={() => handleComplete()} disabled={loading}>
+                <Button size="sm" onClick={(e) => { e.stopPropagation(); handleComplete(); }} disabled={loading}>
                   Complete
                 </Button>
               ) : (
@@ -325,16 +325,16 @@ const TaskCard = ({
           </div>
         )}
 
-        {/* Crew actions */}
+        {/* Crew actions — stopPropagation prevents the card Link from navigating */}
         {(showJoin || showLeave) && (
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             {showJoin && (
-              <Button size="sm" onClick={handleJoinCrew} disabled={loading}>
+              <Button size="sm" onClick={(e) => { e.stopPropagation(); handleJoinCrew(); }} disabled={loading}>
                 Join
               </Button>
             )}
             {showLeave && (
-              <Button size="sm" variant="outline" onClick={handleLeaveCrew} disabled={loading}>
+              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleLeaveCrew(); }} disabled={loading}>
                 Leave
               </Button>
             )}

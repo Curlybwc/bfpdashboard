@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 /* ── Types ── */
@@ -302,10 +302,15 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
   const [data, setData] = useState<TodayData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
+    // Only show full loading spinner on the very first load.
+    // Subsequent refreshes (e.g. after Dibs/Start/Complete) update in-place.
+    if (!hasLoadedOnce.current) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -357,6 +362,7 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
         ...enrichment,
         childTasksByParent,
       });
+      hasLoadedOnce.current = true;
     } catch (err: any) {
       console.error('[Today] Data fetch failed:', err);
       setError(err.message || 'Failed to load today data');
