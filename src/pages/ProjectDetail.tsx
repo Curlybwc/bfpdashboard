@@ -66,6 +66,9 @@ const ProjectDetail = () => {
   const [matQty, setMatQty] = useState('');
   const [matUnit, setMatUnit] = useState('');
   const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
+  const [crewGroups, setCrewGroups] = useState<{ id: string; name: string; members: string[] }[]>([]);
+  const [saveGroupName, setSaveGroupName] = useState('');
+  const [showSaveGroup, setShowSaveGroup] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [newDueDate, setNewDueDate] = useState('');
