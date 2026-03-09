@@ -205,6 +205,7 @@ const TaskCard = ({
     }
   };
 
+  const priorityBorderClass =
     task.is_blocked
       ? 'border-l-4 border-destructive'
       : context === 'today'
