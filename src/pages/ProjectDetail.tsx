@@ -175,6 +175,7 @@ const ProjectDetail = () => {
         assigned_to_user_id: assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
         is_outside_vendor: assignedTo === 'outside_vendor',
         assignment_mode: assignedTo === 'crew' ? 'crew' : 'solo',
+        crewCandidates: assignedTo === 'crew' ? crewCandidates : [],
         pendingMaterials,
         due_date: newDueDate || null,
         is_recurring: newIsRecurring && !!newDueDate,
