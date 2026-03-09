@@ -30,13 +30,14 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
 
-type ActiveView = 'users' | 'cost-library' | 'aliases' | 'availability';
+type ActiveView = 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups';
 
 const VIEW_LABELS: Record<ActiveView, string> = {
   users: 'Users',
   'cost-library': 'Cost Library',
   aliases: 'Aliases',
   availability: 'Availability',
+  'crew-groups': 'Crew Groups',
 };
 
 const AdminPanel = () => {
