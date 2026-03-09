@@ -219,7 +219,25 @@ const TaskCard = ({
             <p className="text-xs text-muted-foreground">Assigned to {assigneeName}</p>
           )}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <StatusBadge status={task.stage} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                <button className="cursor-pointer" aria-label="Change status">
+                  <StatusBadge status={task.stage} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                {TASK_STAGES.map((s) => (
+                  <DropdownMenuItem
+                    key={s}
+                    disabled={s === task.stage || loading}
+                    onSelect={() => handleStageChange(s)}
+                    className={cn(s === task.stage && 'font-semibold')}
+                  >
+                    <StatusBadge status={s} />
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {task.is_blocked && <StatusBadge status="Blocked" />}
             {isCrewTask && (
               <Badge variant="secondary" className="text-xs flex items-center gap-1">
