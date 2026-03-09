@@ -582,6 +582,9 @@ const ProjectDetail = () => {
           isContractor={isContractor}
           openGroup={openGroup}
           setOpenGroup={setOpenGroup}
+          members={projectMembers.map(m => ({ user_id: m.user_id, full_name: m.profiles?.full_name || null, role: m.role }))}
+          crewGroups={crewGroups}
+          onUpdate={invalidateProject}
         />
 
         {bulkMode && (
