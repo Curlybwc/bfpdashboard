@@ -153,6 +153,7 @@ const AdminPanel = () => {
       items: [
         { label: 'Shifts', action: () => handleNav('/shifts') },
         { label: 'Availability', action: () => handleLocal('availability') },
+        { label: 'Crew Groups', action: () => handleLocal('crew-groups') },
       ],
     },
     {
