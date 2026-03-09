@@ -171,8 +171,9 @@ const ProjectDetail = () => {
         trade: trade || null,
         notes: notes || null,
         created_by: user.id,
-        assigned_to_user_id: assignedTo === 'unassigned' || assignedTo === 'outside_vendor' ? null : assignedTo,
+        assigned_to_user_id: assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
         is_outside_vendor: assignedTo === 'outside_vendor',
+        assignment_mode: assignedTo === 'crew' ? 'crew' : 'solo',
         pendingMaterials,
         due_date: newDueDate || null,
         is_recurring: newIsRecurring && !!newDueDate,
@@ -288,6 +289,7 @@ const ProjectDetail = () => {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="crew">Crew Task</SelectItem>
                       <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
                       {projectMembers.map((m) => (
                         <SelectItem key={m.user_id} value={m.user_id}>
