@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat, AlertTriangle } from 'lucide-react';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat, AlertTriangle, Trash2 } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS, TASK_STAGES, type TaskStage } from '@/lib/supabase-types';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
@@ -40,6 +40,7 @@ interface TaskCardProps {
   photoCount?: number;
   materialCount?: number;
   canReportIssue?: boolean;
+  canDelete?: boolean;
 }
 
 const TaskCard = ({
@@ -49,11 +50,13 @@ const TaskCard = ({
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
   blockerInfo, photoCount = 0, materialCount = 0, canReportIssue = false,
+  canDelete = false,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
 
@@ -211,6 +214,24 @@ const TaskCard = ({
       toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      // Delete child tasks first
+      const { error: childErr } = await supabase.from('tasks').delete().eq('parent_task_id', task.id);
+      if (childErr) throw childErr;
+      const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+      if (error) throw error;
+      toast({ title: 'Task deleted' });
+      onUpdate();
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setLoading(false);
+      setDeleteConfirmOpen(false);
     }
   };
 
@@ -417,6 +438,23 @@ const TaskCard = ({
             </Button>
           </div>
         )}
+
+        {canDelete && (
+          <div className="mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteConfirmOpen(true);
+              }}
+              disabled={loading}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
+            </Button>
+          </div>
+        )}
       </Card>
 
       <TaskMaterialsSheet
@@ -455,6 +493,23 @@ const TaskCard = ({
             <AlertDialogCancel>Go Back</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleComplete(true); }}>
               Complete Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{task.task}"?{hasChildren ? ' This will also delete all subtasks.' : ''} This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
