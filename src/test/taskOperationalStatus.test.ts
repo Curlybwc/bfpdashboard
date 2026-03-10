@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getTaskOperationalStatus, isPackageTask } from '@/lib/taskOperationalStatus';
+import { getTaskOperationalStatus, isTaskActionable, isTaskPackage } from '@/lib/taskOperationalStatus';
 
 describe('getTaskOperationalStatus', () => {
   it('returns ready for actionable unstarted task', () => {
@@ -28,10 +28,15 @@ describe('getTaskOperationalStatus', () => {
   });
 });
 
-describe('isPackageTask', () => {
-  it('excludes parent/package tasks from actionable lists', () => {
+describe('package/actionable behavior', () => {
+  it('treats parent/package tasks as non-actionable worker tasks', () => {
+    const parent = { id: 'parent1' };
+    const explicitPackage = { id: 'pkg', is_package: true };
     const childTasksByParent = { parent1: [{ id: 'child1' }] };
-    expect(isPackageTask('parent1', childTasksByParent)).toBe(true);
-    expect(isPackageTask('child1', childTasksByParent)).toBe(false);
+
+    expect(isTaskPackage(parent, childTasksByParent)).toBe(true);
+    expect(isTaskActionable(parent, childTasksByParent)).toBe(false);
+    expect(isTaskPackage(explicitPackage, childTasksByParent)).toBe(true);
+    expect(isTaskActionable({ id: 'child1' }, childTasksByParent)).toBe(true);
   });
 });

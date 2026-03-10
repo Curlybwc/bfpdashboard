@@ -13,6 +13,13 @@ export interface TaskReviewState {
 
 const HOLD_STAGES = new Set(['Hold', 'Not Ready']);
 
+export function isTaskPackage(task: any, childTasksByParent?: Record<string, any[]>): boolean {
+  if (!task) return false;
+  if (task.is_package === true) return true;
+  if (!childTasksByParent) return false;
+  return (childTasksByParent[task.id]?.length ?? 0) > 0;
+}
+
 export function getTaskOperationalStatus(
   task: any,
   materialSummary?: TaskMaterialSummary,
@@ -29,25 +36,13 @@ export function getTaskOperationalStatus(
     (materialSummary?.missingRequiredCount ?? 0) > 0 ||
     ((materialSummary?.requiredCount ?? 0) > 0 && task?.materials_on_site === 'No');
 
-  if (needsManagerReview && !isReviewComplete) {
-    return 'review_needed';
-  }
-
-  if (stage === 'Done') {
-    return 'done';
-  }
-
-  if (task?.is_blocked || HOLD_STAGES.has(stage) || hasMaterialGap) {
-    return 'blocked';
-  }
-
-  if (stage === 'In Progress' || hasActiveWorkers || hasStarted) {
-    return 'in_progress';
-  }
-
+  if (needsManagerReview && !isReviewComplete) return 'review_needed';
+  if (stage === 'Done') return 'done';
+  if (task?.is_blocked || HOLD_STAGES.has(stage) || hasMaterialGap) return 'blocked';
+  if (stage === 'In Progress' || hasActiveWorkers || hasStarted) return 'in_progress';
   return 'ready';
 }
 
-export function isPackageTask(taskId: string, childTasksByParent: Record<string, any[]>): boolean {
-  return (childTasksByParent[taskId]?.length ?? 0) > 0;
+export function isTaskActionable(task: any, childTasksByParent?: Record<string, any[]>): boolean {
+  return !isTaskPackage(task, childTasksByParent);
 }

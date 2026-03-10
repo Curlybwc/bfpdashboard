@@ -28,6 +28,7 @@ import TaskPhotos from '@/components/TaskPhotos';
 import TaskComments from '@/components/TaskComments';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
+import { isTaskActionable } from '@/lib/taskOperationalStatus';
 import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 
@@ -678,7 +679,8 @@ const TaskDetail = () => {
   const meIsCandidate = user ? crewCandidates.includes(user.id) : false;
   const meIsActiveWorker = user ? crewWorkers.some(w => w.user_id === user.id && w.active) : false;
   const hasTaskRelevance = isAssignedToMe || meIsActiveWorker || isAdmin || projectRole === 'manager';
-  const showBlockerButton = !task?.is_blocked && (task?.stage === 'Ready' || task?.stage === 'In Progress') && canReportBlocker(isAdmin, projectRole) && hasTaskRelevance;
+  const isActionableTask = isTaskActionable(task);
+  const showBlockerButton = isActionableTask && !task?.is_blocked && (task?.stage === 'Ready' || task?.stage === 'In Progress') && canReportBlocker(isAdmin, projectRole) && hasTaskRelevance;
 
   const handleDibs = async (force = false) => {
     if (!user || !taskId) return;
@@ -755,10 +757,10 @@ const TaskDetail = () => {
       <div className="p-4 space-y-4">
         {/* Lifecycle action buttons */}
         <div className="flex gap-2 flex-wrap">
-          {!isCrewMode && isUnassigned && task.stage === 'Ready' && (
+          {isActionableTask && !isCrewMode && isUnassigned && task.stage === 'Ready' && (
             <Button variant="outline" onClick={() => handleDibs()} disabled={actionLoading}>Dibs</Button>
           )}
-          {!isCrewMode && isAssignedToMe && task.stage === 'Ready' && (
+          {isActionableTask && !isCrewMode && isAssignedToMe && task.stage === 'Ready' && (
             materialsReady ? (
               <Button onClick={handleStart} disabled={actionLoading}>Start</Button>
             ) : (
@@ -770,7 +772,7 @@ const TaskDetail = () => {
               </Tooltip>
             )
           )}
-          {!isCrewMode && isAssignedToMe && task.stage === 'In Progress' && (
+          {isActionableTask && !isCrewMode && isAssignedToMe && task.stage === 'In Progress' && (
             canComplete ? (
               <Button onClick={handleComplete} disabled={actionLoading}>Complete</Button>
             ) : (
@@ -783,12 +785,12 @@ const TaskDetail = () => {
             )
           )}
           {/* Crew actions */}
-          {isCrewMode && meIsCandidate && !meIsActiveWorker && (
+          {isActionableTask && isCrewMode && meIsCandidate && !meIsActiveWorker && (
             <Button onClick={handleJoinCrew} disabled={actionLoading}>
               <Users className="h-4 w-4 mr-1" />Join
             </Button>
           )}
-          {isCrewMode && meIsActiveWorker && (
+          {isActionableTask && isCrewMode && meIsActiveWorker && (
             <Button variant="outline" onClick={handleLeaveCrew} disabled={actionLoading}>Leave</Button>
           )}
           {showBlockerButton && (

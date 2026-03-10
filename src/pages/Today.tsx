@@ -85,7 +85,7 @@ const Today = () => {
 
   const nextUpTask = useMemo(() => {
     if (!isContractor) return null;
-    const candidates = [...inProgress, ...assigned].filter(t => !t.is_blocked);
+    const candidates = [...inProgress, ...assigned].filter(t => getTaskOperationalStatus(t) !== 'blocked');
     candidates.sort(rankTasks);
     return candidates[0] || null;
   }, [isContractor, inProgress, assigned]);

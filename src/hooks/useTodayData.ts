@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getTaskOperationalStatus, isPackageTask } from '@/lib/taskOperationalStatus';
+import { getTaskOperationalStatus, isTaskPackage } from '@/lib/taskOperationalStatus';
 
 /* ── Types ── */
 export interface TodayData {
@@ -311,7 +311,7 @@ function splitTodaySections(tasks: any[], childTasksByParent: Record<string, any
   const blocked: any[] = [];
 
   tasks.forEach((task) => {
-    if (isPackageTask(task.id, childTasksByParent)) return;
+    if (isTaskPackage(task, childTasksByParent)) return;
 
     const status = getTaskOperationalStatus(task, {
       requiredCount: task.material_count || 0,

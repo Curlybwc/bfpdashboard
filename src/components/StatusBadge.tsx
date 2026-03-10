@@ -22,6 +22,7 @@ const colorMap: Record<string, string> = {
   Replace: 'bg-destructive/15 text-destructive',
   Blocked: 'bg-destructive/15 text-destructive',
   Overdue: 'bg-destructive/15 text-destructive',
+  Package: 'bg-muted text-muted-foreground',
   blocked: 'bg-destructive/15 text-destructive',
   ready: 'bg-primary/15 text-primary',
   in_progress: 'bg-orange-100 text-orange-700',

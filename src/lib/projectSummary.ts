@@ -1,4 +1,4 @@
-import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
+import { getTaskOperationalStatus, isTaskPackage } from '@/lib/taskOperationalStatus';
 
 /**
  * Pure computation for the "What next?" project summary card.
@@ -42,7 +42,7 @@ export function computeWhatNext(
   isContractor: boolean,
   userId: string | undefined,
 ): WhatNextResult {
-  const leafTasks = tasks.filter((t) => !(childrenMap[t.id]?.length) && getTaskOperationalStatus(t) !== 'done');
+  const leafTasks = tasks.filter((t) => !isTaskPackage(t, childrenMap) && !(childrenMap[t.id]?.length) && getTaskOperationalStatus(t) !== 'done');
   const blocked = leafTasks.filter((t) => getTaskOperationalStatus(t) === 'blocked');
   const inProgress = leafTasks.filter((t) => getTaskOperationalStatus(t) === 'in_progress');
   const ready = leafTasks.filter((t) => getTaskOperationalStatus(t) === 'ready');

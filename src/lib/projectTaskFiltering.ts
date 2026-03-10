@@ -20,7 +20,7 @@ export function filterContractorTasks(
     if (t.assigned_to_user_id === userId) return true;
     if (myActiveWorkerTaskIds.has(t.id)) return true;
     if (myCandidateTaskIds.has(t.id)) return true;
-    if (!t.assigned_to_user_id && t.assignment_mode === 'solo' && getTaskOperationalStatus(t) === 'ready' && !t.is_outside_vendor) return true;
+    if (!t.assigned_to_user_id && t.assignment_mode === 'solo' && !t.is_package && getTaskOperationalStatus(t) === 'ready' && !t.is_outside_vendor) return true;
     return false;
   });
 }
