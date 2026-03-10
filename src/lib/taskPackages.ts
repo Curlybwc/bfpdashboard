@@ -47,6 +47,9 @@ export function buildTaskPackageGroups(tasks: any[], materialCountMap: Record<st
 
   groups.forEach((group) => {
     group.childTasks = [...group.childTasks].sort((a, b) => {
+      const aDone = a.stage === 'Done' ? 1 : 0;
+      const bDone = b.stage === 'Done' ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
       const aSort = a.sort_order ?? 999999;
       const bSort = b.sort_order ?? 999999;
       if (aSort !== bSort) return aSort - bSort;

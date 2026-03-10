@@ -11,34 +11,10 @@ import CostLibrary from '@/components/CostLibrary';
 import AdminAliases from '@/components/AdminAliases';
 import AdminAvailability from '@/components/admin/AdminAvailability';
 import AdminCrewGroups from '@/components/admin/AdminCrewGroups';
-import { LogIn } from 'lucide-react';
-import {
-  Menubar,
-  MenubarMenu,
-  MenubarTrigger,
-  MenubarContent,
-  MenubarItem,
-} from '@/components/ui/menubar';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import { LogIn, BookOpen, Settings, Package, BarChart3, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Menu } from 'lucide-react';
 
-type ActiveView = 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups';
-
-const VIEW_LABELS: Record<ActiveView, string> = {
-  users: 'Users',
-  'cost-library': 'Cost Library',
-  aliases: 'Aliases',
-  availability: 'Availability',
-  'crew-groups': 'Crew Groups',
-};
+type ActiveView = 'hub' | 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups';
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -46,10 +22,8 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [activeView, setActiveView] = useState<ActiveView>('users');
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [activeView, setActiveView] = useState<ActiveView>('hub');
   const [impersonating, setImpersonating] = useState<string | null>(null);
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!adminLoading && !isAdmin) {
@@ -125,57 +99,56 @@ const AdminPanel = () => {
 
   if (!isAdmin) return null;
 
-  const handleLocal = (view: ActiveView) => {
-    setActiveView(view);
-    setSheetOpen(false);
-  };
-
-  const handleNav = (path: string) => {
-    setSheetOpen(false);
-    navigate(path);
-  };
-
-  // Shared menu group definitions
-  const menuGroups = [
+  const hubCategories = [
     {
       label: 'Libraries',
+      icon: BookOpen,
+      description: 'Cost items, recipes, rehab templates, bundles & rules',
       items: [
-        { label: 'Cost Library', action: () => handleLocal('cost-library') },
-        { label: 'Recipes', action: () => handleNav('/admin/recipes') },
-        { label: 'Rehab Library', action: () => handleNav('/admin/rehab-library') },
-        { label: 'Bundles', action: () => handleNav('/admin/bundles') },
-        { label: 'Store Sections', action: () => handleNav('/admin/store-sections') },
-        { label: 'Assignment Rules', action: () => handleNav('/admin/assignment-rules') },
+        { label: 'Cost Library', action: () => setActiveView('cost-library') },
+        { label: 'Recipes', action: () => navigate('/admin/recipes') },
+        { label: 'Rehab Library', action: () => navigate('/admin/rehab-library') },
+        { label: 'Bundles', action: () => navigate('/admin/bundles') },
+        { label: 'Store Sections', action: () => navigate('/admin/store-sections') },
+        { label: 'Assignment Rules', action: () => navigate('/admin/assignment-rules') },
       ],
     },
     {
       label: 'Operations',
+      icon: Settings,
+      description: 'Shifts, availability & crew management',
       items: [
-        { label: 'Shifts', action: () => handleNav('/shifts') },
-        { label: 'Availability', action: () => handleLocal('availability') },
-        { label: 'Crew Groups', action: () => handleLocal('crew-groups') },
+        { label: 'Shifts', action: () => navigate('/shifts') },
+        { label: 'Availability', action: () => setActiveView('availability') },
+        { label: 'Crew Groups', action: () => setActiveView('crew-groups') },
       ],
     },
     {
       label: 'Inventory',
+      icon: Package,
+      description: 'Track tools and materials across projects',
       items: [
-        { label: 'Tools', action: () => handleNav('/admin/inventory/tools') },
-        { label: 'Materials', action: () => handleNav('/admin/inventory/materials') },
+        { label: 'Tools', action: () => navigate('/admin/inventory/tools') },
+        { label: 'Materials', action: () => navigate('/admin/inventory/materials') },
       ],
     },
     {
       label: 'Reports',
+      icon: BarChart3,
+      description: 'Analytics, calendar & scope accuracy',
       items: [
-        { label: 'Analytics', action: () => handleNav('/admin/analytics') },
-        { label: 'Calendar', action: () => handleNav('/admin/calendar') },
-        { label: 'Scope Accuracy', action: () => handleNav('/admin/scope-accuracy') },
+        { label: 'Analytics', action: () => navigate('/admin/analytics') },
+        { label: 'Calendar', action: () => navigate('/admin/calendar') },
+        { label: 'Scope Accuracy', action: () => navigate('/admin/scope-accuracy') },
       ],
     },
     {
       label: 'Access',
+      icon: Users,
+      description: 'User permissions, aliases & impersonation',
       items: [
-        { label: 'Users', action: () => handleLocal('users') },
-        { label: 'Aliases', action: () => handleLocal('aliases') },
+        { label: 'Users', action: () => setActiveView('users') },
+        { label: 'Aliases', action: () => setActiveView('aliases') },
       ],
     },
   ];
@@ -238,64 +211,46 @@ const AdminPanel = () => {
     <div className="pb-20">
       <PageHeader title="Admin Panel" backTo="/projects" />
       <div className="p-4">
-        {/* Desktop Menubar */}
-        {!isMobile ? (
-          <Menubar className="mb-2">
-            {menuGroups.map((group) => (
-              <MenubarMenu key={group.label}>
-                <MenubarTrigger>{group.label}</MenubarTrigger>
-                <MenubarContent>
-                  {group.items.map((item) => (
-                    <MenubarItem key={item.label} onClick={item.action}>
-                      {item.label}
-                    </MenubarItem>
-                  ))}
-                </MenubarContent>
-              </MenubarMenu>
-            ))}
-          </Menubar>
-        ) : (
-          /* Mobile Sheet */
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="mb-2 w-full justify-start gap-2">
-                <Menu className="h-4 w-4" />
-                Admin Menu
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Admin Menu</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4 space-y-5">
-                {menuGroups.map((group) => (
-                  <div key={group.label}>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-                      {group.label}
-                    </p>
-                    <div className="space-y-0.5">
-                      {group.items.map((item) => (
-                        <button
-                          key={item.label}
-                          onClick={item.action}
-                          className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SheetContent>
-          </Sheet>
+        {activeView !== 'hub' && (
+          <Button variant="ghost" size="sm" className="mb-3 -ml-1 text-muted-foreground" onClick={() => setActiveView('hub')}>
+            ← Back to Admin Hub
+          </Button>
         )}
 
-        <p className="text-xs text-muted-foreground mb-4">
-          Viewing: <span className="font-medium text-foreground">{VIEW_LABELS[activeView]}</span>
-        </p>
+        {activeView === 'hub' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {hubCategories.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <Card key={cat.label} className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-md bg-primary/10 p-2">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{cat.label}</p>
+                      <p className="text-xs text-muted-foreground">{cat.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cat.items.map((item) => (
+                      <Button
+                        key={item.label}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7"
+                        onClick={item.action}
+                      >
+                        {item.label}
+                      </Button>
+                    ))}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Content */}
         {activeView === 'users' && usersContent}
         {activeView === 'cost-library' && <CostLibrary />}
         {activeView === 'aliases' && <AdminAliases />}
