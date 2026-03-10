@@ -438,6 +438,23 @@ const TaskCard = ({
             </Button>
           </div>
         )}
+
+        {canDelete && (
+          <div className="mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteConfirmOpen(true);
+              }}
+              disabled={loading}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
+            </Button>
+          </div>
+        )}
       </Card>
 
       <TaskMaterialsSheet
