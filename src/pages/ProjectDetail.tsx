@@ -449,7 +449,8 @@ const ProjectDetail = () => {
                     if (!e.target.value) setNewIsRecurring(false);
                   }} />
                 </div>
-                {newDueDate && (
+                )}
+                {!createAsPackage && newDueDate && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Recurring</Label>
