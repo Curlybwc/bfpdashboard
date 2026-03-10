@@ -1412,6 +1412,7 @@ export type Database = {
           id: string
           is_blocked: boolean
           is_outside_vendor: boolean
+          is_package: boolean
           is_recurring: boolean
           lead_user_id: string | null
           materials_on_site: Database["public"]["Enums"]["materials_status"]
@@ -1452,6 +1453,7 @@ export type Database = {
           id?: string
           is_blocked?: boolean
           is_outside_vendor?: boolean
+          is_package?: boolean
           is_recurring?: boolean
           lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
@@ -1492,6 +1494,7 @@ export type Database = {
           id?: string
           is_blocked?: boolean
           is_outside_vendor?: boolean
+          is_package?: boolean
           is_recurring?: boolean
           lead_user_id?: string | null
           materials_on_site?: Database["public"]["Enums"]["materials_status"]
