@@ -56,6 +56,7 @@ const TaskCard = ({
   const navigate = useNavigate();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
 
