@@ -838,25 +838,34 @@ const ProjectDetail = () => {
                   const open = expandedIds.has(packageKey);
                   return (
                     <div key={group.packageTask.id} className="rounded-lg border">
-                      <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
-                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm">{group.packageTask.task}</p>
-                          {(group.packageTask.room_area || group.packageTask.trade) && (
-                            <p className="text-xs text-muted-foreground">
-                              {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-1">
-                          <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
-                          <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
-                          <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
-                          {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
-                          {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
-                          {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
-                        </div>
-                      </button>
+                      <div className="flex items-center">
+                        <button className="flex-1 p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
+                          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                            {(group.packageTask.room_area || group.packageTask.trade) && (
+                              <p className="text-xs text-muted-foreground">
+                                {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
+                            <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
+                            <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
+                            {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
+                            {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
+                            {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
+                          </div>
+                        </button>
+                        {isManager && group.packageTask.id !== '__general__' && (
+                          <PackageDeleteButton
+                            packageTask={group.packageTask}
+                            childCount={group.childTasks.length}
+                            onDelete={invalidateProject}
+                          />
+                        )}
+                      </div>
                       {open && (
                         <div className="border-t p-2 space-y-2">
                           {bulkMode ? (
