@@ -734,11 +734,13 @@ const ProjectDetail = () => {
             onDone={handleBulkDone}
           />
         )}
-        {packageGroups.length === 0 ? (
+        {filteredPackageGroups.length === 0 && statusFilter ? (
+          <p className="text-center text-muted-foreground py-8">No tasks match this filter.</p>
+        ) : filteredPackageGroups.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
         ) : bulkMode ? (
           <div className="space-y-4">
-            {packageGroups.map((group) => (
+            {filteredPackageGroups.map((group) => (
               <div key={group.packageTask.id} className="space-y-2">
                 <div className="rounded-md border p-3 bg-muted/20">
                   <div className="flex items-center justify-between gap-2">
@@ -759,12 +761,13 @@ const ProjectDetail = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {packageGroups.map((group) => {
+            {filteredPackageGroups.map((group) => {
               const packageKey = `pkg:${group.packageTask.id}`;
-              const open = expandedIds.has(packageKey);
+              const isFiltering = !!statusFilter;
+              const open = isFiltering || expandedIds.has(packageKey);
               return (
                 <div key={group.packageTask.id} className="rounded-lg border">
-                  <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
+                  <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => !isFiltering && toggleExpanded(packageKey)}>
                     {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{group.packageTask.task}</p>
@@ -776,16 +779,20 @@ const ProjectDetail = () => {
                     </div>
                     <div className="flex flex-wrap justify-end gap-1">
                       <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
-                      <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
-                      <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
-                      {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
-                      {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
-                      {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
+                      {!isFiltering && (
+                        <>
+                          <Badge variant="secondary" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('ready'); }}>Ready {group.summary.byStatus.ready}</Badge>
+                          <Badge variant="secondary" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('in_progress'); }}>In Progress {group.summary.byStatus.in_progress}</Badge>
+                          {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('blocked'); }}>Blocked {group.summary.byStatus.blocked}</Badge>}
+                          {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('review'); }}>Review {group.summary.byStatus.review_needed}</Badge>}
+                          {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('materials'); }}>Materials {group.summary.materialsNeeded}</Badge>}
+                        </>
+                      )}
                     </div>
                   </button>
                   {open && (
                     <div className="border-t p-2 space-y-2">
-                      {isManager ? (
+                      {isManager && !isFiltering ? (
                         <SortableTaskList
                           items={group.childTasks}
                           onReorder={async (orderedIds) => {
