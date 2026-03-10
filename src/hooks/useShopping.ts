@@ -26,7 +26,6 @@ export function useShoppingItems() {
     queryFn: async (): Promise<ShoppingItem[]> => {
       const { data, error } = await supabase
         .from('task_materials')
-        .select('id, name, quantity, unit, sku, vendor_url, item_type, purchased, delivered, store_section, task_id, tasks!inner(id, task, project_id, stage, projects!inner(id, name, address))')
         .select('id, name, quantity, unit, unit_cost, sku, vendor_url, item_type, purchased, delivered, store_section, task_id, tasks!inner(id, task, project_id, stage, projects!inner(id, name, address))')
         .eq('is_active', true)
         .neq('tasks.stage', 'Done');
