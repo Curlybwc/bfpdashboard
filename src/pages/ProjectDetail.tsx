@@ -88,7 +88,7 @@ const PackageDeleteButton = ({ packageTask, childCount, onDelete }: { packageTas
   );
 };
 
-  const { id } = useParams<{ id: string }>();
+  const ProjectDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
