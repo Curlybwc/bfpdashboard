@@ -88,6 +88,7 @@ const ProjectDetail = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   // Derived role & permissions
   const projectRole = useMemo(
