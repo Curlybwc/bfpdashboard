@@ -125,7 +125,7 @@ const ProjectDetail = () => {
   }, [tasks, allTasks, isContractor]);
 
   const packageOptions = useMemo(() => {
-    return allTasks.filter((t) => t.is_package === true || allTasks.some((c) => c.parent_task_id === t.id));
+    return allTasks.filter((t) => allTasks.some((c) => c.parent_task_id === t.id));
   }, [allTasks]);
 
   // Build tree
