@@ -4,6 +4,8 @@ import type { Database } from '@/integrations/supabase/types';
 import { computeProjectHealthSummary } from '@/lib/projectSummary';
 
 export type ProjectType = 'construction' | 'rental' | 'general';
+import type { ProjectType } from '@/lib/supabase-types';
+
 type ProjectRow = Database['public']['Tables']['projects']['Row'];
 
 type TaskSummaryRow = {

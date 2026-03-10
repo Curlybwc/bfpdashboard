@@ -5,7 +5,7 @@
 
 export interface OperationalAlert {
   id: string;
-  type: 'blocked' | 'review' | 'overdue' | 'shift' | 'photo';
+  type: 'blocked' | 'review' | 'overdue' | 'due_tomorrow' | 'due_this_week' | 'shift' | 'photo';
   severity: 'high' | 'medium' | 'low';
   title: string;
   subtitle?: string;
@@ -41,6 +41,13 @@ export function generateAlerts(input: AlertInput): OperationalAlert[] {
 
   const alerts: OperationalAlert[] = [];
   const todayStr = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const dueWeekEnd = new Date();
+  dueWeekEnd.setDate(dueWeekEnd.getDate() + 7);
+  const dueWeekEndStr = dueWeekEnd.toISOString().slice(0, 10);
+  const alertedTaskIds = new Set<string>();
 
   // ── Blocked tasks (high) ──
   // Manager/admin see all blocked; contractor sees only their own
@@ -55,6 +62,7 @@ export function generateAlerts(input: AlertInput): OperationalAlert[] {
         actionPath: `/projects/${t.project_id}/tasks/${t.id}`,
         taskId: t.id,
       });
+      alertedTaskIds.add(t.id);
     });
   } else {
     blocked.forEach(t => {
@@ -70,6 +78,7 @@ export function generateAlerts(input: AlertInput): OperationalAlert[] {
           actionPath: `/projects/${t.project_id}/tasks/${t.id}`,
           taskId: t.id,
         });
+        alertedTaskIds.add(t.id);
       }
     });
   }
@@ -86,6 +95,7 @@ export function generateAlerts(input: AlertInput): OperationalAlert[] {
         actionPath: `/projects/${t.project_id}/tasks/${t.id}`,
         taskId: t.id,
       });
+      alertedTaskIds.add(t.id);
     });
   }
 
@@ -114,6 +124,49 @@ export function generateAlerts(input: AlertInput): OperationalAlert[] {
       actionPath: `/projects/${t.project_id}/tasks/${t.id}`,
       taskId: t.id,
     });
+    alertedTaskIds.add(t.id);
+  });
+
+  // ── Due tomorrow / due this week (low) ──
+  const seenDueSoon = new Set<string>();
+  allTasks.forEach((t) => {
+    if (seenDueSoon.has(t.id) || alertedTaskIds.has(t.id)) return;
+    if (!t.due_date || t.stage === 'Done') return;
+    if (t.due_date <= todayStr) return;
+
+    // Contractor: only their own tasks
+    if (isContractor) {
+      const isMine =
+        t.assigned_to_user_id === userId || crewActiveTaskIds.has(t.id);
+      if (!isMine) return;
+    }
+
+    if (t.due_date === tomorrowStr) {
+      seenDueSoon.add(t.id);
+      alerts.push({
+        id: `due-tomorrow-${t.id}`,
+        type: 'due_tomorrow',
+        severity: 'low',
+        title: `Due tomorrow: ${t.task}`,
+        subtitle: projectMap[t.project_id]?.name,
+        actionPath: `/projects/${t.project_id}/tasks/${t.id}`,
+        taskId: t.id,
+      });
+      return;
+    }
+
+    if (t.due_date > tomorrowStr && t.due_date <= dueWeekEndStr) {
+      seenDueSoon.add(t.id);
+      alerts.push({
+        id: `due-week-${t.id}`,
+        type: 'due_this_week',
+        severity: 'low',
+        title: `Due this week: ${t.task}`,
+        subtitle: projectMap[t.project_id]?.name,
+        actionPath: `/projects/${t.project_id}/tasks/${t.id}`,
+        taskId: t.id,
+      });
+    }
   });
 
   // ── No shift logged today (medium) — contractor only, after 10am ──
