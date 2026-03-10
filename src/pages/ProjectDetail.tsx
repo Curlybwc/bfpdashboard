@@ -465,7 +465,6 @@ const ProjectDetail = () => {
                     )}
                   </div>
                 )}
-                )}
                 {!createAsPackage && (
                 <Collapsible>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
