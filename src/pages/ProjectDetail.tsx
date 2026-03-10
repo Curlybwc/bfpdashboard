@@ -29,6 +29,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import WhatNextCard from '@/components/WhatNextCard';
 import { computeWhatNext, computeProjectTotalActual } from '@/lib/projectSummary';
 import { filterContractorTasks, includeParentTasks, buildChildrenMap, buildAssigneeMap } from '@/lib/projectTaskFiltering';
+import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -123,8 +124,8 @@ const ProjectDetail = () => {
   const rootTasks = useMemo(() => {
     const filtered = tasksWithParents.filter((t) => !t.parent_task_id);
     return filtered.sort((a, b) => {
-      const aDone = a.stage === 'Done' ? 1 : 0;
-      const bDone = b.stage === 'Done' ? 1 : 0;
+      const aDone = getTaskOperationalStatus(a) === 'done' ? 1 : 0;
+      const bDone = getTaskOperationalStatus(b) === 'done' ? 1 : 0;
       return aDone - bDone;
     });
   }, [tasksWithParents]);
@@ -603,7 +604,7 @@ const ProjectDetail = () => {
             {rootTasks.map((t) => {
               const children = childrenMap[t.id] || [];
               const isExpanded = expandedIds.has(t.id);
-              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              const allChildrenDone = children.length === 0 || children.every((c: any) => getTaskOperationalStatus(c) === 'done');
               return (
                 <div key={t.id}>
                   <div className="flex items-start gap-2">
@@ -641,7 +642,7 @@ const ProjectDetail = () => {
             {(t) => {
               const children = childrenMap[t.id] || [];
               const isExpanded = expandedIds.has(t.id);
-              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              const allChildrenDone = children.length === 0 || children.every((c: any) => getTaskOperationalStatus(c) === 'done');
               return (
                 <SortableTaskItem key={t.id} id={t.id}>
                   <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
@@ -660,7 +661,7 @@ const ProjectDetail = () => {
             {rootTasks.map((t) => {
               const children = childrenMap[t.id] || [];
               const isExpanded = expandedIds.has(t.id);
-              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+              const allChildrenDone = children.length === 0 || children.every((c: any) => getTaskOperationalStatus(c) === 'done');
               return (
                 <div key={t.id}>
                   <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />

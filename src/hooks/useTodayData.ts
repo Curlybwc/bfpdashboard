@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getTaskOperationalStatus, isPackageTask } from '@/lib/taskOperationalStatus';
 
 /* ── Types ── */
 export interface TodayData {
@@ -297,6 +298,51 @@ function mergeAndDedupe(primary: any[], secondary: any[]): any[] {
   return merged;
 }
 
+
+function addCrewWorkerCounts(tasks: any[], crewWorkerCounts: Record<string, number>) {
+  return tasks.map((task) => ({ ...task, active_worker_count: crewWorkerCounts[task.id] || 0 }));
+}
+
+function splitTodaySections(tasks: any[], childTasksByParent: Record<string, any[]>, isAdminOrManager: boolean, userId: string) {
+  const inProgress: any[] = [];
+  const assigned: any[] = [];
+  const available: any[] = [];
+  const needsReview: any[] = [];
+  const blocked: any[] = [];
+
+  tasks.forEach((task) => {
+    if (isPackageTask(task.id, childTasksByParent)) return;
+
+    const status = getTaskOperationalStatus(task, {
+      requiredCount: task.material_count || 0,
+      hasRequiredMaterials: (task.material_count || 0) > 0 ? task.materials_on_site === 'Yes' : true,
+    });
+
+    if (status === 'review_needed') {
+      if (isAdminOrManager) needsReview.push(task);
+      return;
+    }
+
+    if (status === 'blocked') {
+      blocked.push(task);
+      return;
+    }
+
+    if (status === 'in_progress') {
+      inProgress.push(task);
+      return;
+    }
+
+    if (status === 'ready') {
+      const canTake = !task.assigned_to_user_id && task.assignment_mode === 'solo' && !task.is_outside_vendor;
+      if (canTake) available.push(task);
+      else if (task.assigned_to_user_id === userId) assigned.push(task);
+    }
+  });
+
+  return { inProgress, assigned, available, needsReview, blocked };
+}
+
 /* ── Hook ── */
 export function useTodayData(userId: string | undefined, isAdmin: boolean) {
   const [data, setData] = useState<TodayData>(EMPTY_DATA);
@@ -333,12 +379,6 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
         isAdminOrManager, memberProjectIds,
         mergedIp, core.soloAssigned, crew.crewIpTasks,
       );
-      const blockedIds = new Set(blockedTasks.map(t => t.id));
-
-      // Remove blocked from main lists
-      const inProgress = mergedIp.filter(t => !blockedIds.has(t.id));
-      const assigned = core.soloAssigned.filter(t => !blockedIds.has(t.id));
-
       // Phase 5: enrichment + visible child tasks
       const allTasks = [...mergedIp, ...core.soloAssigned, ...mergedAvail, ...reviewTasks, ...blockedTasks];
       const parentIds = [...new Set(allTasks.map(t => t.id))];
@@ -347,12 +387,15 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
         fetchChildrenForParents(parentIds),
       ]);
 
+      const allTasksWithCounts = addCrewWorkerCounts(allTasks, enrichment.crewWorkerCounts).map((task) => ({
+        ...task,
+        material_count: enrichment.materialCountMap[task.id] || 0,
+      }));
+
+      const sections = splitTodaySections(allTasksWithCounts, childTasksByParent, isAdminOrManager, userId);
+
       setData({
-        inProgress,
-        assigned,
-        available: mergedAvail,
-        needsReview: reviewTasks,
-        blocked: blockedTasks,
+        ...sections,
         blockerMap,
         crewActiveTaskIds: core.myActiveTaskIds,
         crewCandidateTaskIds: core.myCandidateIds,
