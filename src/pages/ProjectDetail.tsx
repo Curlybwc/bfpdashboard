@@ -24,7 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
-import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
+import { useCreateTask, useCreateTasksBatch, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
 import { canCreateTask, canEditProject, getProjectRole } from '@/lib/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 import WhatNextCard from '@/components/WhatNextCard';
@@ -34,6 +34,8 @@ import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 import { buildTaskPackageGroups } from '@/lib/taskPackages';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import AlertsBanner from '@/components/AlertsBanner';
+import { generateAlerts } from '@/lib/alerts';
 
 const PackageDeleteButton = ({ packageTask, childCount, onDelete }: { packageTask: any; childCount: number; onDelete: () => void }) => {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -108,12 +110,15 @@ const ProjectDetail = () => {
 
   // Mutations
   const createTaskMutation = useCreateTask(id);
+  const createTasksBatchMutation = useCreateTasksBatch(id);
   const updateProjectMutation = useUpdateProject(id);
   const deleteProjectMutation = useDeleteProject();
 
   // Local UI state
   const [open, setOpen] = useState(false);
   const [taskName, setTaskName] = useState('');
+  const [createMode, setCreateMode] = useState<'single' | 'batch'>('single');
+  const [batchTaskInput, setBatchTaskInput] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
   const [priority, setPriority] = useState<TaskPriority>('2 – This Week');
   const [roomArea, setRoomArea] = useState('');
@@ -275,6 +280,33 @@ const ProjectDetail = () => {
     [allTasks],
   );
 
+  const projectAlerts = useMemo(() => {
+    if (!user || !project) return [];
+    const blocked = tasks.filter((t) => t.is_blocked && t.stage !== 'Done');
+    const needsReview = tasks.filter((t) => getTaskOperationalStatus(t) === 'review_needed');
+    const inProgress = tasks.filter((t) => getTaskOperationalStatus(t) === 'in_progress');
+    const duePool = tasks.filter((t) => {
+      const status = getTaskOperationalStatus(t);
+      return status !== 'done' && status !== 'blocked' && status !== 'review_needed' && status !== 'in_progress';
+    });
+
+    return generateAlerts({
+      inProgress,
+      assigned: duePool,
+      blocked,
+      needsReview,
+      available: [],
+      isAdmin,
+      isManager,
+      isContractor,
+      hasShiftToday: true,
+      photoCountMap: {},
+      projectMap: { [project.id]: { name: project.name, address: project.address || undefined } },
+      userId: user.id,
+      crewActiveTaskIds: myActiveWorkerTaskIds,
+    });
+  }, [user, project, tasks, isAdmin, isManager, isContractor, myActiveWorkerTaskIds]);
+
   // UI helpers
   const toggleExpanded = (taskId: string) => {
     setExpandedIds((prev) => {
@@ -319,6 +351,64 @@ const ProjectDetail = () => {
     setEditOpen(true);
   };
 
+
+  const batchPreview = useMemo(() => {
+    const normalizedSeen = new Set<string>();
+    const uniqueTitles: string[] = [];
+    let blankLines = 0;
+    let duplicateLines = 0;
+
+    batchTaskInput.split('\n').forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        blankLines += 1;
+        return;
+      }
+      const normalized = trimmed.toLocaleLowerCase();
+      if (normalizedSeen.has(normalized)) {
+        duplicateLines += 1;
+        return;
+      }
+      normalizedSeen.add(normalized);
+      uniqueTitles.push(trimmed);
+    });
+
+    return { uniqueTitles, blankLines, duplicateLines };
+  }, [batchTaskInput]);
+
+  const resetCreateTaskForm = () => {
+    setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
+    setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
+    setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
+    setCrewCandidates([]);
+    setSelectedPackageId('general');
+    setCreateAsPackage(false);
+    setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
+    setCreateMode('single');
+    setBatchTaskInput('');
+  };
+
+  const buildCreatePayload = (title: string) => ({
+    project_id: id!,
+    task: title,
+    stage,
+    priority,
+    room_area: roomArea || null,
+    trade: trade || null,
+    notes: notes || null,
+    created_by: user!.id,
+    assigned_to_user_id: createAsPackage || assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
+    is_outside_vendor: assignedTo === 'outside_vendor',
+    assignment_mode: createAsPackage ? 'solo' : (assignedTo === 'crew' ? 'crew' : 'solo') as 'solo' | 'crew',
+    crewCandidates: createAsPackage ? [] : (assignedTo === 'crew' ? crewCandidates : []),
+    parent_task_id: createAsPackage || selectedPackageId === 'general' ? null : selectedPackageId,
+    is_package: createAsPackage,
+    pendingMaterials: createMode === 'batch' || createAsPackage ? [] : pendingMaterials,
+    due_date: newDueDate || null,
+    is_recurring: newIsRecurring && !!newDueDate,
+    recurrence_frequency: newIsRecurring && newDueDate ? newRecurrenceFrequency : null,
+  });
+
   const handleEditProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !editName.trim()) return;
@@ -331,36 +421,45 @@ const ProjectDetail = () => {
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !id) return;
+
+    if (createMode === 'batch') {
+      if (batchPreview.uniqueTitles.length === 0) {
+        toast({ title: 'No tasks to create', description: 'Add at least one non-empty task line.', variant: 'destructive' });
+        return;
+      }
+
+      createTasksBatchMutation.mutate(
+        { tasks: batchPreview.uniqueTitles.map((title) => buildCreatePayload(title)) },
+        {
+          onSuccess: (result) => {
+            const skippedCount = batchPreview.blankLines + batchPreview.duplicateLines;
+            if (result.createdCount === 0) {
+              toast({ title: 'No tasks created', description: result.errors[0]?.error || 'All lines failed.', variant: 'destructive' });
+              return;
+            }
+
+            const failureCount = result.errors.length;
+            toast({
+              title: `Created ${result.createdCount} task${result.createdCount !== 1 ? 's' : ''}`,
+              description: [
+                skippedCount > 0 ? `${skippedCount} line${skippedCount !== 1 ? 's' : ''} skipped (blank/duplicate).` : null,
+                failureCount > 0 ? `${failureCount} line${failureCount !== 1 ? 's' : ''} failed.` : null,
+              ].filter(Boolean).join(' '),
+              variant: failureCount > 0 ? 'destructive' : 'default',
+            });
+            resetCreateTaskForm();
+            setOpen(false);
+          },
+        },
+      );
+      return;
+    }
+
     createTaskMutation.mutate(
-      {
-        project_id: id,
-        task: taskName,
-        stage,
-        priority,
-        room_area: roomArea || null,
-        trade: trade || null,
-        notes: notes || null,
-        created_by: user.id,
-        assigned_to_user_id: createAsPackage || assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
-        is_outside_vendor: assignedTo === 'outside_vendor',
-        assignment_mode: createAsPackage ? 'solo' : (assignedTo === 'crew' ? 'crew' : 'solo'),
-        crewCandidates: createAsPackage ? [] : (assignedTo === 'crew' ? crewCandidates : []),
-        parent_task_id: createAsPackage || selectedPackageId === 'general' ? null : selectedPackageId,
-        is_package: createAsPackage,
-        pendingMaterials: createAsPackage ? [] : pendingMaterials,
-        due_date: newDueDate || null,
-        is_recurring: newIsRecurring && !!newDueDate,
-        recurrence_frequency: newIsRecurring && newDueDate ? newRecurrenceFrequency : null,
-      },
+      buildCreatePayload(taskName.trim()),
       {
         onSuccess: () => {
-          setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
-          setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
-          setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
-          setCrewCandidates([]);
-          setSelectedPackageId('general');
-          setCreateAsPackage(false);
-          setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
+          resetCreateTaskForm();
           setOpen(false);
         },
       },
@@ -445,19 +544,65 @@ const ProjectDetail = () => {
               <DialogHeader><DialogTitle>New Task</DialogTitle></DialogHeader>
               <form onSubmit={handleCreateTask} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Task Description</Label>
-                  <Input value={taskName} onChange={(e) => setTaskName(e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select value={createAsPackage ? 'package' : 'task'} onValueChange={(v) => setCreateAsPackage(v === 'package')}>
+                  <Label>Create Mode</Label>
+                  <Select value={createMode} onValueChange={(value: 'single' | 'batch') => {
+                    setCreateMode(value);
+                    if (value === 'batch') setCreateAsPackage(false);
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="task">Actionable Task</SelectItem>
-                      <SelectItem value="package">Package (Container)</SelectItem>
+                      <SelectItem value="single">Single task</SelectItem>
+                      <SelectItem value="batch">Batch (one per line)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                {createMode === 'single' ? (
+                  <div className="space-y-2">
+                    <Label>Task Description</Label>
+                    <Input value={taskName} onChange={(e) => setTaskName(e.target.value)} required />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Tasks (one per line)</Label>
+                    <Textarea
+                      value={batchTaskInput}
+                      onChange={(e) => setBatchTaskInput(e.target.value)}
+                      rows={6}
+                      placeholder={`Demo kitchen\nReplace outlet covers\nPaint hallway`}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {batchPreview.uniqueTitles.length} task{batchPreview.uniqueTitles.length !== 1 ? 's' : ''} ready
+                      {batchPreview.blankLines > 0 ? ` • ${batchPreview.blankLines} blank line${batchPreview.blankLines !== 1 ? 's' : ''} ignored` : ''}
+                      {batchPreview.duplicateLines > 0 ? ` • ${batchPreview.duplicateLines} duplicate line${batchPreview.duplicateLines !== 1 ? 's' : ''} ignored` : ''}
+                    </p>
+                    {batchPreview.uniqueTitles.length > 0 && (
+                      <div className="rounded border p-2 max-h-28 overflow-y-auto space-y-1">
+                        {batchPreview.uniqueTitles.slice(0, 8).map((line, idx) => (
+                          <p key={`${line}-${idx}`} className="text-xs truncate">{idx + 1}. {line}</p>
+                        ))}
+                        {batchPreview.uniqueTitles.length > 8 && (
+                          <p className="text-xs text-muted-foreground">+{batchPreview.uniqueTitles.length - 8} more…</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {createMode === 'single' && (
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select value={createAsPackage ? 'package' : 'task'} onValueChange={(v) => setCreateAsPackage(v === 'package')}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="task">Actionable Task</SelectItem>
+                        <SelectItem value="package">Package (Container)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {!createAsPackage && (
                   <div className="space-y-2">
                     <Label>Package</Label>
@@ -472,6 +617,7 @@ const ProjectDetail = () => {
                     </Select>
                   </div>
                 )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Stage</Label>
@@ -492,6 +638,7 @@ const ProjectDetail = () => {
                     </Select>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Trade</Label>
@@ -502,6 +649,7 @@ const ProjectDetail = () => {
                     <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} />
                   </div>
                 </div>
+
                 {!createAsPackage && (
                 <div className="space-y-2">
                   <Label>Assigned To</Label>
@@ -520,6 +668,7 @@ const ProjectDetail = () => {
                   </Select>
                 </div>
                 )}
+
                 {!createAsPackage && assignedTo === 'crew' && (
                   <div className="space-y-2">
                     <Label>Crew Members</Label>
@@ -618,7 +767,7 @@ const ProjectDetail = () => {
                     )}
                   </div>
                 )}
-                {!createAsPackage && (
+                {!createAsPackage && createMode === 'single' && (
                 <Collapsible>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
                     <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
@@ -680,7 +829,7 @@ const ProjectDetail = () => {
                   </CollapsibleContent>
                 </Collapsible>
                 )}
-                <Button type="submit" className="w-full" disabled={createTaskMutation.isPending}>Create Task</Button>
+                <Button type="submit" className="w-full" disabled={createTaskMutation.isPending || createTasksBatchMutation.isPending || (createMode === 'single' ? !taskName.trim() : batchPreview.uniqueTitles.length === 0)}>{createMode === 'batch' ? (createTasksBatchMutation.isPending ? 'Creating Tasks…' : `Create ${batchPreview.uniqueTitles.length || ''} Tasks`) : (createTaskMutation.isPending ? 'Creating Task…' : 'Create Task')}</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -767,6 +916,8 @@ const ProjectDetail = () => {
           <StatusBadge status={project.status} />
           {project.address && <span className="text-sm text-muted-foreground">{project.address}</span>}
         </div>
+
+        <AlertsBanner alerts={projectAlerts} />
 
         <Card className="mb-4">
           <CardContent className="p-3">

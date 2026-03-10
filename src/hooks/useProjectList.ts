@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { computeProjectHealthSummary } from '@/lib/projectSummary';
+import type { ProjectType } from '@/lib/supabase-types';
 
-export type ProjectType = 'construction' | 'rental' | 'general';
 type ProjectRow = Database['public']['Tables']['projects']['Row'];
 
 type TaskSummaryRow = {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ClipboardCheck, Clock, Camera, X, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Clock, Camera, X, ChevronDown, ChevronUp, ShieldAlert, CalendarClock, CalendarRange } from 'lucide-react';
 import type { OperationalAlert } from '@/lib/alerts';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,8 @@ const iconMap: Record<OperationalAlert['type'], React.ElementType> = {
   blocked: ShieldAlert,
   review: ClipboardCheck,
   overdue: AlertTriangle,
+  due_tomorrow: CalendarClock,
+  due_this_week: CalendarRange,
   shift: Clock,
   photo: Camera,
 };
