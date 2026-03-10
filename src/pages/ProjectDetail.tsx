@@ -113,10 +113,10 @@ const ProjectDetail = () => {
       const { data: groupsData } = await supabase.from('crew_groups').select('id, name');
       if (!groupsData) return;
       const { data: membersData } = await supabase.from('crew_group_members').select('crew_group_id, user_id');
-      setCrewGroups(groupsData.map((g: any) => ({
-        id: g.id,
-        name: g.name,
-        members: (membersData || []).filter((m: any) => m.crew_group_id === g.id).map((m: any) => m.user_id),
+      setCrewGroups(groupsData.map((group) => ({
+        id: group.id,
+        name: group.name,
+        members: (membersData || []).filter((member) => member.crew_group_id === group.id).map((member) => member.user_id),
       })));
     };
     fetchCrewGroups();
@@ -662,7 +662,7 @@ const ProjectDetail = () => {
           {userCanEditProject && (
             <div className="border-t pt-3 mt-1 flex flex-col gap-2">
               {(['construction', 'rental', 'general'] as const)
-                .filter((t) => t !== (project as any).project_type)
+                .filter((t) => t !== project.project_type)
                 .map((targetType) => {
                   const labels: Record<string, string> = { construction: 'Construction', rental: 'Rentals', general: 'General' };
                   return (
@@ -674,7 +674,7 @@ const ProjectDetail = () => {
                       disabled={updateProjectMutation.isPending}
                       onClick={() => {
                         updateProjectMutation.mutate(
-                          { project_type: targetType } as any,
+                          { project_type: targetType },
                           {
                             onSuccess: () => {
                               setEditOpen(false);
