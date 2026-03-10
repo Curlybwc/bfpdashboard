@@ -9,11 +9,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat, AlertTriangle } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS, TASK_STAGES, type TaskStage } from '@/lib/supabase-types';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
+import { getTaskOperationalStatus, isTaskActionable } from '@/lib/taskOperationalStatus';
 
 interface TaskCardProps {
   task: any;
@@ -38,6 +39,7 @@ interface TaskCardProps {
   blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
   photoCount?: number;
   materialCount?: number;
+  canReportIssue?: boolean;
 }
 
 const TaskCard = ({
@@ -46,9 +48,10 @@ const TaskCard = ({
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
-  blockerInfo, photoCount = 0, materialCount = 0,
+  blockerInfo, photoCount = 0, materialCount = 0, canReportIssue = false,
 }: TaskCardProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,17 +61,23 @@ const TaskCard = ({
   const isUnassigned = !task.assigned_to_user_id;
   const isOutsideVendor = task.is_outside_vendor === true;
   const materialsReady = task.materials_on_site === 'Yes';
+  const operationalStatus = getTaskOperationalStatus(task, {
+    requiredCount: materialCount,
+    hasRequiredMaterials: materialCount > 0 ? materialsReady : true,
+  });
+  const isActionable = isTaskActionable(task);
+  const canExecute = operationalStatus !== 'review_needed' && operationalStatus !== 'done';
 
   // Solo action visibility — outside vendor tasks are not available for dibs
   const hasChildren = childCount > 0;
   const isLeafTask = !hasChildren;
-  const showDibs = !isCrewTask && isLeafTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
-  const showStart = !isCrewTask && isLeafTask && isAssignedToMe && task.stage === 'Ready';
-  const showComplete = !isCrewTask && isLeafTask && isAssignedToMe && (task.stage === 'Ready' || task.stage === 'In Progress');
+  const showDibs = isActionable && canExecute && !isCrewTask && isLeafTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
+  const showStart = isActionable && canExecute && !isCrewTask && isLeafTask && isAssignedToMe && task.stage === 'Ready';
+  const showComplete = isActionable && canExecute && !isCrewTask && isLeafTask && isAssignedToMe && (task.stage === 'Ready' || task.stage === 'In Progress');
 
   // Crew action visibility
-  const showJoin = isCrewTask && isCandidate && !isActiveWorker;
-  const showLeave = isCrewTask && isActiveWorker;
+  const showJoin = isActionable && canExecute && isCrewTask && isCandidate && !isActiveWorker;
+  const showLeave = isActionable && canExecute && isCrewTask && isActiveWorker;
 
   const showNeedsMaterials = !materialsReady && materialCount > 0;
   const canComplete = hasChildren ? allChildrenDone : true;
@@ -250,26 +259,29 @@ const TaskCard = ({
             <p className="text-xs text-muted-foreground">Assigned to {assigneeName}</p>
           )}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                <button className="cursor-pointer" aria-label="Change status">
-                  <StatusBadge status={task.stage} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                {TASK_STAGES.map((s) => (
-                  <DropdownMenuItem
-                    key={s}
-                    disabled={s === task.stage || loading}
-                    onSelect={() => handleStageChange(s)}
-                    className={cn(s === task.stage && 'font-semibold')}
-                  >
-                    <StatusBadge status={s} />
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {task.is_blocked && <StatusBadge status="Blocked" />}
+            {isActionable ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                  <button className="cursor-pointer" aria-label="Change status">
+                    <StatusBadge status={operationalStatus} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                  {TASK_STAGES.map((s) => (
+                    <DropdownMenuItem
+                      key={s}
+                      disabled={s === task.stage || loading}
+                      onSelect={() => handleStageChange(s)}
+                      className={cn(s === task.stage && 'font-semibold')}
+                    >
+                      <StatusBadge status={s} />
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <StatusBadge status="Package" />
+            )
             {isCrewTask && (
               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                 <Users className="h-3 w-3" />
@@ -388,6 +400,21 @@ const TaskCard = ({
                 Leave
               </Button>
             )}
+          </div>
+        )}
+
+        {canReportIssue && isActionable && (
+          <div className="mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/projects/${task.project_id}/tasks/${task.id}?report=1`);
+              }}
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mr-1" />Report Issue
+            </Button>
           </div>
         )}
       </Card>

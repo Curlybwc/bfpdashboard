@@ -22,11 +22,25 @@ const colorMap: Record<string, string> = {
   Replace: 'bg-destructive/15 text-destructive',
   Blocked: 'bg-destructive/15 text-destructive',
   Overdue: 'bg-destructive/15 text-destructive',
+  Package: 'bg-muted text-muted-foreground',
+  blocked: 'bg-destructive/15 text-destructive',
+  ready: 'bg-primary/15 text-primary',
+  in_progress: 'bg-orange-100 text-orange-700',
+  review_needed: 'bg-amber-100 text-amber-700',
+  done: 'bg-success/15 text-success',
+};
+
+const labelMap: Record<string, string> = {
+  blocked: 'Blocked',
+  ready: 'Ready',
+  in_progress: 'In Progress',
+  review_needed: 'Review Needed',
+  done: 'Done',
 };
 
 const StatusBadge = ({ status }: { status: string }) => (
   <Badge variant="secondary" className={`${colorMap[status] || ''} text-xs font-medium border-0`}>
-    {status}
+    {labelMap[status] || status}
   </Badge>
 );
 

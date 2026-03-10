@@ -1,3 +1,5 @@
+import { getTaskOperationalStatus, isTaskPackage } from '@/lib/taskOperationalStatus';
+
 /**
  * Pure computation for the "What next?" project summary card.
  * Extracted from ProjectDetail.tsx to reduce fragility.
@@ -40,10 +42,10 @@ export function computeWhatNext(
   isContractor: boolean,
   userId: string | undefined,
 ): WhatNextResult {
-  const leafTasks = tasks.filter((t) => !(childrenMap[t.id]?.length) && t.stage !== 'Done');
-  const blocked = leafTasks.filter((t) => t.is_blocked);
-  const inProgress = leafTasks.filter((t) => !t.is_blocked && t.stage === 'In Progress');
-  const ready = leafTasks.filter((t) => !t.is_blocked && t.stage === 'Ready');
+  const leafTasks = tasks.filter((t) => !isTaskPackage(t, childrenMap) && !(childrenMap[t.id]?.length) && getTaskOperationalStatus(t) !== 'done');
+  const blocked = leafTasks.filter((t) => getTaskOperationalStatus(t) === 'blocked');
+  const inProgress = leafTasks.filter((t) => getTaskOperationalStatus(t) === 'in_progress');
+  const ready = leafTasks.filter((t) => getTaskOperationalStatus(t) === 'ready');
   const readyUnassigned = ready.filter((t) => !t.assigned_to_user_id && t.assignment_mode !== 'crew' && !t.is_outside_vendor);
   const waitingMaterials = ready.filter((t) => t.materials_on_site === 'No');
 
