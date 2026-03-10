@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,8 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, MapPin } from 'lucide-react';
+import { Plus, MapPin, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+import { computeProjectHealthSummary } from '@/lib/projectSummary';
 
 type ProjectType = 'construction' | 'rental' | 'general';
 
@@ -26,6 +28,7 @@ const ProjectList = () => {
   const isRental = activeTab === 'rental';
 
   const [projects, setProjects] = useState<any[]>([]);
+  const [projectSummaryMap, setProjectSummaryMap] = useState<Record<string, ReturnType<typeof computeProjectHealthSummary>>>({});
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -38,7 +41,50 @@ const ProjectList = () => {
       .select('*')
       .eq('project_type', activeTab)
       .order('created_at', { ascending: false });
-    if (!error) setProjects(data || []);
+
+    if (error) {
+      setProjects([]);
+      setProjectSummaryMap({});
+      setLoading(false);
+      return;
+    }
+
+    const nextProjects = data || [];
+    setProjects(nextProjects);
+
+    if (nextProjects.length === 0) {
+      setProjectSummaryMap({});
+      setLoading(false);
+      return;
+    }
+
+    const projectIds = nextProjects.map((project) => project.id);
+    const { data: taskRows, error: taskError } = await supabase
+      .from('tasks')
+      .select('id, project_id, stage, is_blocked, materials_on_site, needs_manager_review, due_date, parent_task_id, is_package, started_at, active_worker_count')
+      .in('project_id', projectIds);
+
+    if (taskError) {
+      setProjectSummaryMap({});
+      setLoading(false);
+      return;
+    }
+
+    const tasksByProject: Record<string, any[]> = {};
+    nextProjects.forEach((project) => {
+      tasksByProject[project.id] = [];
+    });
+
+    (taskRows || []).forEach((task) => {
+      if (!tasksByProject[task.project_id]) tasksByProject[task.project_id] = [];
+      tasksByProject[task.project_id].push(task);
+    });
+
+    const summaries: Record<string, ReturnType<typeof computeProjectHealthSummary>> = {};
+    nextProjects.forEach((project) => {
+      summaries[project.id] = computeProjectHealthSummary(tasksByProject[project.id] || []);
+    });
+    setProjectSummaryMap(summaries);
     setLoading(false);
   };
 
@@ -63,6 +109,8 @@ const ProjectList = () => {
   };
 
   const entityLabel = isRental ? 'Property' : activeTab === 'general' ? 'List' : 'Project';
+
+  const loadingCards = useMemo(() => Array.from({ length: 3 }, (_, i) => i), []);
 
   return (
     <div className="pb-20">
@@ -103,7 +151,19 @@ const ProjectList = () => {
       </div>
       <div className="p-4 space-y-3">
         {loading ? (
-          <p className="text-center text-muted-foreground py-8">Loading...</p>
+          loadingCards.map((key) => (
+            <Card key={key} className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-2 min-w-0 flex-1">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-56" />
+                </div>
+                <Skeleton className="h-6 w-16" />
+              </div>
+              <Skeleton className="h-3 w-36" />
+              <Skeleton className="h-2 w-full" />
+            </Card>
+          ))
         ) : projects.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
             No {isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'} yet. Create your first one!
@@ -123,6 +183,24 @@ const ProjectList = () => {
                   </div>
                   <StatusBadge status={p.status} />
                 </div>
+                {projectSummaryMap[p.id] && (
+                  <div className="mt-3 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {projectSummaryMap[p.id].completedTasks}/{projectSummaryMap[p.id].totalTasks} tasks • {projectSummaryMap[p.id].percentComplete}%
+                      </span>
+                      {projectSummaryMap[p.id].blockedTasks > 0 && (
+                        <span className="inline-flex items-center gap-1 text-destructive font-medium">
+                          <AlertTriangle className="h-3 w-3" />
+                          {projectSummaryMap[p.id].blockedTasks} blocked
+                        </span>
+                      )}
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-primary" style={{ width: `${projectSummaryMap[p.id].percentComplete}%` }} />
+                    </div>
+                  </div>
+                )}
               </Card>
             </Link>
           ))

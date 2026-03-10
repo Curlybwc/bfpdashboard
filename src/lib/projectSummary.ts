@@ -26,6 +26,15 @@ export interface WhatNextResult {
   available: any[];
 }
 
+export interface ProjectHealthSummary {
+  totalTasks: number;
+  completedTasks: number;
+  blockedTasks: number;
+  needsReviewCount: number;
+  overdueCount: number;
+  percentComplete: number;
+}
+
 const sortByPriority = (a: any, b: any) => {
   const pa = a.priority || '5 – Later';
   const pb = b.priority || '5 – Later';
@@ -122,4 +131,45 @@ export function computeProjectTotalActual(
     return t.actual_total_cost ?? 0;
   };
   return rootTasks.reduce((sum, t) => sum + getTaskActual(t), 0);
+}
+
+/**
+ * Compute compact project-health metrics from task rows.
+ * Packages/containers are excluded from counts.
+ */
+export function computeProjectHealthSummary(tasks: any[]): ProjectHealthSummary {
+  const childrenMap: Record<string, any[]> = {};
+  tasks.forEach((task) => {
+    if (!task.parent_task_id) return;
+    if (!childrenMap[task.parent_task_id]) childrenMap[task.parent_task_id] = [];
+    childrenMap[task.parent_task_id].push(task);
+  });
+
+  const actionableTasks = tasks.filter((task) => !isTaskPackage(task, childrenMap));
+  const today = new Date().toISOString().slice(0, 10);
+
+  let completedTasks = 0;
+  let blockedTasks = 0;
+  let needsReviewCount = 0;
+  let overdueCount = 0;
+
+  actionableTasks.forEach((task) => {
+    const status = getTaskOperationalStatus(task);
+    if (status === 'done') completedTasks += 1;
+    if (status === 'blocked') blockedTasks += 1;
+    if (status === 'review_needed') needsReviewCount += 1;
+    if (task.due_date && task.due_date < today && status !== 'done') overdueCount += 1;
+  });
+
+  const totalTasks = actionableTasks.length;
+  const percentComplete = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  return {
+    totalTasks,
+    completedTasks,
+    blockedTasks,
+    needsReviewCount,
+    overdueCount,
+    percentComplete,
+  };
 }

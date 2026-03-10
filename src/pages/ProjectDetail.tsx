@@ -28,10 +28,12 @@ import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/usePr
 import { canCreateTask, canEditProject, getProjectRole } from '@/lib/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 import WhatNextCard from '@/components/WhatNextCard';
-import { computeWhatNext, computeProjectTotalActual } from '@/lib/projectSummary';
+import { computeWhatNext, computeProjectHealthSummary, computeProjectTotalActual } from '@/lib/projectSummary';
 import { filterContractorTasks, includeParentTasks, buildChildrenMap, buildAssigneeMap } from '@/lib/projectTaskFiltering';
 import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 import { buildTaskPackageGroups } from '@/lib/taskPackages';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -151,6 +153,11 @@ const ProjectDetail = () => {
     [rootTasks, childrenMap],
   );
 
+  const projectHealthSummary = useMemo(
+    () => computeProjectHealthSummary(allTasks),
+    [allTasks],
+  );
+
   // UI helpers
   const toggleExpanded = (taskId: string) => {
     setExpandedIds((prev) => {
@@ -245,7 +252,26 @@ const ProjectDetail = () => {
     queryClient.invalidateQueries({ queryKey: ['project-detail', id] });
   };
 
-  if (isLoading || !project) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
+  if (isLoading || !project) {
+    return (
+      <div className="pb-20">
+        <div className="p-4 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Card>
+            <CardContent className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-1">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-5 w-10" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Skeleton className="h-28 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-20">
@@ -611,13 +637,41 @@ const ProjectDetail = () => {
         </AlertDialogContent>
       </AlertDialog>
       <div className="p-4">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-3">
           <StatusBadge status={project.status} />
           {project.address && <span className="text-sm text-muted-foreground">{project.address}</span>}
-          {projectTotalActual > 0 && (
-            <span className="ml-auto text-sm font-medium">Actual: ${projectTotalActual.toFixed(2)}</span>
-          )}
         </div>
+
+        <Card className="mb-4">
+          <CardContent className="p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</p>
+                <p className="text-lg font-semibold">{projectHealthSummary.totalTasks}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Completed</p>
+                <p className="text-lg font-semibold">{projectHealthSummary.completedTasks}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Blocked</p>
+                <p className="text-lg font-semibold text-destructive">{projectHealthSummary.blockedTasks}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Needs Review</p>
+                <p className="text-lg font-semibold">{projectHealthSummary.needsReviewCount}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Overdue</p>
+                <p className="text-lg font-semibold">{projectHealthSummary.overdueCount}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Actual Cost</p>
+                <p className="text-lg font-semibold">${projectTotalActual.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* What next? section */}
         <WhatNextCard
