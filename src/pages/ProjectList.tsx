@@ -61,7 +61,7 @@ const ProjectList = () => {
     const projectIds = nextProjects.map((project) => project.id);
     const { data: taskRows, error: taskError } = await supabase
       .from('tasks')
-      .select('id, project_id, stage, is_blocked, materials_on_site, needs_manager_review, due_date, parent_task_id, is_package, started_at, active_worker_count')
+      .select('id, project_id, stage, is_blocked, materials_on_site, needs_manager_review, due_date, parent_task_id, started_at')
       .in('project_id', projectIds);
 
     if (taskError) {
