@@ -209,7 +209,8 @@ const ProjectDetail = () => {
     const byId = new Map(tasksWithParents.map((t) => [t.id, t]));
     const matched = tasksWithParents.filter((task) => {
       if (query) {
-        const haystack = [task.task, task.trade, task.room_area, task.notes].filter(Boolean).join(' ').toLowerCase();
+        const assigneeName = task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : null;
+        const haystack = [task.task, task.trade, task.room_area, task.notes, assigneeName].filter(Boolean).join(' ').toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       if (filterStage !== 'all' && task.stage !== filterStage) return false;
@@ -230,7 +231,7 @@ const ProjectDetail = () => {
     });
 
     return tasksWithParents.filter((task) => visibleIds.has(task.id));
-  }, [tasksWithParents, taskSearch, filterStage, filterPriority, filterAssignee, filterTrade, filterRoomArea]);
+  }, [tasksWithParents, taskSearch, filterStage, filterPriority, filterAssignee, filterTrade, filterRoomArea, assigneeMap]);
 
   const rootTasks = useMemo(() => {
     const filtered = filteredTasksWithParents.filter((t) => !t.parent_task_id);
@@ -911,7 +912,7 @@ const ProjectDetail = () => {
                             {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
                           </div>
                         </button>
-                        {isManager && group.packageTask.id !== '__general__' && (
+                        {isManager && group.packageTask.id !== 'general-package' && (
                           <PackageDeleteButton
                             packageTask={group.packageTask}
                             childCount={group.childTasks.length}
