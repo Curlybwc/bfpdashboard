@@ -50,6 +50,7 @@ const TaskCard = ({
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
   blockerInfo, photoCount = 0, materialCount = 0, canReportIssue = false,
+  canDelete = false,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
