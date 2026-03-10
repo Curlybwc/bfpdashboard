@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
@@ -15,24 +14,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, MapPin, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { computeProjectHealthSummary } from '@/lib/projectSummary';
-
-type ProjectType = 'construction' | 'rental' | 'general';
-type ProjectRow = Database['public']['Tables']['projects']['Row'];
-
-type TaskSummaryRow = {
-  id: string;
-  project_id: string;
-  stage: Database['public']['Enums']['task_stage'];
-  is_blocked: boolean;
-  materials_on_site: Database['public']['Enums']['materials_status'];
-  needs_manager_review: boolean;
-  due_date: string | null;
-  parent_task_id: string | null;
-  is_package?: boolean | null;
-  started_at: string | null;
-  active_worker_count?: number | null;
-};
+import { useProjectList, type ProjectType } from '@/hooks/useProjectList';
+import { useQueryClient } from '@tanstack/react-query';
 
 const ProjectList = () => {
   const { user } = useAuth();
@@ -43,70 +26,14 @@ const ProjectList = () => {
   const activeTab = (searchParams.get('tab') as ProjectType) || 'construction';
   const isRental = activeTab === 'rental';
 
-  const [projects, setProjects] = useState<ProjectRow[]>([]);
-  const [projectSummaryMap, setProjectSummaryMap] = useState<Record<string, ReturnType<typeof computeProjectHealthSummary>>>({});
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useProjectList(activeTab);
+  const projects = data?.projects ?? [];
+  const projectSummaryMap = data?.projectSummaryMap ?? {};
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
 
-  const fetchProjects = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('project_type', activeTab)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      setProjects([]);
-      setProjectSummaryMap({});
-      setLoading(false);
-      return;
-    }
-
-    const nextProjects = data || [];
-    setProjects(nextProjects);
-
-    if (nextProjects.length === 0) {
-      setProjectSummaryMap({});
-      setLoading(false);
-      return;
-    }
-
-    const projectIds = nextProjects.map((project) => project.id);
-    const { data: taskRows, error: taskError } = await supabase
-      .from('tasks')
-      .select('id, project_id, stage, is_blocked, materials_on_site, needs_manager_review, due_date, parent_task_id, started_at')
-      .in('project_id', projectIds);
-
-    if (taskError) {
-      setProjectSummaryMap({});
-      setLoading(false);
-      return;
-    }
-
-    const tasksByProject: Record<string, TaskSummaryRow[]> = {};
-    nextProjects.forEach((project) => {
-      tasksByProject[project.id] = [];
-    });
-
-    (taskRows || []).forEach((task) => {
-      if (!tasksByProject[task.project_id]) tasksByProject[task.project_id] = [];
-      tasksByProject[task.project_id].push(task);
-    });
-
-    const summaries: Record<string, ReturnType<typeof computeProjectHealthSummary>> = {};
-    nextProjects.forEach((project) => {
-      summaries[project.id] = computeProjectHealthSummary(tasksByProject[project.id] || []);
-    });
-    setProjectSummaryMap(summaries);
-    setLoading(false);
-  }, [activeTab]);
-
-  useEffect(() => {
-    void fetchProjects();
-  }, [fetchProjects]);
 
   const handleTabChange = (tab: string) => {
     setSearchParams({ tab });
@@ -128,7 +55,7 @@ const ProjectList = () => {
     setName('');
     setAddress('');
     setOpen(false);
-    void fetchProjects();
+    queryClient.invalidateQueries({ queryKey: ['projects-list', activeTab] });
   };
 
   const entityLabel = isRental ? 'Property' : activeTab === 'general' ? 'List' : 'Project';
@@ -173,7 +100,7 @@ const ProjectList = () => {
         </Tabs>
       </div>
       <div className="p-4 space-y-3">
-        {loading ? (
+        {isLoading ? (
           loadingCards.map((key) => (
             <Card key={key} className="p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">

@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getTaskOperationalStatus, isTaskPackage } from '@/lib/taskOperationalStatus';
 
@@ -345,43 +346,30 @@ function splitTodaySections(tasks: any[], childTasksByParent: Record<string, any
 
 /* ── Hook ── */
 export function useTodayData(userId: string | undefined, isAdmin: boolean) {
-  const [data, setData] = useState<TodayData>(EMPTY_DATA);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const hasLoadedOnce = useRef(false);
+  const query = useQuery({
+    queryKey: ['today-data', userId, isAdmin],
+    queryFn: async (): Promise<TodayData> => {
+      if (!userId) return EMPTY_DATA;
 
-  const refresh = useCallback(async () => {
-    if (!userId) return;
-    // Only show full loading spinner on the very first load.
-    // Subsequent refreshes (e.g. after Dibs/Start/Complete) update in-place.
-    if (!hasLoadedOnce.current) {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      // Phase 1: memberships
       const { projectIds: memberProjectIds, hasManagerRole } = await fetchMemberships(userId);
       const isAdminOrManager = isAdmin || hasManagerRole;
 
-      // Phase 2: core tasks
       const core = await fetchCoreTasks(userId, memberProjectIds);
-
-      // Phase 3: crew hydration
       const crew = await fetchCrewTasks(core.myActiveTaskIds, core.myCandidateIds);
 
-      // Merge solo + crew
       const mergedIp = mergeAndDedupe(core.soloIp, crew.crewIpTasks);
       const mergedAvail = mergeAndDedupe(core.soloAvail, crew.crewAvailTasks);
 
-      // Phase 4: blocked + review
       const { blockedTasks, blockerMap, reviewTasks } = await fetchBlockedAndReview(
-        isAdminOrManager, memberProjectIds,
-        mergedIp, core.soloAssigned, crew.crewIpTasks,
+        isAdminOrManager,
+        memberProjectIds,
+        mergedIp,
+        core.soloAssigned,
+        crew.crewIpTasks,
       );
-      // Phase 5: enrichment + visible child tasks
+
       const allTasks = [...mergedIp, ...core.soloAssigned, ...mergedAvail, ...reviewTasks, ...blockedTasks];
-      const parentIds = [...new Set(allTasks.map(t => t.id))];
+      const parentIds = [...new Set(allTasks.map((t) => t.id))];
       const [enrichment, childTasksByParent] = await Promise.all([
         fetchEnrichment(allTasks, userId),
         fetchChildrenForParents(parentIds),
@@ -394,7 +382,7 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
 
       const sections = splitTodaySections(allTasksWithCounts, childTasksByParent, isAdminOrManager, userId);
 
-      setData({
+      return {
         ...sections,
         blockerMap,
         crewActiveTaskIds: core.myActiveTaskIds,
@@ -404,15 +392,24 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
         isManager: hasManagerRole,
         ...enrichment,
         childTasksByParent,
-      });
-      hasLoadedOnce.current = true;
-    } catch (err: any) {
-      console.error('[Today] Data fetch failed:', err);
-      setError(err.message || 'Failed to load today data');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, isAdmin]);
+      };
+    },
+    enabled: !!userId,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000,
+    staleTime: 30000,
+    placeholderData: EMPTY_DATA,
+  });
 
-  return { data, loading, error, refresh };
+  const refresh = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
+  return {
+    data: query.data ?? EMPTY_DATA,
+    loading: query.isLoading,
+    error: query.error ? (query.error instanceof Error ? query.error.message : 'Failed to load today data') : null,
+    refresh,
+    isFetching: query.isFetching,
+  };
 }
