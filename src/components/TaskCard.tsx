@@ -217,6 +217,24 @@ const TaskCard = ({
     }
   };
 
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      // Delete child tasks first
+      const { error: childErr } = await supabase.from('tasks').delete().eq('parent_task_id', task.id);
+      if (childErr) throw childErr;
+      const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+      if (error) throw error;
+      toast({ title: 'Task deleted' });
+      onUpdate();
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setLoading(false);
+      setDeleteConfirmOpen(false);
+    }
+  };
+
   const priorityBorderClass =
     task.is_blocked
       ? 'border-l-4 border-destructive'
