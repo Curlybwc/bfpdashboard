@@ -150,10 +150,14 @@ interface WhatNextCardProps {
   onFilterChange?: (filter: string) => void;
 }
 
-const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGroup, members, crewGroups, onUpdate }: WhatNextCardProps) => {
+const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGroup, members, crewGroups, onUpdate, onFilterChange }: WhatNextCardProps) => {
   if (!whatNext.hasAnyWork) return null;
 
   const toggle = (key: string) => setOpenGroup(openGroup === key ? null : key);
+  const handleBadgeClick = (groupKey: string, filterKey: string) => {
+    toggle(groupKey);
+    onFilterChange?.(filterKey);
+  };
 
   return (
     <Card className="mb-4 border-primary/15">
