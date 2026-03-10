@@ -147,6 +147,7 @@ interface WhatNextCardProps {
   members?: { user_id: string; full_name: string | null; role: string }[];
   crewGroups?: { id: string; name: string; members: string[] }[];
   onUpdate?: () => void;
+  onFilterChange?: (filter: string) => void;
 }
 
 const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGroup, members, crewGroups, onUpdate }: WhatNextCardProps) => {
