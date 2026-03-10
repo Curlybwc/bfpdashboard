@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, CalendarDays, CheckSquare, Search } from 'lucide-react';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
 import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type RecurrenceFrequency } from '@/lib/supabase-types';
@@ -34,6 +34,59 @@ import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 import { buildTaskPackageGroups } from '@/lib/taskPackages';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const PackageDeleteButton = ({ packageTask, childCount, onDelete }: { packageTask: any; childCount: number; onDelete: () => void }) => {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      const { error: childErr } = await supabase.from('tasks').delete().eq('parent_task_id', packageTask.id);
+      if (childErr) throw childErr;
+      const { error } = await supabase.from('tasks').delete().eq('id', packageTask.id);
+      if (error) throw error;
+      toast({ title: 'Package deleted' });
+      onDelete();
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Unable to delete', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+      setConfirmOpen(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-destructive hover:text-destructive hover:bg-destructive/10 mr-2 shrink-0"
+        onClick={(e) => { e.stopPropagation(); setConfirmOpen(true); }}
+        disabled={loading}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Package</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete "{packageTask.task}" and all {childCount} subtask{childCount !== 1 ? 's' : ''}? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Package
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -838,25 +891,34 @@ const ProjectDetail = () => {
                   const open = expandedIds.has(packageKey);
                   return (
                     <div key={group.packageTask.id} className="rounded-lg border">
-                      <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
-                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm">{group.packageTask.task}</p>
-                          {(group.packageTask.room_area || group.packageTask.trade) && (
-                            <p className="text-xs text-muted-foreground">
-                              {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-1">
-                          <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
-                          <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
-                          <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
-                          {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
-                          {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
-                          {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
-                        </div>
-                      </button>
+                      <div className="flex items-center">
+                        <button className="flex-1 p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
+                          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                            {(group.packageTask.room_area || group.packageTask.trade) && (
+                              <p className="text-xs text-muted-foreground">
+                                {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
+                            <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
+                            <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
+                            {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
+                            {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
+                            {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
+                          </div>
+                        </button>
+                        {isManager && group.packageTask.id !== '__general__' && (
+                          <PackageDeleteButton
+                            packageTask={group.packageTask}
+                            childCount={group.childTasks.length}
+                            onDelete={invalidateProject}
+                          />
+                        )}
+                      </div>
                       {open && (
                         <div className="border-t p-2 space-y-2">
                           {bulkMode ? (
@@ -864,7 +926,7 @@ const ProjectDetail = () => {
                               <div key={task.id} className="flex items-start gap-2">
                                 <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} />
+                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
                                 </div>
                               </div>
                             ))
@@ -879,13 +941,13 @@ const ProjectDetail = () => {
                             >
                               {(task) => (
                                 <SortableTaskItem key={task.id} id={task.id}>
-                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} />
+                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
                                 </SortableTaskItem>
                               )}
                             </SortableTaskList>
                           ) : (
                             group.childTasks.map((task) => (
-                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} />
+                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
                             ))
                           )}
                         </div>
@@ -923,7 +985,7 @@ const ProjectDetail = () => {
                           {open && (
                             <div className="border-t p-2 space-y-2">
                               {group.childTasks.map((task) => (
-                                <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} />
+                                <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
                               ))}
                             </div>
                           )}
