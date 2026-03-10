@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getErrorMessage } from '@/lib/utils';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
@@ -28,13 +28,14 @@ import TaskPhotos from '@/components/TaskPhotos';
 import TaskComments from '@/components/TaskComments';
 import { Card } from '@/components/ui/card';
 import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
-import { isTaskActionable } from '@/lib/taskOperationalStatus';
+import { getTaskOperationalStatus, isTaskActionable } from '@/lib/taskOperationalStatus';
 import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
@@ -189,6 +190,22 @@ const TaskDetail = () => {
     });
   }, [task?.field_capture_id]);
 
+
+  useEffect(() => {
+    if (!task) return;
+    if (searchParams.get('report') !== '1') return;
+    const reason = searchParams.get('reason');
+    const allowed = new Set(BLOCKER_REASONS.map((r) => r.value));
+    if (reason && allowed.has(reason as any)) {
+      setBlockerReason(reason as BlockerReason);
+    }
+    setBlockerSheetOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('report');
+    next.delete('reason');
+    setSearchParams(next, { replace: true });
+  }, [task, searchParams, setSearchParams]);
+
   const fetchCrewData = async () => {
     if (!taskId) return;
     const [workersRes, candidatesRes] = await Promise.all([
@@ -246,11 +263,22 @@ const TaskDetail = () => {
       });
       return;
     }
+    if (projectRole === 'contractor') {
+      await supabase.from('tasks').update({ needs_manager_review: true }).eq('id', taskId);
+      if (blockerNote.trim()) {
+        await supabase.from('task_comments').insert({
+          task_id: taskId,
+          author_user_id: user.id,
+          content: `[Issue Report] ${blockerNote.trim()}`,
+        } as any);
+      }
+    }
+
     setBlockerSheetOpen(false);
     setBlockerReason('missing_materials');
     setBlockerNote('');
     setBlockerNeedsFromManager('');
-    toast({ title: 'Blocker reported' });
+    toast({ title: projectRole === 'contractor' ? 'Issue submitted for manager review' : 'Blocker reported' });
     fetchTask();
   };
 
@@ -537,6 +565,7 @@ const TaskDetail = () => {
 
   const canDelete = isAdmin || projectRole === 'manager';
   const canManageCrew = isAdmin || projectRole === 'manager';
+  const canEditTaskMetadata = isAdmin || projectRole === 'manager';
   const hasChildren = children.length > 0;
   const allChildrenDone = hasChildren && children.every(c => c.stage === 'Done');
   const isCrewMode = task?.assignment_mode === 'crew';
@@ -680,6 +709,8 @@ const TaskDetail = () => {
   const meIsActiveWorker = user ? crewWorkers.some(w => w.user_id === user.id && w.active) : false;
   const hasTaskRelevance = isAssignedToMe || meIsActiveWorker || isAdmin || projectRole === 'manager';
   const isActionableTask = isTaskActionable(task);
+  const operationalStatus = getTaskOperationalStatus(task);
+  const canExecuteTask = operationalStatus !== 'review_needed' && operationalStatus !== 'done';
   const showBlockerButton = isActionableTask && !task?.is_blocked && (task?.stage === 'Ready' || task?.stage === 'In Progress') && canReportBlocker(isAdmin, projectRole) && hasTaskRelevance;
 
   const handleDibs = async (force = false) => {
@@ -757,10 +788,10 @@ const TaskDetail = () => {
       <div className="p-4 space-y-4">
         {/* Lifecycle action buttons */}
         <div className="flex gap-2 flex-wrap">
-          {isActionableTask && !isCrewMode && isUnassigned && task.stage === 'Ready' && (
+          {isActionableTask && canExecuteTask && !isCrewMode && isUnassigned && task.stage === 'Ready' && (
             <Button variant="outline" onClick={() => handleDibs()} disabled={actionLoading}>Dibs</Button>
           )}
-          {isActionableTask && !isCrewMode && isAssignedToMe && task.stage === 'Ready' && (
+          {isActionableTask && canExecuteTask && !isCrewMode && isAssignedToMe && task.stage === 'Ready' && (
             materialsReady ? (
               <Button onClick={handleStart} disabled={actionLoading}>Start</Button>
             ) : (
@@ -772,7 +803,7 @@ const TaskDetail = () => {
               </Tooltip>
             )
           )}
-          {isActionableTask && !isCrewMode && isAssignedToMe && task.stage === 'In Progress' && (
+          {isActionableTask && canExecuteTask && !isCrewMode && isAssignedToMe && task.stage === 'In Progress' && (
             canComplete ? (
               <Button onClick={handleComplete} disabled={actionLoading}>Complete</Button>
             ) : (
@@ -785,12 +816,12 @@ const TaskDetail = () => {
             )
           )}
           {/* Crew actions */}
-          {isActionableTask && isCrewMode && meIsCandidate && !meIsActiveWorker && (
+          {isActionableTask && canExecuteTask && isCrewMode && meIsCandidate && !meIsActiveWorker && (
             <Button onClick={handleJoinCrew} disabled={actionLoading}>
               <Users className="h-4 w-4 mr-1" />Join
             </Button>
           )}
-          {isActionableTask && isCrewMode && meIsActiveWorker && (
+          {isActionableTask && canExecuteTask && isCrewMode && meIsActiveWorker && (
             <Button variant="outline" onClick={handleLeaveCrew} disabled={actionLoading}>Leave</Button>
           )}
           {showBlockerButton && (
@@ -1198,7 +1229,7 @@ const TaskDetail = () => {
                 <StatusBadge status={c.stage} />
               </div>
             ))}
-            {(isAdmin || projectRole === 'manager' || projectRole === 'contractor') && (
+            {canEditTaskMetadata && (
               <div className="flex gap-2 pt-1">
                 <Input
                   placeholder="Add subtask…"
@@ -1215,8 +1246,8 @@ const TaskDetail = () => {
           </div>
         )}
 
-        <Button onClick={() => handleSave()} disabled={saving} className="w-full">
-          {saving ? 'Saving...' : 'Save Changes'}
+        <Button onClick={() => handleSave()} disabled={saving || !canEditTaskMetadata} className="w-full">
+          {saving ? 'Saving...' : canEditTaskMetadata ? 'Save Changes' : 'Managers edit task details'}
         </Button>
         {canDelete && (
           <Button variant="destructive" className="w-full" onClick={() => setDeleteConfirmOpen(true)}>
@@ -1318,18 +1349,18 @@ const TaskDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Report Blocker Sheet */}
+      {/* Report Issue Sheet */}
       <Sheet open={blockerSheetOpen} onOpenChange={setBlockerSheetOpen}>
         <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Report Blocker
+              Report Issue
             </SheetTitle>
           </SheetHeader>
           <div className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>What's blocking this task?</Label>
+              <Label>Report missing materials or a jobsite issue</Label>
               <RadioGroup value={blockerReason} onValueChange={(v) => setBlockerReason(v as BlockerReason)}>
                 {BLOCKER_REASONS.map(r => (
                   <div key={r.value} className="flex items-center space-x-2">
@@ -1340,15 +1371,15 @@ const TaskDetail = () => {
               </RadioGroup>
             </div>
             <div className="space-y-2">
-              <Label>Note (optional)</Label>
-              <Textarea value={blockerNote} onChange={(e) => setBlockerNote(e.target.value)} rows={2} placeholder="Additional details…" />
+              <Label>Comment (optional)</Label>
+              <Textarea value={blockerNote} onChange={(e) => setBlockerNote(e.target.value)} rows={2} placeholder="Describe what you found…" />
             </div>
             <div className="space-y-2">
               <Label>What do you need from the manager?</Label>
               <Textarea value={blockerNeedsFromManager} onChange={(e) => setBlockerNeedsFromManager(e.target.value)} rows={2} placeholder="e.g. Order 2x4s, get key from owner…" />
             </div>
             <Button className="w-full" variant="destructive" onClick={handleReportBlocker} disabled={reportingBlocker}>
-              {reportingBlocker ? 'Reporting…' : 'Report Blocker'}
+              {reportingBlocker ? 'Reporting…' : 'Report Issue'}
             </Button>
           </div>
         </SheetContent>

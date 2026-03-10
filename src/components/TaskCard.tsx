@@ -9,8 +9,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat, AlertTriangle } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS, TASK_STAGES, type TaskStage } from '@/lib/supabase-types';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
@@ -39,6 +39,7 @@ interface TaskCardProps {
   blockerInfo?: { reason: string; needs_from_manager?: string | null } | null;
   photoCount?: number;
   materialCount?: number;
+  canReportIssue?: boolean;
 }
 
 const TaskCard = ({
@@ -47,9 +48,10 @@ const TaskCard = ({
   childCount = 0, expanded = false, onToggle, allChildrenDone = true,
   context = 'project', projectAddress, assigneeName,
   isCrewTask = false, isActiveWorker = false, isCandidate = false, activeWorkerCount = 0,
-  blockerInfo, photoCount = 0, materialCount = 0,
+  blockerInfo, photoCount = 0, materialCount = 0, canReportIssue = false,
 }: TaskCardProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,17 +66,18 @@ const TaskCard = ({
     hasRequiredMaterials: materialCount > 0 ? materialsReady : true,
   });
   const isActionable = isTaskActionable(task);
+  const canExecute = operationalStatus !== 'review_needed' && operationalStatus !== 'done';
 
   // Solo action visibility — outside vendor tasks are not available for dibs
   const hasChildren = childCount > 0;
   const isLeafTask = !hasChildren;
-  const showDibs = isActionable && !isCrewTask && isLeafTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
-  const showStart = isActionable && !isCrewTask && isLeafTask && isAssignedToMe && task.stage === 'Ready';
-  const showComplete = isActionable && !isCrewTask && isLeafTask && isAssignedToMe && (task.stage === 'Ready' || task.stage === 'In Progress');
+  const showDibs = isActionable && canExecute && !isCrewTask && isLeafTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
+  const showStart = isActionable && canExecute && !isCrewTask && isLeafTask && isAssignedToMe && task.stage === 'Ready';
+  const showComplete = isActionable && canExecute && !isCrewTask && isLeafTask && isAssignedToMe && (task.stage === 'Ready' || task.stage === 'In Progress');
 
   // Crew action visibility
-  const showJoin = isActionable && isCrewTask && isCandidate && !isActiveWorker;
-  const showLeave = isActionable && isCrewTask && isActiveWorker;
+  const showJoin = isActionable && canExecute && isCrewTask && isCandidate && !isActiveWorker;
+  const showLeave = isActionable && canExecute && isCrewTask && isActiveWorker;
 
   const showNeedsMaterials = !materialsReady && materialCount > 0;
   const canComplete = hasChildren ? allChildrenDone : true;
@@ -397,6 +400,21 @@ const TaskCard = ({
                 Leave
               </Button>
             )}
+          </div>
+        )}
+
+        {canReportIssue && isActionable && (
+          <div className="mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/projects/${task.project_id}/tasks/${task.id}?report=1`);
+              }}
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mr-1" />Report Issue
+            </Button>
           </div>
         )}
       </Card>

@@ -21,7 +21,7 @@ export type AssignmentMode = 'solo' | 'crew';
 
 export type BlockerReason =
   | 'missing_materials' | 'access_issue' | 'waiting_on_approval'
-  | 'hidden_damage' | 'tool_equipment' | 'waiting_on_trade' | 'other';
+  | 'hidden_damage' | 'tool_equipment' | 'waiting_on_trade' | 'instruction_mismatch' | 'new_work_discovered' | 'other';
 
 export const BLOCKER_REASONS: { value: BlockerReason; label: string }[] = [
   { value: 'missing_materials', label: 'Missing Materials' },
@@ -30,6 +30,8 @@ export const BLOCKER_REASONS: { value: BlockerReason; label: string }[] = [
   { value: 'hidden_damage', label: 'Hidden Damage / Unexpected' },
   { value: 'tool_equipment', label: 'Tool / Equipment Issue' },
   { value: 'waiting_on_trade', label: 'Waiting on Another Trade' },
+  { value: 'instruction_mismatch', label: 'Instruction Mismatch' },
+  { value: 'new_work_discovered', label: 'New Work Discovered' },
   { value: 'other', label: 'Other' },
 ];
 

@@ -186,6 +186,7 @@ const Today = () => {
                   blockerInfo={blockerMap[t.id] || null}
                   photoCount={photoCountMap[t.id] || 0}
                   materialCount={materialCountMap[t.id] || 0}
+                  canReportIssue={isContractor}
                 />
 
                 {isExpanded && children.map((child: any) => (
@@ -208,6 +209,7 @@ const Today = () => {
                     blockerInfo={blockerMap[child.id] || null}
                     photoCount={photoCountMap[child.id] || 0}
                     materialCount={materialCountMap[child.id] || 0}
+                    canReportIssue={isContractor}
                   />
                 ))}
               </div>
@@ -263,7 +265,7 @@ const Today = () => {
   /* ── Manager / Admin layout ── */
   const ManagerView = () => (
     <>
-      <Section title="Needs Review" tasks={needsReview} emptyText="No tasks pending review." />
+      <Section title="Needs Review (Contractor / Field Reports)" tasks={needsReview} emptyText="No tasks pending review." />
       <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
       <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
       <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />

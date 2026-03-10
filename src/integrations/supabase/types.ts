@@ -1780,6 +1780,8 @@ export type Database = {
         | "hidden_damage"
         | "tool_equipment"
         | "waiting_on_trade"
+        | "instruction_mismatch"
+        | "new_work_discovered"
         | "other"
       materials_status: "Yes" | "Partial" | "No"
       pricing_status: "Priced" | "Needs Pricing"
@@ -1930,6 +1932,8 @@ export const Constants = {
         "hidden_damage",
         "tool_equipment",
         "waiting_on_trade",
+        "instruction_mismatch",
+        "new_work_discovered",
         "other",
       ],
       materials_status: ["Yes", "Partial", "No"],
