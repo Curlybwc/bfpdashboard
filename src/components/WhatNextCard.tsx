@@ -185,31 +185,31 @@ const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGro
           {isContractor ? (
             <>
               {whatNext.myBlocked.length > 0 && (
-                <Badge variant="destructive" className="text-xs font-normal cursor-pointer" onClick={() => toggle('myblocked')}>🔴 {whatNext.myBlocked.length} My Blocked</Badge>
+                <Badge variant="destructive" className="text-xs font-normal cursor-pointer" onClick={() => handleBadgeClick('myblocked', 'blocked')}>🔴 {whatNext.myBlocked.length} My Blocked</Badge>
               )}
               {whatNext.myInProgress.length > 0 && (
-                <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => toggle('myprogress')}>🔧 {whatNext.myInProgress.length} My In Progress</Badge>
+                <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => handleBadgeClick('myprogress', 'in_progress')}>🔧 {whatNext.myInProgress.length} My In Progress</Badge>
               )}
               {whatNext.available.length > 0 && (
-                <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => toggle('available')}>👤 {whatNext.available.length} Available</Badge>
+                <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => handleBadgeClick('available', 'unassigned')}>👤 {whatNext.available.length} Available</Badge>
               )}
             </>
           ) : (
             <>
               {whatNext.blocked.length > 0 && (
-                <Badge variant="destructive" className="text-xs font-normal cursor-pointer" onClick={() => toggle('blocked')}>🔴 {whatNext.blocked.length} Blocked</Badge>
+                <Badge variant="destructive" className="text-xs font-normal cursor-pointer" onClick={() => handleBadgeClick('blocked', 'blocked')}>🔴 {whatNext.blocked.length} Blocked</Badge>
               )}
               {whatNext.ready.length > 0 && (
-                <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => toggle('ready')}>🟢 {whatNext.ready.length} Ready</Badge>
+                <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => handleBadgeClick('ready', 'ready')}>🟢 {whatNext.ready.length} Ready</Badge>
               )}
               {whatNext.readyUnassigned.length > 0 && (
-                <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => toggle('unassigned')}>👤 {whatNext.readyUnassigned.length} Unassigned</Badge>
+                <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => handleBadgeClick('unassigned', 'unassigned')}>👤 {whatNext.readyUnassigned.length} Unassigned</Badge>
               )}
               {whatNext.inProgress.length > 0 && (
-                <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => toggle('progress')}>🔧 {whatNext.inProgress.length} In Progress</Badge>
+                <Badge variant="secondary" className="text-xs font-normal cursor-pointer" onClick={() => handleBadgeClick('progress', 'in_progress')}>🔧 {whatNext.inProgress.length} In Progress</Badge>
               )}
               {whatNext.waitingMaterials.length > 0 && (
-                <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => toggle('materials')}><Wrench className="h-3 w-3 mr-1" />{whatNext.waitingMaterials.length} Needs Materials/Tools</Badge>
+                <Badge variant="outline" className="text-xs font-normal cursor-pointer" onClick={() => handleBadgeClick('materials', 'materials')}><Wrench className="h-3 w-3 mr-1" />{whatNext.waitingMaterials.length} Needs Materials/Tools</Badge>
               )}
             </>
           )}
