@@ -14,6 +14,7 @@ import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } fro
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS, TASK_STAGES, type TaskStage } from '@/lib/supabase-types';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
+import { getTaskOperationalStatus, isTaskActionable } from '@/lib/taskOperationalStatus';
 
 interface TaskCardProps {
   task: any;
@@ -58,17 +59,22 @@ const TaskCard = ({
   const isUnassigned = !task.assigned_to_user_id;
   const isOutsideVendor = task.is_outside_vendor === true;
   const materialsReady = task.materials_on_site === 'Yes';
+  const operationalStatus = getTaskOperationalStatus(task, {
+    requiredCount: materialCount,
+    hasRequiredMaterials: materialCount > 0 ? materialsReady : true,
+  });
+  const isActionable = isTaskActionable(task);
 
   // Solo action visibility — outside vendor tasks are not available for dibs
   const hasChildren = childCount > 0;
   const isLeafTask = !hasChildren;
-  const showDibs = !isCrewTask && isLeafTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
-  const showStart = !isCrewTask && isLeafTask && isAssignedToMe && task.stage === 'Ready';
-  const showComplete = !isCrewTask && isLeafTask && isAssignedToMe && (task.stage === 'Ready' || task.stage === 'In Progress');
+  const showDibs = isActionable && !isCrewTask && isLeafTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
+  const showStart = isActionable && !isCrewTask && isLeafTask && isAssignedToMe && task.stage === 'Ready';
+  const showComplete = isActionable && !isCrewTask && isLeafTask && isAssignedToMe && (task.stage === 'Ready' || task.stage === 'In Progress');
 
   // Crew action visibility
-  const showJoin = isCrewTask && isCandidate && !isActiveWorker;
-  const showLeave = isCrewTask && isActiveWorker;
+  const showJoin = isActionable && isCrewTask && isCandidate && !isActiveWorker;
+  const showLeave = isActionable && isCrewTask && isActiveWorker;
 
   const showNeedsMaterials = !materialsReady && materialCount > 0;
   const canComplete = hasChildren ? allChildrenDone : true;
@@ -250,26 +256,29 @@ const TaskCard = ({
             <p className="text-xs text-muted-foreground">Assigned to {assigneeName}</p>
           )}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                <button className="cursor-pointer" aria-label="Change status">
-                  <StatusBadge status={task.stage} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                {TASK_STAGES.map((s) => (
-                  <DropdownMenuItem
-                    key={s}
-                    disabled={s === task.stage || loading}
-                    onSelect={() => handleStageChange(s)}
-                    className={cn(s === task.stage && 'font-semibold')}
-                  >
-                    <StatusBadge status={s} />
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {task.is_blocked && <StatusBadge status="Blocked" />}
+            {isActionable ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                  <button className="cursor-pointer" aria-label="Change status">
+                    <StatusBadge status={operationalStatus} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                  {TASK_STAGES.map((s) => (
+                    <DropdownMenuItem
+                      key={s}
+                      disabled={s === task.stage || loading}
+                      onSelect={() => handleStageChange(s)}
+                      className={cn(s === task.stage && 'font-semibold')}
+                    >
+                      <StatusBadge status={s} />
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <StatusBadge status="Package" />
+            )
             {isCrewTask && (
               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                 <Users className="h-3 w-3" />

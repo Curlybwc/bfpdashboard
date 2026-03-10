@@ -21,6 +21,7 @@ import TaskCard from '@/components/TaskCard';
 import BulkTaskBar from '@/components/BulkTaskBar';
 import { SortableTaskList, SortableTaskItem, persistTaskOrder } from '@/components/SortableTaskList';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
@@ -29,6 +30,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import WhatNextCard from '@/components/WhatNextCard';
 import { computeWhatNext, computeProjectTotalActual } from '@/lib/projectSummary';
 import { filterContractorTasks, includeParentTasks, buildChildrenMap, buildAssigneeMap } from '@/lib/projectTaskFiltering';
+import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
+import { buildTaskPackageGroups } from '@/lib/taskPackages';
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +65,8 @@ const ProjectDetail = () => {
   const [trade, setTrade] = useState('');
   const [notes, setNotes] = useState('');
   const [assignedTo, setAssignedTo] = useState('unassigned');
+  const [selectedPackageId, setSelectedPackageId] = useState('general');
+  const [createAsPackage, setCreateAsPackage] = useState(false);
   const [pendingMaterials, setPendingMaterials] = useState<{ name: string; quantity: string; unit: string }[]>([]);
   const [matName, setMatName] = useState('');
   const [matQty, setMatQty] = useState('');
@@ -119,16 +124,21 @@ const ProjectDetail = () => {
     return includeParentTasks(tasks, allTasks);
   }, [tasks, allTasks, isContractor]);
 
+  const packageOptions = useMemo(() => {
+    return allTasks.filter((t) => t.is_package === true || allTasks.some((c) => c.parent_task_id === t.id));
+  }, [allTasks]);
+
   // Build tree
   const rootTasks = useMemo(() => {
     const filtered = tasksWithParents.filter((t) => !t.parent_task_id);
     return filtered.sort((a, b) => {
-      const aDone = a.stage === 'Done' ? 1 : 0;
-      const bDone = b.stage === 'Done' ? 1 : 0;
+      const aDone = getTaskOperationalStatus(a) === 'done' ? 1 : 0;
+      const bDone = getTaskOperationalStatus(b) === 'done' ? 1 : 0;
       return aDone - bDone;
     });
   }, [tasksWithParents]);
   const childrenMap = useMemo(() => buildChildrenMap(tasks), [tasks]);
+  const packageGroups = useMemo(() => buildTaskPackageGroups(tasksWithParents, materialCountMap), [tasksWithParents, materialCountMap]);
 
   // "What next?" summary
   const whatNext = useMemo(
@@ -198,11 +208,13 @@ const ProjectDetail = () => {
         trade: trade || null,
         notes: notes || null,
         created_by: user.id,
-        assigned_to_user_id: assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
+        assigned_to_user_id: createAsPackage || assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
         is_outside_vendor: assignedTo === 'outside_vendor',
-        assignment_mode: assignedTo === 'crew' ? 'crew' : 'solo',
-        crewCandidates: assignedTo === 'crew' ? crewCandidates : [],
-        pendingMaterials,
+        assignment_mode: createAsPackage ? 'solo' : (assignedTo === 'crew' ? 'crew' : 'solo'),
+        crewCandidates: createAsPackage ? [] : (assignedTo === 'crew' ? crewCandidates : []),
+        parent_task_id: createAsPackage || selectedPackageId === 'general' ? null : selectedPackageId,
+        is_package: createAsPackage,
+        pendingMaterials: createAsPackage ? [] : pendingMaterials,
         due_date: newDueDate || null,
         is_recurring: newIsRecurring && !!newDueDate,
         recurrence_frequency: newIsRecurring && newDueDate ? newRecurrenceFrequency : null,
@@ -213,6 +225,8 @@ const ProjectDetail = () => {
           setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
           setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
           setCrewCandidates([]);
+          setSelectedPackageId('general');
+          setCreateAsPackage(false);
           setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
           setOpen(false);
         },
@@ -282,6 +296,30 @@ const ProjectDetail = () => {
                   <Label>Task Description</Label>
                   <Input value={taskName} onChange={(e) => setTaskName(e.target.value)} required />
                 </div>
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={createAsPackage ? 'package' : 'task'} onValueChange={(v) => setCreateAsPackage(v === 'package')}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="task">Actionable Task</SelectItem>
+                      <SelectItem value="package">Package (Container)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!createAsPackage && (
+                  <div className="space-y-2">
+                    <Label>Package</Label>
+                    <Select value={selectedPackageId} onValueChange={setSelectedPackageId}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General (No Package)</SelectItem>
+                        {packageOptions.map((pkg) => (
+                          <SelectItem key={pkg.id} value={pkg.id}>{pkg.task}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Stage</Label>
@@ -312,6 +350,7 @@ const ProjectDetail = () => {
                     <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} />
                   </div>
                 </div>
+                {!createAsPackage && (
                 <div className="space-y-2">
                   <Label>Assigned To</Label>
                   <Select value={assignedTo} onValueChange={setAssignedTo}>
@@ -328,7 +367,8 @@ const ProjectDetail = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                {assignedTo === 'crew' && (
+                )}
+                {!createAsPackage && assignedTo === 'crew' && (
                   <div className="space-y-2">
                     <Label>Crew Members</Label>
                     {crewGroups.length > 0 && (
@@ -401,6 +441,7 @@ const ProjectDetail = () => {
                   <Label>Notes</Label>
                   <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
                 </div>
+                {!createAsPackage && (
                 <div className="space-y-2">
                   <Label>Due Date</Label>
                   <Input type="date" value={newDueDate} onChange={(e) => {
@@ -424,6 +465,8 @@ const ProjectDetail = () => {
                     )}
                   </div>
                 )}
+                )}
+                {!createAsPackage && (
                 <Collapsible>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
                     <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
@@ -484,6 +527,7 @@ const ProjectDetail = () => {
                     )}
                   </CollapsibleContent>
                 </Collapsible>
+                )}
                 <Button type="submit" className="w-full" disabled={createTaskMutation.isPending}>Create Task</Button>
               </form>
             </DialogContent>
@@ -595,78 +639,79 @@ const ProjectDetail = () => {
             onDone={handleBulkDone}
           />
         )}
-        {rootTasks.length === 0 ? (
+        {packageGroups.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
         ) : bulkMode ? (
-          /* Bulk mode — checkboxes, no drag */
-          <div className="space-y-2">
-            {rootTasks.map((t) => {
-              const children = childrenMap[t.id] || [];
-              const isExpanded = expandedIds.has(t.id);
-              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
-              return (
-                <div key={t.id}>
-                  <div className="flex items-start gap-2">
-                    <Checkbox
-                      checked={selectedTaskIds.has(t.id)}
-                      onCheckedChange={() => toggleTaskSelection(t.id)}
-                      className="mt-4 shrink-0"
-                    />
+          <div className="space-y-4">
+            {packageGroups.map((group) => (
+              <div key={group.packageTask.id} className="space-y-2">
+                <div className="rounded-md border p-3 bg-muted/20">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                    <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
+                  </div>
+                </div>
+                {group.childTasks.map((task) => (
+                  <div key={task.id} className="flex items-start gap-2">
+                    <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
+                      <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} />
                     </div>
                   </div>
-                  {isExpanded && children.map((child: any) => (
-                    <div key={child.id} className="flex items-start gap-2">
-                      <Checkbox checked={selectedTaskIds.has(child.id)} onCheckedChange={() => toggleTaskSelection(child.id)} className="mt-4 ml-6 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} materialCount={materialCountMap[child.id] || 0} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            ))}
           </div>
-        ) : isManager ? (
-          /* Manager/Admin — draggable sort */
-          <SortableTaskList
-            items={rootTasks}
-            onReorder={async (orderedIds) => {
-              const { error } = await persistTaskOrder(orderedIds);
-              if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
-              else invalidateProject();
-            }}
-          >
-            {(t) => {
-              const children = childrenMap[t.id] || [];
-              const isExpanded = expandedIds.has(t.id);
-              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
-              return (
-                <SortableTaskItem key={t.id} id={t.id}>
-                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
-                  {isExpanded && children.map((child: any) => (
-                    <div key={child.id} className="mt-2">
-                      <TaskCard task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} materialCount={materialCountMap[child.id] || 0} />
-                    </div>
-                  ))}
-                </SortableTaskItem>
-              );
-            }}
-          </SortableTaskList>
         ) : (
-          /* Contractor — static list */
-          <div className="space-y-2">
-            {rootTasks.map((t) => {
-              const children = childrenMap[t.id] || [];
-              const isExpanded = expandedIds.has(t.id);
-              const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+          <div className="space-y-4">
+            {packageGroups.map((group) => {
+              const packageKey = `pkg:${group.packageTask.id}`;
+              const open = expandedIds.has(packageKey);
               return (
-                <div key={t.id}>
-                  <TaskCard task={t} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} childCount={children.length} expanded={isExpanded} onToggle={() => toggleExpanded(t.id)} allChildrenDone={allChildrenDone} assigneeName={t.assigned_to_user_id ? assigneeMap[t.assigned_to_user_id] : undefined} photoCount={photoCountMap[t.id] || 0} materialCount={materialCountMap[t.id] || 0} />
-                  {isExpanded && children.map((child: any) => (
-                    <TaskCard key={child.id} task={child} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} isChild assigneeName={child.assigned_to_user_id ? assigneeMap[child.assigned_to_user_id] : undefined} photoCount={photoCountMap[child.id] || 0} materialCount={materialCountMap[child.id] || 0} />
-                  ))}
+                <div key={group.packageTask.id} className="rounded-lg border">
+                  <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
+                    {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                      {(group.packageTask.room_area || group.packageTask.trade) && (
+                        <p className="text-xs text-muted-foreground">
+                          {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
+                      <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
+                      <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
+                      {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
+                      {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
+                      {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
+                    </div>
+                  </button>
+                  {open && (
+                    <div className="border-t p-2 space-y-2">
+                      {isManager ? (
+                        <SortableTaskList
+                          items={group.childTasks}
+                          onReorder={async (orderedIds) => {
+                            const { error } = await persistTaskOrder(orderedIds);
+                            if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
+                            else invalidateProject();
+                          }}
+                        >
+                          {(task) => (
+                            <SortableTaskItem key={task.id} id={task.id}>
+                              <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} />
+                            </SortableTaskItem>
+                          )}
+                        </SortableTaskList>
+                      ) : (
+                        group.childTasks.map((task) => (
+                          <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} />
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -165,7 +165,8 @@ const ShiftForm = ({ editShift, editAllocations, onSaved, onCancel }: ShiftFormP
           .select('id, task, stage, assignment_mode')
           .eq('project_id', projectId)
           .eq('assigned_to_user_id', selectedUserId)
-          .neq('stage', 'Not Ready'),
+          .neq('stage', 'Not Ready')
+          .or('is_package.is.null,is_package.eq.false'),
         supabase
           .from('task_candidates')
           .select('task_id')
@@ -190,6 +191,7 @@ const ShiftForm = ({ editShift, editAllocations, onSaved, onCancel }: ShiftFormP
           .eq('project_id', projectId)
           .eq('assignment_mode', 'crew')
           .neq('stage', 'Not Ready')
+          .or('is_package.is.null,is_package.eq.false')
           .in('id', [...crewTaskIds]);
         crewTasks = (data as TaskRow[]) || [];
       }
@@ -200,6 +202,7 @@ const ShiftForm = ({ editShift, editAllocations, onSaved, onCancel }: ShiftFormP
         .select('id, task, stage, assignment_mode')
         .eq('project_id', projectId)
         .eq('stage', 'Done')
+        .or('is_package.is.null,is_package.eq.false')
         .gte('completed_at', shiftDate + 'T00:00:00')
         .lte('completed_at', shiftDate + 'T23:59:59');
 
@@ -223,6 +226,7 @@ const ShiftForm = ({ editShift, editAllocations, onSaved, onCancel }: ShiftFormP
         .eq('project_id', projectId)
         .eq('assigned_to_user_id', selectedUserId)
         .eq('stage', 'Done')
+        .or('is_package.is.null,is_package.eq.false')
         .gte('completed_at', shiftDate + 'T00:00:00')
         .lte('completed_at', shiftDate + 'T23:59:59');
       ((soloCompletedToday as TaskRow[]) || []).forEach(t => all.set(t.id, t));
