@@ -674,26 +674,26 @@ const ProjectDetail = () => {
         <Card className="mb-4">
           <CardContent className="p-3">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div>
+              <button onClick={() => setStatusFilter(null)} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors', !statusFilter && 'bg-accent')}>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</p>
                 <p className="text-lg font-semibold">{projectHealthSummary.totalTasks}</p>
-              </div>
-              <div>
+              </button>
+              <button onClick={() => toggleStatusFilter('completed')} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-accent', statusFilter === 'completed' && 'bg-accent ring-1 ring-primary')}>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Completed</p>
                 <p className="text-lg font-semibold">{projectHealthSummary.completedTasks}</p>
-              </div>
-              <div>
+              </button>
+              <button onClick={() => toggleStatusFilter('blocked')} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-accent', statusFilter === 'blocked' && 'bg-accent ring-1 ring-destructive')}>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Blocked</p>
                 <p className="text-lg font-semibold text-destructive">{projectHealthSummary.blockedTasks}</p>
-              </div>
-              <div>
+              </button>
+              <button onClick={() => toggleStatusFilter('review')} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-accent', statusFilter === 'review' && 'bg-accent ring-1 ring-primary')}>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Needs Review</p>
                 <p className="text-lg font-semibold">{projectHealthSummary.needsReviewCount}</p>
-              </div>
-              <div>
+              </button>
+              <button onClick={() => toggleStatusFilter('overdue')} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-accent', statusFilter === 'overdue' && 'bg-accent ring-1 ring-primary')}>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Overdue</p>
                 <p className="text-lg font-semibold">{projectHealthSummary.overdueCount}</p>
-              </div>
+              </button>
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Actual Cost</p>
                 <p className="text-lg font-semibold">${projectTotalActual.toFixed(2)}</p>
@@ -701,6 +701,17 @@ const ProjectDetail = () => {
             </div>
           </CardContent>
         </Card>
+
+        {statusFilter && (
+          <div className="flex items-center gap-2 mb-3">
+            <Badge variant="secondary" className="text-xs">
+              Showing: {statusFilter === 'completed' ? 'Completed' : statusFilter === 'blocked' ? 'Blocked' : statusFilter === 'review' ? 'Needs Review' : statusFilter === 'overdue' ? 'Overdue' : statusFilter === 'ready' ? 'Ready' : statusFilter === 'in_progress' ? 'In Progress' : statusFilter === 'materials' ? 'Needs Materials' : statusFilter === 'unassigned' ? 'Unassigned' : statusFilter}
+            </Badge>
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setStatusFilter(null)}>
+              <X className="h-3 w-3 mr-1" />Clear
+            </Button>
+          </div>
+        )}
 
         {/* What next? section */}
         <WhatNextCard
