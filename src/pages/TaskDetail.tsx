@@ -248,11 +248,11 @@ const TaskDetail = () => {
     // Single write — trigger keeps tasks.is_blocked in sync
     const { error: insertErr } = await supabase.from('task_blockers').insert({
       task_id: taskId,
-      reason: blockerReason,
+      reason: blockerReason as any,
       note: blockerNote.trim() || null,
       needs_from_manager: blockerNeedsFromManager.trim() || null,
       blocked_by_user_id: user.id,
-    });
+    } as any);
     setReportingBlocker(false);
     if (insertErr) {
       const isDuplicate = insertErr.code === '23505';
