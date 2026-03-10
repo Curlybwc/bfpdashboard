@@ -143,6 +143,34 @@ const ProjectDetail = () => {
   const childrenMap = useMemo(() => buildChildrenMap(tasks), [tasks]);
   const packageGroups = useMemo(() => buildTaskPackageGroups(tasksWithParents, materialCountMap), [tasksWithParents, materialCountMap]);
 
+  // Filter package groups by status filter
+  const filteredPackageGroups = useMemo(() => {
+    if (!statusFilter) return packageGroups;
+    const today = new Date().toISOString().slice(0, 10);
+    return packageGroups.map((group) => {
+      const filtered = group.childTasks.filter((task) => {
+        const opStatus = getTaskOperationalStatus(task, {
+          requiredCount: materialCountMap[task.id] || 0,
+          hasRequiredMaterials: (materialCountMap[task.id] || 0) > 0 ? task.materials_on_site === 'Yes' : true,
+        });
+        if (statusFilter === 'completed') return opStatus === 'done';
+        if (statusFilter === 'blocked') return opStatus === 'blocked';
+        if (statusFilter === 'review') return opStatus === 'review_needed';
+        if (statusFilter === 'overdue') return task.due_date && task.due_date < today && opStatus !== 'done';
+        if (statusFilter === 'ready') return opStatus === 'ready';
+        if (statusFilter === 'in_progress') return opStatus === 'in_progress';
+        if (statusFilter === 'materials') return task.materials_on_site === 'No' && (materialCountMap[task.id] || 0) > 0;
+        if (statusFilter === 'unassigned') return !task.assigned_to_user_id && task.assignment_mode !== 'crew' && !task.is_outside_vendor && opStatus !== 'done';
+        return true;
+      });
+      return { ...group, childTasks: filtered, summary: { ...group.summary, total: filtered.length } };
+    }).filter((group) => group.childTasks.length > 0);
+  }, [packageGroups, statusFilter, materialCountMap]);
+
+  const toggleStatusFilter = (filter: string) => {
+    setStatusFilter((prev) => prev === filter ? null : filter);
+  };
+
   // "What next?" summary
   const whatNext = useMemo(
     () => computeWhatNext(tasks, childrenMap, isContractor, user?.id),
