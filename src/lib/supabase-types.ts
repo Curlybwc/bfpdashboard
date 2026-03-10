@@ -1,5 +1,6 @@
 // Convenience types derived from the database schema
 export type ProjectStatus = 'active' | 'paused' | 'complete';
+export type ProjectType = 'construction' | 'rental' | 'general';
 export type ProjectMemberRole = 'contractor' | 'manager' | 'read_only';
 export type TaskStage = 'Ready' | 'In Progress' | 'Not Ready' | 'Hold' | 'Done';
 export type TaskPriority = '1 – Now' | '2 – This Week' | '3 – Soon' | '4 – When Time' | '5 – Later';

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Shift {
@@ -24,47 +24,60 @@ export interface ShiftAllocation {
   hours: number;
 }
 
-export const useShifts = (userId: string | undefined) => {
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState(false);
+export function useMyShifts(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['shifts', 'my', userId],
+    queryFn: async () => {
+      if (!userId) return { shifts: [] as Shift[], projectMap: {} as Record<string, string> };
 
-  const fetchMyShifts = useCallback(async (limit = 20) => {
-    if (!userId) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from('shifts')
-      .select('*')
-      .eq('user_id', userId)
-      .order('shift_date', { ascending: false })
-      .limit(limit);
-    setShifts((data as Shift[]) || []);
-    setLoading(false);
-  }, [userId]);
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('shift_date', { ascending: false })
+        .limit(20);
 
-  const fetchAllShifts = useCallback(async (from: string, to: string) => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('shifts')
-      .select('*')
-      .gte('shift_date', from)
-      .lte('shift_date', to)
-      .order('shift_date', { ascending: false });
-    setShifts((data as Shift[]) || []);
-    setLoading(false);
-  }, []);
+      if (error) throw error;
 
-  const fetchAllocations = useCallback(async (shiftId: string): Promise<ShiftAllocation[]> => {
-    const { data } = await supabase
-      .from('shift_task_allocations')
-      .select('*')
-      .eq('shift_id', shiftId);
-    return (data as ShiftAllocation[]) || [];
-  }, []);
+      const shifts = ((data ?? []) as Shift[]);
+      const pids = [...new Set(shifts.map((s) => s.project_id))];
+      const projectMap: Record<string, string> = {};
 
-  const deleteShift = useCallback(async (shiftId: string) => {
-    const { error } = await supabase.from('shifts').delete().eq('id', shiftId);
-    return error;
-  }, []);
+      if (pids.length > 0) {
+        const { data: projects, error: projectsError } = await supabase
+          .from('projects')
+          .select('id, name')
+          .in('id', pids);
 
-  return { shifts, loading, fetchMyShifts, fetchAllShifts, fetchAllocations, deleteShift };
-};
+        if (projectsError) throw projectsError;
+        (projects ?? []).forEach((p) => {
+          projectMap[p.id] = p.name;
+        });
+      }
+
+      return { shifts, projectMap };
+    },
+    enabled: !!userId,
+  });
+}
+
+export async function fetchShiftById(shiftId: string): Promise<Shift | null> {
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('*')
+    .eq('id', shiftId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as Shift | null) ?? null;
+}
+
+export async function fetchShiftAllocations(shiftId: string): Promise<ShiftAllocation[]> {
+  const { data, error } = await supabase
+    .from('shift_task_allocations')
+    .select('*')
+    .eq('shift_id', shiftId);
+
+  if (error) throw error;
+  return (data as ShiftAllocation[]) ?? [];
+}

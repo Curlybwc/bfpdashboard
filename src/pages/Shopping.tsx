@@ -1,32 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useStoreSections } from '@/hooks/useStoreSections';
+import { useShoppingItems, type ShoppingItem } from '@/hooks/useShopping';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExternalLink, Copy, Search } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
-
-interface ShoppingItem {
-  id: string;
-  name: string;
-  quantity: number | null;
-  unit: string | null;
-  sku: string | null;
-  vendor_url: string | null;
-  item_type: string;
-  purchased: boolean;
-  delivered: boolean;
-  store_section: string | null;
-  task_id: string;
-  task_title: string;
-  project_id: string;
-  project_name: string;
-  project_address: string | null;
-}
+import { Skeleton } from '@/components/ui/skeleton';
 
 type PurchaseTab = 'not_purchased' | 'purchased_not_delivered' | 'delivered';
 type SortMode = 'project' | 'item';
@@ -36,6 +20,8 @@ interface AggCard {
   name: string;
   totalQty: number;
   unit: string | null;
+  unit_cost: number | null;
+  totalCost: number;
   sku: string | null;
   vendor_url: string | null;
   item_type: string;
@@ -54,15 +40,14 @@ function sectionOf(s: string | null, activeNames: string[]): string {
 }
 
 function aggKey(i: ShoppingItem): string {
-  return `${i.project_id}|${i.name}|${i.sku ?? ''}|${i.unit ?? ''}|${i.vendor_url ?? ''}|${i.item_type}`;
+  return `${i.project_id}|${i.name}|${i.sku ?? ''}|${i.unit ?? ''}|${i.unit_cost ?? ''}|${i.vendor_url ?? ''}|${i.item_type}`;
 }
 
 export default function Shopping() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { sections } = useStoreSections();
-  const [items, setItems] = useState<ShoppingItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: items = [], isLoading, refetch } = useShoppingItems();
   const [tab, setTab] = useState<PurchaseTab>('not_purchased');
   const [sort, setSort] = useState<SortMode>('project');
   const [search, setSearch] = useState('');
@@ -70,42 +55,6 @@ export default function Shopping() {
   const activeNames = useMemo(() => sections.map(s => s.name), [sections]);
   const sectionOrder = useMemo(() => [...activeNames, 'Uncategorized'], [activeNames]);
 
-  const fetchItems = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('task_materials')
-      .select('id, name, quantity, unit, sku, vendor_url, item_type, purchased, delivered, store_section, task_id, tasks!inner(id, task, project_id, stage, projects!inner(id, name, address))')
-      .eq('is_active', true)
-      .neq('tasks.stage', 'Done');
-
-    if (error) {
-      toast({ title: 'Error loading shopping list', description: error.message, variant: 'destructive' });
-      setLoading(false);
-      return;
-    }
-
-    const mapped: ShoppingItem[] = ((data as any[]) || []).map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      quantity: r.quantity,
-      unit: r.unit,
-      sku: r.sku,
-      vendor_url: r.vendor_url,
-      item_type: r.item_type,
-      purchased: r.purchased,
-      delivered: r.delivered,
-      store_section: r.store_section,
-      task_id: r.tasks.id,
-      task_title: r.tasks.task,
-      project_id: r.tasks.projects.id,
-      project_name: r.tasks.projects.name,
-      project_address: r.tasks.projects.address,
-    }));
-    setItems(mapped);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchItems(); }, []);
 
   const filtered = useMemo(() => {
     let f = items;
@@ -132,6 +81,7 @@ export default function Shopping() {
       const existing = map.get(k);
       if (existing) {
         existing.totalQty += i.quantity ?? 0;
+        existing.totalCost += (i.quantity ?? 0) * (i.unit_cost ?? 0);
         if (!existing.tasks.find(t => t.id === i.task_id)) {
           existing.tasks.push({ id: i.task_id, title: i.task_title, project_id: i.project_id });
         }
@@ -142,6 +92,8 @@ export default function Shopping() {
           name: i.name,
           totalQty: i.quantity ?? 0,
           unit: i.unit,
+          unit_cost: i.unit_cost,
+          totalCost: (i.quantity ?? 0) * (i.unit_cost ?? 0),
           sku: i.sku,
           vendor_url: i.vendor_url,
           item_type: i.item_type,
@@ -165,7 +117,7 @@ export default function Shopping() {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    await fetchItems();
+    await refetch();
   };
 
   const materialCards = aggregated.filter(c => c.item_type !== 'tool');
@@ -177,7 +129,11 @@ export default function Shopping() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{card.name}</p>
           {(card.totalQty > 0 || card.unit) && (
-            <p className="text-xs text-muted-foreground">{card.totalQty}{card.unit ? ` ${card.unit}` : ''}</p>
+            <p className="text-xs text-muted-foreground">
+              {card.totalQty}{card.unit ? ` ${card.unit}` : ''}
+              {card.unit_cost != null ? ` · $${card.unit_cost.toFixed(2)}/${card.unit || 'unit'}` : ''}
+              {card.totalCost > 0 ? ` · $${card.totalCost.toFixed(2)} total` : ''}
+            </p>
           )}
         </div>
         {sort === 'item' && (
@@ -319,10 +275,20 @@ export default function Shopping() {
           <Input placeholder="Search name, SKU, project..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
 
-        {loading && <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>}
-        {!loading && aggregated.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No items in this tab.</p>}
+        {isLoading && (
+          <div className="space-y-2 py-2">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="rounded-lg border p-3 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+            ))}
+          </div>
+        )}
+        {!isLoading && aggregated.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No items in this tab.</p>}
 
-        {!loading && aggregated.length > 0 && (
+        {!isLoading && aggregated.length > 0 && (
           <div className="space-y-4 pb-4">
             {sort === 'project' ? renderByProject() : renderByItem()}
           </div>

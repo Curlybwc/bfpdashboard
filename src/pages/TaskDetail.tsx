@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
@@ -22,15 +21,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { TASK_STAGES, TASK_PRIORITIES, BLOCKER_REASONS, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type BlockerReason, type RecurrenceFrequency } from '@/lib/supabase-types';
 import { canReportBlocker, canResolveBlocker } from '@/lib/permissions';
-import { Package, Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle, Repeat } from 'lucide-react';
+import { Trash2, Zap, CheckCircle2, Users, X, Plus, BookOpen, Save, Search, Pencil, ChevronDown, ChevronUp, AlertTriangle, Repeat } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import TaskPhotos from '@/components/TaskPhotos';
 import TaskComments from '@/components/TaskComments';
 import { Card } from '@/components/ui/card';
-import { suggestRecipes, type RecipeForMatch } from '@/lib/recipeMatch';
 import { getTaskOperationalStatus, isTaskActionable } from '@/lib/taskOperationalStatus';
 import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
+import { useTaskDetailData } from '@/hooks/useTaskDetailData';
+import TaskLifecycleActions from '@/components/task-detail/TaskLifecycleActions';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -39,17 +39,12 @@ const TaskDetail = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
-  const [task, setTask] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
-  const [projectRole, setProjectRole] = useState<string | null>(null);
-  const [children, setChildren] = useState<any[]>([]);
   const [cascadeAssign, setCascadeAssign] = useState(false);
-  const [projectMembers, setProjectMembers] = useState<{ user_id: string; role: string; profiles: { full_name: string | null } | null }[]>([]);
-  const [fieldCapture, setFieldCapture] = useState<any>(null);
   const [markingReviewed, setMarkingReviewed] = useState(false);
 
   // Blocker state
@@ -58,14 +53,11 @@ const TaskDetail = () => {
   const [blockerNote, setBlockerNote] = useState('');
   const [blockerNeedsFromManager, setBlockerNeedsFromManager] = useState('');
   const [reportingBlocker, setReportingBlocker] = useState(false);
-  const [activeBlocker, setActiveBlocker] = useState<any>(null);
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [resolutionNote, setResolutionNote] = useState('');
   const [resolvingBlocker, setResolvingBlocker] = useState(false);
-  const [blockerReporterName, setBlockerReporterName] = useState('');
 
   // Recipe state
-  const [suggestedRecipe, setSuggestedRecipe] = useState<{ id: string; name: string } | null>(null);
   const [expandingRecipe, setExpandingRecipe] = useState(false);
   const [saveRecipeOpen, setSaveRecipeOpen] = useState(false);
   const [saveRecipeName, setSaveRecipeName] = useState('');
@@ -78,9 +70,7 @@ const TaskDetail = () => {
   const [creatingRecipe, setCreatingRecipe] = useState(false);
   const [newlyCreatedRecipeId, setNewlyCreatedRecipeId] = useState<string | null>(null);
   const [newRecipeStepCount, setNewRecipeStepCount] = useState(0);
-  const [recipeSearchDone, setRecipeSearchDone] = useState(false);
   const [recipeEditorOpen, setRecipeEditorOpen] = useState(false);
-  const [linkedRecipeStepCount, setLinkedRecipeStepCount] = useState(0);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [recipeSearchOpen, setRecipeSearchOpen] = useState(false);
@@ -89,8 +79,6 @@ const TaskDetail = () => {
   const [recipeSearchLoading, setRecipeSearchLoading] = useState(false);
 
   // Crew state
-  const [crewWorkers, setCrewWorkers] = useState<{ user_id: string; active: boolean; full_name: string }[]>([]);
-  const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
   const [crewToggleLoading, setCrewToggleLoading] = useState(false);
   const [addCandidatesOpen, setAddCandidatesOpen] = useState(false);
   const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
@@ -98,8 +86,30 @@ const TaskDetail = () => {
   const [addingCandidates, setAddingCandidates] = useState(false);
 
   // Photo state
-  const [photos, setPhotos] = useState<any[]>([]);
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
+  const {
+    task,
+    projectRole,
+    children,
+    projectMembers,
+    fieldCapture,
+    photos,
+    activeBlocker,
+    blockerReporterName,
+    suggestedRecipe,
+    setSuggestedRecipe,
+    recipeSearchDone,
+    setRecipeSearchDone,
+    linkedRecipeStepCount,
+    crewWorkers,
+    crewCandidates,
+    fetchTask,
+    fetchChildren,
+    fetchPhotos,
+    fetchCrewData,
+    fetchLinkedRecipeStepCount,
+  } = useTaskDetailData(taskId, user?.id);
+
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
@@ -112,83 +122,6 @@ const TaskDetail = () => {
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
-
-  useEffect(() => { fetchTask(); fetchProjectRole(); fetchChildren(); fetchMembers(); fetchPhotos(); }, [taskId]);
-
-  // Fetch active blocker when task loads
-  useEffect(() => {
-    if (!taskId || !task?.is_blocked) { setActiveBlocker(null); setBlockerReporterName(''); return; }
-    const fetchBlocker = async () => {
-      const { data } = await supabase
-        .from('task_blockers')
-        .select('*')
-        .eq('task_id', taskId)
-        .is('resolved_at', null)
-        .order('blocked_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setActiveBlocker(data);
-      if (data?.blocked_by_user_id) {
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', data.blocked_by_user_id).single();
-        setBlockerReporterName(profile?.full_name || 'Unknown');
-      }
-    };
-    fetchBlocker();
-  }, [taskId, task?.is_blocked]);
-
-
-  // Recipe suggestion effect
-  useEffect(() => {
-    if (!task) { setSuggestedRecipe(null); setRecipeSearchDone(false); return; }
-    if (task.expanded_recipe_id) {
-      supabase.from('task_recipes').select('id, name').eq('id', task.expanded_recipe_id).single().then(({ data }) => {
-        setSuggestedRecipe(data ? { id: data.id, name: data.name } : null);
-        setRecipeSearchDone(true);
-      });
-      return;
-    }
-    if (children.length > 0) { setSuggestedRecipe(null); setRecipeSearchDone(true); return; }
-    const fetchRecipeSuggestion = async () => {
-      if (task.recipe_hint_id) {
-        const { data } = await supabase.from('task_recipes').select('id, name').eq('id', task.recipe_hint_id).eq('active', true).single();
-        if (data) { setSuggestedRecipe(data); setRecipeSearchDone(true); return; }
-      }
-      const { data: recipes } = await supabase.from('task_recipes').select('id, name, keywords').eq('active', true);
-      if (!recipes || recipes.length === 0) { setSuggestedRecipe(null); setRecipeSearchDone(true); return; }
-      const suggestions = suggestRecipes(task.task, recipes as RecipeForMatch[]);
-      setSuggestedRecipe(suggestions.length > 0 ? { id: suggestions[0].recipe.id, name: suggestions[0].recipe.name } : null);
-      setRecipeSearchDone(true);
-    };
-    fetchRecipeSuggestion();
-  }, [task?.id, task?.task, task?.recipe_hint_id, task?.expanded_recipe_id, children.length]);
-
-  // Fetch step count for linked recipe
-  const fetchLinkedRecipeStepCount = async () => {
-    if (!suggestedRecipe) { setLinkedRecipeStepCount(0); return; }
-    const { count } = await supabase
-      .from('task_recipe_steps')
-      .select('id', { count: 'exact', head: true })
-      .eq('recipe_id', suggestedRecipe.id);
-    setLinkedRecipeStepCount(count ?? 0);
-  };
-
-  useEffect(() => {
-    fetchLinkedRecipeStepCount();
-  }, [suggestedRecipe?.id]);
-
-  useEffect(() => {
-    if (task?.assignment_mode === 'crew') {
-      fetchCrewData();
-    }
-  }, [task?.assignment_mode, task?.id]);
-
-  // Fetch field capture when task loads
-  useEffect(() => {
-    if (!task?.field_capture_id) { setFieldCapture(null); return; }
-    supabase.from('field_captures').select('*').eq('id', task.field_capture_id).single().then(({ data }) => {
-      setFieldCapture(data);
-    });
-  }, [task?.field_capture_id]);
 
 
   useEffect(() => {
@@ -206,32 +139,6 @@ const TaskDetail = () => {
     setSearchParams(next, { replace: true });
   }, [task, searchParams, setSearchParams]);
 
-  const fetchCrewData = async () => {
-    if (!taskId) return;
-    const [workersRes, candidatesRes] = await Promise.all([
-      supabase.from('task_workers').select('user_id, active').eq('task_id', taskId),
-      supabase.from('task_candidates').select('user_id').eq('task_id', taskId),
-    ]);
-
-    const workerUserIds = (workersRes.data || []).map(w => w.user_id);
-    const candidateUserIds = (candidatesRes.data || []).map(c => c.user_id);
-    setCrewCandidates(candidateUserIds);
-
-    // Fetch profile names for workers
-    if (workerUserIds.length > 0) {
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', workerUserIds);
-      const profileMap: Record<string, string> = {};
-      (profiles || []).forEach(p => { profileMap[p.id] = p.full_name || 'Unknown'; });
-
-      setCrewWorkers((workersRes.data || []).map(w => ({
-        user_id: w.user_id,
-        active: w.active,
-        full_name: profileMap[w.user_id] || 'Unknown',
-      })));
-    } else {
-      setCrewWorkers([]);
-    }
-  };
 
   const handleMarkReviewed = async () => {
     if (!taskId) return;
@@ -380,45 +287,8 @@ const TaskDetail = () => {
     else { toast({ title: 'Saved' }); fetchTask(); fetchChildren(); }
   };
 
-  const fetchTask = () => {
-    if (!taskId) return;
-    supabase.from('tasks').select('*').eq('id', taskId).single().then(({ data }) => {
-      if (data) {
-        setTask(data);
-        setTaskText(data.task);
-        setStage(data.stage);
-        setPriority(data.priority);
-        setRoomArea(data.room_area || '');
-        setTrade(data.trade || '');
-        setNotes(data.notes || '');
-        setDueDate(data.due_date || '');
-        setActualCost(data.actual_total_cost?.toString() || '');
-        setAssignedTo(data.is_outside_vendor ? 'outside_vendor' : (data.assigned_to_user_id || 'unassigned'));
-        setIsRecurring(data.is_recurring || false);
-        setRecurrenceFrequency((data.recurrence_frequency as RecurrenceFrequency) || 'weekly');
-      }
-    });
-  };
 
-  const fetchChildren = async () => {
-    if (!taskId) return;
-    const { data } = await supabase.from('tasks')
-      .select('id, task, stage, assigned_to_user_id')
-      .eq('parent_task_id', taskId)
-      .order('sort_order', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: true });
-    setChildren(data || []);
-  };
 
-  const fetchPhotos = async () => {
-    if (!taskId) return;
-    const { data } = await supabase
-      .from('task_photos' as any)
-      .select('*')
-      .eq('task_id', taskId)
-      .order('created_at', { ascending: true });
-    setPhotos(data || []);
-  };
 
   const handleExpandRecipe = async (recipeId: string) => {
     if (!taskId || !task || !user) return;
@@ -551,17 +421,7 @@ const TaskDetail = () => {
     fetchLinkedRecipeStepCount();
   };
 
-  const fetchMembers = async () => {
-    if (!projectId) return;
-    const { data } = await supabase.from('project_members').select('user_id, role, profiles(full_name)').eq('project_id', projectId);
-    if (data) setProjectMembers(data as any);
-  };
 
-  const fetchProjectRole = async () => {
-    if (!user || !projectId) return;
-    const { data } = await supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', user.id).maybeSingle();
-    setProjectRole(data?.role ?? null);
-  };
 
   const canDelete = isAdmin || projectRole === 'manager';
   const canManageCrew = isAdmin || projectRole === 'manager';
@@ -787,53 +647,27 @@ const TaskDetail = () => {
       <PageHeader title="Task Detail" backTo={`/projects/${projectId}`} />
       <div className="p-4 space-y-4">
         {/* Lifecycle action buttons */}
-        <div className="flex gap-2 flex-wrap">
-          {isActionableTask && canExecuteTask && !isCrewMode && isUnassigned && task.stage === 'Ready' && (
-            <Button variant="outline" onClick={() => handleDibs()} disabled={actionLoading}>Dibs</Button>
-          )}
-          {isActionableTask && canExecuteTask && !isCrewMode && isAssignedToMe && task.stage === 'Ready' && (
-            materialsReady ? (
-              <Button onClick={handleStart} disabled={actionLoading}>Start</Button>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span><Button disabled>Start</Button></span>
-                </TooltipTrigger>
-                <TooltipContent>Materials must be on site before starting.</TooltipContent>
-              </Tooltip>
-            )
-          )}
-          {isActionableTask && canExecuteTask && !isCrewMode && isAssignedToMe && task.stage === 'In Progress' && (
-            canComplete ? (
-              <Button onClick={handleComplete} disabled={actionLoading}>Complete</Button>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span><Button disabled>Complete</Button></span>
-                </TooltipTrigger>
-                <TooltipContent>All subtasks must be completed first.</TooltipContent>
-              </Tooltip>
-            )
-          )}
-          {/* Crew actions */}
-          {isActionableTask && canExecuteTask && isCrewMode && meIsCandidate && !meIsActiveWorker && (
-            <Button onClick={handleJoinCrew} disabled={actionLoading}>
-              <Users className="h-4 w-4 mr-1" />Join
-            </Button>
-          )}
-          {isActionableTask && canExecuteTask && isCrewMode && meIsActiveWorker && (
-            <Button variant="outline" onClick={handleLeaveCrew} disabled={actionLoading}>Leave</Button>
-          )}
-          {showBlockerButton && (
-            <Button variant="destructive" size="sm" onClick={() => setBlockerSheetOpen(true)} disabled={actionLoading}>
-              <AlertTriangle className="h-4 w-4 mr-1" />Report Issue
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setMaterialsOpen(true)}>
-            <Package className="h-4 w-4" />
-            Materials
-          </Button>
-        </div>
+        <TaskLifecycleActions
+          isActionableTask={isActionableTask}
+          canExecuteTask={canExecuteTask}
+          isCrewMode={isCrewMode}
+          isUnassigned={isUnassigned}
+          isAssignedToMe={!!isAssignedToMe}
+          materialsReady={materialsReady}
+          canComplete={canComplete}
+          meIsCandidate={meIsCandidate}
+          meIsActiveWorker={meIsActiveWorker}
+          showBlockerButton={showBlockerButton}
+          actionLoading={actionLoading}
+          stage={task.stage}
+          onDibs={() => handleDibs()}
+          onStart={handleStart}
+          onComplete={handleComplete}
+          onJoinCrew={handleJoinCrew}
+          onLeaveCrew={handleLeaveCrew}
+          onOpenBlocker={() => setBlockerSheetOpen(true)}
+          onOpenMaterials={() => setMaterialsOpen(true)}
+        />
 
         {/* Active blocker display card */}
         {task.is_blocked && activeBlocker && (

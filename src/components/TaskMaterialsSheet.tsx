@@ -21,6 +21,7 @@ interface TaskMaterial {
   name: string;
   quantity: number | null;
   unit: string | null;
+  unit_cost: number | null;
   purchased: boolean;
   delivered: boolean;
   sku: string | null;
@@ -61,6 +62,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [newName, setNewName] = useState('');
   const [newQty, setNewQty] = useState('');
   const [newUnit, setNewUnit] = useState('');
+  const [newUnitCost, setNewUnitCost] = useState('');
   const [newSku, setNewSku] = useState('');
   const [newVendorUrl, setNewVendorUrl] = useState('');
   const [newItemType, setNewItemType] = useState<string>('material');
@@ -73,6 +75,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [editName, setEditName] = useState('');
   const [editQty, setEditQty] = useState('');
   const [editUnit, setEditUnit] = useState('');
+  const [editUnitCost, setEditUnitCost] = useState('');
   const [editSku, setEditSku] = useState('');
   const [editVendorUrl, setEditVendorUrl] = useState('');
   const [editItemType, setEditItemType] = useState<string>('material');
@@ -175,6 +178,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       name: newName.trim(),
       quantity: newQty ? parseFloat(newQty) : null,
       unit: newUnit.trim() || null,
+      unit_cost: newUnitCost ? parseFloat(newUnitCost) : null,
       sku: newSku.trim() || null,
       vendor_url: normalizeUrl(newVendorUrl),
       item_type: newItemType,
@@ -187,7 +191,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewName(''); setNewQty(''); setNewUnit(''); setNewSku(''); setNewVendorUrl('');
+    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost(''); setNewSku(''); setNewVendorUrl('');
     setNewItemType('material'); setNewProvidedBy('either'); setNewStoreSection('');
     await fetchMaterials();
   };
@@ -197,6 +201,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     setEditName(m.name);
     setEditQty(m.quantity?.toString() ?? '');
     setEditUnit(m.unit ?? '');
+    setEditUnitCost(m.unit_cost?.toString() ?? '');
     setEditSku(m.sku ?? '');
     setEditVendorUrl(m.vendor_url ?? '');
     setEditItemType(m.item_type ?? 'material');
@@ -219,6 +224,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       name: editName.trim(),
       quantity: editQty ? parseFloat(editQty) : null,
       unit: editUnit.trim() || null,
+      unit_cost: editUnitCost ? parseFloat(editUnitCost) : null,
       sku: editSku.trim() || null,
       vendor_url: normalizeUrl(editVendorUrl),
       item_type: editItemType,
@@ -278,9 +284,11 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{m.name}</p>
-            {(m.quantity || m.unit) && (
+            {(m.quantity || m.unit || m.unit_cost != null) && (
               <p className="text-xs text-muted-foreground">
                 {m.quantity}{m.unit ? ` ${m.unit}` : ''}
+                {m.unit_cost != null ? ` · $${m.unit_cost.toFixed(2)}/${m.unit || 'unit'}` : ''}
+                {m.quantity != null && m.unit_cost != null ? ` · $${(m.quantity * m.unit_cost).toFixed(2)} total` : ''}
               </p>
             )}
           </div>
@@ -453,6 +461,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             <Input placeholder="Name *" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
             <Input placeholder="Qty" type="number" value={newQty} onChange={(e) => setNewQty(e.target.value)} className="w-16" />
             <Input placeholder="Unit" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} className="w-16" />
+            <Input placeholder="$/unit" type="number" step="0.01" value={newUnitCost} onChange={(e) => setNewUnitCost(e.target.value)} className="w-20" />
           </div>
           <div className="flex gap-2">
             <Input placeholder="SKU (optional)" value={newSku} onChange={(e) => setNewSku(e.target.value)} className="flex-1" />
@@ -521,6 +530,10 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
               <div className="flex-1">
                 <Label className="text-xs">Unit</Label>
                 <Input value={editUnit} onChange={(e) => setEditUnit(e.target.value)} />
+              </div>
+              <div className="flex-1">
+                <Label className="text-xs">Unit Cost</Label>
+                <Input type="number" step="0.01" value={editUnitCost} onChange={(e) => setEditUnitCost(e.target.value)} />
               </div>
             </div>
             <div>
