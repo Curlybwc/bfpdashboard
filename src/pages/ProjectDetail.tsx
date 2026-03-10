@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from 'react';
-import { cn } from '@/lib/utils';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, CalendarDays, CheckSquare } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2, Pencil, CalendarDays, CheckSquare, Search } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
@@ -89,7 +88,13 @@ const ProjectDetail = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [taskSearch, setTaskSearch] = useState('');
+  const [filterStage, setFilterStage] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterAssignee, setFilterAssignee] = useState<string>('all');
+  const [filterTrade, setFilterTrade] = useState<string>('all');
+  const [filterRoomArea, setFilterRoomArea] = useState<string>('all');
+  const [showCompletedSection, setShowCompletedSection] = useState(false);
 
   // Derived role & permissions
   const projectRole = useMemo(
@@ -132,45 +137,73 @@ const ProjectDetail = () => {
     return allTasks.filter((t) => allTasks.some((c) => c.parent_task_id === t.id));
   }, [allTasks]);
 
+  const tradeFilterOptions = useMemo(() => {
+    return [...new Set(tasksWithParents.map((t) => t.trade).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+  }, [tasksWithParents]);
+
+  const roomAreaFilterOptions = useMemo(() => {
+    return [...new Set(tasksWithParents.map((t) => t.room_area).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+  }, [tasksWithParents]);
+
   // Build tree
+  const childrenMap = useMemo(() => buildChildrenMap(tasks), [tasks]);
+
+  const filteredTasksWithParents = useMemo(() => {
+    const query = taskSearch.trim().toLowerCase();
+    const hasTaskFilters = !!query || filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all';
+    if (!hasTaskFilters) return tasksWithParents;
+
+    const byId = new Map(tasksWithParents.map((t) => [t.id, t]));
+    const matched = tasksWithParents.filter((task) => {
+      if (query) {
+        const haystack = [task.task, task.trade, task.room_area, task.notes].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      if (filterStage !== 'all' && task.stage !== filterStage) return false;
+      if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
+      if (filterAssignee !== 'all' && (task.assigned_to_user_id || 'unassigned') !== filterAssignee) return false;
+      if (filterTrade !== 'all' && (task.trade || '') !== filterTrade) return false;
+      if (filterRoomArea !== 'all' && (task.room_area || '') !== filterRoomArea) return false;
+      return true;
+    });
+
+    const visibleIds = new Set(matched.map((t) => t.id));
+    matched.forEach((task) => {
+      let parentId = task.parent_task_id;
+      while (parentId) {
+        visibleIds.add(parentId);
+        parentId = byId.get(parentId)?.parent_task_id || null;
+      }
+    });
+
+    return tasksWithParents.filter((task) => visibleIds.has(task.id));
+  }, [tasksWithParents, taskSearch, filterStage, filterPriority, filterAssignee, filterTrade, filterRoomArea]);
+
   const rootTasks = useMemo(() => {
-    const filtered = tasksWithParents.filter((t) => !t.parent_task_id);
+    const filtered = filteredTasksWithParents.filter((t) => !t.parent_task_id);
     return filtered.sort((a, b) => {
       const aDone = getTaskOperationalStatus(a) === 'done' ? 1 : 0;
       const bDone = getTaskOperationalStatus(b) === 'done' ? 1 : 0;
       return aDone - bDone;
     });
-  }, [tasksWithParents]);
-  const childrenMap = useMemo(() => buildChildrenMap(tasks), [tasks]);
-  const packageGroups = useMemo(() => buildTaskPackageGroups(tasksWithParents, materialCountMap), [tasksWithParents, materialCountMap]);
+  }, [filteredTasksWithParents]);
 
-  // Filter package groups by status filter
-  const filteredPackageGroups = useMemo(() => {
-    if (!statusFilter) return packageGroups;
-    const today = new Date().toISOString().slice(0, 10);
-    return packageGroups.map((group) => {
-      const filtered = group.childTasks.filter((task) => {
-        const opStatus = getTaskOperationalStatus(task, {
-          requiredCount: materialCountMap[task.id] || 0,
-          hasRequiredMaterials: (materialCountMap[task.id] || 0) > 0 ? task.materials_on_site === 'Yes' : true,
-        });
-        if (statusFilter === 'completed') return opStatus === 'done';
-        if (statusFilter === 'blocked') return opStatus === 'blocked';
-        if (statusFilter === 'review') return opStatus === 'review_needed';
-        if (statusFilter === 'overdue') return task.due_date && task.due_date < today && opStatus !== 'done';
-        if (statusFilter === 'ready') return opStatus === 'ready';
-        if (statusFilter === 'in_progress') return opStatus === 'in_progress';
-        if (statusFilter === 'materials') return task.materials_on_site === 'No' && (materialCountMap[task.id] || 0) > 0;
-        if (statusFilter === 'unassigned') return !task.assigned_to_user_id && task.assignment_mode !== 'crew' && !task.is_outside_vendor && opStatus !== 'done';
-        return true;
-      });
-      return { ...group, childTasks: filtered, summary: { ...group.summary, total: filtered.length } };
-    }).filter((group) => group.childTasks.length > 0);
-  }, [packageGroups, statusFilter, materialCountMap]);
+  const packageGroups = useMemo(() => buildTaskPackageGroups(filteredTasksWithParents, materialCountMap), [filteredTasksWithParents, materialCountMap]);
 
-  const toggleStatusFilter = (filter: string) => {
-    setStatusFilter((prev) => prev === filter ? null : filter);
-  };
+  const activePackageGroups = useMemo(
+    () => packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total)),
+    [packageGroups],
+  );
+
+  const completedPackageGroups = useMemo(
+    () => packageGroups.filter((group) => group.summary.total > 0 && group.summary.byStatus.done === group.summary.total),
+    [packageGroups],
+  );
+
+  const completedTaskCount = useMemo(
+    () => completedPackageGroups.reduce((sum, group) => sum + group.summary.total, 0),
+    [completedPackageGroups],
+  );
 
   // "What next?" summary
   const whatNext = useMemo(
@@ -215,6 +248,15 @@ const ProjectDetail = () => {
   const handleBulkDone = () => {
     exitBulkMode();
     invalidateProject();
+  };
+
+  const clearTaskFilters = () => {
+    setTaskSearch('');
+    setFilterStage('all');
+    setFilterPriority('all');
+    setFilterAssignee('all');
+    setFilterTrade('all');
+    setFilterRoomArea('all');
   };
 
   const openEditDialog = () => {
@@ -675,26 +717,26 @@ const ProjectDetail = () => {
         <Card className="mb-4">
           <CardContent className="p-3">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <button onClick={() => setStatusFilter(null)} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors', !statusFilter && 'bg-accent')}>
+              <div>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</p>
                 <p className="text-lg font-semibold">{projectHealthSummary.totalTasks}</p>
-              </button>
-              <button onClick={() => toggleStatusFilter('completed')} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-accent', statusFilter === 'completed' && 'bg-accent ring-1 ring-primary')}>
+              </div>
+              <div>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Completed</p>
                 <p className="text-lg font-semibold">{projectHealthSummary.completedTasks}</p>
-              </button>
-              <button onClick={() => toggleStatusFilter('blocked')} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-accent', statusFilter === 'blocked' && 'bg-accent ring-1 ring-destructive')}>
+              </div>
+              <div>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Blocked</p>
                 <p className="text-lg font-semibold text-destructive">{projectHealthSummary.blockedTasks}</p>
-              </button>
-              <button onClick={() => toggleStatusFilter('review')} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-accent', statusFilter === 'review' && 'bg-accent ring-1 ring-primary')}>
+              </div>
+              <div>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Needs Review</p>
                 <p className="text-lg font-semibold">{projectHealthSummary.needsReviewCount}</p>
-              </button>
-              <button onClick={() => toggleStatusFilter('overdue')} className={cn('text-left rounded-md px-2 py-1 -mx-2 -my-1 transition-colors hover:bg-accent', statusFilter === 'overdue' && 'bg-accent ring-1 ring-primary')}>
+              </div>
+              <div>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Overdue</p>
                 <p className="text-lg font-semibold">{projectHealthSummary.overdueCount}</p>
-              </button>
+              </div>
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Actual Cost</p>
                 <p className="text-lg font-semibold">${projectTotalActual.toFixed(2)}</p>
@@ -702,17 +744,6 @@ const ProjectDetail = () => {
             </div>
           </CardContent>
         </Card>
-
-        {statusFilter && (
-          <div className="flex items-center gap-2 mb-3">
-            <Badge variant="secondary" className="text-xs">
-              Showing: {statusFilter === 'completed' ? 'Completed' : statusFilter === 'blocked' ? 'Blocked' : statusFilter === 'review' ? 'Needs Review' : statusFilter === 'overdue' ? 'Overdue' : statusFilter === 'ready' ? 'Ready' : statusFilter === 'in_progress' ? 'In Progress' : statusFilter === 'materials' ? 'Needs Materials' : statusFilter === 'unassigned' ? 'Unassigned' : statusFilter}
-            </Badge>
-            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setStatusFilter(null)}>
-              <X className="h-3 w-3 mr-1" />Clear
-            </Button>
-          </div>
-        )}
 
         {/* What next? section */}
         <WhatNextCard
@@ -724,8 +755,62 @@ const ProjectDetail = () => {
           members={projectMembers.map(m => ({ user_id: m.user_id, full_name: m.profiles?.full_name || null, role: m.role }))}
           crewGroups={crewGroups}
           onUpdate={invalidateProject}
-          onFilterChange={toggleStatusFilter}
         />
+
+        <Card className="mb-4">
+          <CardContent className="p-3 space-y-2">
+            <div className="relative">
+              <Search className="h-4 w-4 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Input
+                value={taskSearch}
+                onChange={(e) => setTaskSearch(e.target.value)}
+                placeholder="Search tasks..."
+                className="pl-8"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={filterStage} onValueChange={setFilterStage}>
+                <SelectTrigger><SelectValue placeholder="Stage" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All stages</SelectItem>
+                  {TASK_STAGES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterPriority} onValueChange={setFilterPriority}>
+                <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All priorities</SelectItem>
+                  {TASK_PRIORITIES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+                <SelectTrigger><SelectValue placeholder="Assignee" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All assignees</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {projectMembers.map((member) => (
+                    <SelectItem key={member.user_id} value={member.user_id}>{member.profiles?.full_name || 'Unnamed'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterTrade} onValueChange={setFilterTrade}>
+                <SelectTrigger><SelectValue placeholder="Trade" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All trades</SelectItem>
+                  {tradeFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterRoomArea} onValueChange={setFilterRoomArea}>
+                <SelectTrigger><SelectValue placeholder="Room / Area" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All rooms/areas</SelectItem>
+                  {roomAreaFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" onClick={clearTaskFilters}>Clear</Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {bulkMode && (
           <BulkTaskBar
@@ -735,90 +820,121 @@ const ProjectDetail = () => {
             onDone={handleBulkDone}
           />
         )}
-        {filteredPackageGroups.length === 0 && statusFilter ? (
-          <p className="text-center text-muted-foreground py-8">No tasks match this filter.</p>
-        ) : filteredPackageGroups.length === 0 ? (
+
+        {tasksWithParents.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No tasks yet.</p>
-        ) : bulkMode ? (
-          <div className="space-y-4">
-            {filteredPackageGroups.map((group) => (
-              <div key={group.packageTask.id} className="space-y-2">
-                <div className="rounded-md border p-3 bg-muted/20">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-sm">{group.packageTask.task}</p>
-                    <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
-                  </div>
-                </div>
-                {group.childTasks.map((task) => (
-                  <div key={task.id} className="flex items-start gap-2">
-                    <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
+        ) : packageGroups.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
+            <p className="text-sm font-medium">No tasks match your filters.</p>
+            <p className="text-xs text-muted-foreground">Try adjusting search or filter selections.</p>
+            <Button type="button" variant="outline" size="sm" onClick={clearTaskFilters}>Reset filters</Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredPackageGroups.map((group) => {
-              const packageKey = `pkg:${group.packageTask.id}`;
-              const isFiltering = !!statusFilter;
-              const open = isFiltering || expandedIds.has(packageKey);
-              return (
-                <div key={group.packageTask.id} className="rounded-lg border">
-                  <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => !isFiltering && toggleExpanded(packageKey)}>
-                    {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm">{group.packageTask.task}</p>
-                      {(group.packageTask.room_area || group.packageTask.trade) && (
-                        <p className="text-xs text-muted-foreground">
-                          {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-1">
-                      <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
-                      {!isFiltering && (
-                        <>
-                          <Badge variant="secondary" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('ready'); }}>Ready {group.summary.byStatus.ready}</Badge>
-                          <Badge variant="secondary" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('in_progress'); }}>In Progress {group.summary.byStatus.in_progress}</Badge>
-                          {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('blocked'); }}>Blocked {group.summary.byStatus.blocked}</Badge>}
-                          {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('review'); }}>Review {group.summary.byStatus.review_needed}</Badge>}
-                          {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleStatusFilter('materials'); }}>Materials {group.summary.materialsNeeded}</Badge>}
-                        </>
-                      )}
-                    </div>
-                  </button>
-                  {open && (
-                    <div className="border-t p-2 space-y-2">
-                      {isManager && !isFiltering ? (
-                        <SortableTaskList
-                          items={group.childTasks}
-                          onReorder={async (orderedIds) => {
-                            const { error } = await persistTaskOrder(orderedIds);
-                            if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
-                            else invalidateProject();
-                          }}
-                        >
-                          {(task) => (
-                            <SortableTaskItem key={task.id} id={task.id}>
-                              <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
-                            </SortableTaskItem>
+          <>
+            {activePackageGroups.length > 0 && (
+              <div className="space-y-4">
+                {activePackageGroups.map((group) => {
+                  const packageKey = `pkg:${group.packageTask.id}`;
+                  const open = expandedIds.has(packageKey);
+                  return (
+                    <div key={group.packageTask.id} className="rounded-lg border">
+                      <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
+                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                          {(group.packageTask.room_area || group.packageTask.trade) && (
+                            <p className="text-xs text-muted-foreground">
+                              {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
+                            </p>
                           )}
-                        </SortableTaskList>
-                      ) : (
-                        group.childTasks.map((task) => (
-                          <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
-                        ))
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
+                          <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
+                          <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
+                          {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
+                          {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
+                          {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
+                        </div>
+                      </button>
+                      {open && (
+                        <div className="border-t p-2 space-y-2">
+                          {bulkMode ? (
+                            group.childTasks.map((task) => (
+                              <div key={task.id} className="flex items-start gap-2">
+                                <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} />
+                                </div>
+                              </div>
+                            ))
+                          ) : isManager ? (
+                            <SortableTaskList
+                              items={group.childTasks}
+                              onReorder={async (orderedIds) => {
+                                const { error } = await persistTaskOrder(orderedIds);
+                                if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
+                                else invalidateProject();
+                              }}
+                            >
+                              {(task) => (
+                                <SortableTaskItem key={task.id} id={task.id}>
+                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} />
+                                </SortableTaskItem>
+                              )}
+                            </SortableTaskList>
+                          ) : (
+                            group.childTasks.map((task) => (
+                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} />
+                            ))
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {completedPackageGroups.length > 0 && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between rounded-lg border p-3 text-left"
+                  onClick={() => setShowCompletedSection((prev) => !prev)}
+                >
+                  <span className="text-sm font-medium">{showCompletedSection ? 'Hide' : 'Show'} {completedTaskCount} completed tasks</span>
+                  {showCompletedSection ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+                {showCompletedSection && (
+                  <div className="mt-3 space-y-4">
+                    {completedPackageGroups.map((group) => {
+                      const packageKey = `pkg:${group.packageTask.id}`;
+                      const open = expandedIds.has(packageKey);
+                      return (
+                        <div key={group.packageTask.id} className="rounded-lg border border-muted">
+                          <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
+                            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                            </div>
+                            <Badge variant="outline" className="text-xs">{group.summary.total} done</Badge>
+                          </button>
+                          {open && (
+                            <div className="border-t p-2 space-y-2">
+                              {group.childTasks.map((task) => (
+                                <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
         {isManager && <ProjectMembers projectId={id!} />}
       </div>
