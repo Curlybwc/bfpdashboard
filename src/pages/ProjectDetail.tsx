@@ -35,7 +35,59 @@ import { buildTaskPackageGroups } from '@/lib/taskPackages';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const ProjectDetail = () => {
+const PackageDeleteButton = ({ packageTask, childCount, onDelete }: { packageTask: any; childCount: number; onDelete: () => void }) => {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      const { error: childErr } = await supabase.from('tasks').delete().eq('parent_task_id', packageTask.id);
+      if (childErr) throw childErr;
+      const { error } = await supabase.from('tasks').delete().eq('id', packageTask.id);
+      if (error) throw error;
+      toast({ title: 'Package deleted' });
+      onDelete();
+    } catch (error: unknown) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Unable to delete', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+      setConfirmOpen(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-destructive hover:text-destructive hover:bg-destructive/10 mr-2 shrink-0"
+        onClick={(e) => { e.stopPropagation(); setConfirmOpen(true); }}
+        disabled={loading}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Package</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete "{packageTask.task}" and all {childCount} subtask{childCount !== 1 ? 's' : ''}? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Package
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
