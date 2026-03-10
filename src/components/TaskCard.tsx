@@ -40,6 +40,7 @@ interface TaskCardProps {
   photoCount?: number;
   materialCount?: number;
   canReportIssue?: boolean;
+  canDelete?: boolean;
 }
 
 const TaskCard = ({
