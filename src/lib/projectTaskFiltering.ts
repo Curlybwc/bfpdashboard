@@ -1,3 +1,5 @@
+import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
+
 /**
  * Pure helpers for filtering and structuring tasks on the ProjectDetail page.
  * Extracted to reduce fragility in ProjectDetail.tsx.
@@ -18,7 +20,7 @@ export function filterContractorTasks(
     if (t.assigned_to_user_id === userId) return true;
     if (myActiveWorkerTaskIds.has(t.id)) return true;
     if (myCandidateTaskIds.has(t.id)) return true;
-    if (!t.assigned_to_user_id && t.assignment_mode === 'solo' && t.stage === 'Ready' && !t.is_outside_vendor) return true;
+    if (!t.assigned_to_user_id && t.assignment_mode === 'solo' && getTaskOperationalStatus(t) === 'ready' && !t.is_outside_vendor) return true;
     return false;
   });
 }

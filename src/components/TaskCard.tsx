@@ -14,6 +14,7 @@ import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat } fro
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import { BLOCKER_REASONS, TASK_STAGES, type TaskStage } from '@/lib/supabase-types';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
+import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 
 interface TaskCardProps {
   task: any;
@@ -58,6 +59,10 @@ const TaskCard = ({
   const isUnassigned = !task.assigned_to_user_id;
   const isOutsideVendor = task.is_outside_vendor === true;
   const materialsReady = task.materials_on_site === 'Yes';
+  const operationalStatus = getTaskOperationalStatus(task, {
+    requiredCount: materialCount,
+    hasRequiredMaterials: materialCount > 0 ? materialsReady : true,
+  });
 
   // Solo action visibility — outside vendor tasks are not available for dibs
   const hasChildren = childCount > 0;
@@ -253,7 +258,7 @@ const TaskCard = ({
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                 <button className="cursor-pointer" aria-label="Change status">
-                  <StatusBadge status={task.stage} />
+                  <StatusBadge status={operationalStatus} />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
@@ -269,7 +274,6 @@ const TaskCard = ({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            {task.is_blocked && <StatusBadge status="Blocked" />}
             {isCrewTask && (
               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                 <Users className="h-3 w-3" />

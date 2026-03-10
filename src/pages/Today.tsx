@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Zap, Clock, CalendarDays, AlertTriangle } from 'lucide-react';
 import { generateAlerts } from '@/lib/alerts';
+import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 import AlertsBanner from '@/components/AlertsBanner';
 import {
   Sheet,
@@ -30,9 +31,12 @@ const PRIORITY_ORDER: Record<string, number> = {
   '5 – Later': 5,
 };
 
-const STAGE_ORDER: Record<string, number> = {
-  'In Progress': 0,
-  'Ready': 1,
+const STATUS_ORDER: Record<string, number> = {
+  in_progress: 0,
+  ready: 1,
+  review_needed: 2,
+  blocked: 3,
+  done: 4,
 };
 
 function rankTasks(a: any, b: any): number {
@@ -40,8 +44,8 @@ function rankTasks(a: any, b: any): number {
   const aOverdue = a.due_date && a.due_date < todayStr ? 0 : 1;
   const bOverdue = b.due_date && b.due_date < todayStr ? 0 : 1;
   if (aOverdue !== bOverdue) return aOverdue - bOverdue;
-  const sa = STAGE_ORDER[a.stage] ?? 9;
-  const sb = STAGE_ORDER[b.stage] ?? 9;
+  const sa = STATUS_ORDER[getTaskOperationalStatus(a)] ?? 9;
+  const sb = STATUS_ORDER[getTaskOperationalStatus(b)] ?? 9;
   if (sa !== sb) return sa - sb;
   const pa = PRIORITY_ORDER[a.priority] ?? 9;
   const pb = PRIORITY_ORDER[b.priority] ?? 9;
