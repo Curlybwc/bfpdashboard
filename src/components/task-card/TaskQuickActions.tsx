@@ -1,23 +1,18 @@
 /**
- * TaskQuickActions — inline "⋯" menu on TaskCard for rapid task management
- * without navigating to the detail page.
+ * TaskQuickActions — visible pill buttons on TaskCard for rapid task management.
  */
 import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { getErrorMessage } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import { TASK_PRIORITIES, MATERIALS_OPTIONS, type TaskPriority, type MaterialsStatus } from '@/lib/supabase-types';
-import { MoreHorizontal, UserPlus, Camera, Package, Flag, CalendarDays } from 'lucide-react';
+import { UserPlus, Camera, Package, Flag, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -26,13 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 interface Profile {
@@ -82,17 +71,19 @@ async function compressImage(file: File): Promise<Blob> {
   });
 }
 
+const pillClass =
+  'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer';
+
 const TaskQuickActions = ({ task, userId, onUpdate, allProfiles }: TaskQuickActionsProps) => {
   const { toast } = useToast();
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [photoPhase, setPhotoPhase] = useState<'before' | 'progress' | 'after'>('progress');
   const [uploading, setUploading] = useState(false);
-  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAssign = async (profileId: string | null) => {
     try {
-      // If assigning someone new, ensure they're a project member
       if (profileId) {
         const { data: existing } = await supabase
           .from('project_members')
@@ -149,7 +140,7 @@ const TaskQuickActions = ({ task, userId, onUpdate, allProfiles }: TaskQuickActi
         .update({ due_date: date ? format(date, 'yyyy-MM-dd') : null })
         .eq('id', task.id);
       if (error) throw error;
-      setDatePopoverOpen(false);
+      setDateDialogOpen(false);
       onUpdate();
     } catch (error: unknown) {
       toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
@@ -179,7 +170,6 @@ const TaskQuickActions = ({ task, userId, onUpdate, allProfiles }: TaskQuickActi
         uploaded_by: userId,
       });
       if (insertErr) {
-        // Best-effort cleanup
         await supabase.storage.from('task-photos').remove([path]);
         throw insertErr;
       }
@@ -194,120 +184,113 @@ const TaskQuickActions = ({ task, userId, onUpdate, allProfiles }: TaskQuickActi
     }
   };
 
-  // Sort profiles: project members first could be nice, but for simplicity just alpha sort
   const sortedProfiles = (allProfiles || []).slice().sort((a, b) =>
     (a.full_name || '').localeCompare(b.full_name || '')
   );
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            aria-label="Quick actions"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-          {/* Assign / Reassign */}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <UserPlus className="h-4 w-4 mr-2" />
+      <div className="flex items-center gap-1 flex-wrap" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+        {/* Assign */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={pillClass} aria-label="Assign">
+              <UserPlus className="h-3.5 w-3.5" />
               {task.assigned_to_user_id ? 'Reassign' : 'Assign'}
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
-              {task.assigned_to_user_id && (
-                <DropdownMenuItem onSelect={() => handleAssign(null)}>
-                  <span className="text-muted-foreground">Unassign</span>
-                </DropdownMenuItem>
-              )}
-              {sortedProfiles.map((p) => (
-                <DropdownMenuItem
-                  key={p.id}
-                  disabled={p.id === task.assigned_to_user_id}
-                  onSelect={() => handleAssign(p.id)}
-                  className={cn(p.id === task.assigned_to_user_id && 'font-semibold')}
-                >
-                  {p.full_name || 'Unnamed'}
-                </DropdownMenuItem>
-              ))}
-              {sortedProfiles.length === 0 && (
-                <DropdownMenuLabel className="text-xs text-muted-foreground">No users found</DropdownMenuLabel>
-              )}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+            {task.assigned_to_user_id && (
+              <DropdownMenuItem onSelect={() => handleAssign(null)}>
+                <span className="text-muted-foreground">Unassign</span>
+              </DropdownMenuItem>
+            )}
+            {sortedProfiles.map((p) => (
+              <DropdownMenuItem
+                key={p.id}
+                disabled={p.id === task.assigned_to_user_id}
+                onSelect={() => handleAssign(p.id)}
+                className={cn(p.id === task.assigned_to_user_id && 'font-semibold')}
+              >
+                {p.full_name || 'Unnamed'}
+              </DropdownMenuItem>
+            ))}
+            {sortedProfiles.length === 0 && (
+              <DropdownMenuLabel className="text-xs text-muted-foreground">No users found</DropdownMenuLabel>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-          {/* Add Photo */}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Camera className="h-4 w-4 mr-2" />
-              Add Photo
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              <DropdownMenuItem onSelect={() => openPhotoUpload('before')}>Before</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openPhotoUpload('progress')}>Progress</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openPhotoUpload('after')}>After</DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+        {/* Photo */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={pillClass} aria-label="Add photo">
+              <Camera className="h-3.5 w-3.5" />
+              Photo
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onSelect={() => openPhotoUpload('before')}>Before</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openPhotoUpload('progress')}>Progress</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openPhotoUpload('after')}>After</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-          <DropdownMenuSeparator />
-
-          {/* Priority */}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Flag className="h-4 w-4 mr-2" />
+        {/* Priority */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={pillClass} aria-label="Priority">
+              <Flag className="h-3.5 w-3.5" />
               Priority
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              {TASK_PRIORITIES.map((p) => (
-                <DropdownMenuItem
-                  key={p}
-                  onSelect={() => handlePriority(p)}
-                  className={cn(p === task.priority && 'font-semibold')}
-                >
-                  {p}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {TASK_PRIORITIES.map((p) => (
+              <DropdownMenuItem
+                key={p}
+                onSelect={() => handlePriority(p)}
+                className={cn(p === task.priority && 'font-semibold')}
+              >
+                {p}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-          {/* Materials on Site */}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Package className="h-4 w-4 mr-2" />
-              Materials on Site
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              {MATERIALS_OPTIONS.map((opt) => (
-                <DropdownMenuItem
-                  key={opt}
-                  onSelect={() => handleMaterialsOnSite(opt)}
-                  className={cn(opt === task.materials_on_site && 'font-semibold')}
-                >
-                  {opt}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+        {/* Materials on Site */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={pillClass} aria-label="Materials on site">
+              <Package className="h-3.5 w-3.5" />
+              On Site: {task.materials_on_site}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {MATERIALS_OPTIONS.map((opt) => (
+              <DropdownMenuItem
+                key={opt}
+                onSelect={() => handleMaterialsOnSite(opt)}
+                className={cn(opt === task.materials_on_site && 'font-semibold')}
+              >
+                {opt}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-          {/* Due Date */}
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-              setDatePopoverOpen(true);
-            }}
-          >
-            <CalendarDays className="h-4 w-4 mr-2" />
-            {task.due_date ? `Due: ${task.due_date}` : 'Set Due Date'}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        {/* Due Date */}
+        <button
+          className={pillClass}
+          onClick={() => setDateDialogOpen(true)}
+          aria-label="Due date"
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+          {task.due_date ? task.due_date : 'Due Date'}
+        </button>
+      </div>
 
       {/* Due Date Dialog */}
-      <Dialog open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+      <Dialog open={dateDialogOpen} onOpenChange={setDateDialogOpen}>
         <DialogContent className="sm:max-w-[350px]" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
           <DialogHeader>
             <DialogTitle>Set Due Date</DialogTitle>
