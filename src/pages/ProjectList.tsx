@@ -14,7 +14,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, MapPin, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useProjectList, type ProjectType } from '@/hooks/useProjectList';
+import { useProjectList } from '@/hooks/useProjectList';
+import type { ProjectType } from '@/lib/supabase-types';
 import { useQueryClient } from '@tanstack/react-query';
 
 const ProjectList = () => {
