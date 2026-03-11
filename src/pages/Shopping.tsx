@@ -20,8 +20,6 @@ interface AggCard {
   name: string;
   totalQty: number;
   unit: string | null;
-  unit_cost: number | null;
-  totalCost: number;
   sku: string | null;
   vendor_url: string | null;
   item_type: string;
@@ -40,7 +38,7 @@ function sectionOf(s: string | null, activeNames: string[]): string {
 }
 
 function aggKey(i: ShoppingItem): string {
-  return `${i.project_id}|${i.name}|${i.sku ?? ''}|${i.unit ?? ''}|${i.unit_cost ?? ''}|${i.vendor_url ?? ''}|${i.item_type}`;
+  return `${i.project_id}|${i.name}|${i.sku ?? ''}|${i.unit ?? ''}|${i.vendor_url ?? ''}|${i.item_type}`;
 }
 
 export default function Shopping() {
@@ -81,7 +79,6 @@ export default function Shopping() {
       const existing = map.get(k);
       if (existing) {
         existing.totalQty += i.quantity ?? 0;
-        existing.totalCost += (i.quantity ?? 0) * (i.unit_cost ?? 0);
         if (!existing.tasks.find(t => t.id === i.task_id)) {
           existing.tasks.push({ id: i.task_id, title: i.task_title, project_id: i.project_id });
         }
@@ -92,8 +89,6 @@ export default function Shopping() {
           name: i.name,
           totalQty: i.quantity ?? 0,
           unit: i.unit,
-          unit_cost: i.unit_cost,
-          totalCost: (i.quantity ?? 0) * (i.unit_cost ?? 0),
           sku: i.sku,
           vendor_url: i.vendor_url,
           item_type: i.item_type,
@@ -131,8 +126,6 @@ export default function Shopping() {
           {(card.totalQty > 0 || card.unit) && (
             <p className="text-xs text-muted-foreground">
               {card.totalQty}{card.unit ? ` ${card.unit}` : ''}
-              {card.unit_cost != null ? ` · $${card.unit_cost.toFixed(2)}/${card.unit || 'unit'}` : ''}
-              {card.totalCost > 0 ? ` · $${card.totalCost.toFixed(2)} total` : ''}
             </p>
           )}
         </div>
