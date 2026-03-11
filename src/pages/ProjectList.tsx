@@ -34,6 +34,8 @@ const ProjectList = () => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'name' | 'address'>('newest');
 
 
   const handleTabChange = (tab: string) => {
