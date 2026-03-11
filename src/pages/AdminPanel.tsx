@@ -16,7 +16,7 @@ import AdminMaterialLibrary from '@/components/admin/AdminMaterialLibrary';
 import { LogIn, BookOpen, Settings, Package, BarChart3, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type ActiveView = 'hub' | 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups' | 'tenants';
+type ActiveView = 'hub' | 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups' | 'tenants' | 'material-library';
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
