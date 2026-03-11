@@ -126,6 +126,16 @@ const TaskQuickActions = ({
     } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
   };
 
+  const handleSetOutsideVendor = async () => {
+    try {
+      const newVal = !task.is_outside_vendor;
+      const { error } = await supabase.from('tasks').update({ is_outside_vendor: newVal, assigned_to_user_id: newVal ? null : task.assigned_to_user_id }).eq('id', task.id);
+      if (error) throw error;
+      toast({ title: newVal ? 'Marked as Outside Vendor' : 'Removed Outside Vendor flag' });
+      onUpdate();
+    } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
+  };
+
   const handleToggleCrew = async () => {
     const newMode = task.assignment_mode === 'crew' ? 'solo' : 'crew';
     try {
