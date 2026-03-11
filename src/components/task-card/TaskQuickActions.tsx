@@ -124,6 +124,16 @@ const TaskQuickActions = ({
     } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
   };
 
+  const handleToggleCrew = async () => {
+    const newMode = task.assignment_mode === 'crew' ? 'solo' : 'crew';
+    try {
+      const { error } = await supabase.from('tasks').update({ assignment_mode: newMode }).eq('id', task.id);
+      if (error) throw error;
+      toast({ title: newMode === 'crew' ? 'Set as crew task' : 'Set as solo task' });
+      onUpdate();
+    } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
+  };
+
   const handleStageChange = async (newStage: TaskStage) => {
     if (newStage === task.stage) return;
     setLoading(true);
