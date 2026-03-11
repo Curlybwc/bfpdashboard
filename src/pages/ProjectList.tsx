@@ -42,6 +42,11 @@ const ProjectList = () => {
 
   const filteredProjects = useMemo(() => {
     let result = [...projects];
+    if (!showArchived) {
+      result = result.filter(p => p.status !== 'complete');
+    } else {
+      result = result.filter(p => p.status === 'complete');
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(p =>
@@ -59,7 +64,7 @@ const ProjectList = () => {
       });
     }
     return result;
-  }, [projects, search, sortBy]);
+  }, [projects, search, sortBy, showArchived]);
 
   const handleTabChange = (tab: string) => {
     setSearchParams({ tab });
