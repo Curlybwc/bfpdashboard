@@ -147,6 +147,7 @@ const ProjectDetail = () => {
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [taskSearch, setTaskSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('stage');
   const [filterStage, setFilterStage] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterAssignee, setFilterAssignee] = useState<string>('all');
