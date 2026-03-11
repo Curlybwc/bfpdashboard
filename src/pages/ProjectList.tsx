@@ -18,11 +18,6 @@ import { useProjectList } from '@/hooks/useProjectList';
 import type { ProjectType } from '@/lib/supabase-types';
 import { useQueryClient } from '@tanstack/react-query';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useProjectList } from '@/hooks/useProjectList';
-import type { ProjectType } from '@/lib/supabase-types';
-import { useQueryClient } from '@tanstack/react-query';
 
 const ProjectList = () => {
   const { user } = useAuth();
