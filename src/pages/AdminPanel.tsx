@@ -12,6 +12,7 @@ import AdminAliases from '@/components/AdminAliases';
 import AdminAvailability from '@/components/admin/AdminAvailability';
 import AdminCrewGroups from '@/components/admin/AdminCrewGroups';
 import AdminTenants from '@/components/admin/AdminTenants';
+import AdminMaterialLibrary from '@/components/admin/AdminMaterialLibrary';
 import { LogIn, BookOpen, Settings, Package, BarChart3, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
