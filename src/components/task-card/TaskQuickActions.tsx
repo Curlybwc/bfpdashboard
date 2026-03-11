@@ -49,6 +49,7 @@ interface TaskQuickActionsProps {
   onMaterialsOpen: () => void;
   onPhotoConfirm: () => void;
   canReportIssue?: boolean;
+  canReassign?: boolean;
 }
 
 const pill =
@@ -77,7 +78,7 @@ const TaskQuickActions = ({
   assigneeName, photoCount = 0, materialCount = 0,
   operationalStatus, isCrewTask = false, isActiveWorker = false, isCandidate = false,
   hasChildren = false, allChildrenDone = true, materialsReady = true,
-  onMaterialsOpen, onPhotoConfirm, canReportIssue = false,
+  onMaterialsOpen, onPhotoConfirm, canReportIssue = false, canReassign = false,
 }: TaskQuickActionsProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -119,6 +120,16 @@ const TaskQuickActions = ({
       }
       const { error } = await supabase.from('tasks').update({ assigned_to_user_id: profileId }).eq('id', task.id);
       if (error) throw error;
+      onUpdate();
+    } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
+  };
+
+  const handleToggleCrew = async () => {
+    const newMode = task.assignment_mode === 'crew' ? 'solo' : 'crew';
+    try {
+      const { error } = await supabase.from('tasks').update({ assignment_mode: newMode }).eq('id', task.id);
+      if (error) throw error;
+      toast({ title: newMode === 'crew' ? 'Set as crew task' : 'Set as solo task' });
       onUpdate();
     } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
   };
@@ -228,20 +239,28 @@ const TaskQuickActions = ({
     <>
       <div className="flex items-center gap-1 flex-wrap">
         {/* Assigned To */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className={pill}><UserPlus className="h-3.5 w-3.5" />{assigneeLabel}</button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
-            {task.assigned_to_user_id && <DropdownMenuItem onSelect={() => handleAssign(null)}><span className="text-muted-foreground">Unassign</span></DropdownMenuItem>}
-            {sortedProfiles.map((p) => (
-              <DropdownMenuItem key={p.id} disabled={p.id === task.assigned_to_user_id} onSelect={() => handleAssign(p.id)} className={cn(p.id === task.assigned_to_user_id && 'font-semibold')}>
-                {p.full_name || 'Unnamed'}
+        {canReassign ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className={pill}><UserPlus className="h-3.5 w-3.5" />{assigneeLabel}</button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+              {task.assigned_to_user_id && <DropdownMenuItem onSelect={() => handleAssign(null)}><span className="text-muted-foreground">Unassign</span></DropdownMenuItem>}
+              <DropdownMenuItem onSelect={handleToggleCrew}>
+                <Users className="h-3.5 w-3.5 mr-1" />
+                {task.assignment_mode === 'crew' ? 'Switch to Solo' : 'Make Crew Task'}
               </DropdownMenuItem>
-            ))}
-            {sortedProfiles.length === 0 && <DropdownMenuLabel className="text-xs text-muted-foreground">No users found</DropdownMenuLabel>}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {sortedProfiles.map((p) => (
+                <DropdownMenuItem key={p.id} disabled={p.id === task.assigned_to_user_id} onSelect={() => handleAssign(p.id)} className={cn(p.id === task.assigned_to_user_id && 'font-semibold')}>
+                  {p.full_name || 'Unnamed'}
+                </DropdownMenuItem>
+              ))}
+              {sortedProfiles.length === 0 && <DropdownMenuLabel className="text-xs text-muted-foreground">No users found</DropdownMenuLabel>}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className={pill}><UserPlus className="h-3.5 w-3.5" />{assigneeLabel}</span>
+        )}
 
         {/* Status */}
         {actionable ? (

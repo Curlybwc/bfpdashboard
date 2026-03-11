@@ -77,6 +77,7 @@ const Today = () => {
     projectMap, parentTitles, assigneeMap, blockerMap,
     crewActiveTaskIds, crewCandidateTaskIds, crewWorkerCounts,
     photoCountMap, materialCountMap, childTasksByParent, hasShiftToday, isManager,
+    allProfiles,
   } = data;
 
   /* ── Derived state ── */
@@ -202,6 +203,8 @@ const Today = () => {
                   photoCount={photoCountMap[t.id] || 0}
                   materialCount={materialCountMap[t.id] || 0}
                   canReportIssue={isContractor}
+                  canDelete={isAdmin || isManager}
+                  allProfiles={allProfiles}
                 />
 
                 {isExpanded && children.map((child: any) => (
@@ -225,6 +228,8 @@ const Today = () => {
                     photoCount={photoCountMap[child.id] || 0}
                     materialCount={materialCountMap[child.id] || 0}
                     canReportIssue={isContractor}
+                    canDelete={isAdmin || isManager}
+                    allProfiles={allProfiles}
                   />
                 ))}
               </div>

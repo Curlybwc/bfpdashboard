@@ -22,6 +22,7 @@ export interface TodayData {
   childTasksByParent: Record<string, any[]>;
   hasShiftToday: boolean;
   isManager: boolean;
+  allProfiles: { id: string; full_name: string | null }[];
 }
 
 const EMPTY_DATA: TodayData = {
@@ -42,6 +43,7 @@ const EMPTY_DATA: TodayData = {
   childTasksByParent: {},
   hasShiftToday: true, // default true to suppress flash
   isManager: false,
+  allProfiles: [],
 };
 
 const EMPTY_PROJECT_IDS = ['00000000-0000-0000-0000-000000000000'];
@@ -214,7 +216,7 @@ async function fetchEnrichment(allTasks: any[], userId: string) {
   const allTaskIds = [...new Set(allTasks.map(t => t.id))];
 
   // Run all enrichment queries in parallel
-  const [projectsRes, parentsRes, assigneesRes, crewWorkerRes, photoRes, materialRes] = await Promise.all([
+  const [projectsRes, parentsRes, assigneesRes, crewWorkerRes, photoRes, materialRes, allProfilesRes] = await Promise.all([
     projectIds.length > 0
       ? supabase.from('projects').select('id, name, address').in('id', projectIds)
       : Promise.resolve({ data: [], error: null }),
@@ -233,6 +235,7 @@ async function fetchEnrichment(allTasks: any[], userId: string) {
     allTaskIds.length > 0
       ? supabase.from('task_materials').select('task_id').in('task_id', allTaskIds)
       : Promise.resolve({ data: [], error: null }),
+    supabase.from('profiles').select('id, full_name'),
   ]);
 
   const projectMap: Record<string, { name: string; address?: string }> = {};
@@ -265,7 +268,12 @@ async function fetchEnrichment(allTasks: any[], userId: string) {
     materialCountMap[r.task_id] = (materialCountMap[r.task_id] || 0) + 1;
   });
 
-  return { projectMap, parentTitles, assigneeMap, crewWorkerCounts, photoCountMap, materialCountMap };
+  const allProfiles = (unwrap(allProfilesRes, 'All profiles') as any[]).map((p: any) => ({
+    id: p.id as string,
+    full_name: p.full_name as string | null,
+  }));
+
+  return { projectMap, parentTitles, assigneeMap, crewWorkerCounts, photoCountMap, materialCountMap, allProfiles };
 }
 
 
