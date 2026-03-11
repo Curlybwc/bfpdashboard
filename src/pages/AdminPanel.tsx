@@ -112,6 +112,7 @@ const AdminPanel = () => {
         { label: 'Rehab Library', action: () => navigate('/admin/rehab-library') },
         { label: 'Bundles', action: () => navigate('/admin/bundles') },
         { label: 'Store Sections', action: () => navigate('/admin/store-sections') },
+        { label: 'Materials Library', action: () => setActiveView('material-library') },
         { label: 'Assignment Rules', action: () => navigate('/admin/assignment-rules') },
       ],
     },
