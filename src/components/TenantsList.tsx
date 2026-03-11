@@ -78,7 +78,7 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
     } else {
       const { error } = await supabase
         .from('tenants')
-        .insert({ project_id: projectId, name: name.trim(), address: address.trim() || null });
+        .insert({ project_id: projectId, name: name.trim(), address: address.trim() || null, phone: phone.trim() || null });
       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
       toast({ title: 'Tenant added' });
     }
