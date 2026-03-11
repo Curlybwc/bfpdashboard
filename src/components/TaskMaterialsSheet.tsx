@@ -567,7 +567,12 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             )}
             <div>
               <Label className="text-xs">Name</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <MaterialAutocomplete
+                value={editName}
+                onChange={setEditName}
+                onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
+                onAddToLibrary={handleAddToLibrary}
+              />
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
