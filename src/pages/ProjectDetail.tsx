@@ -975,47 +975,95 @@ const ProjectDetail = () => {
                 className="pl-8"
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Select value={filterStage} onValueChange={setFilterStage}>
-                <SelectTrigger><SelectValue placeholder="Stage" /></SelectTrigger>
+            <div className="flex items-center gap-2">
+              <Select value={filterCategory} onValueChange={(v) => {
+                setFilterCategory(v);
+              }}>
+                <SelectTrigger className="w-[130px] shrink-0"><SelectValue placeholder="Filter by" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All stages</SelectItem>
-                  {TASK_STAGES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  <SelectItem value="stage">Stage</SelectItem>
+                  <SelectItem value="priority">Priority</SelectItem>
+                  <SelectItem value="assignee">Assignee</SelectItem>
+                  <SelectItem value="trade">Trade</SelectItem>
+                  <SelectItem value="room">Room / Area</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterPriority} onValueChange={setFilterPriority}>
-                <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All priorities</SelectItem>
-                  {TASK_PRIORITIES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-                <SelectTrigger><SelectValue placeholder="Assignee" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All assignees</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {projectMembers.map((member) => (
-                    <SelectItem key={member.user_id} value={member.user_id}>{member.profiles?.full_name || 'Unnamed'}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterTrade} onValueChange={setFilterTrade}>
-                <SelectTrigger><SelectValue placeholder="Trade" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All trades</SelectItem>
-                  {tradeFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterRoomArea} onValueChange={setFilterRoomArea}>
-                <SelectTrigger><SelectValue placeholder="Room / Area" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All rooms/areas</SelectItem>
-                  {roomAreaFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button type="button" variant="outline" onClick={clearTaskFilters}>Clear</Button>
+
+              {filterCategory === 'stage' && (
+                <Select value={filterStage} onValueChange={setFilterStage}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All stages" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All stages</SelectItem>
+                    {TASK_STAGES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {filterCategory === 'priority' && (
+                <Select value={filterPriority} onValueChange={setFilterPriority}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All priorities" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All priorities</SelectItem>
+                    {TASK_PRIORITIES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {filterCategory === 'assignee' && (
+                <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All assignees" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All assignees</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {projectMembers.map((member) => (
+                      <SelectItem key={member.user_id} value={member.user_id}>{member.profiles?.full_name || 'Unnamed'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {filterCategory === 'trade' && (
+                <Select value={filterTrade} onValueChange={setFilterTrade}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All trades" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All trades</SelectItem>
+                    {tradeFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {filterCategory === 'room' && (
+                <Select value={filterRoomArea} onValueChange={setFilterRoomArea}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All rooms/areas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All rooms/areas</SelectItem>
+                    {roomAreaFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
+                <Button type="button" variant="ghost" size="sm" onClick={clearTaskFilters} className="shrink-0 px-2">
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+            {/* Show active filter badges */}
+            {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
+              <div className="flex flex-wrap gap-1">
+                {filterStage !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Stage: {filterStage}<button onClick={() => setFilterStage('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+                {filterPriority !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Priority: {filterPriority.split(' – ')[1] || filterPriority}<button onClick={() => setFilterPriority('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+                {filterAssignee !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Assignee: {filterAssignee === 'unassigned' ? 'Unassigned' : (projectMembers.find(m => m.user_id === filterAssignee)?.profiles?.full_name || 'Unknown')}<button onClick={() => setFilterAssignee('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+                {filterTrade !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Trade: {filterTrade}<button onClick={() => setFilterTrade('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+                {filterRoomArea !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Room: {filterRoomArea}<button onClick={() => setFilterRoomArea('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
