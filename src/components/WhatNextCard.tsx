@@ -210,42 +210,73 @@ const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGro
           )}
         </div>
 
-        {/* Collapsible groups */}
-        {whatNext.sortedBlocked.length > 0 && (
-          <WhatNextGroup label="Blocked" count={whatNext.sortedBlocked.length} tasks={whatNext.sortedBlocked} projectId={projectId} open={openGroup === 'blocked'} onToggle={() => toggle('blocked')} />
-        )}
-        {whatNext.sortedReady.length > 0 && (
-          <WhatNextGroup label="Ready to Start" count={whatNext.sortedReady.length} tasks={whatNext.sortedReady} projectId={projectId} open={openGroup === 'ready'} onToggle={() => toggle('ready')} />
-        )}
-        {whatNext.sortedUnassigned.length > 0 && (
-          <WhatNextGroup
-            label="Unassigned"
-            count={whatNext.sortedUnassigned.length}
-            tasks={whatNext.sortedUnassigned}
-            projectId={projectId}
-            open={openGroup === 'unassigned'}
-            onToggle={() => toggle('unassigned')}
-            mode="assign"
-            members={members}
-            crewGroups={crewGroups}
-            onUpdate={onUpdate}
-          />
-        )}
-        {whatNext.inProgress.length > 0 && (
-          <WhatNextGroup label="In Progress" count={whatNext.inProgress.length} tasks={whatNext.inProgress} projectId={projectId} open={openGroup === 'progress'} onToggle={() => toggle('progress')} />
-        )}
-        {whatNext.sortedWaitingMaterials.length > 0 && (
-          <WhatNextGroup label="Needs Materials/Tools" count={whatNext.sortedWaitingMaterials.length} tasks={whatNext.sortedWaitingMaterials} projectId={projectId} open={openGroup === 'materials'} onToggle={() => toggle('materials')} />
-        )}
-        {/* Contractor-specific groups */}
-        {isContractor && whatNext.myBlocked.length > 0 && (
-          <WhatNextGroup label="My Blocked" count={whatNext.myBlocked.length} tasks={whatNext.myBlocked} projectId={projectId} open={openGroup === 'myblocked'} onToggle={() => toggle('myblocked')} />
-        )}
-        {isContractor && whatNext.myInProgress.length > 0 && (
-          <WhatNextGroup label="My In Progress" count={whatNext.myInProgress.length} tasks={whatNext.myInProgress} projectId={projectId} open={openGroup === 'myprogress'} onToggle={() => toggle('myprogress')} />
-        )}
-        {isContractor && whatNext.available.length > 0 && (
-          <WhatNextGroup label="Available" count={whatNext.available.length} tasks={whatNext.available} projectId={projectId} open={openGroup === 'available'} onToggle={() => toggle('available')} />
+        {/* Collapsible groups — horizontal layout */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {whatNext.sortedBlocked.length > 0 && (
+            <WhatNextGroup label="Blocked" count={whatNext.sortedBlocked.length} tasks={whatNext.sortedBlocked} projectId={projectId} open={openGroup === 'blocked'} onToggle={() => toggle('blocked')} />
+          )}
+          {whatNext.sortedReady.length > 0 && (
+            <WhatNextGroup label="Ready to Start" count={whatNext.sortedReady.length} tasks={whatNext.sortedReady} projectId={projectId} open={openGroup === 'ready'} onToggle={() => toggle('ready')} />
+          )}
+          {whatNext.sortedUnassigned.length > 0 && (
+            <WhatNextGroup
+              label="Unassigned"
+              count={whatNext.sortedUnassigned.length}
+              tasks={whatNext.sortedUnassigned}
+              projectId={projectId}
+              open={openGroup === 'unassigned'}
+              onToggle={() => toggle('unassigned')}
+              mode="assign"
+              members={members}
+              crewGroups={crewGroups}
+              onUpdate={onUpdate}
+            />
+          )}
+          {whatNext.inProgress.length > 0 && (
+            <WhatNextGroup label="In Progress" count={whatNext.inProgress.length} tasks={whatNext.inProgress} projectId={projectId} open={openGroup === 'progress'} onToggle={() => toggle('progress')} />
+          )}
+          {whatNext.sortedWaitingMaterials.length > 0 && (
+            <WhatNextGroup label="Needs Materials/Tools" count={whatNext.sortedWaitingMaterials.length} tasks={whatNext.sortedWaitingMaterials} projectId={projectId} open={openGroup === 'materials'} onToggle={() => toggle('materials')} />
+          )}
+          {/* Contractor-specific groups */}
+          {isContractor && whatNext.myBlocked.length > 0 && (
+            <WhatNextGroup label="My Blocked" count={whatNext.myBlocked.length} tasks={whatNext.myBlocked} projectId={projectId} open={openGroup === 'myblocked'} onToggle={() => toggle('myblocked')} />
+          )}
+          {isContractor && whatNext.myInProgress.length > 0 && (
+            <WhatNextGroup label="My In Progress" count={whatNext.myInProgress.length} tasks={whatNext.myInProgress} projectId={projectId} open={openGroup === 'myprogress'} onToggle={() => toggle('myprogress')} />
+          )}
+          {isContractor && whatNext.available.length > 0 && (
+            <WhatNextGroup label="Available" count={whatNext.available.length} tasks={whatNext.available} projectId={projectId} open={openGroup === 'available'} onToggle={() => toggle('available')} />
+          )}
+        </div>
+        {/* Expanded group content shown below */}
+        {openGroup && (
+          <div className="pt-1">
+            {openGroup === 'blocked' && whatNext.sortedBlocked.length > 0 && (
+              <WhatNextGroupContent tasks={whatNext.sortedBlocked} projectId={projectId} />
+            )}
+            {openGroup === 'ready' && whatNext.sortedReady.length > 0 && (
+              <WhatNextGroupContent tasks={whatNext.sortedReady} projectId={projectId} />
+            )}
+            {openGroup === 'unassigned' && whatNext.sortedUnassigned.length > 0 && (
+              <WhatNextGroupContent tasks={whatNext.sortedUnassigned} projectId={projectId} mode="assign" members={members} crewGroups={crewGroups} onUpdate={onUpdate} />
+            )}
+            {openGroup === 'progress' && whatNext.inProgress.length > 0 && (
+              <WhatNextGroupContent tasks={whatNext.inProgress} projectId={projectId} />
+            )}
+            {openGroup === 'materials' && whatNext.sortedWaitingMaterials.length > 0 && (
+              <WhatNextGroupContent tasks={whatNext.sortedWaitingMaterials} projectId={projectId} />
+            )}
+            {openGroup === 'myblocked' && whatNext.myBlocked.length > 0 && (
+              <WhatNextGroupContent tasks={whatNext.myBlocked} projectId={projectId} />
+            )}
+            {openGroup === 'myprogress' && whatNext.myInProgress.length > 0 && (
+              <WhatNextGroupContent tasks={whatNext.myInProgress} projectId={projectId} />
+            )}
+            {openGroup === 'available' && whatNext.available.length > 0 && (
+              <WhatNextGroupContent tasks={whatNext.available} projectId={projectId} />
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
