@@ -11,12 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, MapPin, AlertTriangle } from 'lucide-react';
+import { Plus, MapPin, AlertTriangle, Search, ArrowUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectList } from '@/hooks/useProjectList';
 import type { ProjectType } from '@/lib/supabase-types';
 import { useQueryClient } from '@tanstack/react-query';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const ProjectList = () => {
   const { user } = useAuth();
@@ -34,7 +35,30 @@ const ProjectList = () => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'name' | 'address'>('newest');
 
+
+  const filteredProjects = useMemo(() => {
+    let result = [...projects];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.address && p.address.toLowerCase().includes(q))
+      );
+    }
+    if (sortBy === 'name') {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'address') {
+      result.sort((a, b) => {
+        const aNum = parseInt((a.address || '').replace(/\D.*/, ''), 10) || Infinity;
+        const bNum = parseInt((b.address || '').replace(/\D.*/, ''), 10) || Infinity;
+        return aNum - bNum;
+      });
+    }
+    return result;
+  }, [projects, search, sortBy]);
 
   const handleTabChange = (tab: string) => {
     setSearchParams({ tab });
@@ -60,6 +84,8 @@ const ProjectList = () => {
   };
 
   const entityLabel = isRental ? 'Property' : activeTab === 'general' ? 'List' : 'Project';
+
+  const sortLabel = sortBy === 'name' ? 'A–Z' : sortBy === 'address' ? 'Address #' : 'Newest';
 
   const loadingCards = useMemo(() => Array.from({ length: 3 }, (_, i) => i), []);
 
@@ -100,6 +126,29 @@ const ProjectList = () => {
           </TabsList>
         </Tabs>
       </div>
+      <div className="px-4 pt-2 flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={`Search ${isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'}…`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="shrink-0 gap-1.5">
+              <ArrowUpDown className="h-3.5 w-3.5" />{sortLabel}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setSortBy('newest')}>Newest</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('name')}>A–Z (Name)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('address')}>Address #</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <div className="p-4 space-y-3">
         {isLoading ? (
           loadingCards.map((key) => (
@@ -115,12 +164,12 @@ const ProjectList = () => {
               <Skeleton className="h-2 w-full" />
             </Card>
           ))
-        ) : projects.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
-            No {isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'} yet. Create your first one!
+            {search.trim() ? 'No matches found.' : `No ${isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'} yet. Create your first one!`}
           </p>
         ) : (
-          projects.map((project) => (
+          filteredProjects.map((project) => (
             <Link key={project.id} to={`/projects/${project.id}`}>
               <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-2">
