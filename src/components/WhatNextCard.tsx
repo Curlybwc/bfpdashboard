@@ -103,39 +103,52 @@ const QuickAssignItem = ({ task, projectId, members, crewGroups, onUpdate }: {
   );
 };
 
-/** Compact collapsible group for the "What next?" section */
-const WhatNextGroup = ({ label, count, tasks, projectId, open, onToggle, mode, members, crewGroups, onUpdate }: {
-  label: string; count: number; tasks: any[]; projectId: string; open?: boolean; onToggle?: () => void;
+/** Compact clickable label for horizontal group list */
+const WhatNextGroup = ({ label, count, open, onToggle }: {
+  label: string; count: number; tasks?: any[]; projectId?: string; open?: boolean; onToggle?: () => void;
   mode?: 'assign';
   members?: { user_id: string; full_name: string | null; role: string }[];
   crewGroups?: { id: string; name: string; members: string[] }[];
   onUpdate?: () => void;
 }) => (
-  <Collapsible open={open} onOpenChange={onToggle}>
-    <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-0.5">
-      <ChevronRight className="h-3.5 w-3.5 transition-transform [[data-state=open]>&]:rotate-90" />
-      {label} ({count})
-    </CollapsibleTrigger>
-    <CollapsibleContent className="pt-1 pl-5 space-y-0.5">
-      {tasks.slice(0, 3).map((t: any) =>
-        mode === 'assign' && members && onUpdate ? (
-          <QuickAssignItem key={t.id} task={t} projectId={projectId} members={members} crewGroups={crewGroups || []} onUpdate={onUpdate} />
-        ) : (
-          <Link
-            key={t.id}
-            to={`/projects/${projectId}/tasks/${t.id}`}
-            className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors"
-          >
-            <span className="truncate flex-1">{t.task}</span>
-            <Badge variant="outline" className="text-[10px] shrink-0">{t.priority?.split(' – ')[0] || '?'}</Badge>
-          </Link>
-        )
-      )}
-      {count > 3 && (
-        <p className="text-xs text-muted-foreground px-2">+{count - 3} more</p>
-      )}
-    </CollapsibleContent>
-  </Collapsible>
+  <button
+    onClick={onToggle}
+    className={cn(
+      'flex items-center gap-1 text-xs font-medium transition-colors py-0.5 px-1 rounded',
+      open ? 'text-foreground bg-muted' : 'text-muted-foreground hover:text-foreground'
+    )}
+  >
+    <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-90')} />
+    {label} ({count})
+  </button>
+);
+
+/** Expanded content for a selected group */
+const WhatNextGroupContent = ({ tasks, projectId, mode, members, crewGroups, onUpdate }: {
+  tasks: any[]; projectId: string; mode?: 'assign';
+  members?: { user_id: string; full_name: string | null; role: string }[];
+  crewGroups?: { id: string; name: string; members: string[] }[];
+  onUpdate?: () => void;
+}) => (
+  <div className="pl-1 space-y-0.5">
+    {tasks.slice(0, 3).map((t: any) =>
+      mode === 'assign' && members && onUpdate ? (
+        <QuickAssignItem key={t.id} task={t} projectId={projectId} members={members} crewGroups={crewGroups || []} onUpdate={onUpdate} />
+      ) : (
+        <Link
+          key={t.id}
+          to={`/projects/${projectId}/tasks/${t.id}`}
+          className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+        >
+          <span className="truncate flex-1">{t.task}</span>
+          <Badge variant="outline" className="text-[10px] shrink-0">{t.priority?.split(' – ')[0] || '?'}</Badge>
+        </Link>
+      )
+    )}
+    {tasks.length > 3 && (
+      <p className="text-xs text-muted-foreground px-2">+{tasks.length - 3} more</p>
+    )}
+  </div>
 );
 
 interface WhatNextCardProps {
