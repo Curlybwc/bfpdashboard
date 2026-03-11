@@ -258,6 +258,7 @@ const AdminPanel = () => {
         {activeView === 'aliases' && <AdminAliases />}
         {activeView === 'availability' && <AdminAvailability />}
         {activeView === 'crew-groups' && <AdminCrewGroups />}
+        {activeView === 'tenants' && <AdminTenants />}
       </div>
     </div>
   );
