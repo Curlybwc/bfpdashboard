@@ -19,7 +19,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
   return useQuery({
     queryKey: ['project-detail', projectId],
     queryFn: async () => {
-      const [{ data: project, error: pErr }, { data: tasks, error: tErr }, { data: members, error: mErr }] = await Promise.all([
+      const [{ data: project, error: pErr }, { data: tasks, error: tErr }, { data: members, error: mErr }, { data: allProfiles, error: apErr }] = await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId!).maybeSingle(),
         supabase
           .from('tasks')
@@ -31,6 +31,9 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
           .from('project_members')
           .select('user_id, role, profiles(full_name)')
           .eq('project_id', projectId!),
+        supabase
+          .from('profiles')
+          .select('id, full_name'),
       ]);
       if (pErr) throw pErr;
       if (tErr) throw tErr;
