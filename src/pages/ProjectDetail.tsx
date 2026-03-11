@@ -680,11 +680,26 @@ const ProjectDetail = () => {
                       <SelectItem value="unassigned">Unassigned</SelectItem>
                       <SelectItem value="crew">Crew Task</SelectItem>
                       <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
-                      {projectMembers.map((m) => (
-                        <SelectItem key={m.user_id} value={m.user_id}>
-                          {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                        </SelectItem>
-                      ))}
+                      {projectMembers.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Project Members</div>
+                          {projectMembers.map((m) => (
+                            <SelectItem key={m.user_id} value={m.user_id}>
+                              {m.profiles?.full_name || 'Unnamed'} ({m.role})
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      {allProfiles.filter(p => !memberUserIds.has(p.id)).length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Other Users (will be added to project)</div>
+                          {allProfiles.filter(p => !memberUserIds.has(p.id)).map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.full_name || 'Unnamed'}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
