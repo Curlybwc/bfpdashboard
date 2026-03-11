@@ -43,6 +43,7 @@ const EMPTY_DATA: TodayData = {
   childTasksByParent: {},
   hasShiftToday: true, // default true to suppress flash
   isManager: false,
+  allProfiles: [],
 };
 
 const EMPTY_PROJECT_IDS = ['00000000-0000-0000-0000-000000000000'];
