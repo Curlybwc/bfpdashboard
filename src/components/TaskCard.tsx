@@ -219,6 +219,7 @@ const TaskCard = ({
             onMaterialsOpen={() => setMaterialsOpen(true)}
             onPhotoConfirm={() => setPhotoConfirmOpen(true)}
             canReportIssue={canReportIssue}
+            canReassign={isAdmin || canDelete}
           />
         </div>
       </Card>
