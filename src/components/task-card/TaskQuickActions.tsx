@@ -78,7 +78,7 @@ const TaskQuickActions = ({
   assigneeName, photoCount = 0, materialCount = 0,
   operationalStatus, isCrewTask = false, isActiveWorker = false, isCandidate = false,
   hasChildren = false, allChildrenDone = true, materialsReady = true,
-  onMaterialsOpen, onPhotoConfirm, canReportIssue = false,
+  onMaterialsOpen, onPhotoConfirm, canReportIssue = false, canReassign = false,
 }: TaskQuickActionsProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
