@@ -79,7 +79,6 @@ export default function Shopping() {
       const existing = map.get(k);
       if (existing) {
         existing.totalQty += i.quantity ?? 0;
-        existing.totalCost += (i.quantity ?? 0) * (i.unit_cost ?? 0);
         if (!existing.tasks.find(t => t.id === i.task_id)) {
           existing.tasks.push({ id: i.task_id, title: i.task_title, project_id: i.project_id });
         }
