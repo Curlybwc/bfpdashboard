@@ -228,6 +228,8 @@ const Today = () => {
                     photoCount={photoCountMap[child.id] || 0}
                     materialCount={materialCountMap[child.id] || 0}
                     canReportIssue={isContractor}
+                    canDelete={isAdmin || isManager}
+                    allProfiles={allProfiles}
                   />
                 ))}
               </div>
