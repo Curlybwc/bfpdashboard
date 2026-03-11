@@ -722,22 +722,29 @@ const ProjectDetail = () => {
                       </Select>
                     )}
                     <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2">
-                      {projectMembers.map((m) => (
-                        <label key={m.user_id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
-                          <Checkbox
-                            checked={crewCandidates.includes(m.user_id)}
-                            onCheckedChange={(checked) => {
-                              setCrewCandidates(prev =>
-                                checked
-                                  ? [...prev, m.user_id]
-                                  : prev.filter(cid => cid !== m.user_id)
-                              );
-                            }}
-                          />
-                          <span>{m.profiles?.full_name || 'Unnamed'}</span>
-                          <span className="text-muted-foreground">({m.role})</span>
-                        </label>
-                      ))}
+                      {allProfiles.map((p) => {
+                        const member = projectMembers.find(m => m.user_id === p.id);
+                        return (
+                          <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
+                            <Checkbox
+                              checked={crewCandidates.includes(p.id)}
+                              onCheckedChange={(checked) => {
+                                setCrewCandidates(prev =>
+                                  checked
+                                    ? [...prev, p.id]
+                                    : prev.filter(cid => cid !== p.id)
+                                );
+                              }}
+                            />
+                            <span>{p.full_name || 'Unnamed'}</span>
+                            {member ? (
+                              <span className="text-muted-foreground">({member.role})</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">(not on project)</span>
+                            )}
+                          </label>
+                        );
+                      })}
                     </div>
                     {crewCandidates.length > 0 && (
                       <div className="space-y-1">
