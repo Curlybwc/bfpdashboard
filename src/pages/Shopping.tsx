@@ -20,6 +20,8 @@ interface AggCard {
   name: string;
   totalQty: number;
   unit: string | null;
+  unit_cost: number | null;
+  totalCost: number;
   sku: string | null;
   vendor_url: string | null;
   item_type: string;
