@@ -124,6 +124,22 @@ const TaskDetail = () => {
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
 
 
+  // Sync fetched task data into editable form fields
+  useEffect(() => {
+    if (!task) return;
+    setTaskText(task.task || '');
+    setStage(task.stage || 'Ready');
+    setPriority(task.priority || '2 – This Week');
+    setRoomArea(task.room_area || '');
+    setTrade(task.trade || '');
+    setNotes(task.notes || '');
+    setDueDate(task.due_date || '');
+    setActualCost(task.actual_total_cost != null ? String(task.actual_total_cost) : '');
+    setAssignedTo(task.is_outside_vendor ? 'outside_vendor' : (task.assigned_to_user_id || 'unassigned'));
+    setIsRecurring(task.is_recurring || false);
+    setRecurrenceFrequency(task.recurrence_frequency || 'weekly');
+  }, [task]);
+
   useEffect(() => {
     if (!task) return;
     if (searchParams.get('report') !== '1') return;
