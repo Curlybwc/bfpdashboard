@@ -15,6 +15,7 @@ import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2,
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
+import TenantsList from '@/components/TenantsList';
 import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type RecurrenceFrequency } from '@/lib/supabase-types';
 import { Switch } from '@/components/ui/switch';
 import TaskCard from '@/components/TaskCard';
@@ -1261,6 +1262,9 @@ const ProjectDetail = () => {
               </div>
             )}
           </>
+        )}
+        {project.project_type === 'rental' && (
+          <TenantsList projectId={id!} canEdit={isManager} />
         )}
         {isManager && <ProjectMembers projectId={id!} />}
       </div>
