@@ -42,6 +42,7 @@ interface TaskCardProps {
   materialCount?: number;
   canReportIssue?: boolean;
   canDelete?: boolean;
+  allProfiles?: { id: string; full_name: string | null }[];
 }
 
 const TaskCard = ({
