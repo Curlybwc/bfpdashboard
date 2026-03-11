@@ -161,6 +161,10 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
               <Label>Address (optional)</Label>
               <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. Unit 2B" />
             </div>
+            <div className="space-y-2">
+              <Label>Phone (optional)</Label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. (555) 123-4567" type="tel" />
+            </div>
             <Button type="submit" className="w-full" disabled={!name.trim()}>
               {editingTenant ? 'Save Changes' : 'Add Tenant'}
             </Button>
