@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { applyBundles } from '@/lib/applyBundles';
-import type { ProjectType, TaskStage, TaskPriority } from '@/lib/supabase-types';
+import type { ProjectType, ProjectStatus, TaskStage, TaskPriority } from '@/lib/supabase-types';
 
 export interface CreateTaskInput {
   project_id: string;
