@@ -6,7 +6,6 @@ export interface ShoppingItem {
   name: string;
   quantity: number | null;
   unit: string | null;
-  unit_cost: number | null;
   sku: string | null;
   vendor_url: string | null;
   item_type: string;
