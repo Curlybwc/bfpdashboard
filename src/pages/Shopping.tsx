@@ -38,7 +38,7 @@ function sectionOf(s: string | null, activeNames: string[]): string {
 }
 
 function aggKey(i: ShoppingItem): string {
-  return `${i.project_id}|${i.name}|${i.sku ?? ''}|${i.unit ?? ''}|${i.unit_cost ?? ''}|${i.vendor_url ?? ''}|${i.item_type}`;
+  return `${i.project_id}|${i.name}|${i.sku ?? ''}|${i.unit ?? ''}|${i.vendor_url ?? ''}|${i.item_type}`;
 }
 
 export default function Shopping() {
