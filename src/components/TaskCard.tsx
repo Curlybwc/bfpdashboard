@@ -349,14 +349,19 @@ const TaskCard = ({
                 Needs Materials
               </Badge>
             )}
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMaterialsOpen(true); }}
-              className="ml-auto inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label="Materials"
-            >
-              <Package className="h-3.5 w-3.5" />
-              Materials
-            </button>
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMaterialsOpen(true); }}
+                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label="Materials"
+              >
+                <Package className="h-3.5 w-3.5" />
+                Materials
+              </button>
+              <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                <TaskQuickActions task={task} userId={userId} onUpdate={onUpdate} allProfiles={allProfiles} />
+              </span>
+            </div>
           </div>
           {task.is_blocked && blockerInfo && (
             <div className="mt-1 px-2 py-1 bg-destructive/5 rounded text-xs text-destructive">
