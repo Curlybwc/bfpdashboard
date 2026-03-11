@@ -1126,7 +1126,6 @@ export type Database = {
           task_id: string
           tool_type_id: string | null
           unit: string | null
-          unit_cost: number | null
           vendor_url: string | null
         }
         Insert: {
@@ -1146,7 +1145,6 @@ export type Database = {
           task_id: string
           tool_type_id?: string | null
           unit?: string | null
-          unit_cost?: number | null
           vendor_url?: string | null
         }
         Update: {
@@ -1166,7 +1164,6 @@ export type Database = {
           task_id?: string
           tool_type_id?: string | null
           unit?: string | null
-          unit_cost?: number | null
           vendor_url?: string | null
         }
         Relationships: [
