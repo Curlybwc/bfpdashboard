@@ -1,0 +1,1 @@
+ALTER TABLE public.task_materials ADD COLUMN unit_cost numeric DEFAULT NULL;
