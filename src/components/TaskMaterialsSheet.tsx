@@ -14,6 +14,7 @@ import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package } from 'lu
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
 import { inferStoreSection } from '@/lib/inferStoreSection';
+import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
 
 interface TaskMaterial {
   id: string;
