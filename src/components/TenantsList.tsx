@@ -71,7 +71,7 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
     if (editingTenant) {
       const { error } = await supabase
         .from('tenants')
-        .update({ name: name.trim(), address: address.trim() || null })
+        .update({ name: name.trim(), address: address.trim() || null, phone: phone.trim() || null })
         .eq('id', editingTenant.id);
       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
       toast({ title: 'Tenant updated' });
