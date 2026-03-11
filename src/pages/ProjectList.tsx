@@ -39,6 +39,27 @@ const ProjectList = () => {
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'address'>('newest');
 
 
+  const filteredProjects = useMemo(() => {
+    let result = [...projects];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.address && p.address.toLowerCase().includes(q))
+      );
+    }
+    if (sortBy === 'name') {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'address') {
+      result.sort((a, b) => {
+        const aNum = parseInt((a.address || '').replace(/\D.*/, ''), 10) || Infinity;
+        const bNum = parseInt((b.address || '').replace(/\D.*/, ''), 10) || Infinity;
+        return aNum - bNum;
+      });
+    }
+    return result;
+  }, [projects, search, sortBy]);
+
   const handleTabChange = (tab: string) => {
     setSearchParams({ tab });
   };
@@ -63,6 +84,8 @@ const ProjectList = () => {
   };
 
   const entityLabel = isRental ? 'Property' : activeTab === 'general' ? 'List' : 'Project';
+
+  const sortLabel = sortBy === 'name' ? 'A–Z' : sortBy === 'address' ? 'Address #' : 'Newest';
 
   const loadingCards = useMemo(() => Array.from({ length: 3 }, (_, i) => i), []);
 
