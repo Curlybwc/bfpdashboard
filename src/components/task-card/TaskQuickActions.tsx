@@ -49,6 +49,7 @@ interface TaskQuickActionsProps {
   onMaterialsOpen: () => void;
   onPhotoConfirm: () => void;
   canReportIssue?: boolean;
+  canReassign?: boolean;
 }
 
 const pill =
