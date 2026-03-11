@@ -422,9 +422,26 @@ const ProjectDetail = () => {
     );
   };
 
+  const ensureMembership = async (userId: string) => {
+    if (memberUserIds.has(userId)) return;
+    await supabase.from('project_members').insert({ project_id: id!, user_id: userId, role: 'contractor' });
+  };
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !id) return;
+
+    // Auto-add assigned user as project member if not already
+    const assignedUserId = createAsPackage || assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo;
+    if (assignedUserId && !memberUserIds.has(assignedUserId)) {
+      await ensureMembership(assignedUserId);
+    }
+    // Auto-add crew candidates as members
+    if (assignedTo === 'crew' && crewCandidates.length > 0) {
+      for (const cid of crewCandidates) {
+        if (!memberUserIds.has(cid)) await ensureMembership(cid);
+      }
+    }
 
     if (createMode === 'batch') {
       if (batchPreview.uniqueTitles.length === 0) {
