@@ -54,6 +54,7 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
     setEditingTenant(null);
     setName('');
     setAddress('');
+    setPhone('');
     setDialogOpen(true);
   };
 
@@ -61,6 +62,7 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
     setEditingTenant(tenant);
     setName(tenant.name);
     setAddress(tenant.address || '');
+    setPhone(tenant.phone || '');
     setDialogOpen(true);
   };
 
