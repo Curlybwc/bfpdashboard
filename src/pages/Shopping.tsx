@@ -131,6 +131,8 @@ export default function Shopping() {
           {(card.totalQty > 0 || card.unit) && (
             <p className="text-xs text-muted-foreground">
               {card.totalQty}{card.unit ? ` ${card.unit}` : ''}
+              {card.unit_cost != null ? ` · $${card.unit_cost.toFixed(2)}/${card.unit || 'unit'}` : ''}
+              {card.totalCost > 0 ? ` · $${card.totalCost.toFixed(2)} total` : ''}
             </p>
           )}
         </div>
