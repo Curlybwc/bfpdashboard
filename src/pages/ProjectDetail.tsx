@@ -105,6 +105,8 @@ const ProjectDetail = () => {
   const photoCountMap = data?.photoCountMap ?? {};
   const materialCountMap = data?.materialCountMap ?? {};
   const projectMembers = data?.members ?? [];
+  const allProfiles = data?.allProfiles ?? [];
+  const memberUserIds = useMemo(() => new Set(projectMembers.map(m => m.user_id)), [projectMembers]);
   const myActiveWorkerTaskIds = useMemo(() => new Set(data?.myActiveWorkerTaskIds ?? []), [data?.myActiveWorkerTaskIds]);
   const myCandidateTaskIds = useMemo(() => new Set(data?.myCandidateTaskIds ?? []), [data?.myCandidateTaskIds]);
 
@@ -420,9 +422,26 @@ const ProjectDetail = () => {
     );
   };
 
+  const ensureMembership = async (userId: string) => {
+    if (memberUserIds.has(userId)) return;
+    await supabase.from('project_members').insert({ project_id: id!, user_id: userId, role: 'contractor' });
+  };
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !id) return;
+
+    // Auto-add assigned user as project member if not already
+    const assignedUserId = createAsPackage || assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo;
+    if (assignedUserId && !memberUserIds.has(assignedUserId)) {
+      await ensureMembership(assignedUserId);
+    }
+    // Auto-add crew candidates as members
+    if (assignedTo === 'crew' && crewCandidates.length > 0) {
+      for (const cid of crewCandidates) {
+        if (!memberUserIds.has(cid)) await ensureMembership(cid);
+      }
+    }
 
     if (createMode === 'batch') {
       if (batchPreview.uniqueTitles.length === 0) {
@@ -661,11 +680,26 @@ const ProjectDetail = () => {
                       <SelectItem value="unassigned">Unassigned</SelectItem>
                       <SelectItem value="crew">Crew Task</SelectItem>
                       <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
-                      {projectMembers.map((m) => (
-                        <SelectItem key={m.user_id} value={m.user_id}>
-                          {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                        </SelectItem>
-                      ))}
+                      {projectMembers.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Project Members</div>
+                          {projectMembers.map((m) => (
+                            <SelectItem key={m.user_id} value={m.user_id}>
+                              {m.profiles?.full_name || 'Unnamed'} ({m.role})
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      {allProfiles.filter(p => !memberUserIds.has(p.id)).length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Other Users (will be added to project)</div>
+                          {allProfiles.filter(p => !memberUserIds.has(p.id)).map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.full_name || 'Unnamed'}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -688,22 +722,29 @@ const ProjectDetail = () => {
                       </Select>
                     )}
                     <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2">
-                      {projectMembers.map((m) => (
-                        <label key={m.user_id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
-                          <Checkbox
-                            checked={crewCandidates.includes(m.user_id)}
-                            onCheckedChange={(checked) => {
-                              setCrewCandidates(prev =>
-                                checked
-                                  ? [...prev, m.user_id]
-                                  : prev.filter(cid => cid !== m.user_id)
-                              );
-                            }}
-                          />
-                          <span>{m.profiles?.full_name || 'Unnamed'}</span>
-                          <span className="text-muted-foreground">({m.role})</span>
-                        </label>
-                      ))}
+                      {allProfiles.map((p) => {
+                        const member = projectMembers.find(m => m.user_id === p.id);
+                        return (
+                          <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
+                            <Checkbox
+                              checked={crewCandidates.includes(p.id)}
+                              onCheckedChange={(checked) => {
+                                setCrewCandidates(prev =>
+                                  checked
+                                    ? [...prev, p.id]
+                                    : prev.filter(cid => cid !== p.id)
+                                );
+                              }}
+                            />
+                            <span>{p.full_name || 'Unnamed'}</span>
+                            {member ? (
+                              <span className="text-muted-foreground">({member.role})</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">(not on project)</span>
+                            )}
+                          </label>
+                        );
+                      })}
                     </div>
                     {crewCandidates.length > 0 && (
                       <div className="space-y-1">
