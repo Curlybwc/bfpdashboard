@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, User, MapPin } from 'lucide-react';
+import { Plus, Pencil, Trash2, User, MapPin, Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface TenantsListProps {
@@ -20,6 +20,7 @@ interface Tenant {
   project_id: string;
   name: string;
   address: string | null;
+  phone: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +32,7 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: tenants = [], isLoading } = useQuery({
@@ -52,6 +54,7 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
     setEditingTenant(null);
     setName('');
     setAddress('');
+    setPhone('');
     setDialogOpen(true);
   };
 
@@ -59,6 +62,7 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
     setEditingTenant(tenant);
     setName(tenant.name);
     setAddress(tenant.address || '');
+    setPhone(tenant.phone || '');
     setDialogOpen(true);
   };
 
@@ -67,14 +71,14 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
     if (editingTenant) {
       const { error } = await supabase
         .from('tenants')
-        .update({ name: name.trim(), address: address.trim() || null })
+        .update({ name: name.trim(), address: address.trim() || null, phone: phone.trim() || null })
         .eq('id', editingTenant.id);
       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
       toast({ title: 'Tenant updated' });
     } else {
       const { error } = await supabase
         .from('tenants')
-        .insert({ project_id: projectId, name: name.trim(), address: address.trim() || null });
+        .insert({ project_id: projectId, name: name.trim(), address: address.trim() || null, phone: phone.trim() || null });
       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
       toast({ title: 'Tenant added' });
     }
@@ -121,6 +125,12 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
                     {tenant.address}
                   </p>
                 )}
+                {tenant.phone && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5 ml-5.5">
+                    <Phone className="h-3 w-3 shrink-0" />
+                    <a href={`tel:${tenant.phone}`} className="hover:underline">{tenant.phone}</a>
+                  </p>
+                )}
               </div>
               {canEdit && (
                 <div className="flex items-center gap-1 shrink-0">
@@ -150,6 +160,10 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
             <div className="space-y-2">
               <Label>Address (optional)</Label>
               <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. Unit 2B" />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone (optional)</Label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. (555) 123-4567" type="tel" />
             </div>
             <Button type="submit" className="w-full" disabled={!name.trim()}>
               {editingTenant ? 'Save Changes' : 'Add Tenant'}
