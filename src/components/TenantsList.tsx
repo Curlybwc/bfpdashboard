@@ -32,6 +32,7 @@ const TenantsList = ({ projectId, canEdit }: TenantsListProps) => {
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: tenants = [], isLoading } = useQuery({
