@@ -170,6 +170,46 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     await fetchMaterials();
   };
 
+  const handleSelectFromLibrary = (item: LibraryMaterial, target: 'new' | 'edit') => {
+    if (target === 'new') {
+      setNewName(item.name);
+      if (item.unit_cost != null) setNewUnitCost(String(item.unit_cost));
+      if (item.unit) setNewUnit(item.unit);
+      if (item.sku) setNewSku(item.sku);
+      if (item.vendor_url) setNewVendorUrl(item.vendor_url);
+      if (item.store_section) setNewStoreSection(item.store_section);
+    } else {
+      setEditName(item.name);
+      if (item.unit_cost != null) setEditUnitCost(String(item.unit_cost));
+      if (item.unit) setEditUnit(item.unit);
+      if (item.sku) setEditSku(item.sku);
+      if (item.vendor_url) setEditVendorUrl(item.vendor_url);
+      if (item.store_section) { setEditStoreSection(item.store_section); setEditStoreSectionManual(true); }
+    }
+  };
+
+  const handleAddToLibrary = async (name: string) => {
+    const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+    const { error } = await supabase.from('material_library').insert({
+      name,
+      normalized_name: normalized,
+      unit_cost: null,
+      sku: null,
+      vendor_url: null,
+      unit: null,
+      store_section: null,
+    });
+    if (error) {
+      if (error.code === '23505') {
+        toast({ title: 'Already in library' });
+      } else {
+        toast({ title: 'Error adding to library', description: error.message, variant: 'destructive' });
+      }
+    } else {
+      toast({ title: `"${name}" added to Materials Library` });
+    }
+  };
+
   const handleAdd = async () => {
     if (!newName.trim()) return;
     setLoading(true);
