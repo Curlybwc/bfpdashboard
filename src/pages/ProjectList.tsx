@@ -37,6 +37,7 @@ const ProjectList = () => {
   const [address, setAddress] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'address'>('newest');
+  const [showArchived, setShowArchived] = useState(false);
 
 
   const filteredProjects = useMemo(() => {
