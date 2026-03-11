@@ -499,7 +499,13 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             )}
           </div>
           <div className="flex gap-2">
-            <Input placeholder="Name *" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
+            <MaterialAutocomplete
+              value={newName}
+              onChange={setNewName}
+              onSelect={(item) => handleSelectFromLibrary(item, 'new')}
+              onAddToLibrary={handleAddToLibrary}
+              className="flex-1"
+            />
             <Input placeholder="Qty" type="number" value={newQty} onChange={(e) => setNewQty(e.target.value)} className="w-16" />
             <Input placeholder="Unit" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} className="w-16" />
             <Input placeholder="$/unit" type="number" step="0.01" value={newUnitCost} onChange={(e) => setNewUnitCost(e.target.value)} className="w-20" />
