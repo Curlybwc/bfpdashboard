@@ -22,6 +22,7 @@ export interface TodayData {
   childTasksByParent: Record<string, any[]>;
   hasShiftToday: boolean;
   isManager: boolean;
+  allProfiles: { id: string; full_name: string | null }[];
 }
 
 const EMPTY_DATA: TodayData = {
