@@ -77,6 +77,7 @@ const Today = () => {
     projectMap, parentTitles, assigneeMap, blockerMap,
     crewActiveTaskIds, crewCandidateTaskIds, crewWorkerCounts,
     photoCountMap, materialCountMap, childTasksByParent, hasShiftToday, isManager,
+    allProfiles,
   } = data;
 
   /* ── Derived state ── */
