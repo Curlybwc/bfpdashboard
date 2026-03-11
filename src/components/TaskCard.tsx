@@ -1,20 +1,16 @@
 import { Card } from '@/components/ui/card';
 import { cn, getErrorMessage } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import StatusBadge from '@/components/StatusBadge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, Flag, Package, ChevronRight, ChevronDown, Users, Repeat, AlertTriangle, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Users, Repeat, AlertTriangle, Trash2 } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import TaskQuickActions from '@/components/task-card/TaskQuickActions';
-import { BLOCKER_REASONS, TASK_STAGES, type TaskStage } from '@/lib/supabase-types';
-import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
+import { BLOCKER_REASONS } from '@/lib/supabase-types';
+import { completeTask } from '@/lib/taskLifecycle';
 import { getTaskOperationalStatus, isTaskActionable } from '@/lib/taskOperationalStatus';
 
 interface TaskCardProps {
@@ -57,90 +53,31 @@ const TaskCard = ({
 }: TaskCardProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
 
-  const isAssignedToMe = task.assigned_to_user_id === userId;
-  const isUnassigned = !task.assigned_to_user_id;
-  const isOutsideVendor = task.is_outside_vendor === true;
   const materialsReady = task.materials_on_site === 'Yes';
   const operationalStatus = getTaskOperationalStatus(task, {
     requiredCount: materialCount,
     hasRequiredMaterials: materialCount > 0 ? materialsReady : true,
   });
-  const isActionable = isTaskActionable(task);
-  const canExecute = operationalStatus !== 'review_needed' && operationalStatus !== 'done';
-
-  // Solo action visibility — outside vendor tasks are not available for dibs
   const hasChildren = childCount > 0;
-  const isLeafTask = !hasChildren;
-  const showDibs = isActionable && canExecute && !isCrewTask && isLeafTask && isUnassigned && !isOutsideVendor && task.stage === 'Ready';
-  const showStart = isActionable && canExecute && !isCrewTask && isLeafTask && isAssignedToMe && task.stage === 'Ready';
-  const showComplete = isActionable && canExecute && !isCrewTask && isLeafTask && isAssignedToMe && (task.stage === 'Ready' || task.stage === 'In Progress');
-
-  // Crew action visibility
-  const showJoin = isActionable && canExecute && isCrewTask && isCandidate && !isActiveWorker;
-  const showLeave = isActionable && canExecute && isCrewTask && isActiveWorker;
-
   const showNeedsMaterials = !materialsReady && materialCount > 0;
-  const canComplete = hasChildren ? allChildrenDone : true;
-
-  const handleDibs = async (force = false) => {
-    if (!force && !isAdmin) {
-      const { count } = await supabase
-        .from('tasks')
-        .select('*', { count: 'exact', head: true })
-        .eq('assigned_to_user_id', userId)
-        .eq('stage', 'Ready')
-        .eq('materials_on_site', 'Yes');
-
-      if ((count ?? 0) >= 5) {
-        setDibsConfirmOpen(true);
-        return;
-      }
-    }
-
-    setLoading(true);
-    try {
-      await claimTask(task.id, userId);
-      onUpdate();
-    } catch (error: unknown) {
-      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStart = async () => {
-    setLoading(true);
-    try {
-      await startTask(task.id, userId);
-      onUpdate();
-    } catch (error: unknown) {
-      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleComplete = async (skipPhotoCheck = false) => {
-    // Photo nudge: check for "after" photo, prompt but allow override
     if (!skipPhotoCheck) {
       const { count: afterCount } = await supabase
         .from('task_photos')
         .select('id', { count: 'exact', head: true })
         .eq('task_id', task.id)
         .eq('phase', 'after');
-
       if ((afterCount ?? 0) === 0) {
         setPhotoConfirmOpen(true);
         return;
       }
     }
-
     setLoading(true);
     try {
       await completeTask({
@@ -156,74 +93,9 @@ const TaskCard = ({
     }
   };
 
-  const handleJoinCrew = async () => {
-    setLoading(true);
-    // Upsert into task_workers
-    const { error } = await supabase.from('task_workers').upsert({
-      task_id: task.id,
-      user_id: userId,
-      active: true,
-      joined_at: new Date().toISOString(),
-      left_at: null,
-    }, { onConflict: 'task_id,user_id' });
-
-    // Optionally set task to In Progress if Ready
-    if (!error && task.stage === 'Ready') {
-      await supabase.from('tasks').update({ stage: 'In Progress' }).eq('id', task.id);
-    }
-
-    setLoading(false);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else onUpdate();
-  };
-
-  const handleLeaveCrew = async () => {
-    setLoading(true);
-    const { error } = await supabase.from('task_workers').update({
-      active: false,
-      left_at: new Date().toISOString(),
-    }).eq('task_id', task.id).eq('user_id', userId);
-    setLoading(false);
-
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else onUpdate();
-  };
-
-  const handleStageChange = async (newStage: TaskStage) => {
-    if (newStage === task.stage) return;
-    setLoading(true);
-    try {
-      // If marking Done, use completeTask for parent auto-complete logic
-      if (newStage === 'Done') {
-        await completeTask({
-          taskId: task.id,
-          parentTaskId: task.parent_task_id,
-          isRecurring: task.is_recurring,
-        });
-      } else {
-        const updates: Record<string, unknown> = { stage: newStage };
-        if (newStage === 'In Progress' && !task.started_at) {
-          updates.started_at = new Date().toISOString();
-          updates.started_by_user_id = userId;
-        }
-        const { error } = await supabase
-          .from('tasks')
-          .update(updates)
-          .eq('id', task.id);
-        if (error) throw error;
-      }
-      onUpdate();
-    } catch (error: unknown) {
-      toast({ title: 'Error', description: getErrorMessage(error), variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDelete = async () => {
     setLoading(true);
     try {
-      // Delete child tasks first
       const { error: childErr } = await supabase.from('tasks').delete().eq('parent_task_id', task.id);
       if (childErr) throw childErr;
       const { error } = await supabase.from('tasks').delete().eq('id', task.id);
@@ -254,213 +126,101 @@ const TaskCard = ({
   return (
     <>
       <Card className={cn('p-3', isChild && 'ml-6', priorityBorderClass)}>
-        <Link to={`/projects/${task.project_id}/tasks/${task.id}`} className="block">
-          {parentTitle && (
-            <p className="text-xs text-muted-foreground mb-0.5">{parentTitle} →</p>
-          )}
-          <div className="flex items-center gap-1">
-            {hasChildren && onToggle && (
-              <button
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(); }}
-                className="shrink-0 p-0.5 rounded hover:bg-accent transition-colors"
-                aria-label={expanded ? 'Collapse' : 'Expand'}
-              >
-                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </button>
+        {/* Title row with optional delete icon top-right */}
+        <div className="flex items-start gap-1">
+          <Link to={`/projects/${task.project_id}/tasks/${task.id}`} className="flex-1 min-w-0 block">
+            {parentTitle && (
+              <p className="text-xs text-muted-foreground mb-0.5">{parentTitle} →</p>
             )}
-            <p className={`truncate ${context === 'today' && !isChild ? 'text-base font-semibold' : `font-medium ${isChild ? 'text-xs' : 'text-sm'}`}`}>{task.task}</p>
-          </div>
-          {showProjectName && (
-            <p className="text-xs text-muted-foreground mt-0.5">{projectName}</p>
-          )}
-          {projectAddress && (
-            <p className="text-xs text-muted-foreground truncate">{projectAddress}</p>
-          )}
-          {isOutsideVendor && !assigneeName && (
-            <p className="text-xs text-muted-foreground">Outside Vendor</p>
-          )}
-          {assigneeName && (
-            <p className="text-xs text-muted-foreground">Assigned to {assigneeName}</p>
-          )}
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            {isActionable ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                  <button className="cursor-pointer" aria-label="Change status">
-                    <StatusBadge status={operationalStatus} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                  {TASK_STAGES.map((s) => (
-                    <DropdownMenuItem
-                      key={s}
-                      disabled={s === task.stage || loading}
-                      onSelect={() => handleStageChange(s)}
-                      className={cn(s === task.stage && 'font-semibold')}
-                    >
-                      <StatusBadge status={s} />
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <StatusBadge status="Package" />
-            )}
-            {isCrewTask && (
-              <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                {activeWorkerCount} active
-              </Badge>
-            )}
-            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-              <Flag className="h-3 w-3" />
-              {task.priority}
-            </span>
-            {task.due_date && (() => {
-              const isOverdue = task.stage !== 'Done' && task.due_date < new Date().toISOString().slice(0, 10);
-              return (
-                <span className={cn("text-xs flex items-center gap-0.5", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
-                  <Calendar className={cn("h-3 w-3", isOverdue && "text-destructive")} />
-                  {task.due_date}
-                </span>
-              );
-            })()}
-            {task.stage !== 'Done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10) && (
-              <StatusBadge status="Overdue" />
-            )}
-            {materialCount > 0 && (
-              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                📦 {materialCount}
-              </span>
-            )}
-            {photoCount > 0 && (
-              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                📷 {photoCount}
-              </span>
-            )}
-            {task.is_recurring && task.recurrence_frequency && (
-              <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                <Repeat className="h-3 w-3" />
-                {task.recurrence_frequency === 'weekly' ? 'Weekly' : task.recurrence_frequency === 'monthly' ? 'Monthly' : 'Yearly'}
-              </Badge>
-            )}
-            {showNeedsMaterials && (
-              <Badge variant="outline" className="text-xs border-warning text-warning">
-                Needs Materials
-              </Badge>
-            )}
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMaterialsOpen(true); }}
-              className="ml-auto inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label="Materials"
-            >
-              <Package className="h-3.5 w-3.5" />
-              Materials
-            </button>
-          </div>
-          <div className="mt-1.5">
-            <TaskQuickActions task={task} userId={userId} onUpdate={onUpdate} allProfiles={allProfiles} />
-          </div>
-          {task.is_blocked && blockerInfo && (
-            <div className="mt-1 px-2 py-1 bg-destructive/5 rounded text-xs text-destructive">
-              <span className="font-medium">{BLOCKER_REASONS.find(r => r.value === blockerInfo.reason)?.label || blockerInfo.reason}</span>
-              {blockerInfo.needs_from_manager && (
-                <span className="text-muted-foreground ml-1">— {blockerInfo.needs_from_manager.slice(0, 60)}{blockerInfo.needs_from_manager.length > 60 ? '…' : ''}</span>
+            <div className="flex items-center gap-1">
+              {hasChildren && onToggle && (
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(); }}
+                  className="shrink-0 p-0.5 rounded hover:bg-accent transition-colors"
+                  aria-label={expanded ? 'Collapse' : 'Expand'}
+                >
+                  {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
               )}
+              <p className={`truncate ${context === 'today' && !isChild ? 'text-base font-semibold' : `font-medium ${isChild ? 'text-xs' : 'text-sm'}`}`}>{task.task}</p>
             </div>
-          )}
-        </Link>
+            {showProjectName && (
+              <p className="text-xs text-muted-foreground mt-0.5">{projectName}</p>
+            )}
+            {projectAddress && (
+              <p className="text-xs text-muted-foreground truncate">{projectAddress}</p>
+            )}
+          </Link>
 
-        {/* Solo actions — stopPropagation prevents the card Link from navigating */}
-        {(showDibs || showStart || showComplete) && (
-          <div className="mt-2 flex gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            {showDibs && (
-              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleDibs(); }} disabled={loading}>
-                Dibs
-              </Button>
-            )}
-            {showStart && (
-              materialsReady ? (
-                <Button size="sm" onClick={(e) => { e.stopPropagation(); handleStart(); }} disabled={loading}>
-                  Start
-                </Button>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button size="sm" disabled>Start</Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>Materials must be on site before starting.</TooltipContent>
-                </Tooltip>
-              )
-            )}
-            {showComplete && (
-              canComplete ? (
-                <Button size="sm" onClick={(e) => { e.stopPropagation(); handleComplete(); }} disabled={loading}>
-                  Complete
-                </Button>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button size="sm" disabled>Complete</Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>All subtasks must be completed first.</TooltipContent>
-                </Tooltip>
-              )
-            )}
-          </div>
-        )}
-
-        {/* Crew actions — stopPropagation prevents the card Link from navigating */}
-        {(showJoin || showLeave) && (
-          <div className="mt-2 flex gap-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            {showJoin && (
-              <Button size="sm" onClick={(e) => { e.stopPropagation(); handleJoinCrew(); }} disabled={loading}>
-                Join
-              </Button>
-            )}
-            {showLeave && (
-              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleLeaveCrew(); }} disabled={loading}>
-                Leave
-              </Button>
-            )}
-          </div>
-        )}
-
-        {canReportIssue && isActionable && (
-          <div className="mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/projects/${task.project_id}/tasks/${task.id}?report=1`);
-              }}
-            >
-              <AlertTriangle className="h-3.5 w-3.5 mr-1" />Report Issue
-            </Button>
-          </div>
-        )}
-
-        {canDelete && (
-          <div className="mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeleteConfirmOpen(true);
-              }}
+          {canDelete && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirmOpen(true); }}
+              className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              aria-label="Delete task"
               disabled={loading}
             >
-              <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
-            </Button>
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Info badges row */}
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {isCrewTask && (
+            <Badge variant="secondary" className="text-xs flex items-center gap-1">
+              <Users className="h-3 w-3" />
+              {activeWorkerCount} active
+            </Badge>
+          )}
+          {task.is_recurring && task.recurrence_frequency && (
+            <Badge variant="secondary" className="text-xs flex items-center gap-1">
+              <Repeat className="h-3 w-3" />
+              {task.recurrence_frequency === 'weekly' ? 'Weekly' : task.recurrence_frequency === 'monthly' ? 'Monthly' : 'Yearly'}
+            </Badge>
+          )}
+          {showNeedsMaterials && (
+            <Badge variant="outline" className="text-xs border-warning text-warning">
+              Needs Materials
+            </Badge>
+          )}
+          {task.stage !== 'Done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10) && (
+            <Badge variant="destructive" className="text-xs">Overdue</Badge>
+          )}
+        </div>
+
+        {/* Blocker info */}
+        {task.is_blocked && blockerInfo && (
+          <div className="mt-1 px-2 py-1 bg-destructive/5 rounded text-xs text-destructive">
+            <span className="font-medium">{BLOCKER_REASONS.find(r => r.value === blockerInfo.reason)?.label || blockerInfo.reason}</span>
+            {blockerInfo.needs_from_manager && (
+              <span className="text-muted-foreground ml-1">— {blockerInfo.needs_from_manager.slice(0, 60)}{blockerInfo.needs_from_manager.length > 60 ? '…' : ''}</span>
+            )}
           </div>
         )}
+
+        {/* Unified action pill row */}
+        <div className="mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+          <TaskQuickActions
+            task={task}
+            userId={userId}
+            isAdmin={isAdmin}
+            onUpdate={onUpdate}
+            allProfiles={allProfiles}
+            assigneeName={assigneeName}
+            photoCount={photoCount}
+            materialCount={materialCount}
+            operationalStatus={operationalStatus}
+            isCrewTask={isCrewTask}
+            isActiveWorker={isActiveWorker}
+            isCandidate={isCandidate}
+            hasChildren={hasChildren}
+            allChildrenDone={allChildrenDone}
+            materialsReady={materialsReady}
+            onMaterialsOpen={() => setMaterialsOpen(true)}
+            onPhotoConfirm={() => setPhotoConfirmOpen(true)}
+            canReportIssue={canReportIssue}
+          />
+        </div>
       </Card>
 
       <TaskMaterialsSheet
@@ -469,23 +229,6 @@ const TaskCard = ({
         onOpenChange={setMaterialsOpen}
         onMaterialsChange={onUpdate}
       />
-
-      <AlertDialog open={dibsConfirmOpen} onOpenChange={setDibsConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Dibs Limit Reached</AlertDialogTitle>
-            <AlertDialogDescription>
-              You already have 5 active tasks ready to start. Are you sure you want to claim another?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setDibsConfirmOpen(false); handleDibs(true); }}>
-              Claim Anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
         <AlertDialogContent>
