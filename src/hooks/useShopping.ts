@@ -38,7 +38,6 @@ export function useShoppingItems() {
         quantity: r.quantity,
         unit: r.unit,
         unit_cost: r.unit_cost,
-        unit_cost: r.unit_cost,
         sku: r.sku,
         vendor_url: r.vendor_url,
         item_type: r.item_type,
