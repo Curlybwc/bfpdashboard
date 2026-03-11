@@ -14,6 +14,7 @@ import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package } from 'lu
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
 import { inferStoreSection } from '@/lib/inferStoreSection';
+import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
 
 interface TaskMaterial {
   id: string;
@@ -167,6 +168,46 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const handleProvidedByChange = async (material: TaskMaterial, value: string) => {
     await supabase.from('task_materials').update({ provided_by: value }).eq('id', material.id);
     await fetchMaterials();
+  };
+
+  const handleSelectFromLibrary = (item: LibraryMaterial, target: 'new' | 'edit') => {
+    if (target === 'new') {
+      setNewName(item.name);
+      if (item.unit_cost != null) setNewUnitCost(String(item.unit_cost));
+      if (item.unit) setNewUnit(item.unit);
+      if (item.sku) setNewSku(item.sku);
+      if (item.vendor_url) setNewVendorUrl(item.vendor_url);
+      if (item.store_section) setNewStoreSection(item.store_section);
+    } else {
+      setEditName(item.name);
+      if (item.unit_cost != null) setEditUnitCost(String(item.unit_cost));
+      if (item.unit) setEditUnit(item.unit);
+      if (item.sku) setEditSku(item.sku);
+      if (item.vendor_url) setEditVendorUrl(item.vendor_url);
+      if (item.store_section) { setEditStoreSection(item.store_section); setEditStoreSectionManual(true); }
+    }
+  };
+
+  const handleAddToLibrary = async (name: string) => {
+    const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+    const { error } = await supabase.from('material_library').insert({
+      name,
+      normalized_name: normalized,
+      unit_cost: null,
+      sku: null,
+      vendor_url: null,
+      unit: null,
+      store_section: null,
+    });
+    if (error) {
+      if (error.code === '23505') {
+        toast({ title: 'Already in library' });
+      } else {
+        toast({ title: 'Error adding to library', description: error.message, variant: 'destructive' });
+      }
+    } else {
+      toast({ title: `"${name}" added to Materials Library` });
+    }
   };
 
   const handleAdd = async () => {
@@ -458,7 +499,13 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             )}
           </div>
           <div className="flex gap-2">
-            <Input placeholder="Name *" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
+            <MaterialAutocomplete
+              value={newName}
+              onChange={setNewName}
+              onSelect={(item) => handleSelectFromLibrary(item, 'new')}
+              onAddToLibrary={handleAddToLibrary}
+              className="flex-1"
+            />
             <Input placeholder="Qty" type="number" value={newQty} onChange={(e) => setNewQty(e.target.value)} className="w-16" />
             <Input placeholder="Unit" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} className="w-16" />
             <Input placeholder="$/unit" type="number" step="0.01" value={newUnitCost} onChange={(e) => setNewUnitCost(e.target.value)} className="w-20" />
@@ -520,7 +567,12 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             )}
             <div>
               <Label className="text-xs">Name</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <MaterialAutocomplete
+                value={editName}
+                onChange={setEditName}
+                onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
+                onAddToLibrary={handleAddToLibrary}
+              />
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
