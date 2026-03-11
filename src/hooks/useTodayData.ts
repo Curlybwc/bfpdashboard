@@ -268,7 +268,12 @@ async function fetchEnrichment(allTasks: any[], userId: string) {
     materialCountMap[r.task_id] = (materialCountMap[r.task_id] || 0) + 1;
   });
 
-  return { projectMap, parentTitles, assigneeMap, crewWorkerCounts, photoCountMap, materialCountMap };
+  const allProfiles = (unwrap(allProfilesRes, 'All profiles') as any[]).map((p: any) => ({
+    id: p.id as string,
+    full_name: p.full_name as string | null,
+  }));
+
+  return { projectMap, parentTitles, assigneeMap, crewWorkerCounts, photoCountMap, materialCountMap, allProfiles };
 }
 
 
