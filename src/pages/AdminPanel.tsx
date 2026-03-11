@@ -150,6 +150,7 @@ const AdminPanel = () => {
       items: [
         { label: 'Users', action: () => setActiveView('users') },
         { label: 'Aliases', action: () => setActiveView('aliases') },
+        { label: 'Tenants', action: () => setActiveView('tenants') },
       ],
     },
   ];
