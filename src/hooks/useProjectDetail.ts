@@ -106,6 +106,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
         project,
         tasks: tasks ?? [],
         members: (members ?? []) as ProjectMember[],
+        allProfiles: (allProfiles ?? []) as { id: string; full_name: string | null }[],
         photoCountMap,
         materialCountMap,
         myActiveWorkerTaskIds,
