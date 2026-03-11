@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, MapPin, AlertTriangle, Search, ArrowUpDown } from 'lucide-react';
+import { Plus, MapPin, AlertTriangle, Search, ArrowUpDown, Archive } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectList } from '@/hooks/useProjectList';
@@ -37,10 +37,16 @@ const ProjectList = () => {
   const [address, setAddress] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'address'>('newest');
+  const [showArchived, setShowArchived] = useState(false);
 
 
   const filteredProjects = useMemo(() => {
     let result = [...projects];
+    if (!showArchived) {
+      result = result.filter(p => p.status !== 'complete');
+    } else {
+      result = result.filter(p => p.status === 'complete');
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(p =>
@@ -58,7 +64,7 @@ const ProjectList = () => {
       });
     }
     return result;
-  }, [projects, search, sortBy]);
+  }, [projects, search, sortBy, showArchived]);
 
   const handleTabChange = (tab: string) => {
     setSearchParams({ tab });
@@ -148,6 +154,15 @@ const ProjectList = () => {
             <DropdownMenuItem onClick={() => setSortBy('address')}>Address #</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <Button
+          variant={showArchived ? 'default' : 'outline'}
+          size="sm"
+          className="shrink-0 gap-1.5"
+          onClick={() => setShowArchived(!showArchived)}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          {showArchived ? 'Archived' : 'Archive'}
+        </Button>
       </div>
       <div className="p-4 space-y-3">
         {isLoading ? (

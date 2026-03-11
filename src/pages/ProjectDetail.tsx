@@ -908,6 +908,28 @@ const ProjectDetail = () => {
           </form>
           {userCanEditProject && (
             <div className="border-t pt-3 mt-1 flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={updateProjectMutation.isPending}
+                onClick={() => {
+                  const nextStatus = project.status === 'complete' ? 'active' : 'complete';
+                  updateProjectMutation.mutate(
+                    { status: nextStatus } as any,
+                    {
+                      onSuccess: () => {
+                        setEditOpen(false);
+                        queryClient.invalidateQueries({ queryKey: ['projects-list'] });
+                        toast({ title: nextStatus === 'complete' ? 'Project archived' : 'Project restored' });
+                        if (nextStatus === 'complete') navigate('/projects');
+                      },
+                    },
+                  );
+                }}
+              >
+                {project.status === 'complete' ? 'Restore from Archive' : 'Archive Project'}
+              </Button>
               {(['construction', 'rental', 'general'] as const)
                 .filter((t) => t !== project.project_type)
                 .map((targetType) => {
