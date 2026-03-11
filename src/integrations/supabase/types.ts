@@ -331,6 +331,48 @@ export type Database = {
           },
         ]
       }
+      material_library: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          normalized_name: string
+          sku: string | null
+          store_section: string | null
+          unit: string | null
+          unit_cost: number | null
+          updated_at: string
+          vendor_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          normalized_name: string
+          sku?: string | null
+          store_section?: string | null
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          vendor_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          normalized_name?: string
+          sku?: string | null
+          store_section?: string | null
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          vendor_url?: string | null
+        }
+        Relationships: []
+      }
       profile_aliases: {
         Row: {
           alias: string
