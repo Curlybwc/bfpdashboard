@@ -154,6 +154,15 @@ const ProjectList = () => {
             <DropdownMenuItem onClick={() => setSortBy('address')}>Address #</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <Button
+          variant={showArchived ? 'default' : 'outline'}
+          size="sm"
+          className="shrink-0 gap-1.5"
+          onClick={() => setShowArchived(!showArchived)}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          {showArchived ? 'Archived' : 'Archive'}
+        </Button>
       </div>
       <div className="p-4 space-y-3">
         {isLoading ? (
