@@ -107,9 +107,11 @@ const TaskQuickActions = ({
   const isDone = task.stage === 'Done';
 
   // Assignee display
-  const assigneeLabel = task.assigned_to_user_id
-    ? (assigneeName || allProfiles?.find(p => p.id === task.assigned_to_user_id)?.full_name || 'Assigned')
-    : 'Unassigned';
+  const assigneeLabel = task.is_outside_vendor
+    ? 'Outside Vendor'
+    : task.assigned_to_user_id
+      ? (assigneeName || allProfiles?.find(p => p.id === task.assigned_to_user_id)?.full_name || 'Assigned')
+      : 'Unassigned';
 
   // Handlers
   const handleAssign = async (profileId: string | null) => {
