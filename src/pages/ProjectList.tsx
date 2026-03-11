@@ -126,6 +126,29 @@ const ProjectList = () => {
           </TabsList>
         </Tabs>
       </div>
+      <div className="px-4 pt-2 flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={`Search ${isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'}…`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="shrink-0 gap-1.5">
+              <ArrowUpDown className="h-3.5 w-3.5" />{sortLabel}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setSortBy('newest')}>Newest</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('name')}>A–Z (Name)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('address')}>Address #</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <div className="p-4 space-y-3">
         {isLoading ? (
           loadingCards.map((key) => (
@@ -141,12 +164,12 @@ const ProjectList = () => {
               <Skeleton className="h-2 w-full" />
             </Card>
           ))
-        ) : projects.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
-            No {isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'} yet. Create your first one!
+            {search.trim() ? 'No matches found.' : `No ${isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'} yet. Create your first one!`}
           </p>
         ) : (
-          projects.map((project) => (
+          filteredProjects.map((project) => (
             <Link key={project.id} to={`/projects/${project.id}`}>
               <Card className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-2">
