@@ -1071,8 +1071,47 @@ const ProjectDetail = () => {
             {activePackageGroups.length > 0 && (
               <div className="space-y-4">
                 {activePackageGroups.map((group) => {
+                  const isGeneral = group.packageTask.id === 'general-package';
                   const packageKey = `pkg:${group.packageTask.id}`;
-                  const open = expandedIds.has(packageKey);
+                  const open = isGeneral || expandedIds.has(packageKey);
+
+                  if (isGeneral) {
+                    // Render general tasks flat — no collapsible wrapper
+                    return (
+                      <div key="general-package" className="space-y-2">
+                        {bulkMode ? (
+                          group.childTasks.map((task) => (
+                            <div key={task.id} className="flex items-start gap-2">
+                              <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
+                              </div>
+                            </div>
+                          ))
+                        ) : isManager ? (
+                          <SortableTaskList
+                            items={group.childTasks}
+                            onReorder={async (orderedIds) => {
+                              const { error } = await persistTaskOrder(orderedIds);
+                              if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
+                              else invalidateProject();
+                            }}
+                          >
+                            {(task) => (
+                              <SortableTaskItem key={task.id} id={task.id}>
+                                <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
+                              </SortableTaskItem>
+                            )}
+                          </SortableTaskList>
+                        ) : (
+                          group.childTasks.map((task) => (
+                            <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
+                          ))
+                        )}
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={group.packageTask.id} className="rounded-lg border">
                       <div className="flex items-center">
@@ -1095,7 +1134,7 @@ const ProjectDetail = () => {
                             {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
                           </div>
                         </button>
-                        {isManager && group.packageTask.id !== 'general-package' && (
+                        {isManager && (
                           <PackageDeleteButton
                             packageTask={group.packageTask}
                             childCount={group.childTasks.length}
