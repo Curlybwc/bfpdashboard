@@ -344,6 +344,7 @@ const ProjectDetail = () => {
     setFilterAssignee('all');
     setFilterTrade('all');
     setFilterRoomArea('all');
+    setFilterCategory('stage');
   };
 
   const openEditDialog = () => {
