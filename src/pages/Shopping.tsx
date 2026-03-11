@@ -89,8 +89,6 @@ export default function Shopping() {
           name: i.name,
           totalQty: i.quantity ?? 0,
           unit: i.unit,
-          unit_cost: i.unit_cost,
-          totalCost: (i.quantity ?? 0) * (i.unit_cost ?? 0),
           sku: i.sku,
           vendor_url: i.vendor_url,
           item_type: i.item_type,
