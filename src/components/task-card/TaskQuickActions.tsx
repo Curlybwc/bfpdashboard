@@ -107,9 +107,11 @@ const TaskQuickActions = ({
   const isDone = task.stage === 'Done';
 
   // Assignee display
-  const assigneeLabel = task.assigned_to_user_id
-    ? (assigneeName || allProfiles?.find(p => p.id === task.assigned_to_user_id)?.full_name || 'Assigned')
-    : 'Unassigned';
+  const assigneeLabel = task.is_outside_vendor
+    ? 'Outside Vendor'
+    : task.assigned_to_user_id
+      ? (assigneeName || allProfiles?.find(p => p.id === task.assigned_to_user_id)?.full_name || 'Assigned')
+      : 'Unassigned';
 
   // Handlers
   const handleAssign = async (profileId: string | null) => {
@@ -120,6 +122,16 @@ const TaskQuickActions = ({
       }
       const { error } = await supabase.from('tasks').update({ assigned_to_user_id: profileId }).eq('id', task.id);
       if (error) throw error;
+      onUpdate();
+    } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
+  };
+
+  const handleSetOutsideVendor = async () => {
+    try {
+      const newVal = !task.is_outside_vendor;
+      const { error } = await supabase.from('tasks').update({ is_outside_vendor: newVal, assigned_to_user_id: newVal ? null : task.assigned_to_user_id }).eq('id', task.id);
+      if (error) throw error;
+      toast({ title: newVal ? 'Marked as Outside Vendor' : 'Removed Outside Vendor flag' });
       onUpdate();
     } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
   };
@@ -249,6 +261,9 @@ const TaskQuickActions = ({
               <DropdownMenuItem onSelect={handleToggleCrew}>
                 <Users className="h-3.5 w-3.5 mr-1" />
                 {task.assignment_mode === 'crew' ? 'Switch to Solo' : 'Make Crew Task'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleSetOutsideVendor} className={cn(task.is_outside_vendor && 'font-semibold')}>
+                <Package className="h-3.5 w-3.5 mr-1" />Outside Vendor
               </DropdownMenuItem>
               {sortedProfiles.map((p) => (
                 <DropdownMenuItem key={p.id} disabled={p.id === task.assigned_to_user_id} onSelect={() => handleAssign(p.id)} className={cn(p.id === task.assigned_to_user_id && 'font-semibold')}>
