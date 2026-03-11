@@ -105,6 +105,8 @@ const ProjectDetail = () => {
   const photoCountMap = data?.photoCountMap ?? {};
   const materialCountMap = data?.materialCountMap ?? {};
   const projectMembers = data?.members ?? [];
+  const allProfiles = data?.allProfiles ?? [];
+  const memberUserIds = useMemo(() => new Set(projectMembers.map(m => m.user_id)), [projectMembers]);
   const myActiveWorkerTaskIds = useMemo(() => new Set(data?.myActiveWorkerTaskIds ?? []), [data?.myActiveWorkerTaskIds]);
   const myCandidateTaskIds = useMemo(() => new Set(data?.myCandidateTaskIds ?? []), [data?.myCandidateTaskIds]);
 
