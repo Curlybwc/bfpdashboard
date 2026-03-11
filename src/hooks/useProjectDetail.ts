@@ -38,6 +38,7 @@ export function useProjectDetail(projectId: string | undefined, userId?: string)
       if (pErr) throw pErr;
       if (tErr) throw tErr;
       if (mErr) throw mErr;
+      if (apErr) throw apErr;
       if (!project) throw new Error('Project not found');
 
       const taskIds = (tasks ?? []).map((task) => task.id);
