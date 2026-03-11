@@ -1263,6 +1263,9 @@ const ProjectDetail = () => {
             )}
           </>
         )}
+        {project.project_type === 'rental' && (
+          <TenantsList projectId={id!} canEdit={isManager} />
+        )}
         {isManager && <ProjectMembers projectId={id!} />}
       </div>
     </div>
