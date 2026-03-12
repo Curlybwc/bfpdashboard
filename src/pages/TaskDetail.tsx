@@ -31,6 +31,7 @@ import RecipeStepsEditor from '@/components/recipe/RecipeStepsEditor';
 import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 import { useTaskDetailData } from '@/hooks/useTaskDetailData';
 import TaskLifecycleActions from '@/components/task-detail/TaskLifecycleActions';
+import SubtaskRow from '@/components/task-detail/SubtaskRow';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
