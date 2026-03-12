@@ -136,7 +136,7 @@ const RecipeStepRow = ({
         <button onClick={handleStartEdit} className="text-muted-foreground hover:text-foreground shrink-0">
           <Pencil className="h-3.5 w-3.5" />
         </button>
-        <button onClick={onToggleExpand} className="text-muted-foreground hover:text-foreground shrink-0">
+        <button onClick={onToggleExpand} className="text-muted-foreground hover:text-foreground shrink-0" title="Materials & Tools">
           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <Package className="h-3.5 w-3.5" />}
         </button>
         <button onClick={onDelete} className="text-muted-foreground hover:text-destructive shrink-0">
