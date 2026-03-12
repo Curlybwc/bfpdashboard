@@ -199,7 +199,7 @@ const TaskCard = ({
         )}
 
         {/* Unified action pill row */}
-        <div className="mt-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+        <div className="mt-2" onClick={(e) => { e.stopPropagation(); }} onPointerDown={(e) => { e.stopPropagation(); }}>
           <TaskQuickActions
             task={task}
             userId={userId}
