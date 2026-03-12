@@ -29,6 +29,7 @@ function normalize(s: string): string {
 
 export default function AdminMaterialLibrary() {
   const { toast } = useToast();
+  const [pushingId, setPushingId] = useState<string | null>(null);
   const [items, setItems] = useState<MaterialItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
