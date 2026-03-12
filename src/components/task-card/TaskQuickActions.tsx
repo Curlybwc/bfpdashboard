@@ -503,6 +503,80 @@ const TaskQuickActions = ({
         </DialogContent>
       </Dialog>
 
+      {/* Crew members dialog */}
+      <Dialog open={crewDialogOpen} onOpenChange={setCrewDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+          <DialogHeader><DialogTitle>Set Crew Members</DialogTitle></DialogHeader>
+
+          <div className="space-y-3">
+            <Input
+              placeholder="Search members..."
+              value={crewSearch}
+              onChange={(e) => setCrewSearch(e.target.value)}
+            />
+
+            <div className="max-h-64 overflow-y-auto border rounded-md">
+              {crewLoading ? (
+                <div className="p-3 text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />Loading crew members...
+                </div>
+              ) : sortedProfiles.filter((profile) => {
+                const q = crewSearch.trim().toLowerCase();
+                if (!q) return true;
+                return (profile.full_name || '').toLowerCase().includes(q);
+              }).length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">No members found.</p>
+              ) : (
+                sortedProfiles
+                  .filter((profile) => {
+                    const q = crewSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (profile.full_name || '').toLowerCase().includes(q);
+                  })
+                  .map((profile) => {
+                    const checked = crewCandidates.includes(profile.id);
+                    return (
+                      <label
+                        key={profile.id}
+                        className="flex items-center gap-2 px-3 py-2 text-sm border-b last:border-b-0 hover:bg-accent cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => {
+                            const enabled = value === true;
+                            setCrewCandidates((prev) => {
+                              if (enabled) {
+                                return prev.includes(profile.id) ? prev : [...prev, profile.id];
+                              }
+                              return prev.filter((id) => id !== profile.id);
+                            });
+                          }}
+                        />
+                        <span className="truncate">{profile.full_name || 'Unnamed'}</span>
+                      </label>
+                    );
+                  })
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">Selected: {crewCandidates.length}</p>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setCrewDialogOpen(false)}
+                disabled={crewSaving}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveCrewCandidates} disabled={crewSaving || crewLoading}>
+                {crewSaving ? 'Saving...' : 'Save Crew'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Dibs confirm */}
       <Dialog open={dibsConfirmOpen} onOpenChange={setDibsConfirmOpen}>
         <DialogContent onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
