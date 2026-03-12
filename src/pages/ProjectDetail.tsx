@@ -580,6 +580,194 @@ const ProjectDetail = () => {
                     </p>
                   </div>
                 )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Stage</Label>
+                    <Select value={stage} onValueChange={(v) => setStage(v as TaskStage)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TASK_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TASK_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Room / Area</Label>
+                    <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} placeholder="e.g. Kitchen" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Trade</Label>
+                    <Input value={trade} onChange={(e) => setTrade(e.target.value)} placeholder="e.g. Plumbing" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Assigned To</Label>
+                  <Select value={assignedTo} onValueChange={setAssignedTo}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
+                      <SelectItem value="crew">Crew (multi-worker)</SelectItem>
+                      {projectMembers.map(m => (
+                        <SelectItem key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Unnamed'}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {assignedTo === 'crew' && (
+                  <div className="space-y-2">
+                    <Label>Crew Candidates</Label>
+                    <div className="space-y-1">
+                      {projectMembers.map(m => (
+                        <label key={m.user_id} className="flex items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={crewCandidates.includes(m.user_id)}
+                            onCheckedChange={(checked) => {
+                              setCrewCandidates(prev => checked ? [...prev, m.user_id] : prev.filter(id => id !== m.user_id));
+                            }}
+                          />
+                          {m.profiles?.full_name || 'Unnamed'}
+                        </label>
+                      ))}
+                      {crewGroups.length > 0 && crewGroups.map(g => (
+                        <Button key={g.id} type="button" variant="outline" size="sm" className="mr-1" onClick={() => {
+                          setCrewCandidates(prev => {
+                            const set = new Set(prev);
+                            g.members.forEach(mid => set.add(mid));
+                            return [...set];
+                          });
+                        }}>+ {g.name}</Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {packageOptions.length > 0 && createMode === 'single' && !createAsPackage && (
+                  <div className="space-y-2">
+                    <Label>Add to Package</Label>
+                    <Select value={selectedPackageId} onValueChange={setSelectedPackageId}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">None (standalone)</SelectItem>
+                        {packageOptions.map(p => <SelectItem key={p.id} value={p.id}>{p.task}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {createMode === 'single' && selectedPackageId === 'general' && (
+                  <div className="flex items-center gap-2">
+                    <Switch checked={createAsPackage} onCheckedChange={setCreateAsPackage} id="create-package" />
+                    <Label htmlFor="create-package">Create as package (parent task)</Label>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Due Date</Label>
+                  <Input type="date" value={newDueDate} onChange={(e) => setNewDueDate(e.target.value)} />
+                </div>
+
+                {newDueDate && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Switch checked={newIsRecurring} onCheckedChange={setNewIsRecurring} id="recurring-toggle" />
+                      <Label htmlFor="recurring-toggle">Recurring</Label>
+                    </div>
+                    {newIsRecurring && (
+                      <Select value={newRecurrenceFrequency} onValueChange={(v) => setNewRecurrenceFrequency(v as RecurrenceFrequency)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {RECURRENCE_FREQUENCIES.map(f => <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                )}
+
+                {createMode === 'single' && !createAsPackage && (
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
+                    <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
+                    📦 Add Materials ({pendingMaterials.length})
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2 space-y-2">
+                    <div className="flex gap-2">
+                      <Input value={matName} onChange={(e) => setMatName(e.target.value)} placeholder="Material name" className="flex-1" />
+                      <Input value={matQty} onChange={(e) => setMatQty(e.target.value)} placeholder="Qty" className="w-16" />
+                      <Input value={matUnit} onChange={(e) => setMatUnit(e.target.value)} placeholder="Unit" className="w-20" />
+                      <Button type="button" size="sm" onClick={() => {
+                        if (!matName.trim()) return;
+                        setPendingMaterials(prev => [...prev, { name: matName.trim(), quantity: matQty, unit: matUnit }]);
+                        setMatName(''); setMatQty(''); setMatUnit('');
+                      }}><Plus className="h-4 w-4" /></Button>
+                    </div>
+                    {pendingMaterials.length > 0 && (
+                      <div className="space-y-1">
+                        {pendingMaterials.map((m, i) => (
+                          <div key={i} className="flex items-center justify-between text-sm bg-muted rounded px-2 py-1">
+                            <span>{m.name}{m.quantity ? ` × ${m.quantity}` : ''}{m.unit ? ` ${m.unit}` : ''}</span>
+                            <button type="button" onClick={() => setPendingMaterials(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+                )}
+                <Button type="submit" className="w-full" disabled={createTaskMutation.isPending || createTasksBatchMutation.isPending || (createMode === 'single' ? !taskName.trim() : batchPreview.uniqueTitles.length === 0)}>{createMode === 'batch' ? (createTasksBatchMutation.isPending ? 'Creating Tasks…' : `Create ${batchPreview.uniqueTitles.length || ''} Tasks`) : (createTaskMutation.isPending ? 'Creating Task…' : 'Create Task')}</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {userCanEditProject && (
+            <Button size="sm" variant="outline" onClick={openEditDialog}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {isManager && (
+            <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
+              <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
+            <Package className="h-4 w-4 mr-1" />Materials
+          </Button>
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
+              <CalendarDays className="h-4 w-4 mr-1" />Calendar
+            </Button>
+          )}
+          {isManager && (
+            <>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
+                <Zap className="h-4 w-4 mr-1" />Field Mode
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
+                <Mic className="h-4 w-4 mr-1" />Walkthrough
+              </Button>
+            </>
+          )}
+        </div>
+      )}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
