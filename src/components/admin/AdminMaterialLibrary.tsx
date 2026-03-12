@@ -188,6 +188,9 @@ export default function AdminMaterialLibrary() {
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePushToAll(item)} disabled={pushingId === item.id} title="Push to all recipes & tasks">
+                    <RefreshCw className={`h-3.5 w-3.5 ${pushingId === item.id ? 'animate-spin' : ''}`} />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(item)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
