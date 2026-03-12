@@ -1074,10 +1074,15 @@ const TaskDetail = () => {
               )}
             </div>
             {children.map(c => (
-              <div key={c.id} className="text-sm border rounded px-3 py-2 flex justify-between cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/projects/${projectId}/tasks/${c.id}`)}>
-                <span className="truncate">{c.task}</span>
-                <StatusBadge status={c.stage} />
-              </div>
+              <SubtaskRow
+                key={c.id}
+                child={c}
+                projectId={projectId!}
+                projectMembers={projectMembers}
+                canEdit={canEditTaskMetadata}
+                onNavigate={() => navigate(`/projects/${projectId}/tasks/${c.id}`)}
+                onUpdated={() => { fetchChildren(); fetchTask(); }}
+              />
             ))}
             {canEditTaskMetadata && (
               <div className="flex gap-2 pt-1">
