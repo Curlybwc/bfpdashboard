@@ -64,7 +64,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
     setTaskText(child.task);
     setStage(child.stage);
     setPriority(child.priority);
-    setAssignedTo(child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned'));
+    setAssignedTo(child.assignment_mode === 'crew' ? 'crew' : child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned'));
     setEditing(false);
   };
 
