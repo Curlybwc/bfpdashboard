@@ -10,7 +10,7 @@ import {
   TASK_PRIORITIES, TASK_STAGES, MATERIALS_OPTIONS,
   type TaskPriority, type MaterialsStatus, type TaskStage,
 } from '@/lib/supabase-types';
-import { UserPlus, Camera, Package, Flag, CalendarDays, Play, CheckCircle2, Users, LogOut, Loader2 } from 'lucide-react';
+import { UserPlus, Camera, Package, Flag, CalendarDays, Play, CheckCircle2, Users, LogOut, Loader2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -95,6 +95,7 @@ const TaskQuickActions = ({
   const [crewSaving, setCrewSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
+  const [syncingRecipe, setSyncingRecipe] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const actionable = isTaskActionable(task);
@@ -112,6 +113,23 @@ const TaskQuickActions = ({
   const showLeave = actionable && canExecute && isCrewTask && isActiveWorker;
   const canComplete = hasChildren ? allChildrenDone : true;
   const isDone = task.stage === 'Done';
+  const showSyncRecipe = hasChildren && task.expanded_recipe_id && canReassign;
+
+  const handleSyncToRecipe = async () => {
+    if (!task.expanded_recipe_id) return;
+    setSyncingRecipe(true);
+    const { data, error } = await supabase.rpc('capture_recipe_from_task', {
+      p_parent_task_id: task.id,
+      p_recipe_id: task.expanded_recipe_id,
+    });
+    setSyncingRecipe(false);
+    if (error) {
+      toast({ title: 'Sync failed', description: error.message, variant: 'destructive' });
+    } else {
+      const result = data as any;
+      toast({ title: 'Recipe updated', description: `${result?.steps_written ?? 0} steps, ${result?.materials_written ?? 0} materials synced.` });
+    }
+  };
 
   // Assignee display
   const assigneeLabel = task.is_outside_vendor
@@ -479,6 +497,13 @@ const TaskQuickActions = ({
         {canReportIssue && actionable && (
           <button className={pill} onClick={() => navigate(`/projects/${task.project_id}/tasks/${task.id}?report=1`)}>
             <AlertTriangle className="h-3.5 w-3.5" />Issue
+          </button>
+        )}
+
+        {/* Sync to Recipe */}
+        {showSyncRecipe && (
+          <button className={cn(pill, 'border-primary/50')} onClick={handleSyncToRecipe} disabled={syncingRecipe}>
+            <BookOpen className="h-3.5 w-3.5" />{syncingRecipe ? 'Syncing…' : 'Sync to Recipe'}
           </button>
         )}
       </div>

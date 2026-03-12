@@ -32,6 +32,7 @@ import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 import { useTaskDetailData } from '@/hooks/useTaskDetailData';
 import TaskLifecycleActions from '@/components/task-detail/TaskLifecycleActions';
 import SubtaskRow from '@/components/task-detail/SubtaskRow';
+import TaskCard from '@/components/TaskCard';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -381,12 +382,29 @@ const TaskDetail = () => {
     }
 
     const sourceTasks = children.length > 0 ? children : [task];
+
+    // Fetch crew candidates for each source task
+    const sourceTaskIds = sourceTasks.map((sourceTask) => sourceTask.id);
+    const { data: allCandidates } = await supabase
+      .from('task_candidates')
+      .select('task_id, user_id')
+      .in('task_id', sourceTaskIds);
+
+    const candidatesByTask = new Map<string, string[]>();
+    (allCandidates || []).forEach((c) => {
+      const list = candidatesByTask.get(c.task_id) || [];
+      list.push(c.user_id);
+      candidatesByTask.set(c.task_id, list);
+    });
+
     const stepInserts = sourceTasks.map((sourceTask, idx) => ({
       recipe_id: recipe.id,
       title: sourceTask.task,
       sort_order: (idx + 1) * 10,
       trade: sourceTask.trade || null,
       created_by: user.id,
+      assignment_mode: sourceTask.assignment_mode || 'solo',
+      default_candidate_user_ids: candidatesByTask.get(sourceTask.id) || [],
     }));
 
     const { data: insertedSteps, error: stepErr } = await supabase
@@ -400,7 +418,6 @@ const TaskDetail = () => {
       return;
     }
 
-    const sourceTaskIds = sourceTasks.map((sourceTask) => sourceTask.id);
     const { data: sourceMaterials, error: matsErr } = await supabase
       .from('task_materials')
       .select('task_id, name, quantity, unit, sku, vendor_url, store_section, provided_by, item_type, unit_cost')
@@ -1146,28 +1163,46 @@ const TaskDetail = () => {
 
         {(canDelete || hasChildren) && (
           <div className="space-y-1">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-1">
               <Label>Subtasks ({children.length})</Label>
-              {canDelete && (
-                <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
-                  <Save className="h-3.5 w-3.5 mr-1" />{hasChildren ? 'Save as Workflow Recipe' : 'Save as Single-Step Recipe'}
-                </Button>
-              )}
+              <div className="flex gap-1">
+                {canDelete && task.expanded_recipe_id && hasChildren && (
+                  <Button size="sm" variant="outline" onClick={() => setRecipeSyncOpen(true)}>
+                    <BookOpen className="h-3.5 w-3.5 mr-1" />Sync to Recipe
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
+                    <Save className="h-3.5 w-3.5 mr-1" />{hasChildren ? 'Save as Workflow Recipe' : 'Save as Single-Step Recipe'}
+                  </Button>
+                )}
+              </div>
             </div>
             {!hasChildren && (
               <p className="text-xs text-muted-foreground">No subtasks yet. Saving now creates a 1-step reusable task template from this task + materials.</p>
             )}
-            {children.map(c => (
-              <SubtaskRow
-                key={c.id}
-                child={c}
-                projectId={projectId!}
-                projectMembers={projectMembers}
-                canEdit={canEditTaskMetadata}
-                onNavigate={() => navigate(`/projects/${projectId}/tasks/${c.id}`)}
-                onUpdated={() => { fetchChildren(); fetchTask(); }}
-              />
-            ))}
+            {children.map(c => {
+              const assigneeName = c.assigned_to_user_id
+                ? projectMembers.find(m => m.user_id === c.assigned_to_user_id)?.profiles?.full_name || undefined
+                : undefined;
+              return (
+                <TaskCard
+                  key={c.id}
+                  task={c}
+                  projectName=""
+                  userId={user?.id ?? ''}
+                  isAdmin={isAdmin}
+                  onUpdate={() => { fetchChildren(); fetchTask(); }}
+                  showProjectName={false}
+                  isChild
+                  parentTitle={task.task}
+                  assigneeName={assigneeName}
+                  canReportIssue={projectRole === 'contractor'}
+                  canDelete={canDelete}
+                  allProfiles={projectMembers.map(m => ({ id: m.user_id, full_name: m.profiles?.full_name || null }))}
+                />
+              );
+            })}
             {canEditTaskMetadata && (
               <div className="flex gap-2 pt-1">
                 <Input
