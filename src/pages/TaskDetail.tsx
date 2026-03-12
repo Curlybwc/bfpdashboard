@@ -88,6 +88,9 @@ const TaskDetail = () => {
 
   // Photo state
   const [photoConfirmOpen, setPhotoConfirmOpen] = useState(false);
+  // Recipe sync state
+  const [recipeSyncOpen, setRecipeSyncOpen] = useState(false);
+  const [syncingRecipe, setSyncingRecipe] = useState(false);
   const {
     task,
     projectRole,
