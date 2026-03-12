@@ -1327,8 +1327,10 @@ export type Database = {
       }
       task_recipe_steps: {
         Row: {
+          assignment_mode: string
           created_at: string
           created_by: string | null
+          default_candidate_user_ids: string[]
           id: string
           is_optional: boolean
           notes: string | null
@@ -1338,8 +1340,10 @@ export type Database = {
           trade: string | null
         }
         Insert: {
+          assignment_mode?: string
           created_at?: string
           created_by?: string | null
+          default_candidate_user_ids?: string[]
           id?: string
           is_optional?: boolean
           notes?: string | null
@@ -1349,8 +1353,10 @@ export type Database = {
           trade?: string | null
         }
         Update: {
+          assignment_mode?: string
           created_at?: string
           created_by?: string | null
+          default_candidate_user_ids?: string[]
           id?: string
           is_optional?: boolean
           notes?: string | null
