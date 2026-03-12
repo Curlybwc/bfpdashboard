@@ -29,6 +29,20 @@ interface StepMaterial {
   unit_cost: number | null;
 }
 
+interface QueuedItem {
+  _key: string;
+  material_name: string;
+  qty: number | null;
+  unit: string | null;
+  sku: string | null;
+  vendor_url: string | null;
+  store_section: string | null;
+  provided_by: string;
+  qty_formula: string | null;
+  item_type: string;
+  unit_cost: number | null;
+}
+
 interface StepMaterialsEditorProps {
   stepId: string;
 }
