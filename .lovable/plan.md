@@ -1,97 +1,63 @@
 
 
-## Plan: Crew Tasks (Multi-Person, Multi-Day)
+## Plan: Unified Materials/Tools UI + Organic Library Sync
 
-### 1. Database Migration
+This is a significant feature spanning the recipe builder, task detail, and the `expand_recipe` RPC. The core idea: recipe steps should use the same rich materials/tools interface as project tasks, and edits in projects should offer to sync back to the recipe library.
 
-Single migration adding columns, tables, indexes, RLS, and a helper function.
+### 1. Database: Add `item_type` and `unit_cost` to `task_recipe_step_materials`
 
-**New columns on `tasks`:**
-- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
-- `lead_user_id uuid NULL`
-
-**New table `task_candidates` (eligibility pool):**
 ```sql
-CREATE TABLE public.task_candidates (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
+ALTER TABLE public.task_recipe_step_materials
+  ADD COLUMN item_type text NOT NULL DEFAULT 'material',
+  ADD COLUMN unit_cost numeric;
 ```
 
-**New table `task_workers` (active crew):**
-```sql
-CREATE TABLE public.task_workers (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  active boolean NOT NULL DEFAULT true,
-  joined_at timestamptz NOT NULL DEFAULT now(),
-  left_at timestamptz NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
-CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
-```
+### 2. Update `expand_recipe` RPC
 
-**RLS on `task_candidates`:**
-- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
-- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
+Currently hardcodes `item_type: 'material'` when inserting into `task_materials`. Change to pass through `v_mat.item_type` and `v_mat.unit_cost` from the recipe step material row.
 
-**RLS on `task_workers`:**
-- SELECT: same as task_candidates SELECT
-- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
-- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
-- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
+### 3. Rebuild `StepMaterialsEditor` to match `TaskMaterialsSheet` UI
 
-### 2. Today Tab (`src/pages/Today.tsx`)
+Replace the current minimal grid form with the same add-form pattern from `TaskMaterialsSheet`:
+- **Material/Tool type selector** (material vs tool)
+- **MaterialAutocomplete** for name (with "Add to library" support)
+- **Provided by** selector (for tools: company/contractor/either)
+- **Qty, Unit, Unit Cost, SKU, Vendor URL, Store Section** fields
+- **Qty Formula** field (recipe-specific, kept from current UI)
+- **Edit dialog** for existing items (matching `TaskMaterialsSheet` edit dialog)
+- **Item cards** with edit/delete buttons instead of compact inline rows
+- Separate "Materials" and "Tools" sections like `TaskMaterialsSheet`
 
-Add two additional queries in `fetchTasks` after existing solo queries:
+### 4. Update `RecipeStepRow` label
 
-**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
+Change "Materials (applied to task on expand)" to "Materials & Tools (applied on expand)".
 
-**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
+### 5. "Update Recipe in Library" prompt on project task save
 
-Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
+When a user edits subtasks on a task that was expanded from a recipe (`expanded_recipe_id` is set), and they click "Save Changes" or modify subtask materials:
+- Show a confirmation dialog: **"This task was created from recipe '{name}'. Update the recipe in the library with these changes?"**
+- If confirmed, call the existing `capture_recipe_from_task` RPC which already syncs steps + materials back to the recipe.
+- This uses the existing RPC — no new backend logic needed.
 
-### 3. TaskCard (`src/components/TaskCard.tsx`)
+### 6. "Save to Library" prompt for materials
 
-Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+When adding a material/tool in the recipe `StepMaterialsEditor`, the `MaterialAutocomplete` component already supports "Add to library" via `onAddToLibrary`. Wire this up the same way `TaskMaterialsSheet` does — calling `material_library.insert` for materials and `tool_types.insert` for tools.
 
-When `isCrewTask`:
-- Show a small crew icon + "N active" badge next to status
-- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
-- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
-- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
-- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+### Files affected
 
-### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+| File | Change |
+|------|--------|
+| DB migration | Add `item_type`, `unit_cost` columns |
+| `expand_recipe` RPC | Pass `item_type` and `unit_cost` through |
+| `capture_recipe_from_task` RPC | Pass `item_type` and `unit_cost` back |
+| `StepMaterialsEditor.tsx` | Major rewrite to match TaskMaterialsSheet UI |
+| `RecipeStepRow.tsx` | Minor label update |
+| `TaskDetail.tsx` | Add "Update recipe?" confirmation dialog after subtask/material edits |
 
-**Crew toggle** (visible to admin/manager only, below Assigned To):
-- Switch labeled "Crew Task"
-- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
-- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+### Technical details
 
-**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
-- "Active Crew" list showing names from `task_workers` joined to `profiles`
-- Join/Leave button for current user
-- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
-
-**Solo mode**: keep existing Assigned To UI unchanged.
-
-### 5. Files to Modify
-
-1. **Migration SQL** — new columns, tables, indexes, RLS
-2. `src/pages/Today.tsx` — crew task queries merged into sections
-3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
-4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
-5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
-
-### 6. Key Edge Cases
-
-- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
-- Crew Available shows even when task is 'In Progress' (multiple people can join)
-- Upsert PK on `task_workers` prevents duplicate joins
-- Done tasks filtered out everywhere by existing stage checks
-- Crew→Solo cleanup deletes both tables to prevent orphan rows
+- `StepMaterialsEditor` will import and use `MaterialAutocomplete` for name input, plus `inferStoreSection` for auto-section detection.
+- The edit dialog within `StepMaterialsEditor` will be a `Dialog` component (same as `TaskMaterialsSheet` edit dialog) with all fields including type, provided_by, name (autocomplete), qty, unit, unit_cost, SKU, vendor URL, store section, and qty_formula.
+- The "Update recipe?" prompt in `TaskDetail` will appear as an `AlertDialog` triggered after the user saves a task that has `expanded_recipe_id`. It calls `capture_recipe_from_task(task_id, expanded_recipe_id)`.
+- The `capture_recipe_from_task` RPC needs a small update to also sync `item_type` and `unit_cost` fields.
 
