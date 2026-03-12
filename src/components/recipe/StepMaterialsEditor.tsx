@@ -103,12 +103,14 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     }
   };
 
-  const handleAddToLibrary = async (name: string) => {
-    if (newItemType === 'tool') {
+  const handleAddToLibrary = async (name: string, itemType: string = 'material') => {
+    if (itemType === 'tool') {
+      const sku = itemType === newItemType ? newSku : editSku;
+      const vendorUrl = itemType === newItemType ? newVendorUrl : editVendorUrl;
       const { error } = await supabase.from('tool_types').insert({
         name: name.trim(),
-        sku: newSku.trim() || null,
-        vendor_url: normalizeUrl(newVendorUrl),
+        sku: sku.trim() || null,
+        vendor_url: normalizeUrl(vendorUrl),
       });
       if (error) {
         if (error.code === '23505') toast({ title: 'Already in tool inventory' });
@@ -118,15 +120,20 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       }
       return;
     }
+    const sku = itemType === newItemType ? newSku : editSku;
+    const vendorUrl = itemType === newItemType ? newVendorUrl : editVendorUrl;
+    const unitCost = itemType === newItemType ? newUnitCost : editUnitCost;
+    const unit = itemType === newItemType ? newUnit : editUnit;
+    const storeSection = itemType === newItemType ? newStoreSection : editStoreSection;
     const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
     const { error } = await supabase.from('material_library').insert({
       name,
       normalized_name: normalized,
-      unit_cost: newUnitCost ? parseFloat(newUnitCost) : null,
-      sku: newSku.trim() || null,
-      vendor_url: normalizeUrl(newVendorUrl),
-      unit: newUnit.trim() || null,
-      store_section: newStoreSection.trim() || null,
+      unit_cost: unitCost ? parseFloat(unitCost) : null,
+      sku: sku.trim() || null,
+      vendor_url: normalizeUrl(vendorUrl),
+      unit: unit.trim() || null,
+      store_section: storeSection.trim() || null,
     });
     if (error) {
       if (error.code === '23505') toast({ title: 'Already in library' });
@@ -291,7 +298,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
             value={newName}
             onChange={setNewName}
             onSelect={(item) => handleSelectFromLibrary(item, 'new')}
-            onAddToLibrary={handleAddToLibrary}
+            onAddToLibrary={(name) => handleAddToLibrary(name, newItemType)}
             className="flex-1"
           />
           <Input placeholder="Qty" type="number" value={newQty} onChange={e => setNewQty(e.target.value)} className="h-7 text-xs w-14" />
@@ -358,7 +365,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
                 value={editName}
                 onChange={setEditName}
                 onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
-                onAddToLibrary={handleAddToLibrary}
+                onAddToLibrary={(name) => handleAddToLibrary(name, editItemType)}
               />
             </div>
             <div className="flex gap-2">
