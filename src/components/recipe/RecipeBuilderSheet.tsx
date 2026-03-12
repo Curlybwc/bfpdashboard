@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, RefreshCw } from 'lucide-react';
 import RecipeMetaEditor from './RecipeMetaEditor';
 import RecipeStepsEditor from './RecipeStepsEditor';
 
@@ -26,6 +26,7 @@ const RecipeBuilderSheet = ({
   onSaved, onDeleted,
 }: RecipeBuilderSheetProps) => {
   const { toast } = useToast();
+  const [pushing, setPushing] = useState(false);
 
   const [name, setName] = useState(initialName);
   const [trade, setTrade] = useState(initialTrade);
@@ -58,6 +59,18 @@ const RecipeBuilderSheet = ({
     onDeleted();
   };
 
+  const handlePushToTasks = async () => {
+    setPushing(true);
+    const { data, error } = await supabase.rpc('push_recipe_to_tasks', { p_recipe_id: recipeId });
+    setPushing(false);
+    if (error) {
+      toast({ title: 'Error pushing to tasks', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const result = data as any;
+    toast({ title: `Pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
+  };
+
   return (
     <div className="space-y-4">
       <RecipeMetaEditor
@@ -71,6 +84,10 @@ const RecipeBuilderSheet = ({
 
       <div className="flex gap-2">
         <Button onClick={handleSave} className="flex-1">Save Recipe</Button>
+        <Button variant="outline" size="sm" onClick={handlePushToTasks} disabled={pushing}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${pushing ? 'animate-spin' : ''}`} />
+          Push to Active Tasks
+        </Button>
         <Button variant="destructive" size="icon" onClick={handleDelete}>
           <Trash2 className="h-4 w-4" />
         </Button>

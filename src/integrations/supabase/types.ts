@@ -1855,6 +1855,11 @@ export type Database = {
         Args: { _scope_id: string; _user_id: string }
         Returns: boolean
       }
+      push_material_library_to_all: {
+        Args: { p_material_id: string }
+        Returns: Json
+      }
+      push_recipe_to_tasks: { Args: { p_recipe_id: string }; Returns: Json }
       upsert_shift_with_allocations: {
         Args: {
           p_allocations?: Json

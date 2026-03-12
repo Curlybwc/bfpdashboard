@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Search, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, Search, ExternalLink, RefreshCw } from 'lucide-react';
 
 interface MaterialItem {
   id: string;
@@ -29,6 +29,7 @@ function normalize(s: string): string {
 
 export default function AdminMaterialLibrary() {
   const { toast } = useToast();
+  const [pushingId, setPushingId] = useState<string | null>(null);
   const [items, setItems] = useState<MaterialItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -129,6 +130,21 @@ export default function AdminMaterialLibrary() {
     fetchItems();
   };
 
+  const handlePushToAll = async (item: MaterialItem) => {
+    setPushingId(item.id);
+    const { data, error } = await supabase.rpc('push_material_library_to_all' as any, { p_material_id: item.id });
+    setPushingId(null);
+    if (error) {
+      toast({ title: 'Error pushing updates', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const result = data as any;
+    toast({
+      title: 'Material synced everywhere',
+      description: `${result?.recipe_materials_updated ?? 0} recipe items, ${result?.task_materials_updated ?? 0} task items updated`,
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -172,6 +188,9 @@ export default function AdminMaterialLibrary() {
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePushToAll(item)} disabled={pushingId === item.id} title="Push to all recipes & tasks">
+                    <RefreshCw className={`h-3.5 w-3.5 ${pushingId === item.id ? 'animate-spin' : ''}`} />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(item)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
