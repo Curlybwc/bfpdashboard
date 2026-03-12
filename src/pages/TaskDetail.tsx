@@ -1162,13 +1162,20 @@ const TaskDetail = () => {
 
         {(canDelete || hasChildren) && (
           <div className="space-y-1">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-1">
               <Label>Subtasks ({children.length})</Label>
-              {canDelete && (
-                <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
-                  <Save className="h-3.5 w-3.5 mr-1" />{hasChildren ? 'Save as Workflow Recipe' : 'Save as Single-Step Recipe'}
-                </Button>
-              )}
+              <div className="flex gap-1">
+                {canDelete && task.expanded_recipe_id && hasChildren && (
+                  <Button size="sm" variant="outline" onClick={() => setRecipeSyncOpen(true)}>
+                    <BookOpen className="h-3.5 w-3.5 mr-1" />Sync to Recipe
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
+                    <Save className="h-3.5 w-3.5 mr-1" />{hasChildren ? 'Save as Workflow Recipe' : 'Save as Single-Step Recipe'}
+                  </Button>
+                )}
+              </div>
             </div>
             {!hasChildren && (
               <p className="text-xs text-muted-foreground">No subtasks yet. Saving now creates a 1-step reusable task template from this task + materials.</p>
