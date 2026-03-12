@@ -10,6 +10,7 @@ import { useStoreSections } from '@/hooks/useStoreSections';
 import { useToast } from '@/hooks/use-toast';
 import { inferStoreSection } from '@/lib/inferStoreSection';
 import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 
 interface StepMaterial {
