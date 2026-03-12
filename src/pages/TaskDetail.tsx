@@ -1180,17 +1180,28 @@ const TaskDetail = () => {
             {!hasChildren && (
               <p className="text-xs text-muted-foreground">No subtasks yet. Saving now creates a 1-step reusable task template from this task + materials.</p>
             )}
-            {children.map(c => (
-              <SubtaskRow
-                key={c.id}
-                child={c}
-                projectId={projectId!}
-                projectMembers={projectMembers}
-                canEdit={canEditTaskMetadata}
-                onNavigate={() => navigate(`/projects/${projectId}/tasks/${c.id}`)}
-                onUpdated={() => { fetchChildren(); fetchTask(); }}
-              />
-            ))}
+            {children.map(c => {
+              const assigneeName = c.assigned_to_user_id
+                ? projectMembers.find(m => m.user_id === c.assigned_to_user_id)?.profiles?.full_name || undefined
+                : undefined;
+              return (
+                <TaskCard
+                  key={c.id}
+                  task={c}
+                  projectName=""
+                  userId={user?.id ?? ''}
+                  isAdmin={isAdmin}
+                  onUpdate={() => { fetchChildren(); fetchTask(); }}
+                  showProjectName={false}
+                  isChild
+                  parentTitle={task.task}
+                  assigneeName={assigneeName}
+                  canReportIssue={projectRole === 'contractor'}
+                  canDelete={canDelete}
+                  allProfiles={projectMembers.map(m => ({ id: m.user_id, full_name: m.profiles?.full_name || null }))}
+                />
+              );
+            })}
             {canEditTaskMetadata && (
               <div className="flex gap-2 pt-1">
                 <Input
