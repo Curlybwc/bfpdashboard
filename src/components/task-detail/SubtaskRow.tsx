@@ -25,7 +25,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
   const [stage, setStage] = useState<TaskStage>(child.stage);
   const [priority, setPriority] = useState<TaskPriority>(child.priority);
   const [assignedTo, setAssignedTo] = useState<string>(
-    child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned')
+    child.assignment_mode === 'crew' ? 'crew' : child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned')
   );
 
   const handleSave = async () => {
