@@ -210,6 +210,39 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       store_section: editStoreSection || null,
       qty_formula: editFormula.trim() || null,
     } as any).eq('id', editMat.id);
+
+    if (!error && editSyncToLibrary) {
+      if (editItemType === 'tool') {
+        const normalized = editName.trim();
+        const { error: toolErr } = await supabase.from('tool_types').upsert({
+          name: normalized,
+          sku: editSku.trim() || null,
+          vendor_url: normalizeUrl(editVendorUrl),
+        }, { onConflict: 'name' });
+        if (toolErr && toolErr.code !== '23505') {
+          toast({ title: 'Tool library update failed', description: toolErr.message, variant: 'destructive' });
+        } else {
+          toast({ title: `"${editName.trim()}" synced to Tool Types` });
+        }
+      } else {
+        const normalized = editName.toLowerCase().trim().replace(/\s+/g, ' ');
+        const { error: libErr } = await supabase.from('material_library').upsert({
+          name: editName.trim(),
+          normalized_name: normalized,
+          unit_cost: editUnitCost ? parseFloat(editUnitCost) : null,
+          sku: editSku.trim() || null,
+          vendor_url: normalizeUrl(editVendorUrl),
+          unit: editUnit.trim() || null,
+          store_section: editStoreSection.trim() || null,
+        }, { onConflict: 'normalized_name' });
+        if (libErr && libErr.code !== '23505') {
+          toast({ title: 'Library update failed', description: libErr.message, variant: 'destructive' });
+        } else {
+          toast({ title: `"${editName.trim()}" synced to Materials Library` });
+        }
+      }
+    }
+
     setEditLoading(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
