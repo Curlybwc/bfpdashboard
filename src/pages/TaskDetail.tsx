@@ -383,18 +383,45 @@ const TaskDetail = () => {
 
     const sourceTasks = children.length > 0 ? children : [task];
 
-    // Fetch crew candidates for each source task
     const sourceTaskIds = sourceTasks.map((sourceTask) => sourceTask.id);
-    const { data: allCandidates } = await supabase
-      .from('task_candidates')
-      .select('task_id, user_id')
-      .in('task_id', sourceTaskIds);
+    const [{ data: allCandidates, error: candidateErr }, { data: activeWorkers, error: workersErr }] = await Promise.all([
+      supabase
+        .from('task_candidates')
+        .select('task_id, user_id')
+        .in('task_id', sourceTaskIds),
+      supabase
+        .from('task_workers')
+        .select('task_id, user_id')
+        .in('task_id', sourceTaskIds)
+        .eq('active', true),
+    ]);
 
-    const candidatesByTask = new Map<string, string[]>();
-    (allCandidates || []).forEach((c) => {
-      const list = candidatesByTask.get(c.task_id) || [];
-      list.push(c.user_id);
-      candidatesByTask.set(c.task_id, list);
+    if (candidateErr || workersErr) {
+      toast({
+        title: 'Error',
+        description: candidateErr?.message || workersErr?.message || 'Unable to save worker assignments',
+        variant: 'destructive',
+      });
+      setSavingRecipe(false);
+      return;
+    }
+
+    const candidatesByTask = new Map<string, Set<string>>();
+    const addCandidate = (sourceTaskId: string, userId: string | null | undefined) => {
+      if (!userId) return;
+      const existing = candidatesByTask.get(sourceTaskId) || new Set<string>();
+      existing.add(userId);
+      candidatesByTask.set(sourceTaskId, existing);
+    };
+
+    (allCandidates || []).forEach(({ task_id, user_id }) => addCandidate(task_id, user_id));
+    (activeWorkers || []).forEach(({ task_id, user_id }) => addCandidate(task_id, user_id));
+
+    sourceTasks.forEach((sourceTask) => {
+      if (sourceTask.assignment_mode === 'crew') {
+        addCandidate(sourceTask.id, sourceTask.lead_user_id);
+        addCandidate(sourceTask.id, sourceTask.assigned_to_user_id);
+      }
     });
 
     const stepInserts = sourceTasks.map((sourceTask, idx) => ({
@@ -404,7 +431,7 @@ const TaskDetail = () => {
       trade: sourceTask.trade || null,
       created_by: user.id,
       assignment_mode: sourceTask.assignment_mode || 'solo',
-      default_candidate_user_ids: candidatesByTask.get(sourceTask.id) || [],
+      default_candidate_user_ids: Array.from(candidatesByTask.get(sourceTask.id) || []),
     }));
 
     const { data: insertedSteps, error: stepErr } = await supabase
