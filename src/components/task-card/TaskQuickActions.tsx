@@ -10,8 +10,10 @@ import {
   TASK_PRIORITIES, TASK_STAGES, MATERIALS_OPTIONS,
   type TaskPriority, type MaterialsStatus, type TaskStage,
 } from '@/lib/supabase-types';
-import { UserPlus, Camera, Package, Flag, CalendarDays, Play, CheckCircle2, Users, LogOut } from 'lucide-react';
+import { UserPlus, Camera, Package, Flag, CalendarDays, Play, CheckCircle2, Users, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import StatusBadge from '@/components/StatusBadge';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -86,6 +88,11 @@ const TaskQuickActions = ({
   const [photoPhase, setPhotoPhase] = useState<'before' | 'progress' | 'after'>('progress');
   const [uploading, setUploading] = useState(false);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
+  const [crewDialogOpen, setCrewDialogOpen] = useState(false);
+  const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
+  const [crewSearch, setCrewSearch] = useState('');
+  const [crewLoading, setCrewLoading] = useState(false);
+  const [crewSaving, setCrewSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +151,102 @@ const TaskQuickActions = ({
       toast({ title: newMode === 'crew' ? 'Set as crew task' : 'Set as solo task' });
       onUpdate();
     } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
+  };
+
+  const openCrewAssignmentDialog = async () => {
+    setCrewDialogOpen(true);
+    setCrewSearch('');
+    setCrewLoading(true);
+
+    const { data, error } = await supabase
+      .from('task_candidates')
+      .select('user_id')
+      .eq('task_id', task.id);
+
+    setCrewLoading(false);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    const fromDb = (data || []).map((row) => row.user_id);
+    if (fromDb.length > 0) {
+      setCrewCandidates(fromDb);
+      return;
+    }
+
+    setCrewCandidates(task.assigned_to_user_id ? [task.assigned_to_user_id] : []);
+  };
+
+  const handleSaveCrewCandidates = async () => {
+    if (crewCandidates.length === 0) {
+      toast({ title: 'Select crew members', description: 'Pick at least one crew member.', variant: 'destructive' });
+      return;
+    }
+
+    setCrewSaving(true);
+
+    try {
+      const { data: existingMembers, error: existingMembersError } = await supabase
+        .from('project_members')
+        .select('user_id')
+        .eq('project_id', task.project_id)
+        .in('user_id', crewCandidates);
+
+      if (existingMembersError) throw existingMembersError;
+
+      const existingMemberSet = new Set((existingMembers || []).map((member) => member.user_id));
+      const missingMemberIds = crewCandidates.filter((userId) => !existingMemberSet.has(userId));
+
+      if (missingMemberIds.length > 0) {
+        const { error: memberInsertError } = await supabase
+          .from('project_members')
+          .insert(missingMemberIds.map((userId) => ({
+            project_id: task.project_id,
+            user_id: userId,
+            role: 'contractor' as const,
+          })));
+
+        if (memberInsertError) throw memberInsertError;
+      }
+
+      const { error: taskError } = await supabase
+        .from('tasks')
+        .update({
+          assignment_mode: 'crew',
+          assigned_to_user_id: null,
+          is_outside_vendor: false,
+          lead_user_id: crewCandidates[0] || null,
+        })
+        .eq('id', task.id);
+
+      if (taskError) throw taskError;
+
+      const { error: candidateDeleteError } = await supabase
+        .from('task_candidates')
+        .delete()
+        .eq('task_id', task.id);
+
+      if (candidateDeleteError) throw candidateDeleteError;
+
+      const { error: candidateInsertError } = await supabase
+        .from('task_candidates')
+        .upsert(
+          crewCandidates.map((userId) => ({ task_id: task.id, user_id: userId })),
+          { onConflict: 'task_id,user_id' }
+        );
+
+      if (candidateInsertError) throw candidateInsertError;
+
+      toast({ title: 'Crew members saved' });
+      setCrewDialogOpen(false);
+      onUpdate();
+    } catch (e: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' });
+    } finally {
+      setCrewSaving(false);
+    }
   };
 
   const handleStageChange = async (newStage: TaskStage) => {
@@ -261,6 +364,10 @@ const TaskQuickActions = ({
               <DropdownMenuItem onSelect={handleToggleCrew}>
                 <Users className="h-3.5 w-3.5 mr-1" />
                 {task.assignment_mode === 'crew' ? 'Switch to Solo' : 'Make Crew Task'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={openCrewAssignmentDialog}>
+                <Users className="h-3.5 w-3.5 mr-1" />
+                Set Crew Members
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={handleSetOutsideVendor} className={cn(task.is_outside_vendor && 'font-semibold')}>
                 <Package className="h-3.5 w-3.5 mr-1" />Outside Vendor
@@ -393,6 +500,80 @@ const TaskQuickActions = ({
           <Button className="w-full" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} disabled={uploading}>
             <Camera className="h-4 w-4 mr-2" />{uploading ? 'Uploading…' : 'Take / Choose Photo'}
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Crew members dialog */}
+      <Dialog open={crewDialogOpen} onOpenChange={setCrewDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+          <DialogHeader><DialogTitle>Set Crew Members</DialogTitle></DialogHeader>
+
+          <div className="space-y-3">
+            <Input
+              placeholder="Search members..."
+              value={crewSearch}
+              onChange={(e) => setCrewSearch(e.target.value)}
+            />
+
+            <div className="max-h-64 overflow-y-auto border rounded-md">
+              {crewLoading ? (
+                <div className="p-3 text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />Loading crew members...
+                </div>
+              ) : sortedProfiles.filter((profile) => {
+                const q = crewSearch.trim().toLowerCase();
+                if (!q) return true;
+                return (profile.full_name || '').toLowerCase().includes(q);
+              }).length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">No members found.</p>
+              ) : (
+                sortedProfiles
+                  .filter((profile) => {
+                    const q = crewSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (profile.full_name || '').toLowerCase().includes(q);
+                  })
+                  .map((profile) => {
+                    const checked = crewCandidates.includes(profile.id);
+                    return (
+                      <label
+                        key={profile.id}
+                        className="flex items-center gap-2 px-3 py-2 text-sm border-b last:border-b-0 hover:bg-accent cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => {
+                            const enabled = value === true;
+                            setCrewCandidates((prev) => {
+                              if (enabled) {
+                                return prev.includes(profile.id) ? prev : [...prev, profile.id];
+                              }
+                              return prev.filter((id) => id !== profile.id);
+                            });
+                          }}
+                        />
+                        <span className="truncate">{profile.full_name || 'Unnamed'}</span>
+                      </label>
+                    );
+                  })
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">Selected: {crewCandidates.length}</p>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setCrewDialogOpen(false)}
+                disabled={crewSaving}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveCrewCandidates} disabled={crewSaving || crewLoading}>
+                {crewSaving ? 'Saving...' : 'Save Crew'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
