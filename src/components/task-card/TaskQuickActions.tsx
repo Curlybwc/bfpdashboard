@@ -387,10 +387,10 @@ const TaskQuickActions = ({
 
       {/* Photo Upload Dialog */}
       <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
-        <DialogContent className="sm:max-w-[350px]" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+        <DialogContent className="sm:max-w-[350px]" onClick={(e) => { e.stopPropagation(); }}>
           <DialogHeader><DialogTitle>Upload {photoPhase} Photo</DialogTitle></DialogHeader>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
-          <Button className="w-full" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+          <Button className="w-full" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} disabled={uploading}>
             <Camera className="h-4 w-4 mr-2" />{uploading ? 'Uploading…' : 'Take / Choose Photo'}
           </Button>
         </DialogContent>
