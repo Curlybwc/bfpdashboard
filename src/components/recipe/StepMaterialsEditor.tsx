@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { inferStoreSection } from '@/lib/inferStoreSection';
 import MaterialAutocomplete, { type LibraryMaterial, type LibraryTool } from '@/components/MaterialAutocomplete';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Save } from 'lucide-react';
 
 interface StepMaterial {
   id: string;
@@ -24,6 +24,20 @@ interface StepMaterial {
   store_section: string | null;
   provided_by: string | null;
   notes: string | null;
+  qty_formula: string | null;
+  item_type: string;
+  unit_cost: number | null;
+}
+
+interface QueuedItem {
+  _key: string;
+  material_name: string;
+  qty: number | null;
+  unit: string | null;
+  sku: string | null;
+  vendor_url: string | null;
+  store_section: string | null;
+  provided_by: string;
   qty_formula: string | null;
   item_type: string;
   unit_cost: number | null;
@@ -57,6 +71,10 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const [newProvidedBy, setNewProvidedBy] = useState<string>('either');
   const [newStoreSection, setNewStoreSection] = useState('');
   const [newFormula, setNewFormula] = useState('');
+
+  // Batch queue
+  const [queue, setQueue] = useState<QueuedItem[]>([]);
+  const [savingQueue, setSavingQueue] = useState(false);
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
@@ -145,11 +163,11 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     }
   };
 
-  const handleAdd = async () => {
+  const handleQueueItem = () => {
     if (!newName.trim()) return;
     const autoSection = newStoreSection || inferStoreSection(newName.trim(), activeNames);
-    const { error } = await supabase.from('task_recipe_step_materials').insert({
-      recipe_step_id: stepId,
+    setQueue(prev => [...prev, {
+      _key: crypto.randomUUID(),
       material_name: newName.trim(),
       qty: newQty ? parseFloat(newQty) : null,
       unit: newUnit.trim() || null,
@@ -160,14 +178,33 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       provided_by: newItemType === 'tool' ? newProvidedBy : 'either',
       qty_formula: newFormula.trim() || null,
       item_type: newItemType,
-    } as any);
+    }]);
+    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost('');
+    setNewSku(''); setNewVendorUrl(''); setNewStoreSection('');
+    setNewFormula('');
+    // Keep itemType and providedBy for convenience when adding multiple of same type
+  };
+
+  const handleRemoveFromQueue = (key: string) => {
+    setQueue(prev => prev.filter(i => i._key !== key));
+  };
+
+  const handleSaveQueue = async () => {
+    if (queue.length === 0) return;
+    setSavingQueue(true);
+    const rows = queue.map(({ _key, ...rest }) => ({
+      recipe_step_id: stepId,
+      ...rest,
+    }));
+    const { error } = await supabase.from('task_recipe_step_materials').insert(rows as any);
+    setSavingQueue(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost('');
-    setNewSku(''); setNewVendorUrl(''); setNewStoreSection('');
-    setNewItemType('material'); setNewProvidedBy('either'); setNewFormula('');
+    toast({ title: `${queue.length} item(s) added` });
+    setQueue([]);
+    setNewItemType('material'); setNewProvidedBy('either');
     fetchMaterials();
   };
 
@@ -366,10 +403,37 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
           <Input placeholder="Qty Formula (e.g. room_sqft * 1.1)" value={newFormula} onChange={e => setNewFormula(e.target.value)} className="h-7 text-xs flex-1" />
         </div>
         <p className="text-[10px] text-muted-foreground">Formula variables: room_sqft, perimeter_ft, task_qty</p>
-        <Button size="sm" onClick={handleAdd} disabled={!newName.trim()} className="h-7 text-xs w-full">
-          <Plus className="h-3 w-3 mr-1" />Add {newItemType === 'tool' ? 'Tool' : 'Material'}
+        <Button size="sm" onClick={handleQueueItem} disabled={!newName.trim()} className="h-7 text-xs w-full">
+          <Plus className="h-3 w-3 mr-1" />Queue {newItemType === 'tool' ? 'Tool' : 'Material'}
         </Button>
       </div>
+
+      {/* Queued items */}
+      {queue.length > 0 && (
+        <div className="space-y-1.5 border rounded-lg p-2 bg-muted/30">
+          <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            Queued ({queue.length})
+          </h4>
+          {queue.map(item => (
+            <div key={item._key} className="flex items-center justify-between gap-2 rounded border bg-background px-2 py-1">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-medium">{item.material_name}</span>
+                <span className="text-[10px] text-muted-foreground ml-1">
+                  {item.item_type === 'tool' ? '🔧' : '📦'}
+                  {item.qty != null && <> · {item.qty}{item.unit ? ` ${item.unit}` : ''}</>}
+                  {item.unit_cost != null && <> · ${item.unit_cost.toFixed(2)}</>}
+                </span>
+              </div>
+              <button onClick={() => handleRemoveFromQueue(item._key)} className="p-0.5 text-muted-foreground hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+          <Button size="sm" onClick={handleSaveQueue} disabled={savingQueue} className="h-7 text-xs w-full">
+            <Save className="h-3 w-3 mr-1" />{savingQueue ? 'Saving…' : `Save All (${queue.length})`}
+          </Button>
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
