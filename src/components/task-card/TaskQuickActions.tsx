@@ -499,6 +499,13 @@ const TaskQuickActions = ({
             <AlertTriangle className="h-3.5 w-3.5" />Issue
           </button>
         )}
+
+        {/* Sync to Recipe */}
+        {showSyncRecipe && (
+          <button className={cn(pill, 'border-primary/50')} onClick={handleSyncToRecipe} disabled={syncingRecipe}>
+            <BookOpen className="h-3.5 w-3.5" />{syncingRecipe ? 'Syncing…' : 'Sync to Recipe'}
+          </button>
+        )}
       </div>
 
       {/* Due Date Dialog */}
