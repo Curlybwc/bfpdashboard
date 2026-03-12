@@ -72,6 +72,10 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const [newStoreSection, setNewStoreSection] = useState('');
   const [newFormula, setNewFormula] = useState('');
 
+  // Batch queue
+  const [queue, setQueue] = useState<QueuedItem[]>([]);
+  const [savingQueue, setSavingQueue] = useState(false);
+
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
   const [editMat, setEditMat] = useState<StepMaterial | null>(null);
