@@ -86,7 +86,7 @@ const SortableRehabItem = ({ item, onDelete }: { item: RehabItem; onDelete: () =
   );
 };
 
-
+const AdminRehabLibrary = () => {
   const { isAdmin, canManageProjects, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
   const navigate = useNavigate();
