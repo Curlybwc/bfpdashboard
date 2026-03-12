@@ -113,6 +113,23 @@ const TaskQuickActions = ({
   const showLeave = actionable && canExecute && isCrewTask && isActiveWorker;
   const canComplete = hasChildren ? allChildrenDone : true;
   const isDone = task.stage === 'Done';
+  const showSyncRecipe = hasChildren && task.expanded_recipe_id && canReassign;
+
+  const handleSyncToRecipe = async () => {
+    if (!task.expanded_recipe_id) return;
+    setSyncingRecipe(true);
+    const { data, error } = await supabase.rpc('capture_recipe_from_task', {
+      p_parent_task_id: task.id,
+      p_recipe_id: task.expanded_recipe_id,
+    });
+    setSyncingRecipe(false);
+    if (error) {
+      toast({ title: 'Sync failed', description: error.message, variant: 'destructive' });
+    } else {
+      const result = data as any;
+      toast({ title: 'Recipe updated', description: `${result?.steps_written ?? 0} steps, ${result?.materials_written ?? 0} materials synced.` });
+    }
+  };
 
   // Assignee display
   const assigneeLabel = task.is_outside_vendor
