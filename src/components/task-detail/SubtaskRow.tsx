@@ -141,6 +141,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="unassigned">Unassigned</SelectItem>
+            <SelectItem value="crew">Crew Task</SelectItem>
             <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
             {projectMembers.map((m) => (
               <SelectItem key={m.user_id} value={m.user_id}>
