@@ -298,7 +298,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
             value={newName}
             onChange={setNewName}
             onSelect={(item) => handleSelectFromLibrary(item, 'new')}
-            onAddToLibrary={(name) => handleAddToLibrary(name, newItemType)}
+            onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
             className="flex-1"
           />
           <Input placeholder="Qty" type="number" value={newQty} onChange={e => setNewQty(e.target.value)} className="h-7 text-xs w-14" />
