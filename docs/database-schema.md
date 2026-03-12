@@ -94,6 +94,7 @@ Construction projects.
 | **id** | uuid | No | gen_random_uuid() | PK |
 | name | text | No | — | |
 | address | text | Yes | — | |
+| project_type | enum project_type | No | 'construction' | construction / rental / general |
 | status | enum project_status | No | 'active' | active / paused / complete |
 | scope_id | uuid | Yes | — | FK → scopes.id |
 | has_missing_estimates | boolean | No | false | |
@@ -211,9 +212,11 @@ Individual work items.
 | notes | text | Yes | — | |
 | due_date | date | Yes | — | |
 | sort_order | integer | Yes | — | |
+| is_blocked | boolean | No | false | Synced from active task_blockers |
 | assignment_mode | text | No | 'solo' | solo / crew |
 | assigned_to_user_id | uuid | Yes | — | Solo assignment |
 | lead_user_id | uuid | Yes | — | Crew lead |
+| is_outside_vendor | boolean | No | false | Outside-vendor assignment marker |
 | claimed_by_user_id | uuid | Yes | — | FK → profiles.id |
 | claimed_at | timestamptz | Yes | — | |
 | started_by_user_id | uuid | Yes | — | FK → profiles.id |
@@ -228,6 +231,11 @@ Individual work items.
 | recipe_hint_id | uuid | Yes | — | FK → task_recipes.id |
 | field_capture_id | uuid | Yes | — | FK → field_captures.id |
 | bundles_applied | boolean | No | false | |
+| is_package | boolean | No | false | Parent/container task |
+| is_recurring | boolean | No | false | |
+| recurrence_frequency | text | Yes | — | weekly / monthly / yearly |
+| recurrence_anchor_date | date | Yes | — | |
+| recurrence_source_task_id | uuid | Yes | — | FK → tasks.id |
 | needs_manager_review | boolean | No | false | |
 | created_by | uuid | No | — | |
 | created_at | timestamptz | No | now() | |
@@ -247,6 +255,7 @@ Materials and tools needed for tasks.
 | item_type | text | No | 'material' | material / tool |
 | quantity | numeric | Yes | — | |
 | unit | text | Yes | — | |
+| unit_cost | numeric | Yes | — | Cost per unit |
 | sku | text | Yes | — | |
 | vendor_url | text | Yes | — | |
 | store_section | text | Yes | — | |
@@ -272,6 +281,26 @@ Crew labor tracking.
 | active | boolean | No | true | |
 | joined_at | timestamptz | No | now() | |
 | left_at | timestamptz | Yes | — | |
+
+---
+
+### task_blockers
+
+Active/resolved task blocker records that feed `tasks.is_blocked`.
+
+| Column | Type | Nullable | Default | Notes |
+|---|---|---|---|---|
+| **id** | uuid | No | gen_random_uuid() | PK |
+| task_id | uuid | No | — | FK → tasks.id |
+| reason | enum blocker_reason | No | — | |
+| note | text | Yes | — | |
+| needs_from_manager | text | Yes | — | |
+| blocked_by_user_id | uuid | No | — | |
+| blocked_at | timestamptz | No | now() | |
+| resolved_at | timestamptz | Yes | — | |
+| resolved_by_user_id | uuid | Yes | — | |
+| resolution_note | text | Yes | — | |
+| created_at | timestamptz | No | now() | |
 
 ---
 
@@ -559,6 +588,7 @@ Bulk material stock.
 | Enum | Values |
 |---|---|
 | `project_status` | active, paused, complete |
+| `project_type` | construction, rental, general |
 | `project_member_role` | contractor, manager, read_only |
 | `scope_status` | Draft, Converted, Archived, active, archived |
 | `scope_member_role` | viewer, editor, manager |
@@ -567,6 +597,7 @@ Bulk material stock.
 | `materials_status` | Yes, Partial, No |
 | `pricing_status` | Priced, Needs Pricing |
 | `unit_type` | each, sqft, lf, piece |
+| `blocker_reason` | missing_materials, access_issue, waiting_on_approval, hidden_damage, tool_equipment, waiting_on_trade, other, instruction_mismatch, new_work_discovered |
 
 ---
 

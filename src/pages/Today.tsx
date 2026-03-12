@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -13,6 +13,7 @@ import { Zap, Clock, CalendarDays, AlertTriangle } from 'lucide-react';
 import { generateAlerts } from '@/lib/alerts';
 import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 import AlertsBanner from '@/components/AlertsBanner';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Sheet,
   SheetContent,
@@ -71,13 +72,12 @@ const Today = () => {
   const { data, loading, error, refresh } = useTodayData(user?.id, isAdmin);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => { refresh(); }, [refresh]);
-
   const {
     inProgress, assigned, available, needsReview, blocked,
     projectMap, parentTitles, assigneeMap, blockerMap,
     crewActiveTaskIds, crewCandidateTaskIds, crewWorkerCounts,
     photoCountMap, materialCountMap, childTasksByParent, hasShiftToday, isManager,
+    allProfiles,
   } = data;
 
   /* ── Derived state ── */
@@ -141,7 +141,23 @@ const Today = () => {
     );
   }
 
-  if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
+  if (loading) return (
+    <div className="pb-20">
+      <PageHeader title="Today" />
+      <div className="p-4 space-y-4">
+        <div className="rounded-lg border p-4 space-y-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-full" />
+        </div>
+        {Array.from({ length: 3 }).map((_, idx) => (
+          <div key={idx} className="rounded-lg border p-3 space-y-2">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   /* ── Shared section renderer ── */
   const Section = ({ title, tasks, emptyText, isBlockedSection = false }: { title: string; tasks: any[]; emptyText: string; isBlockedSection?: boolean }) => {
@@ -187,6 +203,8 @@ const Today = () => {
                   photoCount={photoCountMap[t.id] || 0}
                   materialCount={materialCountMap[t.id] || 0}
                   canReportIssue={isContractor}
+                  canDelete={isAdmin || isManager}
+                  allProfiles={allProfiles}
                 />
 
                 {isExpanded && children.map((child: any) => (
@@ -210,6 +228,8 @@ const Today = () => {
                     photoCount={photoCountMap[child.id] || 0}
                     materialCount={materialCountMap[child.id] || 0}
                     canReportIssue={isContractor}
+                    canDelete={isAdmin || isManager}
+                    allProfiles={allProfiles}
                   />
                 ))}
               </div>

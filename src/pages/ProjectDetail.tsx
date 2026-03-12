@@ -15,6 +15,7 @@ import { Plus, ChevronDown, ChevronRight, X, Mic, Zap, Package, Trash2, Loader2,
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import ProjectMembers from '@/components/ProjectMembers';
+import TenantsList from '@/components/TenantsList';
 import { TASK_STAGES, TASK_PRIORITIES, RECURRENCE_FREQUENCIES, type TaskStage, type TaskPriority, type RecurrenceFrequency } from '@/lib/supabase-types';
 import { Switch } from '@/components/ui/switch';
 import TaskCard from '@/components/TaskCard';
@@ -24,7 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
-import { useCreateTask, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
+import { useCreateTask, useCreateTasksBatch, useUpdateProject, useDeleteProject } from '@/hooks/useProjectMutations';
 import { canCreateTask, canEditProject, getProjectRole } from '@/lib/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 import WhatNextCard from '@/components/WhatNextCard';
@@ -34,6 +35,8 @@ import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 import { buildTaskPackageGroups } from '@/lib/taskPackages';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import AlertsBanner from '@/components/AlertsBanner';
+import { generateAlerts } from '@/lib/alerts';
 
 const PackageDeleteButton = ({ packageTask, childCount, onDelete }: { packageTask: any; childCount: number; onDelete: () => void }) => {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -103,17 +106,22 @@ const ProjectDetail = () => {
   const photoCountMap = data?.photoCountMap ?? {};
   const materialCountMap = data?.materialCountMap ?? {};
   const projectMembers = data?.members ?? [];
+  const allProfiles = data?.allProfiles ?? [];
+  const memberUserIds = useMemo(() => new Set(projectMembers.map(m => m.user_id)), [projectMembers]);
   const myActiveWorkerTaskIds = useMemo(() => new Set(data?.myActiveWorkerTaskIds ?? []), [data?.myActiveWorkerTaskIds]);
   const myCandidateTaskIds = useMemo(() => new Set(data?.myCandidateTaskIds ?? []), [data?.myCandidateTaskIds]);
 
   // Mutations
   const createTaskMutation = useCreateTask(id);
+  const createTasksBatchMutation = useCreateTasksBatch(id);
   const updateProjectMutation = useUpdateProject(id);
   const deleteProjectMutation = useDeleteProject();
 
   // Local UI state
   const [open, setOpen] = useState(false);
   const [taskName, setTaskName] = useState('');
+  const [createMode, setCreateMode] = useState<'single' | 'batch'>('single');
+  const [batchTaskInput, setBatchTaskInput] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
   const [priority, setPriority] = useState<TaskPriority>('2 – This Week');
   const [roomArea, setRoomArea] = useState('');
@@ -142,6 +150,7 @@ const ProjectDetail = () => {
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [taskSearch, setTaskSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('stage');
   const [filterStage, setFilterStage] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterAssignee, setFilterAssignee] = useState<string>('all');
@@ -275,6 +284,33 @@ const ProjectDetail = () => {
     [allTasks],
   );
 
+  const projectAlerts = useMemo(() => {
+    if (!user || !project) return [];
+    const blocked = tasks.filter((t) => t.is_blocked && t.stage !== 'Done');
+    const needsReview = tasks.filter((t) => getTaskOperationalStatus(t) === 'review_needed');
+    const inProgress = tasks.filter((t) => getTaskOperationalStatus(t) === 'in_progress');
+    const duePool = tasks.filter((t) => {
+      const status = getTaskOperationalStatus(t);
+      return status !== 'done' && status !== 'blocked' && status !== 'review_needed' && status !== 'in_progress';
+    });
+
+    return generateAlerts({
+      inProgress,
+      assigned: duePool,
+      blocked,
+      needsReview,
+      available: [],
+      isAdmin,
+      isManager,
+      isContractor,
+      hasShiftToday: true,
+      photoCountMap: {},
+      projectMap: { [project.id]: { name: project.name, address: project.address || undefined } },
+      userId: user.id,
+      crewActiveTaskIds: myActiveWorkerTaskIds,
+    });
+  }, [user, project, tasks, isAdmin, isManager, isContractor, myActiveWorkerTaskIds]);
+
   // UI helpers
   const toggleExpanded = (taskId: string) => {
     setExpandedIds((prev) => {
@@ -311,6 +347,7 @@ const ProjectDetail = () => {
     setFilterAssignee('all');
     setFilterTrade('all');
     setFilterRoomArea('all');
+    setFilterCategory('stage');
   };
 
   const openEditDialog = () => {
@@ -318,6 +355,64 @@ const ProjectDetail = () => {
     setEditAddress(project?.address || '');
     setEditOpen(true);
   };
+
+
+  const batchPreview = useMemo(() => {
+    const normalizedSeen = new Set<string>();
+    const uniqueTitles: string[] = [];
+    let blankLines = 0;
+    let duplicateLines = 0;
+
+    batchTaskInput.split('\n').forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        blankLines += 1;
+        return;
+      }
+      const normalized = trimmed.toLocaleLowerCase();
+      if (normalizedSeen.has(normalized)) {
+        duplicateLines += 1;
+        return;
+      }
+      normalizedSeen.add(normalized);
+      uniqueTitles.push(trimmed);
+    });
+
+    return { uniqueTitles, blankLines, duplicateLines };
+  }, [batchTaskInput]);
+
+  const resetCreateTaskForm = () => {
+    setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
+    setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
+    setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
+    setCrewCandidates([]);
+    setSelectedPackageId('general');
+    setCreateAsPackage(false);
+    setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
+    setCreateMode('single');
+    setBatchTaskInput('');
+  };
+
+  const buildCreatePayload = (title: string) => ({
+    project_id: id!,
+    task: title,
+    stage,
+    priority,
+    room_area: roomArea || null,
+    trade: trade || null,
+    notes: notes || null,
+    created_by: user!.id,
+    assigned_to_user_id: createAsPackage || assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
+    is_outside_vendor: assignedTo === 'outside_vendor',
+    assignment_mode: createAsPackage ? 'solo' : (assignedTo === 'crew' ? 'crew' : 'solo') as 'solo' | 'crew',
+    crewCandidates: createAsPackage ? [] : (assignedTo === 'crew' ? crewCandidates : []),
+    parent_task_id: createAsPackage || selectedPackageId === 'general' ? null : selectedPackageId,
+    is_package: createAsPackage,
+    pendingMaterials: createMode === 'batch' || createAsPackage ? [] : pendingMaterials,
+    due_date: newDueDate || null,
+    is_recurring: newIsRecurring && !!newDueDate,
+    recurrence_frequency: newIsRecurring && newDueDate ? newRecurrenceFrequency : null,
+  });
 
   const handleEditProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,39 +423,65 @@ const ProjectDetail = () => {
     );
   };
 
+  const ensureMembership = async (userId: string) => {
+    if (memberUserIds.has(userId)) return;
+    await supabase.from('project_members').insert({ project_id: id!, user_id: userId, role: 'contractor' });
+  };
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !id) return;
+
+    // Auto-add assigned user as project member if not already
+    const assignedUserId = createAsPackage || assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo;
+    if (assignedUserId && !memberUserIds.has(assignedUserId)) {
+      await ensureMembership(assignedUserId);
+    }
+    // Auto-add crew candidates as members
+    if (assignedTo === 'crew' && crewCandidates.length > 0) {
+      for (const cid of crewCandidates) {
+        if (!memberUserIds.has(cid)) await ensureMembership(cid);
+      }
+    }
+
+    if (createMode === 'batch') {
+      if (batchPreview.uniqueTitles.length === 0) {
+        toast({ title: 'No tasks to create', description: 'Add at least one non-empty task line.', variant: 'destructive' });
+        return;
+      }
+
+      createTasksBatchMutation.mutate(
+        { tasks: batchPreview.uniqueTitles.map((title) => buildCreatePayload(title)) },
+        {
+          onSuccess: (result) => {
+            const skippedCount = batchPreview.blankLines + batchPreview.duplicateLines;
+            if (result.createdCount === 0) {
+              toast({ title: 'No tasks created', description: result.errors[0]?.error || 'All lines failed.', variant: 'destructive' });
+              return;
+            }
+
+            const failureCount = result.errors.length;
+            toast({
+              title: `Created ${result.createdCount} task${result.createdCount !== 1 ? 's' : ''}`,
+              description: [
+                skippedCount > 0 ? `${skippedCount} line${skippedCount !== 1 ? 's' : ''} skipped (blank/duplicate).` : null,
+                failureCount > 0 ? `${failureCount} line${failureCount !== 1 ? 's' : ''} failed.` : null,
+              ].filter(Boolean).join(' '),
+              variant: failureCount > 0 ? 'destructive' : 'default',
+            });
+            resetCreateTaskForm();
+            setOpen(false);
+          },
+        },
+      );
+      return;
+    }
+
     createTaskMutation.mutate(
-      {
-        project_id: id,
-        task: taskName,
-        stage,
-        priority,
-        room_area: roomArea || null,
-        trade: trade || null,
-        notes: notes || null,
-        created_by: user.id,
-        assigned_to_user_id: createAsPackage || assignedTo === 'unassigned' || assignedTo === 'outside_vendor' || assignedTo === 'crew' ? null : assignedTo,
-        is_outside_vendor: assignedTo === 'outside_vendor',
-        assignment_mode: createAsPackage ? 'solo' : (assignedTo === 'crew' ? 'crew' : 'solo'),
-        crewCandidates: createAsPackage ? [] : (assignedTo === 'crew' ? crewCandidates : []),
-        parent_task_id: createAsPackage || selectedPackageId === 'general' ? null : selectedPackageId,
-        is_package: createAsPackage,
-        pendingMaterials: createAsPackage ? [] : pendingMaterials,
-        due_date: newDueDate || null,
-        is_recurring: newIsRecurring && !!newDueDate,
-        recurrence_frequency: newIsRecurring && newDueDate ? newRecurrenceFrequency : null,
-      },
+      buildCreatePayload(taskName.trim()),
       {
         onSuccess: () => {
-          setTaskName(''); setStage('Ready'); setPriority('2 – This Week');
-          setRoomArea(''); setTrade(''); setNotes(''); setAssignedTo('unassigned');
-          setPendingMaterials([]); setMatName(''); setMatQty(''); setMatUnit('');
-          setCrewCandidates([]);
-          setSelectedPackageId('general');
-          setCreateAsPackage(false);
-          setNewDueDate(''); setNewIsRecurring(false); setNewRecurrenceFrequency('weekly');
+          resetCreateTaskForm();
           setOpen(false);
         },
       },
@@ -405,39 +526,18 @@ const ProjectDetail = () => {
         title={project.name}
         backTo="/projects"
         actions={
-          userCanCreateTask ? (
-            <div className="flex gap-2">
-              {userCanEditProject && (
-                <Button size="sm" variant="outline" onClick={openEditDialog}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-               )}
-              {isManager && (
-                <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
-                  <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
-                 <Package className="h-4 w-4 mr-1" />Materials
-               </Button>
-              {/* Calendar route is admin-guarded in App routes */}
-              {isAdmin && (
-                <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
-                   <CalendarDays className="h-4 w-4 mr-1" />Calendar
-                 </Button>
-              )}
-              {/* Field Mode & Walkthrough are manager/admin workflows */}
-              {isManager && (
-                <>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
-                    <Zap className="h-4 w-4 mr-1" />Field Mode
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
-                    <Mic className="h-4 w-4 mr-1" />Walkthrough
-                  </Button>
-                </>
-              )}
-              <Dialog open={open} onOpenChange={setOpen}>
+          isAdmin ? (
+            <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          ) : undefined
+        }
+      />
+
+      {/* Toolbar */}
+      {userCanCreateTask && (
+        <div className="flex flex-wrap gap-2 px-4 py-2 border-b bg-card">
+          <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" />Task</Button>
             </DialogTrigger>
@@ -445,34 +545,43 @@ const ProjectDetail = () => {
               <DialogHeader><DialogTitle>New Task</DialogTitle></DialogHeader>
               <form onSubmit={handleCreateTask} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Task Description</Label>
-                  <Input value={taskName} onChange={(e) => setTaskName(e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select value={createAsPackage ? 'package' : 'task'} onValueChange={(v) => setCreateAsPackage(v === 'package')}>
+                  <Label>Create Mode</Label>
+                  <Select value={createMode} onValueChange={(value: 'single' | 'batch') => {
+                    setCreateMode(value);
+                    if (value === 'batch') setCreateAsPackage(false);
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="task">Actionable Task</SelectItem>
-                      <SelectItem value="package">Package (Container)</SelectItem>
+                      <SelectItem value="single">Single task</SelectItem>
+                      <SelectItem value="batch">Batch (one per line)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                {!createAsPackage && (
+
+                {createMode === 'single' ? (
                   <div className="space-y-2">
-                    <Label>Package</Label>
-                    <Select value={selectedPackageId} onValueChange={setSelectedPackageId}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="general">General (No Package)</SelectItem>
-                        {packageOptions.map((pkg) => (
-                          <SelectItem key={pkg.id} value={pkg.id}>{pkg.task}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Task Description</Label>
+                    <Input value={taskName} onChange={(e) => setTaskName(e.target.value)} required />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Tasks (one per line)</Label>
+                    <Textarea
+                      value={batchTaskInput}
+                      onChange={(e) => setBatchTaskInput(e.target.value)}
+                      rows={6}
+                      placeholder={`Demo kitchen\nReplace outlet covers\nPaint hallway`}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {batchPreview.uniqueTitles.length} task{batchPreview.uniqueTitles.length !== 1 ? 's' : ''} ready
+                      {batchPreview.blankLines > 0 ? ` • ${batchPreview.blankLines} blank line${batchPreview.blankLines !== 1 ? 's' : ''} ignored` : ''}
+                      {batchPreview.duplicateLines > 0 ? ` • ${batchPreview.duplicateLines} duplicate line${batchPreview.duplicateLines !== 1 ? 's' : ''} ignored` : ''}
+                    </p>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-3">
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Stage</Label>
                     <Select value={stage} onValueChange={(v) => setStage(v as TaskStage)}>
@@ -492,121 +601,96 @@ const ProjectDetail = () => {
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Trade</Label>
-                    <Input value={trade} onChange={(e) => setTrade(e.target.value)} />
-                  </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Room / Area</Label>
-                    <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} />
+                    <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} placeholder="e.g. Kitchen" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Trade</Label>
+                    <Input value={trade} onChange={(e) => setTrade(e.target.value)} placeholder="e.g. Plumbing" />
                   </div>
                 </div>
-                {!createAsPackage && (
+
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+                </div>
+
                 <div className="space-y-2">
                   <Label>Assigned To</Label>
                   <Select value={assignedTo} onValueChange={setAssignedTo}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Unassigned</SelectItem>
-                      <SelectItem value="crew">Crew Task</SelectItem>
                       <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
-                      {projectMembers.map((m) => (
-                        <SelectItem key={m.user_id} value={m.user_id}>
-                          {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                        </SelectItem>
+                      <SelectItem value="crew">Crew (multi-worker)</SelectItem>
+                      {projectMembers.map(m => (
+                        <SelectItem key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Unnamed'}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                )}
-                {!createAsPackage && assignedTo === 'crew' && (
+
+                {assignedTo === 'crew' && (
                   <div className="space-y-2">
-                    <Label>Crew Members</Label>
-                    {crewGroups.length > 0 && (
-                      <Select value="" onValueChange={(groupId) => {
-                        const group = crewGroups.find(g => g.id === groupId);
-                        if (group) setCrewCandidates(group.members);
-                      }}>
-                        <SelectTrigger><SelectValue placeholder="Load from crew group..." /></SelectTrigger>
-                        <SelectContent>
-                          {crewGroups.map(g => (
-                            <SelectItem key={g.id} value={g.id}>{g.name} ({g.members.length})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2">
-                      {projectMembers.map((m) => (
-                        <label key={m.user_id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
+                    <Label>Crew Candidates</Label>
+                    <div className="space-y-1">
+                      {projectMembers.map(m => (
+                        <label key={m.user_id} className="flex items-center gap-2 text-sm">
                           <Checkbox
                             checked={crewCandidates.includes(m.user_id)}
                             onCheckedChange={(checked) => {
-                              setCrewCandidates(prev =>
-                                checked
-                                  ? [...prev, m.user_id]
-                                  : prev.filter(cid => cid !== m.user_id)
-                              );
+                              setCrewCandidates(prev => checked ? [...prev, m.user_id] : prev.filter(id => id !== m.user_id));
                             }}
                           />
-                          <span>{m.profiles?.full_name || 'Unnamed'}</span>
-                          <span className="text-muted-foreground">({m.role})</span>
+                          {m.profiles?.full_name || 'Unnamed'}
                         </label>
                       ))}
+                      {crewGroups.length > 0 && crewGroups.map(g => (
+                        <Button key={g.id} type="button" variant="outline" size="sm" className="mr-1" onClick={() => {
+                          setCrewCandidates(prev => {
+                            const set = new Set(prev);
+                            g.members.forEach(mid => set.add(mid));
+                            return [...set];
+                          });
+                        }}>+ {g.name}</Button>
+                      ))}
                     </div>
-                    {crewCandidates.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">{crewCandidates.length} member{crewCandidates.length !== 1 ? 's' : ''} selected</p>
-                        {!showSaveGroup ? (
-                          <button type="button" className="text-xs text-primary hover:underline" onClick={() => setShowSaveGroup(true)}>
-                            Save as crew group
-                          </button>
-                        ) : (
-                          <div className="flex gap-1">
-                            <Input
-                              placeholder="Group name"
-                              value={saveGroupName}
-                              onChange={(e) => setSaveGroupName(e.target.value)}
-                              className="h-7 text-xs"
-                            />
-                            <Button type="button" size="sm" className="h-7 text-xs" disabled={!saveGroupName.trim()} onClick={async () => {
-                              if (!user) return;
-                              const { data: newGroup } = await supabase.from('crew_groups').insert({ name: saveGroupName.trim(), created_by: user.id }).select('id').single();
-                              if (newGroup) {
-                                await supabase.from('crew_group_members').insert(crewCandidates.map(uid => ({ crew_group_id: newGroup.id, user_id: uid })));
-                                setCrewGroups(prev => [...prev, { id: newGroup.id, name: saveGroupName.trim(), members: crewCandidates }]);
-                                toast({ title: 'Crew group saved' });
-                              }
-                              setSaveGroupName('');
-                              setShowSaveGroup(false);
-                            }}>Save</Button>
-                            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowSaveGroup(false); setSaveGroupName(''); }}>
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label>Notes</Label>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-                </div>
-                {!createAsPackage && (
+
+                {packageOptions.length > 0 && createMode === 'single' && !createAsPackage && (
+                  <div className="space-y-2">
+                    <Label>Add to Package</Label>
+                    <Select value={selectedPackageId} onValueChange={setSelectedPackageId}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">None (standalone)</SelectItem>
+                        {packageOptions.map(p => <SelectItem key={p.id} value={p.id}>{p.task}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {createMode === 'single' && selectedPackageId === 'general' && (
+                  <div className="flex items-center gap-2">
+                    <Switch checked={createAsPackage} onCheckedChange={setCreateAsPackage} id="create-package" />
+                    <Label htmlFor="create-package">Create as package (parent task)</Label>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Due Date</Label>
-                  <Input type="date" value={newDueDate} onChange={(e) => {
-                    setNewDueDate(e.target.value);
-                    if (!e.target.value) setNewIsRecurring(false);
-                  }} />
+                  <Input type="date" value={newDueDate} onChange={(e) => setNewDueDate(e.target.value)} />
                 </div>
-                )}
-                {!createAsPackage && newDueDate && (
+
+                {newDueDate && (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Recurring</Label>
-                      <Switch checked={newIsRecurring} onCheckedChange={setNewIsRecurring} />
+                    <div className="flex items-center gap-2">
+                      <Switch checked={newIsRecurring} onCheckedChange={setNewIsRecurring} id="recurring-toggle" />
+                      <Label htmlFor="recurring-toggle">Recurring</Label>
                     </div>
                     {newIsRecurring && (
                       <Select value={newRecurrenceFrequency} onValueChange={(v) => setNewRecurrenceFrequency(v as RecurrenceFrequency)}>
@@ -618,7 +702,8 @@ const ProjectDetail = () => {
                     )}
                   </div>
                 )}
-                {!createAsPackage && (
+
+                {createMode === 'single' && !createAsPackage && (
                 <Collapsible>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
                     <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
@@ -626,53 +711,21 @@ const ProjectDetail = () => {
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-2 space-y-2">
                     <div className="flex gap-2">
-                      <Input
-                        placeholder="Name *"
-                        value={matName}
-                        onChange={(e) => setMatName(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Input
-                        placeholder="Qty"
-                        type="number"
-                        value={matQty}
-                        onChange={(e) => setMatQty(e.target.value)}
-                        className="w-16"
-                      />
-                      <Input
-                        placeholder="Unit"
-                        value={matUnit}
-                        onChange={(e) => setMatUnit(e.target.value)}
-                        className="w-16"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      disabled={!matName.trim()}
-                      onClick={() => {
-                        setPendingMaterials(prev => [...prev, { name: matName.trim(), quantity: matQty, unit: matUnit.trim() }]);
+                      <Input value={matName} onChange={(e) => setMatName(e.target.value)} placeholder="Material name" className="flex-1" />
+                      <Input value={matQty} onChange={(e) => setMatQty(e.target.value)} placeholder="Qty" className="w-16" />
+                      <Input value={matUnit} onChange={(e) => setMatUnit(e.target.value)} placeholder="Unit" className="w-20" />
+                      <Button type="button" size="sm" onClick={() => {
+                        if (!matName.trim()) return;
+                        setPendingMaterials(prev => [...prev, { name: matName.trim(), quantity: matQty, unit: matUnit }]);
                         setMatName(''); setMatQty(''); setMatUnit('');
-                      }}
-                    >
-                      Add Material
-                    </Button>
+                      }}><Plus className="h-4 w-4" /></Button>
+                    </div>
                     {pendingMaterials.length > 0 && (
                       <div className="space-y-1">
                         {pendingMaterials.map((m, i) => (
-                          <div key={i} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
-                            <span className="truncate">
-                              {m.name}{m.quantity ? ` × ${m.quantity}` : ''}{m.unit ? ` ${m.unit}` : ''}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setPendingMaterials(prev => prev.filter((_, j) => j !== i))}
-                              className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                          <div key={i} className="flex items-center justify-between text-sm bg-muted rounded px-2 py-1">
+                            <span>{m.name}{m.quantity ? ` × ${m.quantity}` : ''}{m.unit ? ` ${m.unit}` : ''}</span>
+                            <button type="button" onClick={() => setPendingMaterials(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
                           </div>
                         ))}
                       </div>
@@ -680,23 +733,36 @@ const ProjectDetail = () => {
                   </CollapsibleContent>
                 </Collapsible>
                 )}
-                <Button type="submit" className="w-full" disabled={createTaskMutation.isPending}>Create Task</Button>
+                <Button type="submit" className="w-full" disabled={createTaskMutation.isPending || createTasksBatchMutation.isPending || (createMode === 'single' ? !taskName.trim() : batchPreview.uniqueTitles.length === 0)}>{createMode === 'batch' ? (createTasksBatchMutation.isPending ? 'Creating Tasks…' : `Create ${batchPreview.uniqueTitles.length || ''} Tasks`) : (createTaskMutation.isPending ? 'Creating Task…' : 'Create Task')}</Button>
               </form>
             </DialogContent>
           </Dialog>
-              {isAdmin && (
-                <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          ) : isAdmin ? (
-            <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-              <Trash2 className="h-4 w-4" />
+
+          {userCanEditProject && (
+            <Button size="sm" variant="outline" onClick={openEditDialog}>
+              <Pencil className="h-4 w-4" />
             </Button>
-          ) : undefined
-        }
-      />
+          )}
+          {isManager && (
+            <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
+              <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
+            <Package className="h-4 w-4 mr-1" />Materials
+          </Button>
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
+              <CalendarDays className="h-4 w-4 mr-1" />Calendar
+            </Button>
+          )}
+          {isManager && (
+            <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
+              <Mic className="h-4 w-4 mr-1" />Walkthrough
+            </Button>
+          )}
+        </div>
+      )}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
@@ -715,6 +781,28 @@ const ProjectDetail = () => {
           </form>
           {userCanEditProject && (
             <div className="border-t pt-3 mt-1 flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={updateProjectMutation.isPending}
+                onClick={() => {
+                  const nextStatus = project.status === 'complete' ? 'active' : 'complete';
+                  updateProjectMutation.mutate(
+                    { status: nextStatus } as any,
+                    {
+                      onSuccess: () => {
+                        setEditOpen(false);
+                        queryClient.invalidateQueries({ queryKey: ['projects-list'] });
+                        toast({ title: nextStatus === 'complete' ? 'Project archived' : 'Project restored' });
+                        if (nextStatus === 'complete') navigate('/projects');
+                      },
+                    },
+                  );
+                }}
+              >
+                {project.status === 'complete' ? 'Restore from Archive' : 'Archive Project'}
+              </Button>
               {(['construction', 'rental', 'general'] as const)
                 .filter((t) => t !== project.project_type)
                 .map((targetType) => {
@@ -768,33 +856,17 @@ const ProjectDetail = () => {
           {project.address && <span className="text-sm text-muted-foreground">{project.address}</span>}
         </div>
 
+        <AlertsBanner alerts={projectAlerts} />
+
         <Card className="mb-4">
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</p>
-                <p className="text-lg font-semibold">{projectHealthSummary.totalTasks}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Completed</p>
-                <p className="text-lg font-semibold">{projectHealthSummary.completedTasks}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Blocked</p>
-                <p className="text-lg font-semibold text-destructive">{projectHealthSummary.blockedTasks}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Needs Review</p>
-                <p className="text-lg font-semibold">{projectHealthSummary.needsReviewCount}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Overdue</p>
-                <p className="text-lg font-semibold">{projectHealthSummary.overdueCount}</p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Actual Cost</p>
-                <p className="text-lg font-semibold">${projectTotalActual.toFixed(2)}</p>
-              </div>
+          <CardContent className="px-3 py-2">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-1 text-xs">
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Total</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.totalTasks}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Done</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.completedTasks}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Blocked</span> <span className="font-semibold text-sm ml-1 text-destructive">{projectHealthSummary.blockedTasks}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Review</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.needsReviewCount}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Overdue</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.overdueCount}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Cost</span> <span className="font-semibold text-sm ml-1">${projectTotalActual.toFixed(2)}</span></div>
             </div>
           </CardContent>
         </Card>
@@ -822,47 +894,95 @@ const ProjectDetail = () => {
                 className="pl-8"
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Select value={filterStage} onValueChange={setFilterStage}>
-                <SelectTrigger><SelectValue placeholder="Stage" /></SelectTrigger>
+            <div className="flex items-center gap-2">
+              <Select value={filterCategory} onValueChange={(v) => {
+                setFilterCategory(v);
+              }}>
+                <SelectTrigger className="w-[130px] shrink-0"><SelectValue placeholder="Filter by" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All stages</SelectItem>
-                  {TASK_STAGES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  <SelectItem value="stage">Stage</SelectItem>
+                  <SelectItem value="priority">Priority</SelectItem>
+                  <SelectItem value="assignee">Assignee</SelectItem>
+                  <SelectItem value="trade">Trade</SelectItem>
+                  <SelectItem value="room">Room / Area</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterPriority} onValueChange={setFilterPriority}>
-                <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All priorities</SelectItem>
-                  {TASK_PRIORITIES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-                <SelectTrigger><SelectValue placeholder="Assignee" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All assignees</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {projectMembers.map((member) => (
-                    <SelectItem key={member.user_id} value={member.user_id}>{member.profiles?.full_name || 'Unnamed'}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterTrade} onValueChange={setFilterTrade}>
-                <SelectTrigger><SelectValue placeholder="Trade" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All trades</SelectItem>
-                  {tradeFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterRoomArea} onValueChange={setFilterRoomArea}>
-                <SelectTrigger><SelectValue placeholder="Room / Area" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All rooms/areas</SelectItem>
-                  {roomAreaFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Button type="button" variant="outline" onClick={clearTaskFilters}>Clear</Button>
+
+              {filterCategory === 'stage' && (
+                <Select value={filterStage} onValueChange={setFilterStage}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All stages" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All stages</SelectItem>
+                    {TASK_STAGES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {filterCategory === 'priority' && (
+                <Select value={filterPriority} onValueChange={setFilterPriority}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All priorities" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All priorities</SelectItem>
+                    {TASK_PRIORITIES.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {filterCategory === 'assignee' && (
+                <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All assignees" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All assignees</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {projectMembers.map((member) => (
+                      <SelectItem key={member.user_id} value={member.user_id}>{member.profiles?.full_name || 'Unnamed'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {filterCategory === 'trade' && (
+                <Select value={filterTrade} onValueChange={setFilterTrade}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All trades" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All trades</SelectItem>
+                    {tradeFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {filterCategory === 'room' && (
+                <Select value={filterRoomArea} onValueChange={setFilterRoomArea}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="All rooms/areas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All rooms/areas</SelectItem>
+                    {roomAreaFilterOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
+                <Button type="button" variant="ghost" size="sm" onClick={clearTaskFilters} className="shrink-0 px-2">
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+            {/* Show active filter badges */}
+            {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
+              <div className="flex flex-wrap gap-1">
+                {filterStage !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Stage: {filterStage}<button onClick={() => setFilterStage('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+                {filterPriority !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Priority: {filterPriority.split(' – ')[1] || filterPriority}<button onClick={() => setFilterPriority('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+                {filterAssignee !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Assignee: {filterAssignee === 'unassigned' ? 'Unassigned' : (projectMembers.find(m => m.user_id === filterAssignee)?.profiles?.full_name || 'Unknown')}<button onClick={() => setFilterAssignee('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+                {filterTrade !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Trade: {filterTrade}<button onClick={() => setFilterTrade('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+                {filterRoomArea !== 'all' && (
+                  <Badge variant="secondary" className="text-xs gap-1">Room: {filterRoomArea}<button onClick={() => setFilterRoomArea('all')}><X className="h-3 w-3" /></button></Badge>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -888,8 +1008,47 @@ const ProjectDetail = () => {
             {activePackageGroups.length > 0 && (
               <div className="space-y-4">
                 {activePackageGroups.map((group) => {
+                  const isGeneral = group.packageTask.id === 'general-package';
                   const packageKey = `pkg:${group.packageTask.id}`;
-                  const open = expandedIds.has(packageKey);
+                  const open = isGeneral || expandedIds.has(packageKey);
+
+                  if (isGeneral) {
+                    // Render general tasks flat — no collapsible wrapper
+                    return (
+                      <div key="general-package" className="space-y-2">
+                        {bulkMode ? (
+                          group.childTasks.map((task) => (
+                            <div key={task.id} className="flex items-start gap-2">
+                              <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                              </div>
+                            </div>
+                          ))
+                        ) : isManager ? (
+                          <SortableTaskList
+                            items={group.childTasks}
+                            onReorder={async (orderedIds) => {
+                              const { error } = await persistTaskOrder(orderedIds);
+                              if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
+                              else invalidateProject();
+                            }}
+                          >
+                            {(task) => (
+                              <SortableTaskItem key={task.id} id={task.id}>
+                                <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                              </SortableTaskItem>
+                            )}
+                          </SortableTaskList>
+                        ) : (
+                          group.childTasks.map((task) => (
+                            <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                          ))
+                        )}
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={group.packageTask.id} className="rounded-lg border">
                       <div className="flex items-center">
@@ -912,7 +1071,7 @@ const ProjectDetail = () => {
                             {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
                           </div>
                         </button>
-                        {isManager && group.packageTask.id !== 'general-package' && (
+                        {isManager && (
                           <PackageDeleteButton
                             packageTask={group.packageTask}
                             childCount={group.childTasks.length}
@@ -927,7 +1086,7 @@ const ProjectDetail = () => {
                               <div key={task.id} className="flex items-start gap-2">
                                 <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
+                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                                 </div>
                               </div>
                             ))
@@ -942,13 +1101,13 @@ const ProjectDetail = () => {
                             >
                               {(task) => (
                                 <SortableTaskItem key={task.id} id={task.id}>
-                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
+                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                                 </SortableTaskItem>
                               )}
                             </SortableTaskList>
                           ) : (
                             group.childTasks.map((task) => (
-                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
+                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                             ))
                           )}
                         </div>
@@ -986,7 +1145,7 @@ const ProjectDetail = () => {
                           {open && (
                             <div className="border-t p-2 space-y-2">
                               {group.childTasks.map((task) => (
-                                <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} />
+                                <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                               ))}
                             </div>
                           )}
@@ -998,6 +1157,9 @@ const ProjectDetail = () => {
               </div>
             )}
           </>
+        )}
+        {project.project_type === 'rental' && (
+          <TenantsList projectId={id!} canEdit={isManager} />
         )}
         {isManager && <ProjectMembers projectId={id!} />}
       </div>

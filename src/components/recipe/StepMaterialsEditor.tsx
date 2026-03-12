@@ -3,10 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useStoreSections } from '@/hooks/useStoreSections';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2 } from 'lucide-react';
+import { inferStoreSection } from '@/lib/inferStoreSection';
+import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 
 interface StepMaterial {
   id: string;
@@ -20,25 +25,54 @@ interface StepMaterial {
   provided_by: string | null;
   notes: string | null;
   qty_formula: string | null;
+  item_type: string;
+  unit_cost: number | null;
 }
 
 interface StepMaterialsEditorProps {
   stepId: string;
 }
 
+function normalizeUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  return 'https://' + trimmed;
+}
+
 const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const { toast } = useToast();
   const { sections: storeSections } = useStoreSections();
+  const activeNames = storeSections.map(s => s.name);
   const [materials, setMaterials] = useState<StepMaterial[]>([]);
 
-  const [matName, setMatName] = useState('');
-  const [matQty, setMatQty] = useState('');
-  const [matUnit, setMatUnit] = useState('');
-  const [matStoreSection, setMatStoreSection] = useState('');
-  const [matSku, setMatSku] = useState('');
-  const [matVendorUrl, setMatVendorUrl] = useState('');
-  const [matProvidedBy, setMatProvidedBy] = useState('either');
-  const [matFormula, setMatFormula] = useState('');
+  // Add form state
+  const [newName, setNewName] = useState('');
+  const [newQty, setNewQty] = useState('');
+  const [newUnit, setNewUnit] = useState('');
+  const [newUnitCost, setNewUnitCost] = useState('');
+  const [newSku, setNewSku] = useState('');
+  const [newVendorUrl, setNewVendorUrl] = useState('');
+  const [newItemType, setNewItemType] = useState<string>('material');
+  const [newProvidedBy, setNewProvidedBy] = useState<string>('either');
+  const [newStoreSection, setNewStoreSection] = useState('');
+  const [newFormula, setNewFormula] = useState('');
+
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editMat, setEditMat] = useState<StepMaterial | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editQty, setEditQty] = useState('');
+  const [editUnit, setEditUnit] = useState('');
+  const [editUnitCost, setEditUnitCost] = useState('');
+  const [editSku, setEditSku] = useState('');
+  const [editVendorUrl, setEditVendorUrl] = useState('');
+  const [editItemType, setEditItemType] = useState<string>('material');
+  const [editProvidedBy, setEditProvidedBy] = useState<string>('either');
+  const [editStoreSection, setEditStoreSection] = useState('');
+  const [editFormula, setEditFormula] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSyncToLibrary, setEditSyncToLibrary] = useState(false);
 
   const fetchMaterials = async () => {
     const { data } = await supabase
@@ -53,24 +87,87 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     fetchMaterials();
   }, [stepId]);
 
+  const handleSelectFromLibrary = (item: LibraryMaterial, target: 'new' | 'edit') => {
+    if (target === 'new') {
+      setNewName(item.name);
+      if (item.unit_cost != null) setNewUnitCost(String(item.unit_cost));
+      if (item.unit) setNewUnit(item.unit);
+      if (item.sku) setNewSku(item.sku);
+      if (item.vendor_url) setNewVendorUrl(item.vendor_url);
+      if (item.store_section) setNewStoreSection(item.store_section);
+    } else {
+      setEditName(item.name);
+      if (item.unit_cost != null) setEditUnitCost(String(item.unit_cost));
+      if (item.unit) setEditUnit(item.unit);
+      if (item.sku) setEditSku(item.sku);
+      if (item.vendor_url) setEditVendorUrl(item.vendor_url);
+      if (item.store_section) setEditStoreSection(item.store_section);
+    }
+  };
+
+  const handleAddToLibrary = async (name: string, context: 'new' | 'edit' = 'new') => {
+    const itemType = context === 'new' ? newItemType : editItemType;
+    const sku = context === 'new' ? newSku : editSku;
+    const vendorUrl = context === 'new' ? newVendorUrl : editVendorUrl;
+    const unitCost = context === 'new' ? newUnitCost : editUnitCost;
+    const unit = context === 'new' ? newUnit : editUnit;
+    const storeSection = context === 'new' ? newStoreSection : editStoreSection;
+
+    if (itemType === 'tool') {
+      const { error } = await supabase.from('tool_types').insert({
+        name: name.trim(),
+        sku: sku.trim() || null,
+        vendor_url: normalizeUrl(vendorUrl),
+      });
+      if (error) {
+        if (error.code === '23505') toast({ title: 'Already in tool inventory' });
+        else toast({ title: 'Error adding tool type', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: `"${name}" added to Tool Types` });
+      }
+      return;
+    }
+    const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+    const { error } = await supabase.from('material_library').insert({
+      name,
+      normalized_name: normalized,
+      unit_cost: unitCost ? parseFloat(unitCost) : null,
+      sku: sku.trim() || null,
+      vendor_url: normalizeUrl(vendorUrl),
+      unit: unit.trim() || null,
+      store_section: storeSection.trim() || null,
+    });
+    if (error) {
+      if (error.code === '23505') toast({ title: 'Already in library' });
+      else toast({ title: 'Error adding to library', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: `"${name}" added to Materials Library` });
+    }
+  };
+
   const handleAdd = async () => {
-    if (!matName.trim()) return;
+    if (!newName.trim()) return;
+    const autoSection = newStoreSection || inferStoreSection(newName.trim(), activeNames);
     const { error } = await supabase.from('task_recipe_step_materials').insert({
       recipe_step_id: stepId,
-      material_name: matName.trim(),
-      qty: matQty ? parseFloat(matQty) : null,
-      unit: matUnit.trim() || null,
-      store_section: matStoreSection || null,
-      sku: matSku.trim() || null,
-      vendor_url: matVendorUrl.trim() || null,
-      provided_by: matProvidedBy || 'either',
-      qty_formula: matFormula.trim() || null,
-    });
+      material_name: newName.trim(),
+      qty: newQty ? parseFloat(newQty) : null,
+      unit: newUnit.trim() || null,
+      unit_cost: newUnitCost ? parseFloat(newUnitCost) : null,
+      store_section: autoSection || null,
+      sku: newSku.trim() || null,
+      vendor_url: normalizeUrl(newVendorUrl),
+      provided_by: newItemType === 'tool' ? newProvidedBy : 'either',
+      qty_formula: newFormula.trim() || null,
+      item_type: newItemType,
+    } as any);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setMatName(''); setMatQty(''); setMatUnit(''); setMatStoreSection(''); setMatSku(''); setMatVendorUrl(''); setMatProvidedBy('either'); setMatFormula('');
+    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost('');
+    setNewSku(''); setNewVendorUrl(''); setNewStoreSection('');
+    setNewItemType('material'); setNewProvidedBy('either'); setNewFormula('');
     fetchMaterials();
   };
 
@@ -83,65 +180,284 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     fetchMaterials();
   };
 
-  return (
-    <div className="ml-6 mt-1 mb-2 space-y-1.5 border-l-2 border-muted pl-3">
-      <p className="text-xs font-medium text-muted-foreground">Materials (applied to task on expand)</p>
-      {materials.map(mat => (
-        <div key={mat.id} className="flex items-center gap-2 text-xs">
-          <span className="flex-1 truncate">{mat.material_name}</span>
-          {mat.qty_formula ? (
-            <Badge variant="default" className="text-[9px] font-mono">{mat.qty_formula}</Badge>
-          ) : mat.qty != null ? (
-            <span className="text-muted-foreground">{mat.qty} {mat.unit || ''}</span>
-          ) : null}
-          {mat.qty_formula && mat.qty != null && (
-            <span className="text-muted-foreground text-[9px]">(fallback: {mat.qty})</span>
-          )}
-          {mat.store_section && <Badge variant="secondary" className="text-[9px]">{mat.store_section}</Badge>}
-          {mat.sku && <Badge variant="outline" className="text-[9px]">{mat.sku}</Badge>}
-          {mat.provided_by && mat.provided_by !== 'either' && <Badge variant="outline" className="text-[9px]">{mat.provided_by}</Badge>}
-          <button onClick={() => handleDelete(mat.id)} className="text-muted-foreground hover:text-destructive shrink-0">
-            <Trash2 className="h-3 w-3" />
+  const openEdit = (m: StepMaterial) => {
+    setEditMat(m);
+    setEditName(m.material_name);
+    setEditQty(m.qty?.toString() ?? '');
+    setEditUnit(m.unit ?? '');
+    setEditUnitCost(m.unit_cost?.toString() ?? '');
+    setEditSku(m.sku ?? '');
+    setEditVendorUrl(m.vendor_url ?? '');
+    setEditItemType(m.item_type ?? 'material');
+    setEditProvidedBy(m.provided_by ?? 'either');
+    setEditStoreSection(m.store_section ?? '');
+    setEditFormula(m.qty_formula ?? '');
+    setEditSyncToLibrary(false);
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editMat || !editName.trim()) return;
+    setEditLoading(true);
+    const { error } = await supabase.from('task_recipe_step_materials').update({
+      material_name: editName.trim(),
+      qty: editQty ? parseFloat(editQty) : null,
+      unit: editUnit.trim() || null,
+      unit_cost: editUnitCost ? parseFloat(editUnitCost) : null,
+      sku: editSku.trim() || null,
+      vendor_url: normalizeUrl(editVendorUrl),
+      item_type: editItemType,
+      provided_by: editItemType === 'tool' ? editProvidedBy : 'either',
+      store_section: editStoreSection || null,
+      qty_formula: editFormula.trim() || null,
+    } as any).eq('id', editMat.id);
+
+    if (!error && editSyncToLibrary) {
+      if (editItemType === 'tool') {
+        const normalized = editName.trim();
+        const { error: toolErr } = await supabase.from('tool_types').upsert({
+          name: normalized,
+          sku: editSku.trim() || null,
+          vendor_url: normalizeUrl(editVendorUrl),
+        }, { onConflict: 'name' });
+        if (toolErr && toolErr.code !== '23505') {
+          toast({ title: 'Tool library update failed', description: toolErr.message, variant: 'destructive' });
+        } else {
+          toast({ title: `"${editName.trim()}" synced to Tool Types` });
+        }
+      } else {
+        const normalized = editName.toLowerCase().trim().replace(/\s+/g, ' ');
+        const { error: libErr } = await supabase.from('material_library').upsert({
+          name: editName.trim(),
+          normalized_name: normalized,
+          unit_cost: editUnitCost ? parseFloat(editUnitCost) : null,
+          sku: editSku.trim() || null,
+          vendor_url: normalizeUrl(editVendorUrl),
+          unit: editUnit.trim() || null,
+          store_section: editStoreSection.trim() || null,
+        }, { onConflict: 'normalized_name' });
+        if (libErr && libErr.code !== '23505') {
+          toast({ title: 'Library update failed', description: libErr.message, variant: 'destructive' });
+        } else {
+          toast({ title: `"${editName.trim()}" synced to Materials Library` });
+        }
+      }
+    }
+
+    setEditLoading(false);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setEditOpen(false);
+    fetchMaterials();
+  };
+
+  const materialItems = materials.filter(m => m.item_type !== 'tool');
+  const toolItems = materials.filter(m => m.item_type === 'tool');
+
+  const renderItemCard = (mat: StepMaterial) => (
+    <div key={mat.id} className="rounded-lg border p-2.5 space-y-1">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{mat.material_name}</p>
+          <p className="text-xs text-muted-foreground">
+            {mat.qty != null && <>{mat.qty}{mat.unit ? ` ${mat.unit}` : ''}</>}
+            {mat.unit_cost != null && <> · ${mat.unit_cost.toFixed(2)}/{mat.unit || 'unit'}</>}
+            {mat.qty != null && mat.unit_cost != null && <> · ${(mat.qty * mat.unit_cost).toFixed(2)} total</>}
+          </p>
+        </div>
+        <div className="flex gap-0.5 shrink-0">
+          <button onClick={() => openEdit(mat)} className="p-1 text-muted-foreground hover:text-foreground">
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => handleDelete(mat.id)} className="p-1 text-muted-foreground hover:text-destructive">
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
-      ))}
-      <div className="grid grid-cols-5 gap-1">
-        <Input placeholder="Material" value={matName} onChange={e => setMatName(e.target.value)} className="h-7 text-xs col-span-2" />
-        <Input placeholder="Qty" type="number" value={matQty} onChange={e => setMatQty(e.target.value)} className="h-7 text-xs" />
-        <Input placeholder="Unit" value={matUnit} onChange={e => setMatUnit(e.target.value)} className="h-7 text-xs" />
-        <Button size="sm" onClick={handleAdd} disabled={!matName.trim()} className="h-7 text-xs">
-          <Plus className="h-3 w-3" />
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {mat.qty_formula && <Badge variant="default" className="text-[9px] font-mono">{mat.qty_formula}</Badge>}
+        {mat.store_section && <Badge variant="secondary" className="text-[9px]">{mat.store_section}</Badge>}
+        {mat.sku && <Badge variant="outline" className="text-[9px]">{mat.sku}</Badge>}
+        {mat.provided_by && mat.provided_by !== 'either' && <Badge variant="outline" className="text-[9px]">{mat.provided_by}</Badge>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="ml-6 mt-1 mb-2 space-y-2 border-l-2 border-muted pl-3">
+      <p className="text-xs font-medium text-muted-foreground">Materials & Tools (applied on expand)</p>
+
+      {materialItems.length > 0 && (
+        <div className="space-y-1.5">
+          <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Materials</h4>
+          {materialItems.map(renderItemCard)}
+        </div>
+      )}
+
+      {toolItems.length > 0 && (
+        <div className="space-y-1.5">
+          <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">🔧 Tools</h4>
+          {toolItems.map(renderItemCard)}
+        </div>
+      )}
+
+      {/* Add form */}
+      <div className="space-y-1.5 pt-1 border-t border-dashed">
+        <div className="flex items-center gap-2">
+          <Label className="text-[10px] font-medium text-muted-foreground">Add</Label>
+          <Select value={newItemType} onValueChange={setNewItemType}>
+            <SelectTrigger className="h-7 text-xs w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="material">Material</SelectItem>
+              <SelectItem value="tool">Tool</SelectItem>
+            </SelectContent>
+          </Select>
+          {newItemType === 'tool' && (
+            <Select value={newProvidedBy} onValueChange={setNewProvidedBy}>
+              <SelectTrigger className="h-7 text-xs w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="company">Company</SelectItem>
+                <SelectItem value="contractor">Contractor</SelectItem>
+                <SelectItem value="either">Either</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <div className="flex gap-1.5">
+          <MaterialAutocomplete
+            value={newName}
+            onChange={setNewName}
+            onSelect={(item) => handleSelectFromLibrary(item, 'new')}
+            onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
+            className="flex-1"
+          />
+          <Input placeholder="Qty" type="number" value={newQty} onChange={e => setNewQty(e.target.value)} className="h-7 text-xs w-14" />
+          <Input placeholder="Unit" value={newUnit} onChange={e => setNewUnit(e.target.value)} className="h-7 text-xs w-14" />
+          <Input placeholder="$/unit" type="number" step="0.01" value={newUnitCost} onChange={e => setNewUnitCost(e.target.value)} className="h-7 text-xs w-16" />
+        </div>
+        <div className="flex gap-1.5">
+          <Input placeholder="SKU" value={newSku} onChange={e => setNewSku(e.target.value)} className="h-7 text-xs flex-1" />
+          <Input placeholder="Vendor URL" value={newVendorUrl} onChange={e => setNewVendorUrl(e.target.value)} className="h-7 text-xs flex-1" />
+        </div>
+        <div className="flex gap-1.5">
+          <Select value={newStoreSection || '__auto'} onValueChange={(v) => setNewStoreSection(v === '__auto' ? '' : v)}>
+            <SelectTrigger className="h-7 text-xs flex-1">
+              <SelectValue placeholder="Store section (auto)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__auto">Auto-detect section</SelectItem>
+              {activeNames.map(s => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input placeholder="Qty Formula (e.g. room_sqft * 1.1)" value={newFormula} onChange={e => setNewFormula(e.target.value)} className="h-7 text-xs flex-1" />
+        </div>
+        <p className="text-[10px] text-muted-foreground">Formula variables: room_sqft, perimeter_ft, task_qty</p>
+        <Button size="sm" onClick={handleAdd} disabled={!newName.trim()} className="h-7 text-xs w-full">
+          <Plus className="h-3 w-3 mr-1" />Add {newItemType === 'tool' ? 'Tool' : 'Material'}
         </Button>
       </div>
-      <div className="space-y-1">
-        <Input placeholder="Qty Formula (e.g. room_sqft * 1.1)" value={matFormula} onChange={e => setMatFormula(e.target.value)} className="h-7 text-xs" />
-        <p className="text-[10px] text-muted-foreground">Variables: room_sqft, perimeter_ft, task_qty</p>
-      </div>
-      <div className="grid grid-cols-3 gap-1">
-        <Select value={matStoreSection} onValueChange={setMatStoreSection}>
-          <SelectTrigger className="h-7 text-xs">
-            <SelectValue placeholder="Section" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">None</SelectItem>
-            {storeSections.map(s => (
-              <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input placeholder="SKU" value={matSku} onChange={e => setMatSku(e.target.value)} className="h-7 text-xs" />
-        <Select value={matProvidedBy} onValueChange={setMatProvidedBy}>
-          <SelectTrigger className="h-7 text-xs">
-            <SelectValue placeholder="Provided by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="either">Either</SelectItem>
-            <SelectItem value="company">Company</SelectItem>
-            <SelectItem value="contractor">Contractor</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <Input placeholder="Vendor URL" value={matVendorUrl} onChange={e => setMatVendorUrl(e.target.value)} className="h-7 text-xs" />
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit {editItemType === 'tool' ? 'Tool' : 'Material'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs">Type</Label>
+              <Select value={editItemType} onValueChange={setEditItemType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="material">Material</SelectItem>
+                  <SelectItem value="tool">Tool</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editItemType === 'tool' && (
+              <div>
+                <Label className="text-xs">Provided By</Label>
+                <Select value={editProvidedBy} onValueChange={setEditProvidedBy}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="company">Company</SelectItem>
+                    <SelectItem value="contractor">Contractor</SelectItem>
+                    <SelectItem value="either">Either</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <Label className="text-xs">Name</Label>
+              <MaterialAutocomplete
+                value={editName}
+                onChange={setEditName}
+                onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
+                onAddToLibrary={(name) => handleAddToLibrary(name, 'edit')}
+              />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Label className="text-xs">Qty</Label>
+                <Input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} />
+              </div>
+              <div className="flex-1">
+                <Label className="text-xs">Unit</Label>
+                <Input value={editUnit} onChange={(e) => setEditUnit(e.target.value)} />
+              </div>
+              <div className="flex-1">
+                <Label className="text-xs">Unit Cost</Label>
+                <Input type="number" step="0.01" value={editUnitCost} onChange={(e) => setEditUnitCost(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">SKU</Label>
+              <Input value={editSku} onChange={(e) => setEditSku(e.target.value)} placeholder="e.g. HD-12345" />
+            </div>
+            <div>
+              <Label className="text-xs">Vendor URL</Label>
+              <Input value={editVendorUrl} onChange={(e) => setEditVendorUrl(e.target.value)} placeholder="e.g. homedepot.com/p/12345" />
+            </div>
+            <div>
+              <Label className="text-xs">Store Section</Label>
+              <Select value={editStoreSection || '__auto'} onValueChange={(v) => setEditStoreSection(v === '__auto' ? '' : v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__auto">Auto-detect</SelectItem>
+                  {activeNames.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Qty Formula</Label>
+              <Input value={editFormula} onChange={(e) => setEditFormula(e.target.value)} placeholder="e.g. room_sqft * 1.1" />
+              <p className="text-[10px] text-muted-foreground mt-0.5">Variables: room_sqft, perimeter_ft, task_qty</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-1 border-t">
+            <Checkbox
+              id="sync-to-library"
+              checked={editSyncToLibrary}
+              onCheckedChange={(v) => setEditSyncToLibrary(!!v)}
+            />
+            <Label htmlFor="sync-to-library" className="text-xs cursor-pointer">
+              Also update {editItemType === 'tool' ? 'Tool Types' : 'Materials Library'}
+            </Label>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleEditSave} disabled={editLoading || !editName.trim()}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -11,10 +11,12 @@ import CostLibrary from '@/components/CostLibrary';
 import AdminAliases from '@/components/AdminAliases';
 import AdminAvailability from '@/components/admin/AdminAvailability';
 import AdminCrewGroups from '@/components/admin/AdminCrewGroups';
+import AdminTenants from '@/components/admin/AdminTenants';
+import AdminMaterialLibrary from '@/components/admin/AdminMaterialLibrary';
 import { LogIn, BookOpen, Settings, Package, BarChart3, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-type ActiveView = 'hub' | 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups';
+type ActiveView = 'hub' | 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups' | 'tenants' | 'material-library';
 
 const AdminPanel = () => {
   const { isAdmin, loading: adminLoading } = useAdmin();
@@ -110,6 +112,7 @@ const AdminPanel = () => {
         { label: 'Rehab Library', action: () => navigate('/admin/rehab-library') },
         { label: 'Bundles', action: () => navigate('/admin/bundles') },
         { label: 'Store Sections', action: () => navigate('/admin/store-sections') },
+        { label: 'Materials Library', action: () => setActiveView('material-library') },
         { label: 'Assignment Rules', action: () => navigate('/admin/assignment-rules') },
       ],
     },
@@ -149,6 +152,7 @@ const AdminPanel = () => {
       items: [
         { label: 'Users', action: () => setActiveView('users') },
         { label: 'Aliases', action: () => setActiveView('aliases') },
+        { label: 'Tenants', action: () => setActiveView('tenants') },
       ],
     },
   ];
@@ -256,6 +260,8 @@ const AdminPanel = () => {
         {activeView === 'aliases' && <AdminAliases />}
         {activeView === 'availability' && <AdminAvailability />}
         {activeView === 'crew-groups' && <AdminCrewGroups />}
+        {activeView === 'tenants' && <AdminTenants />}
+        {activeView === 'material-library' && <AdminMaterialLibrary />}
       </div>
     </div>
   );

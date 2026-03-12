@@ -14,6 +14,7 @@ import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package } from 'lu
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
 import { inferStoreSection } from '@/lib/inferStoreSection';
+import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
 
 interface TaskMaterial {
   id: string;
@@ -21,6 +22,7 @@ interface TaskMaterial {
   name: string;
   quantity: number | null;
   unit: string | null;
+  unit_cost: number | null;
   purchased: boolean;
   delivered: boolean;
   sku: string | null;
@@ -61,6 +63,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [newName, setNewName] = useState('');
   const [newQty, setNewQty] = useState('');
   const [newUnit, setNewUnit] = useState('');
+  const [newUnitCost, setNewUnitCost] = useState('');
   const [newSku, setNewSku] = useState('');
   const [newVendorUrl, setNewVendorUrl] = useState('');
   const [newItemType, setNewItemType] = useState<string>('material');
@@ -73,6 +76,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [editName, setEditName] = useState('');
   const [editQty, setEditQty] = useState('');
   const [editUnit, setEditUnit] = useState('');
+  const [editUnitCost, setEditUnitCost] = useState('');
   const [editSku, setEditSku] = useState('');
   const [editVendorUrl, setEditVendorUrl] = useState('');
   const [editItemType, setEditItemType] = useState<string>('material');
@@ -166,6 +170,64 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     await fetchMaterials();
   };
 
+  const handleSelectFromLibrary = (item: LibraryMaterial, target: 'new' | 'edit') => {
+    if (target === 'new') {
+      setNewName(item.name);
+      if (item.unit_cost != null) setNewUnitCost(String(item.unit_cost));
+      if (item.unit) setNewUnit(item.unit);
+      if (item.sku) setNewSku(item.sku);
+      if (item.vendor_url) setNewVendorUrl(item.vendor_url);
+      if (item.store_section) setNewStoreSection(item.store_section);
+    } else {
+      setEditName(item.name);
+      if (item.unit_cost != null) setEditUnitCost(String(item.unit_cost));
+      if (item.unit) setEditUnit(item.unit);
+      if (item.sku) setEditSku(item.sku);
+      if (item.vendor_url) setEditVendorUrl(item.vendor_url);
+      if (item.store_section) { setEditStoreSection(item.store_section); setEditStoreSectionManual(true); }
+    }
+  };
+
+  const handleAddToLibrary = async (name: string, context: 'new' | 'edit' = 'new') => {
+    const itemType = context === 'new' ? newItemType : editItemType;
+    const sku = context === 'new' ? newSku : editSku;
+    const vendorUrl = context === 'new' ? newVendorUrl : editVendorUrl;
+    const unitCost = context === 'new' ? newUnitCost : editUnitCost;
+    const unit = context === 'new' ? newUnit : editUnit;
+    const storeSection = context === 'new' ? newStoreSection : editStoreSection;
+
+    if (itemType === 'tool') {
+      const { error } = await supabase.from('tool_types').insert({
+        name: name.trim(),
+        sku: sku.trim() || null,
+        vendor_url: normalizeUrl(vendorUrl),
+      });
+      if (error) {
+        if (error.code === '23505') toast({ title: 'Already in tool inventory' });
+        else toast({ title: 'Error adding tool type', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: `"${name}" added to Tool Types` });
+      }
+      return;
+    }
+    const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+    const { error } = await supabase.from('material_library').insert({
+      name,
+      normalized_name: normalized,
+      unit_cost: unitCost ? parseFloat(unitCost) : null,
+      sku: sku.trim() || null,
+      vendor_url: normalizeUrl(vendorUrl),
+      unit: unit.trim() || null,
+      store_section: storeSection.trim() || null,
+    });
+    if (error) {
+      if (error.code === '23505') toast({ title: 'Already in library' });
+      else toast({ title: 'Error adding to library', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: `"${name}" added to Materials Library` });
+    }
+  };
+
   const handleAdd = async () => {
     if (!newName.trim()) return;
     setLoading(true);
@@ -175,6 +237,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       name: newName.trim(),
       quantity: newQty ? parseFloat(newQty) : null,
       unit: newUnit.trim() || null,
+      unit_cost: newUnitCost ? parseFloat(newUnitCost) : null,
       sku: newSku.trim() || null,
       vendor_url: normalizeUrl(newVendorUrl),
       item_type: newItemType,
@@ -187,7 +250,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewName(''); setNewQty(''); setNewUnit(''); setNewSku(''); setNewVendorUrl('');
+    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost(''); setNewSku(''); setNewVendorUrl('');
     setNewItemType('material'); setNewProvidedBy('either'); setNewStoreSection('');
     await fetchMaterials();
   };
@@ -197,6 +260,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     setEditName(m.name);
     setEditQty(m.quantity?.toString() ?? '');
     setEditUnit(m.unit ?? '');
+    setEditUnitCost(m.unit_cost?.toString() ?? '');
     setEditSku(m.sku ?? '');
     setEditVendorUrl(m.vendor_url ?? '');
     setEditItemType(m.item_type ?? 'material');
@@ -219,6 +283,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       name: editName.trim(),
       quantity: editQty ? parseFloat(editQty) : null,
       unit: editUnit.trim() || null,
+      unit_cost: editUnitCost ? parseFloat(editUnitCost) : null,
       sku: editSku.trim() || null,
       vendor_url: normalizeUrl(editVendorUrl),
       item_type: editItemType,
@@ -278,9 +343,11 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{m.name}</p>
-            {(m.quantity || m.unit) && (
+            {(m.quantity || m.unit || m.unit_cost != null) && (
               <p className="text-xs text-muted-foreground">
                 {m.quantity}{m.unit ? ` ${m.unit}` : ''}
+                {m.unit_cost != null ? ` · $${m.unit_cost.toFixed(2)}/${m.unit || 'unit'}` : ''}
+                {m.quantity != null && m.unit_cost != null ? ` · $${(m.quantity * m.unit_cost).toFixed(2)} total` : ''}
               </p>
             )}
           </div>
@@ -450,9 +517,16 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             )}
           </div>
           <div className="flex gap-2">
-            <Input placeholder="Name *" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
+            <MaterialAutocomplete
+              value={newName}
+              onChange={setNewName}
+              onSelect={(item) => handleSelectFromLibrary(item, 'new')}
+              onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
+              className="flex-1"
+            />
             <Input placeholder="Qty" type="number" value={newQty} onChange={(e) => setNewQty(e.target.value)} className="w-16" />
             <Input placeholder="Unit" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} className="w-16" />
+            <Input placeholder="$/unit" type="number" step="0.01" value={newUnitCost} onChange={(e) => setNewUnitCost(e.target.value)} className="w-20" />
           </div>
           <div className="flex gap-2">
             <Input placeholder="SKU (optional)" value={newSku} onChange={(e) => setNewSku(e.target.value)} className="flex-1" />
@@ -511,7 +585,12 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
             )}
             <div>
               <Label className="text-xs">Name</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <MaterialAutocomplete
+                value={editName}
+                onChange={setEditName}
+                onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
+                onAddToLibrary={(name) => handleAddToLibrary(name, 'edit')}
+              />
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
@@ -521,6 +600,10 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
               <div className="flex-1">
                 <Label className="text-xs">Unit</Label>
                 <Input value={editUnit} onChange={(e) => setEditUnit(e.target.value)} />
+              </div>
+              <div className="flex-1">
+                <Label className="text-xs">Unit Cost</Label>
+                <Input type="number" step="0.01" value={editUnitCost} onChange={(e) => setEditUnitCost(e.target.value)} />
               </div>
             </div>
             <div>
