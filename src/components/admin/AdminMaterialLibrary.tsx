@@ -130,6 +130,21 @@ export default function AdminMaterialLibrary() {
     fetchItems();
   };
 
+  const handlePushToAll = async (item: MaterialItem) => {
+    setPushingId(item.id);
+    const { data, error } = await supabase.rpc('push_material_library_to_all' as any, { p_material_id: item.id });
+    setPushingId(null);
+    if (error) {
+      toast({ title: 'Error pushing updates', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const result = data as any;
+    toast({
+      title: 'Material synced everywhere',
+      description: `${result?.recipe_materials_updated ?? 0} recipe items, ${result?.task_materials_updated ?? 0} task items updated`,
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
