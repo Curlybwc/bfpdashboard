@@ -403,10 +403,37 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
           <Input placeholder="Qty Formula (e.g. room_sqft * 1.1)" value={newFormula} onChange={e => setNewFormula(e.target.value)} className="h-7 text-xs flex-1" />
         </div>
         <p className="text-[10px] text-muted-foreground">Formula variables: room_sqft, perimeter_ft, task_qty</p>
-        <Button size="sm" onClick={handleAdd} disabled={!newName.trim()} className="h-7 text-xs w-full">
-          <Plus className="h-3 w-3 mr-1" />Add {newItemType === 'tool' ? 'Tool' : 'Material'}
+        <Button size="sm" onClick={handleQueueItem} disabled={!newName.trim()} className="h-7 text-xs w-full">
+          <Plus className="h-3 w-3 mr-1" />Queue {newItemType === 'tool' ? 'Tool' : 'Material'}
         </Button>
       </div>
+
+      {/* Queued items */}
+      {queue.length > 0 && (
+        <div className="space-y-1.5 border rounded-lg p-2 bg-muted/30">
+          <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            Queued ({queue.length})
+          </h4>
+          {queue.map(item => (
+            <div key={item._key} className="flex items-center justify-between gap-2 rounded border bg-background px-2 py-1">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-medium">{item.material_name}</span>
+                <span className="text-[10px] text-muted-foreground ml-1">
+                  {item.item_type === 'tool' ? '🔧' : '📦'}
+                  {item.qty != null && <> · {item.qty}{item.unit ? ` ${item.unit}` : ''}</>}
+                  {item.unit_cost != null && <> · ${item.unit_cost.toFixed(2)}</>}
+                </span>
+              </div>
+              <button onClick={() => handleRemoveFromQueue(item._key)} className="p-0.5 text-muted-foreground hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+          <Button size="sm" onClick={handleSaveQueue} disabled={savingQueue} className="h-7 text-xs w-full">
+            <Save className="h-3 w-3 mr-1" />{savingQueue ? 'Saving…' : `Save All (${queue.length})`}
+          </Button>
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
