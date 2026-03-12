@@ -521,7 +521,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
               value={newName}
               onChange={setNewName}
               onSelect={(item) => handleSelectFromLibrary(item, 'new')}
-              onAddToLibrary={handleAddToLibrary}
+              onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
               className="flex-1"
             />
             <Input placeholder="Qty" type="number" value={newQty} onChange={(e) => setNewQty(e.target.value)} className="w-16" />
