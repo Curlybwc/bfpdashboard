@@ -277,10 +277,10 @@ const AdminRehabLibrary = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Select value={newItemRecipeHint} onValueChange={setNewItemRecipeHint}>
+              <Select value={newItemRecipeHint || '__none'} onValueChange={(v) => setNewItemRecipeHint(v === '__none' ? '' : v)}>
                 <SelectTrigger className="h-10"><SelectValue placeholder="Recipe hint (optional)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="__none">None</SelectItem>
                   {recipes.map(r => (
                     <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                   ))}

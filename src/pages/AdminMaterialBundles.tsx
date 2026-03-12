@@ -269,10 +269,10 @@ const AdminMaterialBundles = () => {
               </div>
               <Input placeholder="Vendor URL" value={newMatVendorUrl} onChange={e => setNewMatVendorUrl(e.target.value)} className="h-8 text-xs" />
               <div className="grid grid-cols-2 gap-1">
-                <Select value={newMatStoreSection} onValueChange={setNewMatStoreSection}>
+                <Select value={newMatStoreSection || '__none'} onValueChange={(v) => setNewMatStoreSection(v === '__none' ? '' : v)}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Store section" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="__none">None</SelectItem>
                     {storeSections.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
