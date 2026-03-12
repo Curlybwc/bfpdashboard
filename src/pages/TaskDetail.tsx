@@ -321,6 +321,10 @@ const TaskDetail = () => {
   const handleExpandRecipe = async (recipeId: string) => {
     if (!taskId || !task || !user) return;
     setExpandingRecipe(true);
+    // Clear stale expanded_recipe_id if set but no children exist (orphaned state)
+    if (task.expanded_recipe_id && children.length === 0) {
+      await supabase.from('tasks').update({ expanded_recipe_id: null }).eq('id', taskId);
+    }
     const { data, error } = await supabase.rpc('expand_recipe', {
       p_parent_task_id: taskId,
       p_recipe_id: recipeId,
@@ -806,15 +810,15 @@ const TaskDetail = () => {
           canComment={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
         />
 
-        {/* Recipe: read-only badge if already expanded */}
-        {task.expanded_recipe_id && suggestedRecipe && (
+        {/* Recipe: read-only badge if already expanded AND has children */}
+        {task.expanded_recipe_id && suggestedRecipe && hasChildren && (
           <Card className="p-3 flex items-center gap-2 border-muted">
             <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
           </Card>
         )}
         {/* Recipe linked but not yet expanded — show edit + expand */}
-        {!task.expanded_recipe_id && suggestedRecipe && children.length === 0 && (
+        {((!task.expanded_recipe_id || !hasChildren) && suggestedRecipe && children.length === 0) && (
           <Card className="p-3 space-y-3 border-primary/30 bg-primary/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
