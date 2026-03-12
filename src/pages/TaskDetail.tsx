@@ -381,12 +381,29 @@ const TaskDetail = () => {
     }
 
     const sourceTasks = children.length > 0 ? children : [task];
+
+    // Fetch crew candidates for each source task
+    const sourceTaskIds = sourceTasks.map((sourceTask) => sourceTask.id);
+    const { data: allCandidates } = await supabase
+      .from('task_candidates')
+      .select('task_id, user_id')
+      .in('task_id', sourceTaskIds);
+
+    const candidatesByTask = new Map<string, string[]>();
+    (allCandidates || []).forEach((c) => {
+      const list = candidatesByTask.get(c.task_id) || [];
+      list.push(c.user_id);
+      candidatesByTask.set(c.task_id, list);
+    });
+
     const stepInserts = sourceTasks.map((sourceTask, idx) => ({
       recipe_id: recipe.id,
       title: sourceTask.task,
       sort_order: (idx + 1) * 10,
       trade: sourceTask.trade || null,
       created_by: user.id,
+      assignment_mode: sourceTask.assignment_mode || 'solo',
+      default_candidate_user_ids: candidatesByTask.get(sourceTask.id) || [],
     }));
 
     const { data: insertedSteps, error: stepErr } = await supabase
@@ -400,7 +417,6 @@ const TaskDetail = () => {
       return;
     }
 
-    const sourceTaskIds = sourceTasks.map((sourceTask) => sourceTask.id);
     const { data: sourceMaterials, error: matsErr } = await supabase
       .from('task_materials')
       .select('task_id, name, quantity, unit, sku, vendor_url, store_section, provided_by, item_type, unit_cost')
