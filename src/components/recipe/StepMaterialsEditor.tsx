@@ -123,7 +123,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
             <SelectValue placeholder="Section" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">None</SelectItem>
+            <SelectItem value="__none">None</SelectItem>
             {storeSections.map(s => (
               <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
             ))}
