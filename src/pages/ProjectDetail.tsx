@@ -987,13 +987,13 @@ const ProjectDetail = () => {
 
         <Card className="mb-4">
           <CardContent className="px-3 py-2">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs">
-              <div><span className="text-muted-foreground uppercase tracking-wide">Total</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.totalTasks}</span></div>
-              <div><span className="text-muted-foreground uppercase tracking-wide">Done</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.completedTasks}</span></div>
-              <div><span className="text-muted-foreground uppercase tracking-wide">Blocked</span> <span className="font-semibold text-sm ml-1 text-destructive">{projectHealthSummary.blockedTasks}</span></div>
-              <div><span className="text-muted-foreground uppercase tracking-wide">Review</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.needsReviewCount}</span></div>
-              <div><span className="text-muted-foreground uppercase tracking-wide">Overdue</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.overdueCount}</span></div>
-              <div><span className="text-muted-foreground uppercase tracking-wide">Cost</span> <span className="font-semibold text-sm ml-1">${projectTotalActual.toFixed(2)}</span></div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-1 text-xs">
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Total</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.totalTasks}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Done</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.completedTasks}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Blocked</span> <span className="font-semibold text-sm ml-1 text-destructive">{projectHealthSummary.blockedTasks}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Review</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.needsReviewCount}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Overdue</span> <span className="font-semibold text-sm ml-1">{projectHealthSummary.overdueCount}</span></div>
+              <div className="whitespace-nowrap"><span className="text-muted-foreground uppercase tracking-wide">Cost</span> <span className="font-semibold text-sm ml-1">${projectTotalActual.toFixed(2)}</span></div>
             </div>
           </CardContent>
         </Card>
