@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useStoreSections } from '@/hooks/useStoreSections';
 import { useToast } from '@/hooks/use-toast';
 import { inferStoreSection } from '@/lib/inferStoreSection';
-import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
+import MaterialAutocomplete, { type LibraryMaterial, type LibraryTool } from '@/components/MaterialAutocomplete';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 
@@ -336,6 +336,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
             onSelect={(item) => handleSelectFromLibrary(item, 'new')}
             onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
             className="flex-1"
+            itemType={newItemType as 'material' | 'tool'}
+            onSelectTool={(tool) => {
+              setNewName(tool.name);
+              if (tool.sku) setNewSku(tool.sku);
+              if (tool.vendor_url) setNewVendorUrl(tool.vendor_url);
+            }}
           />
           <Input placeholder="Qty" type="number" value={newQty} onChange={e => setNewQty(e.target.value)} className="h-7 text-xs w-14" />
           <Input placeholder="Unit" value={newUnit} onChange={e => setNewUnit(e.target.value)} className="h-7 text-xs w-14" />
@@ -402,6 +408,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
                 onChange={setEditName}
                 onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
                 onAddToLibrary={(name) => handleAddToLibrary(name, 'edit')}
+                itemType={editItemType as 'material' | 'tool'}
+                onSelectTool={(tool) => {
+                  setEditName(tool.name);
+                  if (tool.sku) setEditSku(tool.sku);
+                  if (tool.vendor_url) setEditVendorUrl(tool.vendor_url);
+                }}
               />
             </div>
             <div className="flex gap-2">
