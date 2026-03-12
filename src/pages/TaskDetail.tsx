@@ -1290,6 +1290,42 @@ const TaskDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Recipe sync prompt */}
+      <AlertDialog open={recipeSyncOpen} onOpenChange={setRecipeSyncOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Recipe in Library?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This task was expanded from a recipe. Would you like to sync these changes back to the recipe library so future projects use the updated steps and materials?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, keep local only</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={syncingRecipe}
+              onClick={async () => {
+                if (!taskId || !task?.expanded_recipe_id) return;
+                setSyncingRecipe(true);
+                const { data, error: syncErr } = await supabase.rpc('capture_recipe_from_task', {
+                  p_parent_task_id: taskId,
+                  p_recipe_id: task.expanded_recipe_id,
+                });
+                setSyncingRecipe(false);
+                if (syncErr) {
+                  toast({ title: 'Sync failed', description: syncErr.message, variant: 'destructive' });
+                } else {
+                  const result = data as any;
+                  toast({ title: 'Recipe updated', description: `${result?.steps_written ?? 0} steps, ${result?.materials_written ?? 0} materials synced.` });
+                }
+                setRecipeSyncOpen(false);
+              }}
+            >
+              {syncingRecipe ? 'Syncing…' : 'Yes, update recipe'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
