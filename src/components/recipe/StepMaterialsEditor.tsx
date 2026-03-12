@@ -163,11 +163,11 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     }
   };
 
-  const handleAdd = async () => {
+  const handleQueueItem = () => {
     if (!newName.trim()) return;
     const autoSection = newStoreSection || inferStoreSection(newName.trim(), activeNames);
-    const { error } = await supabase.from('task_recipe_step_materials').insert({
-      recipe_step_id: stepId,
+    setQueue(prev => [...prev, {
+      _key: crypto.randomUUID(),
       material_name: newName.trim(),
       qty: newQty ? parseFloat(newQty) : null,
       unit: newUnit.trim() || null,
@@ -178,14 +178,33 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       provided_by: newItemType === 'tool' ? newProvidedBy : 'either',
       qty_formula: newFormula.trim() || null,
       item_type: newItemType,
-    } as any);
+    }]);
+    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost('');
+    setNewSku(''); setNewVendorUrl(''); setNewStoreSection('');
+    setNewFormula('');
+    // Keep itemType and providedBy for convenience when adding multiple of same type
+  };
+
+  const handleRemoveFromQueue = (key: string) => {
+    setQueue(prev => prev.filter(i => i._key !== key));
+  };
+
+  const handleSaveQueue = async () => {
+    if (queue.length === 0) return;
+    setSavingQueue(true);
+    const rows = queue.map(({ _key, ...rest }) => ({
+      recipe_step_id: stepId,
+      ...rest,
+    }));
+    const { error } = await supabase.from('task_recipe_step_materials').insert(rows as any);
+    setSavingQueue(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost('');
-    setNewSku(''); setNewVendorUrl(''); setNewStoreSection('');
-    setNewItemType('material'); setNewProvidedBy('either'); setNewFormula('');
+    toast({ title: `${queue.length} item(s) added` });
+    setQueue([]);
+    setNewItemType('material'); setNewProvidedBy('either');
     fetchMaterials();
   };
 
