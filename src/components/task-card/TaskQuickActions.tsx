@@ -205,7 +205,7 @@ const TaskQuickActions = ({
           .insert(missingMemberIds.map((userId) => ({
             project_id: task.project_id,
             user_id: userId,
-            role: 'contractor',
+            role: 'contractor' as const,
           })));
 
         if (memberInsertError) throw memberInsertError;
