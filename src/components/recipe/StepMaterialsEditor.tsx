@@ -71,6 +71,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const [editStoreSection, setEditStoreSection] = useState('');
   const [editFormula, setEditFormula] = useState('');
   const [editLoading, setEditLoading] = useState(false);
+  const [editSyncToLibrary, setEditSyncToLibrary] = useState(false);
 
   const fetchMaterials = async () => {
     const { data } = await supabase
