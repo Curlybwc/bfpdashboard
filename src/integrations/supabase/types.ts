@@ -1270,6 +1270,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          item_type: string
           material_name: string
           notes: string | null
           provided_by: string | null
@@ -1279,11 +1280,13 @@ export type Database = {
           sku: string | null
           store_section: string | null
           unit: string | null
+          unit_cost: number | null
           vendor_url: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          item_type?: string
           material_name: string
           notes?: string | null
           provided_by?: string | null
@@ -1293,11 +1296,13 @@ export type Database = {
           sku?: string | null
           store_section?: string | null
           unit?: string | null
+          unit_cost?: number | null
           vendor_url?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          item_type?: string
           material_name?: string
           notes?: string | null
           provided_by?: string | null
@@ -1307,6 +1312,7 @@ export type Database = {
           sku?: string | null
           store_section?: string | null
           unit?: string | null
+          unit_cost?: number | null
           vendor_url?: string | null
         }
         Relationships: [
