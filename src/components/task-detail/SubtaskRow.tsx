@@ -30,8 +30,9 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
 
   const handleSave = async () => {
     setSaving(true);
+    const isCrew = assignedTo === 'crew';
     const isVendor = assignedTo === 'outside_vendor';
-    const newAssignedTo = assignedTo === 'unassigned' || isVendor ? null : assignedTo;
+    const newAssignedTo = assignedTo === 'unassigned' || isVendor || isCrew ? null : assignedTo;
 
     const updates: any = {
       task: taskText.trim(),
@@ -39,6 +40,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
       priority,
       assigned_to_user_id: newAssignedTo,
       is_outside_vendor: isVendor,
+      assignment_mode: isCrew ? 'crew' : 'solo',
     };
 
     // Handle stage lifecycle timestamps
