@@ -136,6 +136,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
                 isExpanded={expandedStepId === step.id}
                 onToggleExpand={() => toggleExpand(step.id)}
                 onDelete={() => handleDeleteStep(step.id)}
+                onUpdated={() => fetchSteps()}
               />
             ))}
           </div>
