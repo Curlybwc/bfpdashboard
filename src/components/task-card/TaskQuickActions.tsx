@@ -365,6 +365,10 @@ const TaskQuickActions = ({
                 <Users className="h-3.5 w-3.5 mr-1" />
                 {task.assignment_mode === 'crew' ? 'Switch to Solo' : 'Make Crew Task'}
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={openCrewAssignmentDialog}>
+                <Users className="h-3.5 w-3.5 mr-1" />
+                Set Crew Members
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={handleSetOutsideVendor} className={cn(task.is_outside_vendor && 'font-semibold')}>
                 <Package className="h-3.5 w-3.5 mr-1" />Outside Vendor
               </DropdownMenuItem>
