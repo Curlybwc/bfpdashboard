@@ -153,6 +153,102 @@ const TaskQuickActions = ({
     } catch (e: unknown) { toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' }); }
   };
 
+  const openCrewAssignmentDialog = async () => {
+    setCrewDialogOpen(true);
+    setCrewSearch('');
+    setCrewLoading(true);
+
+    const { data, error } = await supabase
+      .from('task_candidates')
+      .select('user_id')
+      .eq('task_id', task.id);
+
+    setCrewLoading(false);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    const fromDb = (data || []).map((row) => row.user_id);
+    if (fromDb.length > 0) {
+      setCrewCandidates(fromDb);
+      return;
+    }
+
+    setCrewCandidates(task.assigned_to_user_id ? [task.assigned_to_user_id] : []);
+  };
+
+  const handleSaveCrewCandidates = async () => {
+    if (crewCandidates.length === 0) {
+      toast({ title: 'Select crew members', description: 'Pick at least one crew member.', variant: 'destructive' });
+      return;
+    }
+
+    setCrewSaving(true);
+
+    try {
+      const { data: existingMembers, error: existingMembersError } = await supabase
+        .from('project_members')
+        .select('user_id')
+        .eq('project_id', task.project_id)
+        .in('user_id', crewCandidates);
+
+      if (existingMembersError) throw existingMembersError;
+
+      const existingMemberSet = new Set((existingMembers || []).map((member) => member.user_id));
+      const missingMemberIds = crewCandidates.filter((userId) => !existingMemberSet.has(userId));
+
+      if (missingMemberIds.length > 0) {
+        const { error: memberInsertError } = await supabase
+          .from('project_members')
+          .insert(missingMemberIds.map((userId) => ({
+            project_id: task.project_id,
+            user_id: userId,
+            role: 'contractor',
+          })));
+
+        if (memberInsertError) throw memberInsertError;
+      }
+
+      const { error: taskError } = await supabase
+        .from('tasks')
+        .update({
+          assignment_mode: 'crew',
+          assigned_to_user_id: null,
+          is_outside_vendor: false,
+          lead_user_id: crewCandidates[0] || null,
+        })
+        .eq('id', task.id);
+
+      if (taskError) throw taskError;
+
+      const { error: candidateDeleteError } = await supabase
+        .from('task_candidates')
+        .delete()
+        .eq('task_id', task.id);
+
+      if (candidateDeleteError) throw candidateDeleteError;
+
+      const { error: candidateInsertError } = await supabase
+        .from('task_candidates')
+        .upsert(
+          crewCandidates.map((userId) => ({ task_id: task.id, user_id: userId })),
+          { onConflict: 'task_id,user_id' }
+        );
+
+      if (candidateInsertError) throw candidateInsertError;
+
+      toast({ title: 'Crew members saved' });
+      setCrewDialogOpen(false);
+      onUpdate();
+    } catch (e: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(e), variant: 'destructive' });
+    } finally {
+      setCrewSaving(false);
+    }
+  };
+
   const handleStageChange = async (newStage: TaskStage) => {
     if (newStage === task.stage) return;
     setLoading(true);
