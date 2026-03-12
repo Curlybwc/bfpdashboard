@@ -81,6 +81,9 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
           {child.is_outside_vendor && (
             <span className="text-[11px] text-muted-foreground">Outside Vendor</span>
           )}
+          {child.assignment_mode === 'crew' && (
+            <span className="text-[11px] text-muted-foreground">Crew Task</span>
+          )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <StatusBadge status={child.stage} />
