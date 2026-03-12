@@ -103,10 +103,15 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     }
   };
 
-  const handleAddToLibrary = async (name: string, itemType: string = 'material') => {
+  const handleAddToLibrary = async (name: string, context: 'new' | 'edit' = 'new') => {
+    const itemType = context === 'new' ? newItemType : editItemType;
+    const sku = context === 'new' ? newSku : editSku;
+    const vendorUrl = context === 'new' ? newVendorUrl : editVendorUrl;
+    const unitCost = context === 'new' ? newUnitCost : editUnitCost;
+    const unit = context === 'new' ? newUnit : editUnit;
+    const storeSection = context === 'new' ? newStoreSection : editStoreSection;
+
     if (itemType === 'tool') {
-      const sku = itemType === newItemType ? newSku : editSku;
-      const vendorUrl = itemType === newItemType ? newVendorUrl : editVendorUrl;
       const { error } = await supabase.from('tool_types').insert({
         name: name.trim(),
         sku: sku.trim() || null,
@@ -120,11 +125,6 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       }
       return;
     }
-    const sku = itemType === newItemType ? newSku : editSku;
-    const vendorUrl = itemType === newItemType ? newVendorUrl : editVendorUrl;
-    const unitCost = itemType === newItemType ? newUnitCost : editUnitCost;
-    const unit = itemType === newItemType ? newUnit : editUnit;
-    const storeSection = itemType === newItemType ? newStoreSection : editStoreSection;
     const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
     const { error } = await supabase.from('material_library').insert({
       name,
@@ -298,7 +298,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
             value={newName}
             onChange={setNewName}
             onSelect={(item) => handleSelectFromLibrary(item, 'new')}
-            onAddToLibrary={(name) => handleAddToLibrary(name, newItemType)}
+            onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
             className="flex-1"
           />
           <Input placeholder="Qty" type="number" value={newQty} onChange={e => setNewQty(e.target.value)} className="h-7 text-xs w-14" />
@@ -365,7 +365,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
                 value={editName}
                 onChange={setEditName}
                 onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
-                onAddToLibrary={(name) => handleAddToLibrary(name, editItemType)}
+                onAddToLibrary={(name) => handleAddToLibrary(name, 'edit')}
               />
             </div>
             <div className="flex gap-2">

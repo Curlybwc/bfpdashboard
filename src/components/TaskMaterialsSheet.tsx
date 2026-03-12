@@ -188,20 +188,23 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     }
   };
 
-  const handleAddToLibrary = async (name: string) => {
-    if (newItemType === 'tool') {
-      // Add to tool_types instead of material_library
+  const handleAddToLibrary = async (name: string, context: 'new' | 'edit' = 'new') => {
+    const itemType = context === 'new' ? newItemType : editItemType;
+    const sku = context === 'new' ? newSku : editSku;
+    const vendorUrl = context === 'new' ? newVendorUrl : editVendorUrl;
+    const unitCost = context === 'new' ? newUnitCost : editUnitCost;
+    const unit = context === 'new' ? newUnit : editUnit;
+    const storeSection = context === 'new' ? newStoreSection : editStoreSection;
+
+    if (itemType === 'tool') {
       const { error } = await supabase.from('tool_types').insert({
         name: name.trim(),
-        sku: newSku.trim() || null,
-        vendor_url: normalizeUrl(newVendorUrl),
+        sku: sku.trim() || null,
+        vendor_url: normalizeUrl(vendorUrl),
       });
       if (error) {
-        if (error.code === '23505') {
-          toast({ title: 'Already in tool inventory' });
-        } else {
-          toast({ title: 'Error adding tool type', description: error.message, variant: 'destructive' });
-        }
+        if (error.code === '23505') toast({ title: 'Already in tool inventory' });
+        else toast({ title: 'Error adding tool type', description: error.message, variant: 'destructive' });
       } else {
         toast({ title: `"${name}" added to Tool Types` });
       }
@@ -211,18 +214,15 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     const { error } = await supabase.from('material_library').insert({
       name,
       normalized_name: normalized,
-      unit_cost: newUnitCost ? parseFloat(newUnitCost) : null,
-      sku: newSku.trim() || null,
-      vendor_url: normalizeUrl(newVendorUrl),
-      unit: newUnit.trim() || null,
-      store_section: newStoreSection.trim() || null,
+      unit_cost: unitCost ? parseFloat(unitCost) : null,
+      sku: sku.trim() || null,
+      vendor_url: normalizeUrl(vendorUrl),
+      unit: unit.trim() || null,
+      store_section: storeSection.trim() || null,
     });
     if (error) {
-      if (error.code === '23505') {
-        toast({ title: 'Already in library' });
-      } else {
-        toast({ title: 'Error adding to library', description: error.message, variant: 'destructive' });
-      }
+      if (error.code === '23505') toast({ title: 'Already in library' });
+      else toast({ title: 'Error adding to library', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: `"${name}" added to Materials Library` });
     }
@@ -521,7 +521,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
               value={newName}
               onChange={setNewName}
               onSelect={(item) => handleSelectFromLibrary(item, 'new')}
-              onAddToLibrary={handleAddToLibrary}
+              onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
               className="flex-1"
             />
             <Input placeholder="Qty" type="number" value={newQty} onChange={(e) => setNewQty(e.target.value)} className="w-16" />
@@ -589,7 +589,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
                 value={editName}
                 onChange={setEditName}
                 onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
-                onAddToLibrary={handleAddToLibrary}
+                onAddToLibrary={(name) => handleAddToLibrary(name, 'edit')}
               />
             </div>
             <div className="flex gap-2">
