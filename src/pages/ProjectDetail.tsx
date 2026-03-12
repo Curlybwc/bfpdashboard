@@ -526,39 +526,18 @@ const ProjectDetail = () => {
         title={project.name}
         backTo="/projects"
         actions={
-          userCanCreateTask ? (
-            <div className="flex gap-2">
-              {userCanEditProject && (
-                <Button size="sm" variant="outline" onClick={openEditDialog}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-               )}
-              {isManager && (
-                <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
-                  <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
-                 <Package className="h-4 w-4 mr-1" />Materials
-               </Button>
-              {/* Calendar route is admin-guarded in App routes */}
-              {isAdmin && (
-                <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
-                   <CalendarDays className="h-4 w-4 mr-1" />Calendar
-                 </Button>
-              )}
-              {/* Field Mode & Walkthrough are manager/admin workflows */}
-              {isManager && (
-                <>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
-                    <Zap className="h-4 w-4 mr-1" />Field Mode
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
-                    <Mic className="h-4 w-4 mr-1" />Walkthrough
-                  </Button>
-                </>
-              )}
-              <Dialog open={open} onOpenChange={setOpen}>
+          isAdmin ? (
+            <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          ) : undefined
+        }
+      />
+
+      {/* Toolbar */}
+      {userCanCreateTask && (
+        <div className="flex flex-wrap gap-2 px-4 py-2 border-b bg-card">
+          <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" />Task</Button>
             </DialogTrigger>
@@ -599,48 +578,10 @@ const ProjectDetail = () => {
                       {batchPreview.blankLines > 0 ? ` • ${batchPreview.blankLines} blank line${batchPreview.blankLines !== 1 ? 's' : ''} ignored` : ''}
                       {batchPreview.duplicateLines > 0 ? ` • ${batchPreview.duplicateLines} duplicate line${batchPreview.duplicateLines !== 1 ? 's' : ''} ignored` : ''}
                     </p>
-                    {batchPreview.uniqueTitles.length > 0 && (
-                      <div className="rounded border p-2 max-h-28 overflow-y-auto space-y-1">
-                        {batchPreview.uniqueTitles.slice(0, 8).map((line, idx) => (
-                          <p key={`${line}-${idx}`} className="text-xs truncate">{idx + 1}. {line}</p>
-                        ))}
-                        {batchPreview.uniqueTitles.length > 8 && (
-                          <p className="text-xs text-muted-foreground">+{batchPreview.uniqueTitles.length - 8} more…</p>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
 
-                {createMode === 'single' && (
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={createAsPackage ? 'package' : 'task'} onValueChange={(v) => setCreateAsPackage(v === 'package')}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="task">Actionable Task</SelectItem>
-                        <SelectItem value="package">Package (Container)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {!createAsPackage && (
-                  <div className="space-y-2">
-                    <Label>Package</Label>
-                    <Select value={selectedPackageId} onValueChange={setSelectedPackageId}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="general">General (No Package)</SelectItem>
-                        {packageOptions.map((pkg) => (
-                          <SelectItem key={pkg.id} value={pkg.id}>{pkg.task}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Stage</Label>
                     <Select value={stage} onValueChange={(v) => setStage(v as TaskStage)}>
@@ -661,145 +602,95 @@ const ProjectDetail = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Trade</Label>
-                    <Input value={trade} onChange={(e) => setTrade(e.target.value)} />
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Room / Area</Label>
-                    <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} />
+                    <Input value={roomArea} onChange={(e) => setRoomArea(e.target.value)} placeholder="e.g. Kitchen" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Trade</Label>
+                    <Input value={trade} onChange={(e) => setTrade(e.target.value)} placeholder="e.g. Plumbing" />
                   </div>
                 </div>
 
-                {!createAsPackage && (
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+                </div>
+
                 <div className="space-y-2">
                   <Label>Assigned To</Label>
                   <Select value={assignedTo} onValueChange={setAssignedTo}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Unassigned</SelectItem>
-                      <SelectItem value="crew">Crew Task</SelectItem>
                       <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
-                      {projectMembers.length > 0 && (
-                        <>
-                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Project Members</div>
-                          {projectMembers.map((m) => (
-                            <SelectItem key={m.user_id} value={m.user_id}>
-                              {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                      {allProfiles.filter(p => !memberUserIds.has(p.id)).length > 0 && (
-                        <>
-                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Other Users (will be added to project)</div>
-                          {allProfiles.filter(p => !memberUserIds.has(p.id)).map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.full_name || 'Unnamed'}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
+                      <SelectItem value="crew">Crew (multi-worker)</SelectItem>
+                      {projectMembers.map(m => (
+                        <SelectItem key={m.user_id} value={m.user_id}>{m.profiles?.full_name || 'Unnamed'}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                )}
 
-                {!createAsPackage && assignedTo === 'crew' && (
+                {assignedTo === 'crew' && (
                   <div className="space-y-2">
-                    <Label>Crew Members</Label>
-                    {crewGroups.length > 0 && (
-                      <Select value="" onValueChange={(groupId) => {
-                        const group = crewGroups.find(g => g.id === groupId);
-                        if (group) setCrewCandidates(group.members);
-                      }}>
-                        <SelectTrigger><SelectValue placeholder="Load from crew group..." /></SelectTrigger>
-                        <SelectContent>
-                          {crewGroups.map(g => (
-                            <SelectItem key={g.id} value={g.id}>{g.name} ({g.members.length})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <div className="space-y-1 max-h-40 overflow-y-auto rounded border p-2">
-                      {allProfiles.map((p) => {
-                        const member = projectMembers.find(m => m.user_id === p.id);
-                        return (
-                          <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer py-0.5">
-                            <Checkbox
-                              checked={crewCandidates.includes(p.id)}
-                              onCheckedChange={(checked) => {
-                                setCrewCandidates(prev =>
-                                  checked
-                                    ? [...prev, p.id]
-                                    : prev.filter(cid => cid !== p.id)
-                                );
-                              }}
-                            />
-                            <span>{p.full_name || 'Unnamed'}</span>
-                            {member ? (
-                              <span className="text-muted-foreground">({member.role})</span>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">(not on project)</span>
-                            )}
-                          </label>
-                        );
-                      })}
+                    <Label>Crew Candidates</Label>
+                    <div className="space-y-1">
+                      {projectMembers.map(m => (
+                        <label key={m.user_id} className="flex items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={crewCandidates.includes(m.user_id)}
+                            onCheckedChange={(checked) => {
+                              setCrewCandidates(prev => checked ? [...prev, m.user_id] : prev.filter(id => id !== m.user_id));
+                            }}
+                          />
+                          {m.profiles?.full_name || 'Unnamed'}
+                        </label>
+                      ))}
+                      {crewGroups.length > 0 && crewGroups.map(g => (
+                        <Button key={g.id} type="button" variant="outline" size="sm" className="mr-1" onClick={() => {
+                          setCrewCandidates(prev => {
+                            const set = new Set(prev);
+                            g.members.forEach(mid => set.add(mid));
+                            return [...set];
+                          });
+                        }}>+ {g.name}</Button>
+                      ))}
                     </div>
-                    {crewCandidates.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">{crewCandidates.length} member{crewCandidates.length !== 1 ? 's' : ''} selected</p>
-                        {!showSaveGroup ? (
-                          <button type="button" className="text-xs text-primary hover:underline" onClick={() => setShowSaveGroup(true)}>
-                            Save as crew group
-                          </button>
-                        ) : (
-                          <div className="flex gap-1">
-                            <Input
-                              placeholder="Group name"
-                              value={saveGroupName}
-                              onChange={(e) => setSaveGroupName(e.target.value)}
-                              className="h-7 text-xs"
-                            />
-                            <Button type="button" size="sm" className="h-7 text-xs" disabled={!saveGroupName.trim()} onClick={async () => {
-                              if (!user) return;
-                              const { data: newGroup } = await supabase.from('crew_groups').insert({ name: saveGroupName.trim(), created_by: user.id }).select('id').single();
-                              if (newGroup) {
-                                await supabase.from('crew_group_members').insert(crewCandidates.map(uid => ({ crew_group_id: newGroup.id, user_id: uid })));
-                                setCrewGroups(prev => [...prev, { id: newGroup.id, name: saveGroupName.trim(), members: crewCandidates }]);
-                                toast({ title: 'Crew group saved' });
-                              }
-                              setSaveGroupName('');
-                              setShowSaveGroup(false);
-                            }}>Save</Button>
-                            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowSaveGroup(false); setSaveGroupName(''); }}>
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label>Notes</Label>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-                </div>
-                {!createAsPackage && (
+
+                {packageOptions.length > 0 && createMode === 'single' && !createAsPackage && (
+                  <div className="space-y-2">
+                    <Label>Add to Package</Label>
+                    <Select value={selectedPackageId} onValueChange={setSelectedPackageId}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">None (standalone)</SelectItem>
+                        {packageOptions.map(p => <SelectItem key={p.id} value={p.id}>{p.task}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {createMode === 'single' && selectedPackageId === 'general' && (
+                  <div className="flex items-center gap-2">
+                    <Switch checked={createAsPackage} onCheckedChange={setCreateAsPackage} id="create-package" />
+                    <Label htmlFor="create-package">Create as package (parent task)</Label>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Due Date</Label>
-                  <Input type="date" value={newDueDate} onChange={(e) => {
-                    setNewDueDate(e.target.value);
-                    if (!e.target.value) setNewIsRecurring(false);
-                  }} />
+                  <Input type="date" value={newDueDate} onChange={(e) => setNewDueDate(e.target.value)} />
                 </div>
-                )}
-                {!createAsPackage && newDueDate && (
+
+                {newDueDate && (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Recurring</Label>
-                      <Switch checked={newIsRecurring} onCheckedChange={setNewIsRecurring} />
+                    <div className="flex items-center gap-2">
+                      <Switch checked={newIsRecurring} onCheckedChange={setNewIsRecurring} id="recurring-toggle" />
+                      <Label htmlFor="recurring-toggle">Recurring</Label>
                     </div>
                     {newIsRecurring && (
                       <Select value={newRecurrenceFrequency} onValueChange={(v) => setNewRecurrenceFrequency(v as RecurrenceFrequency)}>
@@ -811,7 +702,8 @@ const ProjectDetail = () => {
                     )}
                   </div>
                 )}
-                {!createAsPackage && createMode === 'single' && (
+
+                {createMode === 'single' && !createAsPackage && (
                 <Collapsible>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-1">
                     <ChevronDown className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-180" />
@@ -819,53 +711,21 @@ const ProjectDetail = () => {
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-2 space-y-2">
                     <div className="flex gap-2">
-                      <Input
-                        placeholder="Name *"
-                        value={matName}
-                        onChange={(e) => setMatName(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Input
-                        placeholder="Qty"
-                        type="number"
-                        value={matQty}
-                        onChange={(e) => setMatQty(e.target.value)}
-                        className="w-16"
-                      />
-                      <Input
-                        placeholder="Unit"
-                        value={matUnit}
-                        onChange={(e) => setMatUnit(e.target.value)}
-                        className="w-16"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      disabled={!matName.trim()}
-                      onClick={() => {
-                        setPendingMaterials(prev => [...prev, { name: matName.trim(), quantity: matQty, unit: matUnit.trim() }]);
+                      <Input value={matName} onChange={(e) => setMatName(e.target.value)} placeholder="Material name" className="flex-1" />
+                      <Input value={matQty} onChange={(e) => setMatQty(e.target.value)} placeholder="Qty" className="w-16" />
+                      <Input value={matUnit} onChange={(e) => setMatUnit(e.target.value)} placeholder="Unit" className="w-20" />
+                      <Button type="button" size="sm" onClick={() => {
+                        if (!matName.trim()) return;
+                        setPendingMaterials(prev => [...prev, { name: matName.trim(), quantity: matQty, unit: matUnit }]);
                         setMatName(''); setMatQty(''); setMatUnit('');
-                      }}
-                    >
-                      Add Material
-                    </Button>
+                      }}><Plus className="h-4 w-4" /></Button>
+                    </div>
                     {pendingMaterials.length > 0 && (
                       <div className="space-y-1">
                         {pendingMaterials.map((m, i) => (
-                          <div key={i} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
-                            <span className="truncate">
-                              {m.name}{m.quantity ? ` × ${m.quantity}` : ''}{m.unit ? ` ${m.unit}` : ''}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setPendingMaterials(prev => prev.filter((_, j) => j !== i))}
-                              className="text-muted-foreground hover:text-destructive ml-2 shrink-0"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
+                          <div key={i} className="flex items-center justify-between text-sm bg-muted rounded px-2 py-1">
+                            <span>{m.name}{m.quantity ? ` × ${m.quantity}` : ''}{m.unit ? ` ${m.unit}` : ''}</span>
+                            <button type="button" onClick={() => setPendingMaterials(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
                           </div>
                         ))}
                       </div>
@@ -877,19 +737,37 @@ const ProjectDetail = () => {
               </form>
             </DialogContent>
           </Dialog>
-              {isAdmin && (
-                <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          ) : isAdmin ? (
-            <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
-              <Trash2 className="h-4 w-4" />
+
+          {userCanEditProject && (
+            <Button size="sm" variant="outline" onClick={openEditDialog}>
+              <Pencil className="h-4 w-4" />
             </Button>
-          ) : undefined
-        }
-      />
+          )}
+          {isManager && (
+            <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
+              <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
+            <Package className="h-4 w-4 mr-1" />Materials
+          </Button>
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
+              <CalendarDays className="h-4 w-4 mr-1" />Calendar
+            </Button>
+          )}
+          {isManager && (
+            <>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
+                <Zap className="h-4 w-4 mr-1" />Field Mode
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
+                <Mic className="h-4 w-4 mr-1" />Walkthrough
+              </Button>
+            </>
+          )}
+        </div>
+      )}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
