@@ -336,6 +336,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
             onSelect={(item) => handleSelectFromLibrary(item, 'new')}
             onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
             className="flex-1"
+            itemType={newItemType as 'material' | 'tool'}
+            onSelectTool={(tool) => {
+              setNewName(tool.name);
+              if (tool.sku) setNewSku(tool.sku);
+              if (tool.vendor_url) setNewVendorUrl(tool.vendor_url);
+            }}
           />
           <Input placeholder="Qty" type="number" value={newQty} onChange={e => setNewQty(e.target.value)} className="h-7 text-xs w-14" />
           <Input placeholder="Unit" value={newUnit} onChange={e => setNewUnit(e.target.value)} className="h-7 text-xs w-14" />
