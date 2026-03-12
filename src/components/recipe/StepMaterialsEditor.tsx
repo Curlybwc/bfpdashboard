@@ -103,10 +103,15 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     }
   };
 
-  const handleAddToLibrary = async (name: string, itemType: string = 'material') => {
+  const handleAddToLibrary = async (name: string, context: 'new' | 'edit' = 'new') => {
+    const itemType = context === 'new' ? newItemType : editItemType;
+    const sku = context === 'new' ? newSku : editSku;
+    const vendorUrl = context === 'new' ? newVendorUrl : editVendorUrl;
+    const unitCost = context === 'new' ? newUnitCost : editUnitCost;
+    const unit = context === 'new' ? newUnit : editUnit;
+    const storeSection = context === 'new' ? newStoreSection : editStoreSection;
+
     if (itemType === 'tool') {
-      const sku = itemType === newItemType ? newSku : editSku;
-      const vendorUrl = itemType === newItemType ? newVendorUrl : editVendorUrl;
       const { error } = await supabase.from('tool_types').insert({
         name: name.trim(),
         sku: sku.trim() || null,
@@ -120,11 +125,6 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       }
       return;
     }
-    const sku = itemType === newItemType ? newSku : editSku;
-    const vendorUrl = itemType === newItemType ? newVendorUrl : editVendorUrl;
-    const unitCost = itemType === newItemType ? newUnitCost : editUnitCost;
-    const unit = itemType === newItemType ? newUnit : editUnit;
-    const storeSection = itemType === newItemType ? newStoreSection : editStoreSection;
     const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
     const { error } = await supabase.from('material_library').insert({
       name,
