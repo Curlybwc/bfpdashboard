@@ -118,12 +118,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
         <p className="text-[10px] text-muted-foreground">Variables: room_sqft, perimeter_ft, task_qty</p>
       </div>
       <div className="grid grid-cols-3 gap-1">
-        <Select value={matStoreSection} onValueChange={setMatStoreSection}>
+        <Select value={matStoreSection || '__none'} onValueChange={(v) => setMatStoreSection(v === '__none' ? '' : v)}>
           <SelectTrigger className="h-7 text-xs">
             <SelectValue placeholder="Section" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">None</SelectItem>
+            <SelectItem value="__none">None</SelectItem>
             {storeSections.map(s => (
               <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
             ))}
