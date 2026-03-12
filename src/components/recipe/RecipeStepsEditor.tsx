@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,19 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Plus } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import RecipeStepRow from './RecipeStepRow';
 
 interface RecipeStep {
@@ -30,6 +43,11 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [newStepTitle, setNewStepTitle] = useState('');
   const [newStepTrade, setNewStepTrade] = useState('');
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
 
   const fetchSteps = async () => {
     const { data } = await supabase
@@ -75,19 +93,31 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
     onStepsChanged?.();
   };
 
-  const handleMoveStep = async (stepId: string, direction: 'up' | 'down') => {
-    const idx = steps.findIndex(s => s.id === stepId);
-    if (idx < 0) return;
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= steps.length) return;
-    const a = steps[idx];
-    const b = steps[swapIdx];
-    await Promise.all([
-      supabase.from('task_recipe_steps').update({ sort_order: b.sort_order }).eq('id', a.id),
-      supabase.from('task_recipe_steps').update({ sort_order: a.sort_order }).eq('id', b.id),
-    ]);
-    fetchSteps();
-  };
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = steps.findIndex(s => s.id === active.id);
+    const newIndex = steps.findIndex(s => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Optimistic reorder
+    const reordered = [...steps];
+    const [moved] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, moved);
+    setSteps(reordered);
+
+    // Persist
+    const updates = reordered.map((s, i) =>
+      supabase.from('task_recipe_steps').update({ sort_order: (i + 1) * 10 }).eq('id', s.id)
+    );
+    const results = await Promise.all(updates);
+    const firstError = results.find(r => r.error);
+    if (firstError?.error) {
+      toast({ title: 'Error', description: firstError.error.message, variant: 'destructive' });
+      fetchSteps();
+    }
+  }, [steps, toast]);
 
   const toggleExpand = (stepId: string) => {
     setExpandedStepId(prev => prev === stepId ? null : stepId);
@@ -96,19 +126,21 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
   return (
     <div className="space-y-2">
       <Label>Steps ({steps.length})</Label>
-      {steps.map((step, idx) => (
-        <RecipeStepRow
-          key={step.id}
-          step={step}
-          index={idx}
-          totalSteps={steps.length}
-          isExpanded={expandedStepId === step.id}
-          onToggleExpand={() => toggleExpand(step.id)}
-          onMoveUp={() => handleMoveStep(step.id, 'up')}
-          onMoveDown={() => handleMoveStep(step.id, 'down')}
-          onDelete={() => handleDeleteStep(step.id)}
-        />
-      ))}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={steps.map(s => s.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-2">
+            {steps.map((step) => (
+              <RecipeStepRow
+                key={step.id}
+                step={step}
+                isExpanded={expandedStepId === step.id}
+                onToggleExpand={() => toggleExpand(step.id)}
+                onDelete={() => handleDeleteStep(step.id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
       <div className="flex gap-2">
         <Input placeholder="Step title" value={newStepTitle} onChange={(e) => setNewStepTitle(e.target.value)} className="flex-1" />
         <Input placeholder="Trade" value={newStepTrade} onChange={(e) => setNewStepTrade(e.target.value)} className="w-24" />

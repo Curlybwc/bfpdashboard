@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -12,7 +12,23 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, ChevronRight, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { cn } from '@/lib/utils';
 
 interface RehabTemplate {
   id: string;
@@ -38,6 +54,37 @@ interface RecipeOption {
 }
 
 const SCOPE_STATUSES = ['OK', 'Repair', 'Replace', 'Get Bid'];
+
+const SortableRehabItem = ({ item, onDelete }: { item: RehabItem; onDelete: () => void }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <Card ref={setNodeRef} style={style} className={cn('p-2 flex items-center gap-2', isDragging && 'opacity-50 z-50')}>
+      <button
+        className="shrink-0 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors touch-none"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{item.description}</p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {item.trade && <Badge variant="secondary" className="text-[10px]">{item.trade}</Badge>}
+          <Badge variant="outline" className="text-[10px]">{item.default_status}</Badge>
+          {item.recipe_hint_id && (
+            <Badge variant="default" className="text-[10px]">Recipe linked</Badge>
+          )}
+        </div>
+      </div>
+      <button onClick={onDelete} className="text-muted-foreground hover:text-destructive shrink-0">
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </Card>
+  );
+};
 
 const AdminRehabLibrary = () => {
   const { isAdmin, canManageProjects, loading: adminLoading } = useAdmin();
@@ -194,19 +241,33 @@ const AdminRehabLibrary = () => {
     if (selectedTemplate) fetchItems(selectedTemplate.id);
   };
 
-  const handleMoveItem = async (itemId: string, direction: 'up' | 'down') => {
-    const idx = items.findIndex(i => i.id === itemId);
-    if (idx < 0) return;
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= items.length) return;
-    const a = items[idx];
-    const b = items[swapIdx];
-    await Promise.all([
-      supabase.from('rehab_library_items').update({ sort_order: b.sort_order }).eq('id', a.id),
-      supabase.from('rehab_library_items').update({ sort_order: a.sort_order }).eq('id', b.id),
-    ]);
-    if (selectedTemplate) fetchItems(selectedTemplate.id);
-  };
+  const itemSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  const handleItemDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = items.findIndex(i => i.id === active.id);
+    const newIndex = items.findIndex(i => i.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = [...items];
+    const [moved] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, moved);
+    setItems(reordered);
+
+    const updates = reordered.map((item, i) =>
+      supabase.from('rehab_library_items').update({ sort_order: (i + 1) * 10 }).eq('id', item.id)
+    );
+    const results = await Promise.all(updates);
+    const firstError = results.find(r => r.error);
+    if (firstError?.error) {
+      toast({ title: 'Error', description: firstError.error.message, variant: 'destructive' });
+      if (selectedTemplate) fetchItems(selectedTemplate.id);
+    }
+  }, [items, toast, selectedTemplate]);
 
   if (adminLoading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
   if (!canAccess) return null;
@@ -242,27 +303,15 @@ const AdminRehabLibrary = () => {
           {/* Items */}
           <div className="space-y-2">
             <Label>Scope Items ({items.length})</Label>
-            {items.map((item, idx) => (
-              <Card key={item.id} className="p-2 flex items-center gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <button onClick={() => handleMoveItem(item.id, 'up')} disabled={idx === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▲</button>
-                  <button onClick={() => handleMoveItem(item.id, 'down')} disabled={idx === items.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▼</button>
+            <DndContext sensors={itemSensors} collisionDetection={closestCenter} onDragEnd={handleItemDragEnd}>
+              <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {items.map((item) => (
+                    <SortableRehabItem key={item.id} item={item} onDelete={() => handleDeleteItem(item.id)} />
+                  ))}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.description}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {item.trade && <Badge variant="secondary" className="text-[10px]">{item.trade}</Badge>}
-                    <Badge variant="outline" className="text-[10px]">{item.default_status}</Badge>
-                    {item.recipe_hint_id && (
-                      <Badge variant="default" className="text-[10px]">Recipe linked</Badge>
-                    )}
-                  </div>
-                </div>
-                <button onClick={() => handleDeleteItem(item.id)} className="text-muted-foreground hover:text-destructive shrink-0">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </Card>
-            ))}
+              </SortableContext>
+            </DndContext>
 
             <div className="space-y-2 border rounded-md p-3">
               <Input placeholder="Item description" value={newItemDesc} onChange={(e) => setNewItemDesc(e.target.value)} />

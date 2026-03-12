@@ -1,6 +1,9 @@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, ChevronUp, Package } from 'lucide-react';
+import { Trash2, ChevronUp, Package, GripVertical } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { cn } from '@/lib/utils';
 import StepMaterialsEditor from './StepMaterialsEditor';
 
 interface RecipeStep {
@@ -13,26 +16,39 @@ interface RecipeStep {
 
 interface RecipeStepRowProps {
   step: RecipeStep;
-  index: number;
-  totalSteps: number;
   isExpanded: boolean;
   onToggleExpand: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onDelete: () => void;
 }
 
 const RecipeStepRow = ({
-  step, index, totalSteps, isExpanded,
-  onToggleExpand, onMoveUp, onMoveDown, onDelete,
+  step, isExpanded, onToggleExpand, onDelete,
 }: RecipeStepRowProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: step.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
   return (
-    <div className="space-y-0">
+    <div ref={setNodeRef} style={style} className={cn('space-y-0', isDragging && 'opacity-50 z-50')}>
       <Card className="p-2 flex items-center gap-2">
-        <div className="flex flex-col gap-0.5">
-          <button onClick={onMoveUp} disabled={index === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▲</button>
-          <button onClick={onMoveDown} disabled={index === totalSteps - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▼</button>
-        </div>
+        <button
+          className="shrink-0 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors touch-none"
+          {...attributes}
+          {...listeners}
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onToggleExpand}>
           <p className="text-sm font-medium truncate">{step.title}</p>
           {step.trade && <p className="text-xs text-muted-foreground">{step.trade}</p>}
