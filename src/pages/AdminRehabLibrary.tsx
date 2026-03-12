@@ -210,19 +210,33 @@ const AdminRehabLibrary = () => {
     if (selectedTemplate) fetchItems(selectedTemplate.id);
   };
 
-  const handleMoveItem = async (itemId: string, direction: 'up' | 'down') => {
-    const idx = items.findIndex(i => i.id === itemId);
-    if (idx < 0) return;
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= items.length) return;
-    const a = items[idx];
-    const b = items[swapIdx];
-    await Promise.all([
-      supabase.from('rehab_library_items').update({ sort_order: b.sort_order }).eq('id', a.id),
-      supabase.from('rehab_library_items').update({ sort_order: a.sort_order }).eq('id', b.id),
-    ]);
-    if (selectedTemplate) fetchItems(selectedTemplate.id);
-  };
+  const itemSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  const handleItemDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = items.findIndex(i => i.id === active.id);
+    const newIndex = items.findIndex(i => i.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = [...items];
+    const [moved] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, moved);
+    setItems(reordered);
+
+    const updates = reordered.map((item, i) =>
+      supabase.from('rehab_library_items').update({ sort_order: (i + 1) * 10 }).eq('id', item.id)
+    );
+    const results = await Promise.all(updates);
+    const firstError = results.find(r => r.error);
+    if (firstError?.error) {
+      toast({ title: 'Error', description: firstError.error.message, variant: 'destructive' });
+      if (selectedTemplate) fetchItems(selectedTemplate.id);
+    }
+  }, [items, toast, selectedTemplate]);
 
   if (adminLoading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
   if (!canAccess) return null;
