@@ -189,6 +189,24 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   };
 
   const handleAddToLibrary = async (name: string) => {
+    if (newItemType === 'tool') {
+      // Add to tool_types instead of material_library
+      const { error } = await supabase.from('tool_types').insert({
+        name: name.trim(),
+        sku: newSku.trim() || null,
+        vendor_url: normalizeUrl(newVendorUrl),
+      });
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: 'Already in tool inventory' });
+        } else {
+          toast({ title: 'Error adding tool type', description: error.message, variant: 'destructive' });
+        }
+      } else {
+        toast({ title: `"${name}" added to Tool Types` });
+      }
+      return;
+    }
     const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
     const { error } = await supabase.from('material_library').insert({
       name,
