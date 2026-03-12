@@ -25,13 +25,14 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
   const [stage, setStage] = useState<TaskStage>(child.stage);
   const [priority, setPriority] = useState<TaskPriority>(child.priority);
   const [assignedTo, setAssignedTo] = useState<string>(
-    child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned')
+    child.assignment_mode === 'crew' ? 'crew' : child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned')
   );
 
   const handleSave = async () => {
     setSaving(true);
+    const isCrew = assignedTo === 'crew';
     const isVendor = assignedTo === 'outside_vendor';
-    const newAssignedTo = assignedTo === 'unassigned' || isVendor ? null : assignedTo;
+    const newAssignedTo = assignedTo === 'unassigned' || isVendor || isCrew ? null : assignedTo;
 
     const updates: any = {
       task: taskText.trim(),
@@ -39,6 +40,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
       priority,
       assigned_to_user_id: newAssignedTo,
       is_outside_vendor: isVendor,
+      assignment_mode: isCrew ? 'crew' : 'solo',
     };
 
     // Handle stage lifecycle timestamps
@@ -62,7 +64,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
     setTaskText(child.task);
     setStage(child.stage);
     setPriority(child.priority);
-    setAssignedTo(child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned'));
+    setAssignedTo(child.assignment_mode === 'crew' ? 'crew' : child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned'));
     setEditing(false);
   };
 
@@ -78,6 +80,9 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
           )}
           {child.is_outside_vendor && (
             <span className="text-[11px] text-muted-foreground">Outside Vendor</span>
+          )}
+          {child.assignment_mode === 'crew' && (
+            <span className="text-[11px] text-muted-foreground">Crew Task</span>
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -136,6 +141,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="unassigned">Unassigned</SelectItem>
+            <SelectItem value="crew">Crew Task</SelectItem>
             <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
             {projectMembers.map((m) => (
               <SelectItem key={m.user_id} value={m.user_id}>
