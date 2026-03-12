@@ -362,7 +362,7 @@ const TaskDetail = () => {
   };
 
   const handleSaveAsRecipe = async () => {
-    if (!user || !saveRecipeName.trim() || children.length === 0) return;
+    if (!user || !task || !saveRecipeName.trim()) return;
     setSavingRecipe(true);
     const { data: recipe, error: recipeErr } = await supabase.from('task_recipes').insert({
       name: saveRecipeName.trim(),
@@ -375,19 +375,81 @@ const TaskDetail = () => {
       setSavingRecipe(false);
       return;
     }
-    const stepInserts = children.map((c, idx) => ({
+
+    const sourceTasks = children.length > 0 ? children : [task];
+    const stepInserts = sourceTasks.map((sourceTask, idx) => ({
       recipe_id: recipe.id,
-      title: c.task,
+      title: sourceTask.task,
       sort_order: (idx + 1) * 10,
-      trade: null as string | null,
+      trade: sourceTask.trade || null,
       created_by: user.id,
     }));
-    await supabase.from('task_recipe_steps').insert(stepInserts);
+
+    const { data: insertedSteps, error: stepErr } = await supabase
+      .from('task_recipe_steps')
+      .insert(stepInserts)
+      .select('id, sort_order');
+
+    if (stepErr || !insertedSteps) {
+      toast({ title: 'Error', description: stepErr?.message || 'Unable to save recipe steps', variant: 'destructive' });
+      setSavingRecipe(false);
+      return;
+    }
+
+    const sourceTaskIds = sourceTasks.map((sourceTask) => sourceTask.id);
+    const { data: sourceMaterials, error: matsErr } = await supabase
+      .from('task_materials')
+      .select('task_id, name, quantity, unit, sku, vendor_url, store_section, provided_by, item_type, unit_cost')
+      .in('task_id', sourceTaskIds)
+      .eq('is_active', true);
+
+    if (matsErr) {
+      toast({ title: 'Error', description: matsErr.message, variant: 'destructive' });
+      setSavingRecipe(false);
+      return;
+    }
+
+    const stepIdByTaskId = new Map<string, string>();
+    sourceTasks.forEach((sourceTask, index) => {
+      const sortOrder = (index + 1) * 10;
+      const step = insertedSteps.find((insertedStep) => insertedStep.sort_order === sortOrder);
+      if (step?.id) stepIdByTaskId.set(sourceTask.id, step.id);
+    });
+
+    const materialInserts = (sourceMaterials || []).flatMap((material) => {
+      const stepId = stepIdByTaskId.get(material.task_id);
+      if (!stepId) return [];
+      return [{
+        recipe_step_id: stepId,
+        material_name: material.name,
+        qty: material.quantity,
+        unit: material.unit,
+        sku: material.sku,
+        vendor_url: material.vendor_url,
+        store_section: material.store_section,
+        provided_by: material.provided_by,
+        item_type: material.item_type,
+        unit_cost: material.unit_cost,
+      }];
+    });
+
+    if (materialInserts.length > 0) {
+      const { error: insertMatsErr } = await supabase.from('task_recipe_step_materials').insert(materialInserts);
+      if (insertMatsErr) {
+        toast({ title: 'Error', description: insertMatsErr.message, variant: 'destructive' });
+        setSavingRecipe(false);
+        return;
+      }
+    }
+
+    await supabase.from('tasks').update({ recipe_hint_id: recipe.id }).eq('id', taskId);
+    setSuggestedRecipe({ id: recipe.id, name: saveRecipeName.trim() });
+    fetchLinkedRecipeStepCount();
     setSavingRecipe(false);
     setSaveRecipeOpen(false);
     setSaveRecipeName('');
     setSaveRecipeTrade('');
-    toast({ title: 'Recipe saved from tasks' });
+    toast({ title: children.length > 0 ? 'Workflow recipe saved from subtasks' : 'Single-step recipe saved from task' });
   };
 
   const handleCreateRecipeAndExpand = async () => {
@@ -759,6 +821,9 @@ const TaskDetail = () => {
                 <BookOpen className="h-4 w-4 text-primary shrink-0" />
                 <p className="text-sm font-medium truncate">Recipe: {suggestedRecipe.name}</p>
                 <Badge variant="secondary" className="text-xs">{linkedRecipeStepCount} steps</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {linkedRecipeStepCount <= 1 ? 'Single-step template' : 'Multi-step workflow'}
+                </Badge>
               </div>
               <div className="flex gap-2 shrink-0">
                 {(isAdmin || projectRole === 'manager') && (
@@ -1075,16 +1140,19 @@ const TaskDetail = () => {
           </Button>
         )}
 
-        {hasChildren && (
+        {(canDelete || hasChildren) && (
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label>Subtasks ({children.length})</Label>
               {canDelete && (
                 <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
-                  <Save className="h-3.5 w-3.5 mr-1" />Save as Recipe
+                  <Save className="h-3.5 w-3.5 mr-1" />{hasChildren ? 'Save as Workflow Recipe' : 'Save as Single-Step Recipe'}
                 </Button>
               )}
             </div>
+            {!hasChildren && (
+              <p className="text-xs text-muted-foreground">No subtasks yet. Saving now creates a 1-step reusable task template from this task + materials.</p>
+            )}
             {children.map(c => (
               <SubtaskRow
                 key={c.id}
@@ -1173,7 +1241,11 @@ const TaskDetail = () => {
               <Label>Trade</Label>
               <Input value={saveRecipeTrade} onChange={(e) => setSaveRecipeTrade(e.target.value)} />
             </div>
-            <p className="text-sm text-muted-foreground">{children.length} step(s) will be saved.</p>
+            <p className="text-sm text-muted-foreground">
+              {children.length > 0
+                ? `${children.length} steps will be saved as a reusable workflow.`
+                : '1 step will be saved as a reusable standalone task template.'}
+            </p>
             <Button className="w-full" onClick={handleSaveAsRecipe} disabled={savingRecipe || !saveRecipeName.trim()}>
               {savingRecipe ? 'Saving…' : 'Save Recipe'}
             </Button>
