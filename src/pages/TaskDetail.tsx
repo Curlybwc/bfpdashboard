@@ -814,7 +814,7 @@ const TaskDetail = () => {
           </Card>
         )}
         {/* Recipe linked but not yet expanded — show edit + expand */}
-        {!task.expanded_recipe_id && suggestedRecipe && children.length === 0 && (
+        {((!task.expanded_recipe_id || !hasChildren) && suggestedRecipe && children.length === 0) && (
           <Card className="p-3 space-y-3 border-primary/30 bg-primary/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
