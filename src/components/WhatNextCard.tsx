@@ -184,7 +184,7 @@ const WhatNextCard = ({ whatNext, projectId, isContractor, openGroup, setOpenGro
           {whatNext.recommendationType === 'unassigned' && <UserX className="h-4 w-4 shrink-0" />}
           {whatNext.recommendationType === 'ready' && <Circle className="h-4 w-4 shrink-0" />}
           {whatNext.recommendationType === 'progress' && <CircleDot className="h-4 w-4 shrink-0" />}
-          <span className="truncate">{whatNext.recommendation}</span>
+          <span className="line-clamp-2 break-words">{whatNext.recommendation}</span>
         </div>
 
         {/* Stat chips — role-specific */}
