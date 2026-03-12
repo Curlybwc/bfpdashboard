@@ -806,8 +806,8 @@ const TaskDetail = () => {
           canComment={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
         />
 
-        {/* Recipe: read-only badge if already expanded */}
-        {task.expanded_recipe_id && suggestedRecipe && (
+        {/* Recipe: read-only badge if already expanded AND has children */}
+        {task.expanded_recipe_id && suggestedRecipe && hasChildren && (
           <Card className="p-3 flex items-center gap-2 border-muted">
             <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
