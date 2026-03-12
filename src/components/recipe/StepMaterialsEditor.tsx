@@ -365,7 +365,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
                 value={editName}
                 onChange={setEditName}
                 onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
-                onAddToLibrary={handleAddToLibrary}
+                onAddToLibrary={(name) => handleAddToLibrary(name, editItemType)}
               />
             </div>
             <div className="flex gap-2">
