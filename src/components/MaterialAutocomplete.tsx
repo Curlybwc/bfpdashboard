@@ -71,14 +71,21 @@ export default function MaterialAutocomplete({
 
   const suggestions = useMemo(() => {
     if (!value.trim() || value.trim().length < 2) return [];
-    const q = value.toLowerCase().trim();
+    const words = value.toLowerCase().trim().split(/\s+/).filter(w => w.length > 0);
     if (isTool) {
       return toolLibrary
-        .filter(t => t.name.toLowerCase().includes(q))
+        .filter(t => {
+          const name = t.name.toLowerCase();
+          return words.every(w => name.includes(w));
+        })
         .slice(0, 8);
     }
     return library
-      .filter(m => m.normalized_name.includes(q) || m.name.toLowerCase().includes(q))
+      .filter(m => {
+        const name = m.name.toLowerCase();
+        const normalized = m.normalized_name;
+        return words.every(w => name.includes(w) || normalized.includes(w));
+      })
       .slice(0, 8);
   }, [value, library, toolLibrary, isTool]);
 
