@@ -29,6 +29,8 @@ interface RecipeStep {
   trade: string | null;
   notes: string | null;
   is_optional: boolean;
+  assignment_mode: string;
+  default_candidate_user_ids: string[];
 }
 
 interface RecipeStepsEditorProps {
