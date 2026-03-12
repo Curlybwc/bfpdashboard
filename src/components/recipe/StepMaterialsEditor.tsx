@@ -408,6 +408,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
                 onChange={setEditName}
                 onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
                 onAddToLibrary={(name) => handleAddToLibrary(name, 'edit')}
+                itemType={editItemType as 'material' | 'tool'}
+                onSelectTool={(tool) => {
+                  setEditName(tool.name);
+                  if (tool.sku) setEditSku(tool.sku);
+                  if (tool.vendor_url) setEditVendorUrl(tool.vendor_url);
+                }}
               />
             </div>
             <div className="flex gap-2">
