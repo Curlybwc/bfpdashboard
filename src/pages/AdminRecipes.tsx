@@ -25,6 +25,10 @@ interface Recipe {
   active: boolean;
 }
 
+interface RecipeStepCountRow {
+  recipe_id: string;
+}
+
 const AdminRecipes = () => {
   const { isAdmin, canManageProjects, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
@@ -32,6 +36,7 @@ const AdminRecipes = () => {
   const { toast } = useToast();
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipeStepCounts, setRecipeStepCounts] = useState<Record<string, number>>({});
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -55,6 +60,23 @@ const AdminRecipes = () => {
       .select('*')
       .order('name');
     if (data) setRecipes(data as Recipe[]);
+
+    const recipeIds = (data || []).map((recipe) => recipe.id);
+    if (recipeIds.length === 0) {
+      setRecipeStepCounts({});
+      return;
+    }
+
+    const { data: stepRows } = await supabase
+      .from('task_recipe_steps')
+      .select('recipe_id')
+      .in('recipe_id', recipeIds);
+
+    const counts = (stepRows as RecipeStepCountRow[] | null)?.reduce<Record<string, number>>((acc, row) => {
+      acc[row.recipe_id] = (acc[row.recipe_id] || 0) + 1;
+      return acc;
+    }, {}) || {};
+    setRecipeStepCounts(counts);
   };
 
   useEffect(() => {
@@ -126,6 +148,9 @@ const AdminRecipes = () => {
         }
       />
       <div className="p-4">
+        <p className="text-sm text-muted-foreground mb-3">
+          Unified reusable work templates: single-step recipes are standalone task templates, and multi-step recipes are reusable workflows.
+        </p>
         {recipes.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">No recipes yet.</p>
         ) : (
@@ -137,6 +162,10 @@ const AdminRecipes = () => {
                     <p className="font-medium text-sm truncate">{r.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       {r.trade && <Badge variant="secondary" className="text-[10px]">{r.trade}</Badge>}
+                      <Badge variant="outline" className="text-[10px]">
+                        {(recipeStepCounts[r.id] || 0) <= 1 ? 'Single-step template' : 'Multi-step workflow'}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">{recipeStepCounts[r.id] || 0} step{(recipeStepCounts[r.id] || 0) === 1 ? '' : 's'}</span>
                       {r.estimated_cost != null && (
                         <span className="text-xs text-muted-foreground">${r.estimated_cost.toLocaleString()}</span>
                       )}
