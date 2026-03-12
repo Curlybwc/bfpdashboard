@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Trash2, ChevronUp, ChevronDown, Package, GripVertical, Pencil, Check } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Trash2, ChevronUp, Package, GripVertical, Pencil, Check, Users } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,8 @@ interface RecipeStep {
   sort_order: number;
   trade: string | null;
   is_optional: boolean;
+  assignment_mode?: string;
+  default_candidate_user_ids?: string[];
 }
 
 interface RecipeStepRowProps {
@@ -36,6 +39,17 @@ const RecipeStepRow = ({
   const [editTitle, setEditTitle] = useState(step.title);
   const [editTrade, setEditTrade] = useState(step.trade || '');
   const [editOptional, setEditOptional] = useState(step.is_optional);
+  const [editCrewMode, setEditCrewMode] = useState(step.assignment_mode === 'crew');
+  const [editCandidates, setEditCandidates] = useState<string[]>(step.default_candidate_user_ids || []);
+  const [allProfiles, setAllProfiles] = useState<{ id: string; full_name: string | null }[]>([]);
+
+  useEffect(() => {
+    if (isEditing && editCrewMode && allProfiles.length === 0) {
+      supabase.from('profiles').select('id, full_name').then(({ data }) => {
+        setAllProfiles(data || []);
+      });
+    }
+  }, [isEditing, editCrewMode]);
 
   const {
     attributes,
@@ -56,6 +70,8 @@ const RecipeStepRow = ({
     setEditTitle(step.title);
     setEditTrade(step.trade || '');
     setEditOptional(step.is_optional);
+    setEditCrewMode(step.assignment_mode === 'crew');
+    setEditCandidates(step.default_candidate_user_ids || []);
     setIsEditing(true);
   };
 
@@ -66,6 +82,8 @@ const RecipeStepRow = ({
       title: editTitle.trim(),
       trade: editTrade.trim() || null,
       is_optional: editOptional,
+      assignment_mode: editCrewMode ? 'crew' : 'solo',
+      default_candidate_user_ids: editCrewMode ? editCandidates : [],
     }).eq('id', step.id);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -74,6 +92,9 @@ const RecipeStepRow = ({
     setIsEditing(false);
     onUpdated();
   };
+
+  const candidateCount = step.default_candidate_user_ids?.length || 0;
+  const isCrew = step.assignment_mode === 'crew';
 
   if (isEditing) {
     return (
@@ -112,6 +133,48 @@ const RecipeStepRow = ({
               <Label htmlFor={`optional-${step.id}`} className="text-xs text-muted-foreground">Optional</Label>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Switch
+                id={`crew-${step.id}`}
+                checked={editCrewMode}
+                onCheckedChange={setEditCrewMode}
+                className="scale-75"
+              />
+              <Label htmlFor={`crew-${step.id}`} className="text-xs text-muted-foreground">Crew Task</Label>
+            </div>
+          </div>
+          {editCrewMode && (
+            <div className="border rounded p-2 bg-background space-y-1">
+              <p className="text-xs font-medium">Default crew members</p>
+              {allProfiles.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Loading profiles…</p>
+              ) : (
+                <div className="max-h-36 overflow-y-auto space-y-1">
+                  {allProfiles
+                    .slice()
+                    .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
+                    .map((p) => {
+                      const isChecked = editCandidates.includes(p.id);
+                      return (
+                        <label key={p.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={(checked) => {
+                              setEditCandidates(prev =>
+                                checked ? [...prev, p.id] : prev.filter(id => id !== p.id)
+                              );
+                            }}
+                          />
+                          <span>{p.full_name || 'Unnamed'}</span>
+                        </label>
+                      );
+                    })}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">Selected: {editCandidates.length}</p>
+            </div>
+          )}
         </Card>
       </div>
     );
@@ -132,6 +195,12 @@ const RecipeStepRow = ({
           <p className="text-sm font-medium truncate">{step.title}</p>
           {step.trade && <p className="text-xs text-muted-foreground">{step.trade}</p>}
         </div>
+        {isCrew && (
+          <Badge variant="secondary" className="text-[10px] gap-1">
+            <Users className="h-3 w-3" />
+            {candidateCount > 0 ? `${candidateCount}` : 'Crew'}
+          </Badge>
+        )}
         {step.is_optional && <Badge variant="outline" className="text-[10px]">Optional</Badge>}
         <button onClick={handleStartEdit} className="text-muted-foreground hover:text-foreground shrink-0">
           <Pencil className="h-3.5 w-3.5" />
