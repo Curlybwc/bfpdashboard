@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import StatusBadge from '@/components/StatusBadge';
 import { Pencil, Check, X, ExternalLink } from 'lucide-react';
@@ -27,12 +28,59 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
   const [assignedTo, setAssignedTo] = useState<string>(
     child.assignment_mode === 'crew' ? 'crew' : child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned')
   );
+  const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
+  const [loadingCrewCandidates, setLoadingCrewCandidates] = useState(false);
+
+  const loadCrewCandidates = async () => {
+    setLoadingCrewCandidates(true);
+    const { data, error } = await supabase
+      .from('task_candidates')
+      .select('user_id')
+      .eq('task_id', child.id);
+
+    if (error) {
+      toast({ title: 'Error loading crew', description: error.message, variant: 'destructive' });
+      setLoadingCrewCandidates(false);
+      return;
+    }
+
+    const candidateIds = (data || []).map((c) => c.user_id);
+    if (candidateIds.length === 0 && child.lead_user_id) {
+      candidateIds.push(child.lead_user_id);
+    }
+    setCrewCandidates(Array.from(new Set(candidateIds)));
+    setLoadingCrewCandidates(false);
+  };
+
+  const handleStartEdit = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTaskText(child.task);
+    setStage(child.stage);
+    setPriority(child.priority);
+    const initialAssignedTo = child.assignment_mode === 'crew'
+      ? 'crew'
+      : child.is_outside_vendor
+        ? 'outside_vendor'
+        : (child.assigned_to_user_id || 'unassigned');
+    setAssignedTo(initialAssignedTo);
+    setCrewCandidates([]);
+    setEditing(true);
+    if (initialAssignedTo === 'crew') {
+      await loadCrewCandidates();
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
     const isCrew = assignedTo === 'crew';
     const isVendor = assignedTo === 'outside_vendor';
     const newAssignedTo = assignedTo === 'unassigned' || isVendor || isCrew ? null : assignedTo;
+
+    if (isCrew && crewCandidates.length === 0) {
+      toast({ title: 'Add crew members', description: 'Select at least one crew member.', variant: 'destructive' });
+      setSaving(false);
+      return;
+    }
 
     const updates: any = {
       task: taskText.trim(),
@@ -41,6 +89,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
       assigned_to_user_id: newAssignedTo,
       is_outside_vendor: isVendor,
       assignment_mode: isCrew ? 'crew' : 'solo',
+      lead_user_id: isCrew ? (crewCandidates[0] || null) : null,
     };
 
     // Handle stage lifecycle timestamps
@@ -51,11 +100,33 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
     }
 
     const { error } = await supabase.from('tasks').update(updates).eq('id', child.id);
-    setSaving(false);
     if (error) {
+      setSaving(false);
       toast({ title: 'Error saving subtask', description: error.message, variant: 'destructive' });
       return;
     }
+
+    if (isCrew) {
+      await supabase.from('task_candidates').delete().eq('task_id', child.id);
+      const candidateRows = crewCandidates.map((user_id) => ({ task_id: child.id, user_id }));
+      if (candidateRows.length > 0) {
+        const { error: candidateError } = await supabase
+          .from('task_candidates')
+          .upsert(candidateRows, { onConflict: 'task_id,user_id' });
+        if (candidateError) {
+          setSaving(false);
+          toast({ title: 'Error saving crew', description: candidateError.message, variant: 'destructive' });
+          return;
+        }
+      }
+    } else {
+      await Promise.all([
+        supabase.from('task_candidates').delete().eq('task_id', child.id),
+        supabase.from('task_workers').delete().eq('task_id', child.id),
+      ]);
+    }
+
+    setSaving(false);
     setEditing(false);
     onUpdated();
   };
@@ -65,6 +136,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
     setStage(child.stage);
     setPriority(child.priority);
     setAssignedTo(child.assignment_mode === 'crew' ? 'crew' : child.is_outside_vendor ? 'outside_vendor' : (child.assigned_to_user_id || 'unassigned'));
+    setCrewCandidates([]);
     setEditing(false);
   };
 
@@ -92,7 +164,7 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
               variant="ghost"
               size="icon"
               className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+              onClick={handleStartEdit}
             >
               <Pencil className="h-3 w-3" />
             </Button>
@@ -135,7 +207,15 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
             {TASK_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={assignedTo} onValueChange={setAssignedTo}>
+        <Select
+          value={assignedTo}
+          onValueChange={async (value) => {
+            setAssignedTo(value);
+            if (value === 'crew') {
+              await loadCrewCandidates();
+            }
+          }}
+        >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue />
           </SelectTrigger>
@@ -151,6 +231,42 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
           </SelectContent>
         </Select>
       </div>
+
+      {assignedTo === 'crew' && (
+        <div className="space-y-2 border rounded p-2 bg-background">
+          <p className="text-xs font-medium">Crew candidates</p>
+          {loadingCrewCandidates ? (
+            <p className="text-xs text-muted-foreground">Loading crew members…</p>
+          ) : projectMembers.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No project members available.</p>
+          ) : (
+            <div className="max-h-36 overflow-y-auto space-y-1">
+              {projectMembers.map((member) => {
+                const isChecked = crewCandidates.includes(member.user_id);
+                return (
+                  <label key={member.user_id} className="flex items-center gap-2 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={(checked) => {
+                        const enabled = checked === true;
+                        setCrewCandidates((prev) => {
+                          if (enabled) {
+                            return prev.includes(member.user_id) ? prev : [...prev, member.user_id];
+                          }
+                          return prev.filter((id) => id !== member.user_id);
+                        });
+                      }}
+                    />
+                    <span>{member.profiles?.full_name || 'Unnamed'}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground">Selected: {crewCandidates.length}</p>
+        </div>
+      )}
+
       <div className="flex justify-end gap-1.5">
         <Button size="sm" variant="ghost" onClick={handleCancel} className="h-7 text-xs">
           <X className="h-3 w-3 mr-1" />Cancel
@@ -164,4 +280,3 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
 };
 
 export default SubtaskRow;
-
