@@ -272,27 +272,15 @@ const AdminRehabLibrary = () => {
           {/* Items */}
           <div className="space-y-2">
             <Label>Scope Items ({items.length})</Label>
-            {items.map((item, idx) => (
-              <Card key={item.id} className="p-2 flex items-center gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <button onClick={() => handleMoveItem(item.id, 'up')} disabled={idx === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▲</button>
-                  <button onClick={() => handleMoveItem(item.id, 'down')} disabled={idx === items.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▼</button>
+            <DndContext sensors={itemSensors} collisionDetection={closestCenter} onDragEnd={handleItemDragEnd}>
+              <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {items.map((item) => (
+                    <SortableRehabItem key={item.id} item={item} onDelete={() => handleDeleteItem(item.id)} />
+                  ))}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.description}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {item.trade && <Badge variant="secondary" className="text-[10px]">{item.trade}</Badge>}
-                    <Badge variant="outline" className="text-[10px]">{item.default_status}</Badge>
-                    {item.recipe_hint_id && (
-                      <Badge variant="default" className="text-[10px]">Recipe linked</Badge>
-                    )}
-                  </div>
-                </div>
-                <button onClick={() => handleDeleteItem(item.id)} className="text-muted-foreground hover:text-destructive shrink-0">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </Card>
-            ))}
+              </SortableContext>
+            </DndContext>
 
             <div className="space-y-2 border rounded-md p-3">
               <Input placeholder="Item description" value={newItemDesc} onChange={(e) => setNewItemDesc(e.target.value)} />
