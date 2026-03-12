@@ -757,14 +757,9 @@ const ProjectDetail = () => {
             </Button>
           )}
           {isManager && (
-            <>
-              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/field-mode`)}>
-                <Zap className="h-4 w-4 mr-1" />Field Mode
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
-                <Mic className="h-4 w-4 mr-1" />Walkthrough
-              </Button>
-            </>
+            <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
+              <Mic className="h-4 w-4 mr-1" />Walkthrough
+            </Button>
           )}
         </div>
       )}
