@@ -95,6 +95,7 @@ const TaskQuickActions = ({
   const [crewSaving, setCrewSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
+  const [syncingRecipe, setSyncingRecipe] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const actionable = isTaskActionable(task);
