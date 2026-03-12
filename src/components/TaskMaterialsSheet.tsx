@@ -193,11 +193,11 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     const { error } = await supabase.from('material_library').insert({
       name,
       normalized_name: normalized,
-      unit_cost: null,
-      sku: null,
-      vendor_url: null,
-      unit: null,
-      store_section: null,
+      unit_cost: newUnitCost ? parseFloat(newUnitCost) : null,
+      sku: newSku.trim() || null,
+      vendor_url: normalizeUrl(newVendorUrl),
+      unit: newUnit.trim() || null,
+      store_section: newStoreSection.trim() || null,
     });
     if (error) {
       if (error.code === '23505') {
