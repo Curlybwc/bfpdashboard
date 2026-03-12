@@ -304,7 +304,15 @@ const TaskDetail = () => {
     setSaving(false);
     setCascadeAssign(false);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
-    else { toast({ title: 'Saved' }); fetchTask(); fetchChildren(); }
+    else {
+      toast({ title: 'Saved' });
+      fetchTask();
+      fetchChildren();
+      // Prompt recipe sync if task was expanded from a recipe and has children
+      if (task.expanded_recipe_id && children.length > 0) {
+        setRecipeSyncOpen(true);
+      }
+    }
   };
 
 
