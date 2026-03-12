@@ -55,7 +55,38 @@ interface RecipeOption {
 
 const SCOPE_STATUSES = ['OK', 'Repair', 'Replace', 'Get Bid'];
 
-const AdminRehabLibrary = () => {
+const SortableRehabItem = ({ item, onDelete }: { item: RehabItem; onDelete: () => void }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <Card ref={setNodeRef} style={style} className={cn('p-2 flex items-center gap-2', isDragging && 'opacity-50 z-50')}>
+      <button
+        className="shrink-0 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors touch-none"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{item.description}</p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {item.trade && <Badge variant="secondary" className="text-[10px]">{item.trade}</Badge>}
+          <Badge variant="outline" className="text-[10px]">{item.default_status}</Badge>
+          {item.recipe_hint_id && (
+            <Badge variant="default" className="text-[10px]">Recipe linked</Badge>
+          )}
+        </div>
+      </div>
+      <button onClick={onDelete} className="text-muted-foreground hover:text-destructive shrink-0">
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </Card>
+  );
+};
+
+
   const { isAdmin, canManageProjects, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
   const navigate = useNavigate();
