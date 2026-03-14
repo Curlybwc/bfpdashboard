@@ -114,15 +114,15 @@ const RecipeStepRow = ({
     setPushPromptOpen(true);
   };
 
-  const handlePushConfirm = async () => {
+  const handlePushStepOnly = async () => {
     setPushPromptLoading(true);
-    const { data, error } = await supabase.rpc('push_recipe_to_tasks', { p_recipe_id: recipeId });
+    const { data, error } = await supabase.rpc('push_recipe_step_to_tasks' as any, { p_step_id: step.id });
     setPushPromptLoading(false);
     if (error) {
-      toast({ title: 'Error pushing to tasks', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error pushing step', description: error.message, variant: 'destructive' });
     } else {
       const result = data as any;
-      toast({ title: `Pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
+      toast({ title: `Step pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
     }
     setPushPromptOpen(false);
   };
@@ -269,12 +269,12 @@ const RecipeStepRow = ({
       <SyncToLibraryDialog
         open={pushPromptOpen}
         onOpenChange={setPushPromptOpen}
-        title="Push to active tasks?"
-        description="This recipe step was updated. Would you like to push changes to all active tasks expanded from this recipe?"
-        confirmLabel="Yes, push to tasks"
+        title="Push this step to active tasks?"
+        description={`"${step.title}" was updated. Push this step's changes (title, trade, crew, materials) to all matching active subtasks?`}
+        confirmLabel="Yes, push this step"
         cancelLabel="No, recipe only"
         loading={pushPromptLoading}
-        onConfirm={handlePushConfirm}
+        onConfirm={handlePushStepOnly}
       />
     </div>
   );
