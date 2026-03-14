@@ -37,6 +37,10 @@ export default function AdminMaterialLibrary() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<MaterialItem | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [pushPromptOpen, setPushPromptOpen] = useState(false);
+  const [pushPromptItemId, setPushPromptItemId] = useState<string | null>(null);
+  const [pushPromptLoading, setPushPromptLoading] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
