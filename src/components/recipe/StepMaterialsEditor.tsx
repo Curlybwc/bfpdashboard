@@ -234,7 +234,6 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     setEditProvidedBy(m.provided_by ?? 'either');
     setEditStoreSection(m.store_section ?? '');
     setEditFormula(m.qty_formula ?? '');
-    setEditSyncToLibrary(false);
     setEditOpen(true);
   };
 
