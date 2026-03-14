@@ -88,6 +88,11 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [showRemoved, setShowRemoved] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<TaskMaterial | null>(null);
   const [leftoverTarget, setLeftoverTarget] = useState<TaskMaterial | null>(null);
+  const [syncPromptOpen, setSyncPromptOpen] = useState(false);
+  const [pendingSyncData, setPendingSyncData] = useState<{
+    name: string; itemType: string; sku: string; vendorUrl: string;
+    unitCost: string; unit: string; storeSection: string; qty: string;
+  } | null>(null);
 
   const fetchMaterials = async () => {
     const { data, error } = await supabase
