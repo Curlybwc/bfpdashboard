@@ -60,11 +60,22 @@ const Login = () => {
         toast({ title: 'Check your email', description: 'We sent you a confirmation link.' });
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         toast({ title: 'Login failed', description: error.message, variant: 'destructive' });
       } else {
-        navigate('/today', { replace: true });
+        // Check if user is deactivated
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('id', signInData.user.id)
+          .single();
+        if (profile && profile.is_active === false) {
+          await supabase.auth.signOut();
+          toast({ title: 'Account deactivated', description: 'Your account has been deactivated. Contact an administrator.', variant: 'destructive' });
+        } else {
+          navigate('/today', { replace: true });
+        }
       }
     }
     setLoading(false);
