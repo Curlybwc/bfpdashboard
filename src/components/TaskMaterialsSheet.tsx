@@ -58,6 +58,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const activeNames = sections.map(s => s.name);
   const [materials, setMaterials] = useState<TaskMaterial[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sourceRecipeStepId, setSourceRecipeStepId] = useState<string | null>(null);
 
   // Add form state
   const [newName, setNewName] = useState('');
@@ -102,7 +103,12 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   };
 
   useEffect(() => {
-    if (open) fetchMaterials();
+    if (open) {
+      fetchMaterials();
+      // Fetch recipe step origin for organic sync
+      supabase.from('tasks').select('source_recipe_step_id').eq('id', taskId).single()
+        .then(({ data }) => setSourceRecipeStepId(data?.source_recipe_step_id ?? null));
+    }
   }, [open, taskId]);
 
   const runDerivation = async () => {
@@ -228,6 +234,58 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     }
   };
 
+  /** Silently upsert to material_library or tool_types + recipe step */
+  const autoSyncToLibraryAndRecipe = async (params: {
+    name: string; itemType: string; sku: string; vendorUrl: string;
+    unitCost: string; unit: string; storeSection: string; qty: string;
+  }) => {
+    const { name, itemType, sku, vendorUrl, unitCost, unit, storeSection, qty } = params;
+    // 1. Upsert to library
+    if (itemType === 'tool') {
+      const normalized = name.toLowerCase().trim();
+      const { data: existing } = await supabase.from('tool_types')
+        .select('id').ilike('name', normalized).limit(1);
+      if (!existing?.length) {
+        await supabase.from('tool_types').insert({
+          name: name.trim(), sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
+        });
+      }
+    } else {
+      const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+      const { data: existing } = await supabase.from('material_library')
+        .select('id').eq('normalized_name', normalized).limit(1);
+      if (!existing?.length) {
+        await supabase.from('material_library').insert({
+          name: name.trim(), normalized_name: normalized,
+          unit_cost: unitCost ? parseFloat(unitCost) : null,
+          sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
+          unit: unit.trim() || null, store_section: storeSection.trim() || null,
+        });
+      }
+    }
+
+    // 2. Add to recipe step if task originated from one
+    if (sourceRecipeStepId) {
+      const matName = name.trim();
+      const { data: existingStep } = await supabase.from('task_recipe_step_materials')
+        .select('id').eq('recipe_step_id', sourceRecipeStepId)
+        .ilike('material_name', matName).limit(1);
+      if (!existingStep?.length) {
+        await supabase.from('task_recipe_step_materials').insert({
+          recipe_step_id: sourceRecipeStepId,
+          material_name: matName,
+          item_type: itemType,
+          qty: qty ? parseFloat(qty) : null,
+          unit: unit.trim() || null,
+          unit_cost: unitCost ? parseFloat(unitCost) : null,
+          sku: sku.trim() || null,
+          vendor_url: normalizeUrl(vendorUrl),
+          store_section: storeSection.trim() || null,
+        } as any);
+      }
+    }
+  };
+
   const handleAdd = async () => {
     if (!newName.trim()) return;
     setLoading(true);
@@ -250,6 +308,11 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
+    // Organic sync: auto-add to library + recipe
+    autoSyncToLibraryAndRecipe({
+      name: newName, itemType: newItemType, sku: newSku, vendorUrl: newVendorUrl,
+      unitCost: newUnitCost, unit: newUnit, storeSection: autoSection, qty: newQty,
+    });
     setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost(''); setNewSku(''); setNewVendorUrl('');
     setNewItemType('material'); setNewProvidedBy('either'); setNewStoreSection('');
     await fetchMaterials();
