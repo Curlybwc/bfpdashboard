@@ -409,6 +409,7 @@ export type Database = {
           full_name: string | null
           hourly_rate: number | null
           id: string
+          is_active: boolean
           is_admin: boolean
         }
         Insert: {
@@ -417,6 +418,7 @@ export type Database = {
           full_name?: string | null
           hourly_rate?: number | null
           id: string
+          is_active?: boolean
           is_admin?: boolean
         }
         Update: {
@@ -425,6 +427,7 @@ export type Database = {
           full_name?: string | null
           hourly_rate?: number | null
           id?: string
+          is_active?: boolean
           is_admin?: boolean
         }
         Relationships: []

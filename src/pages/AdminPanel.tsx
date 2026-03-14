@@ -13,8 +13,10 @@ import AdminAvailability from '@/components/admin/AdminAvailability';
 import AdminCrewGroups from '@/components/admin/AdminCrewGroups';
 import AdminTenants from '@/components/admin/AdminTenants';
 import AdminMaterialLibrary from '@/components/admin/AdminMaterialLibrary';
-import { LogIn, BookOpen, Settings, Package, BarChart3, Users } from 'lucide-react';
+import { LogIn, BookOpen, Settings, Package, BarChart3, Users, Trash2, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 
 type ActiveView = 'hub' | 'users' | 'cost-library' | 'aliases' | 'availability' | 'crew-groups' | 'tenants' | 'material-library';
 
@@ -61,16 +63,35 @@ const AdminPanel = () => {
     fetchProfiles();
   };
 
-  const toggleField = async (profileId: string, field: 'can_manage_projects', currentValue: boolean) => {
+  const toggleField = async (profileId: string, field: 'can_manage_projects' | 'is_active', currentValue: boolean) => {
     const { error } = await supabase
       .from('profiles')
-      .update({ [field]: !currentValue })
+      .update({ [field]: !currentValue } as any)
       .eq('id', profileId);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
     fetchProfiles();
+    if (field === 'is_active') {
+      toast({ title: currentValue ? 'User deactivated' : 'User reactivated' });
+    }
+  };
+
+  const handleDeleteUser = async (targetUserId: string, name: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin_delete_user', {
+        body: { target_user_id: targetUserId },
+      });
+      if (error || data?.error) {
+        toast({ title: 'Delete failed', description: data?.error || error?.message, variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'User deleted', description: `${name || 'User'} has been permanently removed.` });
+      fetchProfiles();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
   };
 
   const handleImpersonate = async (targetUserId: string) => {
@@ -167,15 +188,28 @@ const AdminPanel = () => {
       ) : (
         <div className="space-y-2">
           {profiles.map((profile) => (
-            <Card key={profile.id} className="p-3">
+            <Card key={profile.id} className={`p-3 ${profile.is_active === false ? 'opacity-60' : ''}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm truncate">
-                    {profile.full_name || 'Unnamed User'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm truncate">
+                      {profile.full_name || 'Unnamed User'}
+                    </p>
+                    {profile.is_active === false && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap justify-end">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Active</span>
+                    <Switch
+                      checked={profile.is_active !== false}
+                      onCheckedChange={() => toggleField(profile.id, 'is_active', profile.is_active !== false)}
+                      disabled={profile.id === user?.id}
+                    />
+                  </div>
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">Manager</span>
                     <Switch
@@ -192,15 +226,45 @@ const AdminPanel = () => {
                     />
                   </div>
                   {profile.id !== user?.id && (
-                    <button
-                      onClick={() => handleImpersonate(profile.id)}
-                      disabled={impersonating === profile.id}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                      title={`Log in as ${profile.full_name || 'this user'}`}
-                    >
-                      <LogIn className="h-3.5 w-3.5" />
-                      {impersonating === profile.id ? '...' : 'Impersonate'}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleImpersonate(profile.id)}
+                        disabled={impersonating === profile.id}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                        title={`Log in as ${profile.full_name || 'this user'}`}
+                      >
+                        <LogIn className="h-3.5 w-3.5" />
+                        {impersonating === profile.id ? '...' : 'Impersonate'}
+                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
+                            title={`Delete ${profile.full_name || 'this user'}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete user permanently?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete <strong>{profile.full_name || 'this user'}</strong>, remove them from all projects and crews, and delete their auth account. Their tasks will be unassigned but preserved. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => handleDeleteUser(profile.id, profile.full_name)}
+                            >
+                              Delete permanently
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
                   )}
                 </div>
               </div>
