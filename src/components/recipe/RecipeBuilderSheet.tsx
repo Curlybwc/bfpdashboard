@@ -7,6 +7,8 @@ import { Trash2, RefreshCw } from 'lucide-react';
 import RecipeMetaEditor from './RecipeMetaEditor';
 import RecipeStepsEditor from './RecipeStepsEditor';
 import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
+import VariantManager from './VariantManager';
+import { useRecipeVariants } from '@/hooks/useRecipeVariants';
 
 interface RecipeBuilderSheetProps {
   recipeId: string;
