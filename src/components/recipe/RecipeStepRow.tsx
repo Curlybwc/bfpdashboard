@@ -13,6 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import StepMaterialsEditor from './StepMaterialsEditor';
 import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
+import VariantBadge from './VariantBadge';
+import type { RecipeVariant } from './VariantManager';
 
 interface RecipeStep {
   id: string;
@@ -22,6 +24,7 @@ interface RecipeStep {
   is_optional: boolean;
   assignment_mode?: string;
   default_candidate_user_ids?: string[];
+  variant_id?: string | null;
 }
 
 interface ProfileOption {
@@ -39,6 +42,7 @@ interface RecipeStepRowProps {
   allProfiles: ProfileOption[];
   profileNameMap: Record<string, string>;
   profilesLoading: boolean;
+  variants?: RecipeVariant[];
 }
 
 const RecipeStepRow = ({
@@ -51,6 +55,7 @@ const RecipeStepRow = ({
   allProfiles,
   profileNameMap,
   profilesLoading,
+  variants = [],
 }: RecipeStepRowProps) => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -243,6 +248,16 @@ const RecipeStepRow = ({
             </p>
           )}
         </div>
+        {variants.length > 0 && (
+          <VariantBadge
+            currentVariantId={step.variant_id ?? null}
+            variants={variants}
+            onChange={async (newVariantId) => {
+              await supabase.from('task_recipe_steps').update({ variant_id: newVariantId } as any).eq('id', step.id);
+              onUpdated();
+            }}
+          />
+        )}
         {isCrew && (
           <Badge variant="secondary" className="text-[10px] gap-1">
             <Users className="h-3 w-3" />

@@ -33,6 +33,8 @@ import { useTaskDetailData } from '@/hooks/useTaskDetailData';
 import TaskLifecycleActions from '@/components/task-detail/TaskLifecycleActions';
 import SubtaskRow from '@/components/task-detail/SubtaskRow';
 import TaskCard from '@/components/TaskCard';
+import VariantManager from '@/components/recipe/VariantManager';
+import { useRecipeVariants } from '@/hooks/useRecipeVariants';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -73,6 +75,7 @@ const TaskDetail = () => {
   const [newlyCreatedRecipeId, setNewlyCreatedRecipeId] = useState<string | null>(null);
   const [newRecipeStepCount, setNewRecipeStepCount] = useState(0);
   const [recipeEditorOpen, setRecipeEditorOpen] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [recipeSearchOpen, setRecipeSearchOpen] = useState(false);
@@ -114,6 +117,8 @@ const TaskDetail = () => {
     fetchCrewData,
     fetchLinkedRecipeStepCount,
   } = useTaskDetailData(taskId, user?.id);
+
+  const { variants, fetchVariants, defaultVariant } = useRecipeVariants(suggestedRecipe?.id);
 
   // Editable fields
   const [taskText, setTaskText] = useState('');
@@ -322,15 +327,20 @@ const TaskDetail = () => {
   const handleExpandRecipe = async (recipeId: string) => {
     if (!taskId || !task || !user) return;
     setExpandingRecipe(true);
-    // Clear stale expanded_recipe_id if set but no children exist (orphaned state)
     if (task.expanded_recipe_id && children.length === 0) {
       await supabase.from('tasks').update({ expanded_recipe_id: null }).eq('id', taskId);
     }
-    const { data, error } = await supabase.rpc('expand_recipe', {
+    const rpcArgs: any = {
       p_parent_task_id: taskId,
       p_recipe_id: recipeId,
       p_user_id: user.id,
-    });
+    };
+    // Pass variant if variants exist
+    const resolvedVariantId = selectedVariantId || defaultVariant?.id || null;
+    if (variants.length > 0 && resolvedVariantId) {
+      rpcArgs.p_variant_id = resolvedVariantId;
+    }
+    const { data, error } = await supabase.rpc('expand_recipe', rpcArgs);
     if (error) {
       toast({ title: 'Error expanding recipe', description: error.message, variant: 'destructive' });
       setExpandingRecipe(false);
@@ -859,6 +869,11 @@ const TaskDetail = () => {
           <Card className="p-3 flex items-center gap-2 border-muted">
             <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
+            {task.variant_name_snapshot && (
+              <Badge variant="secondary" className="text-[10px] shrink-0">
+                Variant: {task.variant_name_snapshot}{task.expanded_recipe_variant_id && !variants.find(v => v.id === task.expanded_recipe_variant_id) ? ' (removed)' : ''}
+              </Badge>
+            )}
           </Card>
         )}
         {/* Recipe linked but not yet expanded — show edit + expand */}
@@ -885,8 +900,29 @@ const TaskDetail = () => {
               </div>
             </div>
             {recipeEditorOpen && (
-              <div className="border-t pt-3">
-                <RecipeStepsEditor recipeId={suggestedRecipe.id} onStepsChanged={fetchLinkedRecipeStepCount} />
+              <div className="border-t pt-3 space-y-3">
+                {variants.length > 0 && (
+                  <VariantManager recipeId={suggestedRecipe.id} variants={variants} onChanged={fetchVariants} readOnly={!isAdmin && projectRole !== 'manager'} />
+                )}
+                <RecipeStepsEditor recipeId={suggestedRecipe.id} onStepsChanged={fetchLinkedRecipeStepCount} variants={variants} />
+              </div>
+            )}
+            {!recipeEditorOpen && variants.length > 0 && (
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Select variant to expand:</p>
+                <RadioGroup
+                  value={selectedVariantId || defaultVariant?.id || ''}
+                  onValueChange={setSelectedVariantId}
+                >
+                  {variants.map(v => (
+                    <div key={v.id} className="flex items-center space-x-2">
+                      <RadioGroupItem value={v.id} id={`variant-${v.id}`} />
+                      <Label htmlFor={`variant-${v.id}`} className="font-normal cursor-pointer text-sm">
+                        {v.name}{v.is_default ? ' (default)' : ''}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
               </div>
             )}
           </Card>

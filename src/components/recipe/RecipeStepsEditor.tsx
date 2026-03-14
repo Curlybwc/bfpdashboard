@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Plus } from 'lucide-react';
+import type { RecipeVariant } from './VariantManager';
 import {
   DndContext,
   closestCenter,
@@ -41,9 +42,10 @@ interface ProfileOption {
 interface RecipeStepsEditorProps {
   recipeId: string;
   onStepsChanged?: () => void;
+  variants?: RecipeVariant[];
 }
 
-const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps) => {
+const RecipeStepsEditor = ({ recipeId, onStepsChanged, variants = [] }: RecipeStepsEditorProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [steps, setSteps] = useState<RecipeStep[]>([]);
@@ -190,7 +192,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={steps.map(s => s.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
-            {steps.map((step) => (
+           {steps.map((step) => (
               <RecipeStepRow
                 key={step.id}
                 step={step}
@@ -202,6 +204,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
                 allProfiles={allProfiles}
                 profileNameMap={profileNameMap}
                 profilesLoading={profilesLoading}
+                variants={variants}
               />
             ))}
           </div>

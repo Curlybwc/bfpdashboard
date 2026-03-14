@@ -7,6 +7,8 @@ import { Trash2, RefreshCw } from 'lucide-react';
 import RecipeMetaEditor from './RecipeMetaEditor';
 import RecipeStepsEditor from './RecipeStepsEditor';
 import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
+import VariantManager from './VariantManager';
+import { useRecipeVariants } from '@/hooks/useRecipeVariants';
 
 interface RecipeBuilderSheetProps {
   recipeId: string;
@@ -35,6 +37,8 @@ const RecipeBuilderSheet = ({
   const [trade, setTrade] = useState(initialTrade);
   const [keywords, setKeywords] = useState(initialKeywords);
   const [estimatedCost, setEstimatedCost] = useState(initialEstimatedCost);
+
+  const { variants, fetchVariants } = useRecipeVariants(recipeId);
 
   const handleSave = async () => {
     const kwArray = keywords.split(',').map(k => k.trim()).filter(Boolean);
@@ -95,7 +99,9 @@ const RecipeBuilderSheet = ({
         </Button>
       </div>
 
-      <RecipeStepsEditor recipeId={recipeId} />
+      <VariantManager recipeId={recipeId} variants={variants} onChanged={fetchVariants} />
+
+      <RecipeStepsEditor recipeId={recipeId} variants={variants} />
 
       <SyncToLibraryDialog
         open={pushPromptOpen}
