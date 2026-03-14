@@ -36,6 +36,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
 import MobileNav from "./components/MobileNav";
+import ImpersonationBanner from "./components/ImpersonationBanner";
 
 const queryClient = new QueryClient();
 
