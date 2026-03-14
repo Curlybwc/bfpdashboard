@@ -8,6 +8,7 @@ import StatusBadge from '@/components/StatusBadge';
 import { Pencil, Check, X, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { TASK_STAGES, TASK_PRIORITIES, type TaskStage, type TaskPriority } from '@/lib/supabase-types';
+import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
 
 interface SubtaskRowProps {
   child: any;
@@ -30,6 +31,14 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
   );
   const [crewCandidates, setCrewCandidates] = useState<string[]>([]);
   const [loadingCrewCandidates, setLoadingCrewCandidates] = useState(false);
+
+  // Sync prompt state
+  const [syncPromptOpen, setSyncPromptOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [pendingSyncData, setPendingSyncData] = useState<{
+    taskText: string; stage: TaskStage; priority: TaskPriority;
+    assignedTo: string; crewCandidates: string[];
+  } | null>(null);
 
   const loadCrewCandidates = async () => {
     setLoadingCrewCandidates(true);
@@ -129,6 +138,60 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
     setSaving(false);
     setEditing(false);
     onUpdated();
+
+    // Check if this subtask is connected to a recipe step and prompt sync
+    if (child.source_recipe_step_id || child.source_recipe_id || child.recipe_hint_id) {
+      setPendingSyncData({
+        taskText: taskText.trim(), stage, priority,
+        assignedTo, crewCandidates: [...crewCandidates],
+      });
+      setSyncPromptOpen(true);
+    }
+  };
+
+  const handleSyncConfirm = async () => {
+    if (!pendingSyncData) return;
+    setSyncLoading(true);
+
+    // Sync to recipe step if source_recipe_step_id exists
+    if (child.source_recipe_step_id) {
+      const isCrew = pendingSyncData.assignedTo === 'crew';
+      const stepUpdate: any = {
+        title: pendingSyncData.taskText,
+        assignment_mode: isCrew ? 'crew' : 'solo',
+      };
+      if (isCrew && pendingSyncData.crewCandidates.length > 0) {
+        stepUpdate.default_candidate_user_ids = pendingSyncData.crewCandidates;
+      }
+      // Also sync trade from the child task
+      if (child.trade) {
+        stepUpdate.trade = child.trade;
+      }
+
+      const { error } = await supabase
+        .from('task_recipe_steps')
+        .update(stepUpdate)
+        .eq('id', child.source_recipe_step_id);
+
+      if (error) {
+        toast({ title: 'Sync failed', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Recipe step updated' });
+      }
+    }
+
+    // If it has a recipe_hint_id, sync metadata to the recipe
+    if (child.recipe_hint_id) {
+      const recipeUpdate: any = {};
+      if (child.trade) recipeUpdate.trade = child.trade;
+      if (Object.keys(recipeUpdate).length > 0) {
+        await supabase.from('task_recipes').update(recipeUpdate).eq('id', child.recipe_hint_id);
+      }
+    }
+
+    setSyncLoading(false);
+    setSyncPromptOpen(false);
+    setPendingSyncData(null);
   };
 
   const handleCancel = () => {
@@ -142,140 +205,160 @@ const SubtaskRow = ({ child, projectId, projectMembers, canEdit, onNavigate, onU
 
   if (!editing) {
     return (
-      <div className="text-sm border rounded px-3 py-2 flex items-center justify-between gap-2 hover:bg-muted/50 group">
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={onNavigate}>
-          <span className="truncate block">{child.task}</span>
-          {child.assigned_to_user_id && (
-            <span className="text-[11px] text-muted-foreground">
-              {projectMembers.find(m => m.user_id === child.assigned_to_user_id)?.profiles?.full_name || 'Assigned'}
-            </span>
-          )}
-          {child.is_outside_vendor && (
-            <span className="text-[11px] text-muted-foreground">Outside Vendor</span>
-          )}
-          {child.assignment_mode === 'crew' && (
-            <span className="text-[11px] text-muted-foreground">Crew Task</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <StatusBadge status={child.stage} />
-          {canEdit && (
+      <>
+        <div className="text-sm border rounded px-3 py-2 flex items-center justify-between gap-2 hover:bg-muted/50 group">
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={onNavigate}>
+            <span className="truncate block">{child.task}</span>
+            {child.assigned_to_user_id && (
+              <span className="text-[11px] text-muted-foreground">
+                {projectMembers.find(m => m.user_id === child.assigned_to_user_id)?.profiles?.full_name || 'Assigned'}
+              </span>
+            )}
+            {child.is_outside_vendor && (
+              <span className="text-[11px] text-muted-foreground">Outside Vendor</span>
+            )}
+            {child.assignment_mode === 'crew' && (
+              <span className="text-[11px] text-muted-foreground">Crew Task</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <StatusBadge status={child.stage} />
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleStartEdit}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={handleStartEdit}
+              onClick={onNavigate}
             >
-              <Pencil className="h-3 w-3" />
+              <ExternalLink className="h-3 w-3" />
             </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={onNavigate}
-          >
-            <ExternalLink className="h-3 w-3" />
-          </Button>
+          </div>
         </div>
-      </div>
+        <SyncToLibraryDialog
+          open={syncPromptOpen}
+          onOpenChange={setSyncPromptOpen}
+          title="Update Recipe Step?"
+          description="This subtask originated from a recipe. Would you like to sync these changes (title, assignment) back to the recipe template?"
+          loading={syncLoading}
+          onConfirm={handleSyncConfirm}
+        />
+      </>
     );
   }
 
   return (
-    <div className="border rounded p-3 space-y-2 bg-muted/30">
-      <Input
-        value={taskText}
-        onChange={(e) => setTaskText(e.target.value)}
-        className="text-sm h-8"
-        autoFocus
-      />
-      <div className="grid grid-cols-3 gap-2">
-        <Select value={stage} onValueChange={(v) => setStage(v as TaskStage)}>
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TASK_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TASK_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select
-          value={assignedTo}
-          onValueChange={async (value) => {
-            setAssignedTo(value);
-            if (value === 'crew') {
-              await loadCrewCandidates();
-            }
-          }}
-        >
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="unassigned">Unassigned</SelectItem>
-            <SelectItem value="crew">Crew Task</SelectItem>
-            <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
-            {projectMembers.map((m) => (
-              <SelectItem key={m.user_id} value={m.user_id}>
-                {m.profiles?.full_name || 'Unnamed'}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {assignedTo === 'crew' && (
-        <div className="space-y-2 border rounded p-2 bg-background">
-          <p className="text-xs font-medium">Crew candidates</p>
-          {loadingCrewCandidates ? (
-            <p className="text-xs text-muted-foreground">Loading crew members…</p>
-          ) : projectMembers.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No project members available.</p>
-          ) : (
-            <div className="max-h-36 overflow-y-auto space-y-1">
-              {projectMembers.map((member) => {
-                const isChecked = crewCandidates.includes(member.user_id);
-                return (
-                  <label key={member.user_id} className="flex items-center gap-2 text-xs cursor-pointer">
-                    <Checkbox
-                      checked={isChecked}
-                      onCheckedChange={(checked) => {
-                        const enabled = checked === true;
-                        setCrewCandidates((prev) => {
-                          if (enabled) {
-                            return prev.includes(member.user_id) ? prev : [...prev, member.user_id];
-                          }
-                          return prev.filter((id) => id !== member.user_id);
-                        });
-                      }}
-                    />
-                    <span>{member.profiles?.full_name || 'Unnamed'}</span>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-          <p className="text-[11px] text-muted-foreground">Selected: {crewCandidates.length}</p>
+    <>
+      <div className="border rounded p-3 space-y-2 bg-muted/30">
+        <Input
+          value={taskText}
+          onChange={(e) => setTaskText(e.target.value)}
+          className="text-sm h-8"
+          autoFocus
+        />
+        <div className="grid grid-cols-3 gap-2">
+          <Select value={stage} onValueChange={(v) => setStage(v as TaskStage)}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TASK_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TASK_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select
+            value={assignedTo}
+            onValueChange={async (value) => {
+              setAssignedTo(value);
+              if (value === 'crew') {
+                await loadCrewCandidates();
+              }
+            }}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              <SelectItem value="crew">Crew Task</SelectItem>
+              <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
+              {projectMembers.map((m) => (
+                <SelectItem key={m.user_id} value={m.user_id}>
+                  {m.profiles?.full_name || 'Unnamed'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
 
-      <div className="flex justify-end gap-1.5">
-        <Button size="sm" variant="ghost" onClick={handleCancel} className="h-7 text-xs">
-          <X className="h-3 w-3 mr-1" />Cancel
-        </Button>
-        <Button size="sm" onClick={handleSave} disabled={saving || !taskText.trim()} className="h-7 text-xs">
-          <Check className="h-3 w-3 mr-1" />{saving ? 'Saving…' : 'Save'}
-        </Button>
+        {assignedTo === 'crew' && (
+          <div className="space-y-2 border rounded p-2 bg-background">
+            <p className="text-xs font-medium">Crew candidates</p>
+            {loadingCrewCandidates ? (
+              <p className="text-xs text-muted-foreground">Loading crew members…</p>
+            ) : projectMembers.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No project members available.</p>
+            ) : (
+              <div className="max-h-36 overflow-y-auto space-y-1">
+                {projectMembers.map((member) => {
+                  const isChecked = crewCandidates.includes(member.user_id);
+                  return (
+                    <label key={member.user_id} className="flex items-center gap-2 text-xs cursor-pointer">
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={(checked) => {
+                          const enabled = checked === true;
+                          setCrewCandidates((prev) => {
+                            if (enabled) {
+                              return prev.includes(member.user_id) ? prev : [...prev, member.user_id];
+                            }
+                            return prev.filter((id) => id !== member.user_id);
+                          });
+                        }}
+                      />
+                      <span>{member.profiles?.full_name || 'Unnamed'}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">Selected: {crewCandidates.length}</p>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-1.5">
+          <Button size="sm" variant="ghost" onClick={handleCancel} className="h-7 text-xs">
+            <X className="h-3 w-3 mr-1" />Cancel
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={saving || !taskText.trim()} className="h-7 text-xs">
+            <Check className="h-3 w-3 mr-1" />{saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </div>
-    </div>
+      <SyncToLibraryDialog
+        open={syncPromptOpen}
+        onOpenChange={setSyncPromptOpen}
+        title="Update Recipe Step?"
+        description="This subtask originated from a recipe. Would you like to sync these changes (title, assignment) back to the recipe template?"
+        loading={syncLoading}
+        onConfirm={handleSyncConfirm}
+      />
+    </>
   );
 };
 
