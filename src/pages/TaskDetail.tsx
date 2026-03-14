@@ -33,6 +33,8 @@ import { useTaskDetailData } from '@/hooks/useTaskDetailData';
 import TaskLifecycleActions from '@/components/task-detail/TaskLifecycleActions';
 import SubtaskRow from '@/components/task-detail/SubtaskRow';
 import TaskCard from '@/components/TaskCard';
+import VariantManager from '@/components/recipe/VariantManager';
+import { useRecipeVariants } from '@/hooks/useRecipeVariants';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
