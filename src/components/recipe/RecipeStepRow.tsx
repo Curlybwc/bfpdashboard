@@ -42,6 +42,7 @@ interface RecipeStepRowProps {
   allProfiles: ProfileOption[];
   profileNameMap: Record<string, string>;
   profilesLoading: boolean;
+  variants?: RecipeVariant[];
 }
 
 const RecipeStepRow = ({
