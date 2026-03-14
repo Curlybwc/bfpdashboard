@@ -58,6 +58,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const activeNames = sections.map(s => s.name);
   const [materials, setMaterials] = useState<TaskMaterial[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sourceRecipeStepId, setSourceRecipeStepId] = useState<string | null>(null);
 
   // Add form state
   const [newName, setNewName] = useState('');
