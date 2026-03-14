@@ -309,8 +309,8 @@ const TaskDetail = () => {
       toast({ title: 'Saved' });
       fetchTask();
       fetchChildren();
-      // Prompt recipe sync if task was expanded from a recipe and has children
-      if (task.expanded_recipe_id && children.length > 0) {
+      // Prompt recipe sync if task is connected to a recipe in any way
+      if (task.expanded_recipe_id || task.recipe_hint_id || task.source_recipe_id || task.source_recipe_step_id) {
         setRecipeSyncOpen(true);
       }
     }
