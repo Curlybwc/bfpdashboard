@@ -75,6 +75,7 @@ const TaskDetail = () => {
   const [newlyCreatedRecipeId, setNewlyCreatedRecipeId] = useState<string | null>(null);
   const [newRecipeStepCount, setNewRecipeStepCount] = useState(0);
   const [recipeEditorOpen, setRecipeEditorOpen] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [recipeSearchOpen, setRecipeSearchOpen] = useState(false);
