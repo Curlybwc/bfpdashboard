@@ -266,6 +266,16 @@ const RecipeStepRow = ({
         </button>
       </Card>
       {isExpanded && <StepMaterialsEditor stepId={step.id} />}
+      <SyncToLibraryDialog
+        open={pushPromptOpen}
+        onOpenChange={setPushPromptOpen}
+        title="Push to active tasks?"
+        description="This recipe step was updated. Would you like to push changes to all active tasks expanded from this recipe?"
+        confirmLabel="Yes, push to tasks"
+        cancelLabel="No, recipe only"
+        loading={pushPromptLoading}
+        onConfirm={handlePushConfirm}
+      />
     </div>
   );
 };
