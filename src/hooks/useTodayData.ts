@@ -367,7 +367,7 @@ function splitTodaySections(
 
     if (status === 'ready') {
       const isSoloAvailable = !task.assigned_to_user_id && task.assignment_mode === 'solo' && !task.is_outside_vendor;
-      const isCrewAvailable = task.assignment_mode === 'crew' && crewCandidateTaskIds.has(task.id);
+      const isCrewAvailable = task.assignment_mode === 'crew' && (crewCandidateTaskIds.has(task.id) || isAdminOrManager);
       if (isSoloAvailable || isCrewAvailable) available.push(task);
       else if (task.assigned_to_user_id === userId) assigned.push(task);
     }
