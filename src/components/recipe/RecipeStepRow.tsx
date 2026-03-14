@@ -269,12 +269,12 @@ const RecipeStepRow = ({
       <SyncToLibraryDialog
         open={pushPromptOpen}
         onOpenChange={setPushPromptOpen}
-        title="Push to active tasks?"
-        description="This recipe step was updated. Would you like to push changes to all active tasks expanded from this recipe?"
-        confirmLabel="Yes, push to tasks"
+        title="Push this step to active tasks?"
+        description={`"${step.title}" was updated. Push this step's changes (title, trade, crew, materials) to all matching active subtasks?`}
+        confirmLabel="Yes, push this step"
         cancelLabel="No, recipe only"
         loading={pushPromptLoading}
-        onConfirm={handlePushConfirm}
+        onConfirm={handlePushStepOnly}
       />
     </div>
   );
