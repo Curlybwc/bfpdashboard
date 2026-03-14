@@ -13,6 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import StepMaterialsEditor from './StepMaterialsEditor';
 import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
+import VariantBadge from './VariantBadge';
+import type { RecipeVariant } from './VariantManager';
 
 interface RecipeStep {
   id: string;
