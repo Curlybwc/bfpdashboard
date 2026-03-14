@@ -537,22 +537,21 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
               <p className="text-[10px] text-muted-foreground mt-0.5">Variables: room_sqft, perimeter_ft, task_qty</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 pt-1 border-t">
-            <Checkbox
-              id="sync-to-library"
-              checked={editSyncToLibrary}
-              onCheckedChange={(v) => setEditSyncToLibrary(!!v)}
-            />
-            <Label htmlFor="sync-to-library" className="text-xs cursor-pointer">
-              Also update {editItemType === 'tool' ? 'Tool Types' : 'Materials Library'}
-            </Label>
-          </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button onClick={handleEditSave} disabled={editLoading || !editName.trim()}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SyncToLibraryDialog
+        open={syncPromptOpen}
+        onOpenChange={setSyncPromptOpen}
+        title={`Update ${pendingSyncData?.itemType === 'tool' ? 'Tool Types' : 'Materials Library'}?`}
+        description="Would you like to sync these changes to the global library so future recipes and tasks use the updated data?"
+        loading={syncLoading}
+        onConfirm={handleSyncConfirm}
+      />
     </div>
   );
 };
