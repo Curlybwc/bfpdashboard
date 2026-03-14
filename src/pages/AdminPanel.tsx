@@ -78,7 +78,7 @@ const AdminPanel = () => {
     setImpersonating(targetUserId);
     try {
       const { data, error } = await supabase.functions.invoke('admin_impersonate', {
-        body: { target_user_id: targetUserId },
+        body: { target_user_id: targetUserId, app_url: window.location.origin },
       });
       if (error || data?.error) {
         toast({ title: 'Impersonate failed', description: data?.error || error?.message, variant: 'destructive' });
