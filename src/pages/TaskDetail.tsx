@@ -900,8 +900,29 @@ const TaskDetail = () => {
               </div>
             </div>
             {recipeEditorOpen && (
-              <div className="border-t pt-3">
-                <RecipeStepsEditor recipeId={suggestedRecipe.id} onStepsChanged={fetchLinkedRecipeStepCount} />
+              <div className="border-t pt-3 space-y-3">
+                {variants.length > 0 && (
+                  <VariantManager recipeId={suggestedRecipe.id} variants={variants} onChanged={fetchVariants} readOnly={!isAdmin && projectRole !== 'manager'} />
+                )}
+                <RecipeStepsEditor recipeId={suggestedRecipe.id} onStepsChanged={fetchLinkedRecipeStepCount} variants={variants} />
+              </div>
+            )}
+            {!recipeEditorOpen && variants.length > 0 && (
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Select variant to expand:</p>
+                <RadioGroup
+                  value={selectedVariantId || defaultVariant?.id || ''}
+                  onValueChange={setSelectedVariantId}
+                >
+                  {variants.map(v => (
+                    <div key={v.id} className="flex items-center space-x-2">
+                      <RadioGroupItem value={v.id} id={`variant-${v.id}`} />
+                      <Label htmlFor={`variant-${v.id}`} className="font-normal cursor-pointer text-sm">
+                        {v.name}{v.is_default ? ' (default)' : ''}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
               </div>
             )}
           </Card>
