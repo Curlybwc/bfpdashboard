@@ -90,7 +90,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const [editStoreSection, setEditStoreSection] = useState('');
   const [editFormula, setEditFormula] = useState('');
   const [editLoading, setEditLoading] = useState(false);
-  const [editSyncToLibrary, setEditSyncToLibrary] = useState(false);
+  const [syncPromptOpen, setSyncPromptOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [pendingSyncData, setPendingSyncData] = useState<{
+    name: string; itemType: string; sku: string; vendorUrl: string;
+    unitCost: string; unit: string; storeSection: string;
+  } | null>(null);
 
   const fetchMaterials = async () => {
     const { data } = await supabase
