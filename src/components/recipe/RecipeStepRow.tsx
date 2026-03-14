@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import StepMaterialsEditor from './StepMaterialsEditor';
+import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
 
 interface RecipeStep {
   id: string;
@@ -30,6 +31,7 @@ interface ProfileOption {
 
 interface RecipeStepRowProps {
   step: RecipeStep;
+  recipeId: string;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onDelete: () => void;
@@ -41,6 +43,7 @@ interface RecipeStepRowProps {
 
 const RecipeStepRow = ({
   step,
+  recipeId,
   isExpanded,
   onToggleExpand,
   onDelete,
@@ -57,6 +60,8 @@ const RecipeStepRow = ({
   const [editCrewMode, setEditCrewMode] = useState(step.assignment_mode === 'crew');
   const [editCandidates, setEditCandidates] = useState<string[]>(step.default_candidate_user_ids || []);
   const [materialCount, setMaterialCount] = useState(0);
+  const [pushPromptOpen, setPushPromptOpen] = useState(false);
+  const [pushPromptLoading, setPushPromptLoading] = useState(false);
 
   useEffect(() => {
     supabase
@@ -106,6 +111,20 @@ const RecipeStepRow = ({
     }
     setIsEditing(false);
     onUpdated();
+    setPushPromptOpen(true);
+  };
+
+  const handlePushConfirm = async () => {
+    setPushPromptLoading(true);
+    const { data, error } = await supabase.rpc('push_recipe_to_tasks', { p_recipe_id: recipeId });
+    setPushPromptLoading(false);
+    if (error) {
+      toast({ title: 'Error pushing to tasks', description: error.message, variant: 'destructive' });
+    } else {
+      const result = data as any;
+      toast({ title: `Pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
+    }
+    setPushPromptOpen(false);
   };
 
   const sortedProfiles = allProfiles
@@ -247,6 +266,16 @@ const RecipeStepRow = ({
         </button>
       </Card>
       {isExpanded && <StepMaterialsEditor stepId={step.id} />}
+      <SyncToLibraryDialog
+        open={pushPromptOpen}
+        onOpenChange={setPushPromptOpen}
+        title="Push to active tasks?"
+        description="This recipe step was updated. Would you like to push changes to all active tasks expanded from this recipe?"
+        confirmLabel="Yes, push to tasks"
+        cancelLabel="No, recipe only"
+        loading={pushPromptLoading}
+        onConfirm={handlePushConfirm}
+      />
     </div>
   );
 };

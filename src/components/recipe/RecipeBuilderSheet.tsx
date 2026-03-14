@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw } from 'lucide-react';
 import RecipeMetaEditor from './RecipeMetaEditor';
 import RecipeStepsEditor from './RecipeStepsEditor';
+import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
 
 interface RecipeBuilderSheetProps {
   recipeId: string;
@@ -27,6 +28,8 @@ const RecipeBuilderSheet = ({
 }: RecipeBuilderSheetProps) => {
   const { toast } = useToast();
   const [pushing, setPushing] = useState(false);
+  const [pushPromptOpen, setPushPromptOpen] = useState(false);
+  const [pushPromptLoading, setPushPromptLoading] = useState(false);
 
   const [name, setName] = useState(initialName);
   const [trade, setTrade] = useState(initialTrade);
@@ -47,6 +50,8 @@ const RecipeBuilderSheet = ({
     }
     toast({ title: 'Recipe updated' });
     onSaved();
+    // Prompt to push to active tasks
+    setPushPromptOpen(true);
   };
 
   const handleDelete = async () => {
@@ -60,15 +65,16 @@ const RecipeBuilderSheet = ({
   };
 
   const handlePushToTasks = async () => {
-    setPushing(true);
+    setPushPromptLoading(true);
     const { data, error } = await supabase.rpc('push_recipe_to_tasks', { p_recipe_id: recipeId });
-    setPushing(false);
+    setPushPromptLoading(false);
     if (error) {
       toast({ title: 'Error pushing to tasks', description: error.message, variant: 'destructive' });
-      return;
+    } else {
+      const result = data as any;
+      toast({ title: `Pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
     }
-    const result = data as any;
-    toast({ title: `Pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
+    setPushPromptOpen(false);
   };
 
   return (
@@ -84,16 +90,23 @@ const RecipeBuilderSheet = ({
 
       <div className="flex gap-2">
         <Button onClick={handleSave} className="flex-1">Save Recipe</Button>
-        <Button variant="outline" size="sm" onClick={handlePushToTasks} disabled={pushing}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${pushing ? 'animate-spin' : ''}`} />
-          Push to Active Tasks
-        </Button>
         <Button variant="destructive" size="icon" onClick={handleDelete}>
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
 
       <RecipeStepsEditor recipeId={recipeId} />
+
+      <SyncToLibraryDialog
+        open={pushPromptOpen}
+        onOpenChange={setPushPromptOpen}
+        title="Push to active tasks?"
+        description="This recipe was updated. Would you like to push these changes to all active tasks that were expanded from it?"
+        confirmLabel="Yes, push to tasks"
+        cancelLabel="No, recipe only"
+        loading={pushPromptLoading}
+        onConfirm={handlePushToTasks}
+      />
     </div>
   );
 };

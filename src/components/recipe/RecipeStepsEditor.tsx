@@ -194,6 +194,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps)
               <RecipeStepRow
                 key={step.id}
                 step={step}
+                recipeId={recipeId}
                 isExpanded={expandedStepId === step.id}
                 onToggleExpand={() => toggleExpand(step.id)}
                 onDelete={() => handleDeleteStep(step.id)}
