@@ -56,6 +56,15 @@ const RecipeStepRow = ({
   const [editOptional, setEditOptional] = useState(step.is_optional);
   const [editCrewMode, setEditCrewMode] = useState(step.assignment_mode === 'crew');
   const [editCandidates, setEditCandidates] = useState<string[]>(step.default_candidate_user_ids || []);
+  const [materialCount, setMaterialCount] = useState(0);
+
+  useEffect(() => {
+    supabase
+      .from('task_recipe_step_materials')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipe_step_id', step.id)
+      .then(({ count }) => setMaterialCount(count ?? 0));
+  }, [step.id, isExpanded]);
 
   const {
     attributes,
