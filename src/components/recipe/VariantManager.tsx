@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Plus, Trash2, Pencil, Check, X, GitBranch } from 'lucide-react';
 
 export interface RecipeVariant {
@@ -23,6 +22,9 @@ interface VariantManagerProps {
   readOnly?: boolean;
 }
 
+// recipe_variants table is new and may not be in auto-generated types yet
+const variantsTable = () => (supabase.from as any)('recipe_variants');
+
 const VariantManager = ({ recipeId, variants, onChanged, readOnly = false }: VariantManagerProps) => {
   const { toast } = useToast();
   const [newName, setNewName] = useState('');
@@ -34,7 +36,7 @@ const VariantManager = ({ recipeId, variants, onChanged, readOnly = false }: Var
     if (!newName.trim()) return;
     setAdding(true);
     const maxOrder = variants.length > 0 ? Math.max(...variants.map(v => v.sort_order)) : 0;
-    const { error } = await supabase.from('recipe_variants').insert({
+    const { error } = await variantsTable().insert({
       recipe_id: recipeId,
       name: newName.trim(),
       sort_order: maxOrder + 10,
@@ -49,7 +51,7 @@ const VariantManager = ({ recipeId, variants, onChanged, readOnly = false }: Var
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('recipe_variants').delete().eq('id', id);
+    const { error } = await variantsTable().delete().eq('id', id);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
@@ -58,7 +60,7 @@ const VariantManager = ({ recipeId, variants, onChanged, readOnly = false }: Var
   };
 
   const handleSetDefault = async (id: string) => {
-    const { error } = await supabase.from('recipe_variants').update({ is_default: true }).eq('id', id);
+    const { error } = await variantsTable().update({ is_default: true }).eq('id', id);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
@@ -68,7 +70,7 @@ const VariantManager = ({ recipeId, variants, onChanged, readOnly = false }: Var
 
   const handleRename = async (id: string) => {
     if (!editName.trim()) return;
-    const { error } = await supabase.from('recipe_variants').update({ name: editName.trim() }).eq('id', id);
+    const { error } = await variantsTable().update({ name: editName.trim() }).eq('id', id);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;

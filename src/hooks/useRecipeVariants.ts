@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RecipeVariant } from '@/components/recipe/VariantManager';
 
+// recipe_variants table is new and may not be in auto-generated types yet
+const variantsTable = () => (supabase.from as any)('recipe_variants');
+
 export function useRecipeVariants(recipeId: string | null | undefined) {
   const [variants, setVariants] = useState<RecipeVariant[]>([]);
   const [loading, setLoading] = useState(false);
@@ -9,8 +12,7 @@ export function useRecipeVariants(recipeId: string | null | undefined) {
   const fetchVariants = useCallback(async () => {
     if (!recipeId) { setVariants([]); return; }
     setLoading(true);
-    const { data } = await supabase
-      .from('recipe_variants')
+    const { data } = await variantsTable()
       .select('*')
       .eq('recipe_id', recipeId)
       .order('sort_order');
