@@ -5,7 +5,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useTodayData } from '@/hooks/useTodayData';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
-import NextUpCard from '@/components/NextUpCard';
+
 import DailyReminders from '@/components/DailyReminders';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
