@@ -833,6 +833,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
         </AlertDialogContent>
       </AlertDialog>
 
+      {leftoverTarget && (
         <RecordLeftoverSheet
           open={!!leftoverTarget}
           onOpenChange={(o) => { if (!o) setLeftoverTarget(null); }}
