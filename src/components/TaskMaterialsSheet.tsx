@@ -522,6 +522,12 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
               onChange={setNewName}
               onSelect={(item) => handleSelectFromLibrary(item, 'new')}
               onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
+              itemType={newItemType === 'tool' ? 'tool' : 'material'}
+              onSelectTool={(tool) => {
+                setNewName(tool.name);
+                if (tool.sku) setNewSku(tool.sku);
+                if (tool.vendor_url) setNewVendorUrl(tool.vendor_url);
+              }}
               className="flex-1"
             />
             <Input placeholder="Qty" type="number" value={newQty} onChange={(e) => setNewQty(e.target.value)} className="w-16" />
