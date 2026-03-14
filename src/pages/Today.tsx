@@ -244,25 +244,6 @@ const Today = () => {
   /* ── Contractor layout ── */
   const ContractorView = () => (
     <>
-      <div className="mb-6">
-        <NextUpCard
-          task={nextUpTask}
-          projectName={nextUpTask ? (projectMap[nextUpTask.project_id]?.name || '') : ''}
-          projectAddress={nextUpTask ? projectMap[nextUpTask.project_id]?.address : undefined}
-          parentTitle={nextUpTask?.parent_task_id ? parentTitles[nextUpTask.parent_task_id] : undefined}
-          userId={user!.id}
-          isAdmin={isAdmin}
-          onUpdate={refresh}
-          isCrewTask={nextUpTask?.assignment_mode === 'crew'}
-          isActiveWorker={nextUpTask ? crewActiveTaskIds.has(nextUpTask.id) : false}
-          isCandidate={nextUpTask ? crewCandidateTaskIds.has(nextUpTask.id) : false}
-          activeWorkerCount={nextUpTask ? (crewWorkerCounts[nextUpTask.id] || 0) : 0}
-          blockerInfo={nextUpTask ? (blockerMap[nextUpTask.id] || null) : null}
-          photoCount={nextUpTask ? (photoCountMap[nextUpTask.id] || 0) : 0}
-          materialCount={nextUpTask ? (materialCountMap[nextUpTask.id] || 0) : 0}
-        />
-      </div>
-
       {showShiftReminder && (
         <div className="mb-6">
           <DailyReminders
@@ -272,13 +253,13 @@ const Today = () => {
         </div>
       )}
 
+      <Section title="Working Now" tasks={inProgress} emptyText="No tasks in progress." />
+      <Section title="Up Next" tasks={assigned} emptyText="No assigned tasks." />
+      <Section title="Available to Take" tasks={available} emptyText="No tasks available for dibs." />
+
       {blocked.length > 0 && (
         <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="" isBlockedSection />
       )}
-
-      <Section title="Working Now" tasks={filteredInProgress} emptyText="No tasks in progress." />
-      <Section title="Up Next" tasks={filteredAssigned} emptyText="No assigned tasks." />
-      <Section title="Available to Take" tasks={available} emptyText="No tasks available for dibs." />
     </>
   );
 
