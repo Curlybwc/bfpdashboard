@@ -78,6 +78,7 @@ const AppRoutes = () => {
 
   return (
     <>
+      <ImpersonationBanner />
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
