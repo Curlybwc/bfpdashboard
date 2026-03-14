@@ -192,7 +192,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged, variants = [] }: RecipeSt
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={steps.map(s => s.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
-            {steps.map((step) => (
+           {steps.map((step) => (
               <RecipeStepRow
                 key={step.id}
                 step={step}
@@ -204,6 +204,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged, variants = [] }: RecipeSt
                 allProfiles={allProfiles}
                 profileNameMap={profileNameMap}
                 profilesLoading={profilesLoading}
+                variants={variants}
               />
             ))}
           </div>
