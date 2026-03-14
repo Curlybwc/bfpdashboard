@@ -148,23 +148,15 @@ async function fetchCrewTasks(
     crewAvailTasks = unwrap(res, 'Crew available tasks');
   }
 
-  // For managers/admins: also fetch all crew tasks from their projects
-  // so they can see crew work in all sections, not just blocked
+  // For managers/admins: fetch all crew tasks from their projects
   let managerCrewTasks: any[] = [];
   if (isAdminOrManager && memberProjectIds.length > 0) {
-    const safeIds = memberProjectIds.length > 0 ? memberProjectIds : EMPTY_PROJECT_IDS;
     const res = await supabase
       .from('tasks').select('*')
       .eq('assignment_mode', 'crew')
       .neq('stage', 'Done')
-      .is('parent_task_id', null) === undefined // we want child crew tasks too
-      ? { data: [], error: null }
-      : await supabase
-        .from('tasks').select('*')
-        .eq('assignment_mode', 'crew')
-        .neq('stage', 'Done')
-        .in('project_id', safeIds)
-        .limit(100);
+      .in('project_id', memberProjectIds)
+      .limit(200);
     managerCrewTasks = unwrap(res, 'Manager crew tasks');
   }
 
