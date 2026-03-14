@@ -99,7 +99,9 @@ const RecipeBuilderSheet = ({
         </Button>
       </div>
 
-      <RecipeStepsEditor recipeId={recipeId} />
+      <VariantManager recipeId={recipeId} variants={variants} onChanged={fetchVariants} />
+
+      <RecipeStepsEditor recipeId={recipeId} variants={variants} />
 
       <SyncToLibraryDialog
         open={pushPromptOpen}
