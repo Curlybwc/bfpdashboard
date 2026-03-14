@@ -103,7 +103,12 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   };
 
   useEffect(() => {
-    if (open) fetchMaterials();
+    if (open) {
+      fetchMaterials();
+      // Fetch recipe step origin for organic sync
+      supabase.from('tasks').select('source_recipe_step_id').eq('id', taskId).single()
+        .then(({ data }) => setSourceRecipeStepId(data?.source_recipe_step_id ?? null));
+    }
   }, [open, taskId]);
 
   const runDerivation = async () => {
