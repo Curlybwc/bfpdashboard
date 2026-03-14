@@ -63,16 +63,35 @@ const AdminPanel = () => {
     fetchProfiles();
   };
 
-  const toggleField = async (profileId: string, field: 'can_manage_projects', currentValue: boolean) => {
+  const toggleField = async (profileId: string, field: 'can_manage_projects' | 'is_active', currentValue: boolean) => {
     const { error } = await supabase
       .from('profiles')
-      .update({ [field]: !currentValue })
+      .update({ [field]: !currentValue } as any)
       .eq('id', profileId);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
     fetchProfiles();
+    if (field === 'is_active') {
+      toast({ title: currentValue ? 'User deactivated' : 'User reactivated' });
+    }
+  };
+
+  const handleDeleteUser = async (targetUserId: string, name: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin_delete_user', {
+        body: { target_user_id: targetUserId },
+      });
+      if (error || data?.error) {
+        toast({ title: 'Delete failed', description: data?.error || error?.message, variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'User deleted', description: `${name || 'User'} has been permanently removed.` });
+      fetchProfiles();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
   };
 
   const handleImpersonate = async (targetUserId: string) => {
