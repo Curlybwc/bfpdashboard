@@ -121,7 +121,12 @@ async function fetchCoreTasks(userId: string, memberProjectIds: string[]) {
 }
 
 /** Phase 3: crew task hydration */
-async function fetchCrewTasks(myActiveTaskIds: Set<string>, myCandidateIds: Set<string>) {
+async function fetchCrewTasks(
+  myActiveTaskIds: Set<string>,
+  myCandidateIds: Set<string>,
+  isAdminOrManager: boolean,
+  memberProjectIds: string[],
+) {
   let crewIpTasks: any[] = [];
   if (myActiveTaskIds.size > 0) {
     const res = await supabase
@@ -143,7 +148,27 @@ async function fetchCrewTasks(myActiveTaskIds: Set<string>, myCandidateIds: Set<
     crewAvailTasks = unwrap(res, 'Crew available tasks');
   }
 
-  return { crewIpTasks, crewAvailTasks };
+  // For managers/admins: also fetch all crew tasks from their projects
+  // so they can see crew work in all sections, not just blocked
+  let managerCrewTasks: any[] = [];
+  if (isAdminOrManager && memberProjectIds.length > 0) {
+    const safeIds = memberProjectIds.length > 0 ? memberProjectIds : EMPTY_PROJECT_IDS;
+    const res = await supabase
+      .from('tasks').select('*')
+      .eq('assignment_mode', 'crew')
+      .neq('stage', 'Done')
+      .is('parent_task_id', null) === undefined // we want child crew tasks too
+      ? { data: [], error: null }
+      : await supabase
+        .from('tasks').select('*')
+        .eq('assignment_mode', 'crew')
+        .neq('stage', 'Done')
+        .in('project_id', safeIds)
+        .limit(100);
+    managerCrewTasks = unwrap(res, 'Manager crew tasks');
+  }
+
+  return { crewIpTasks, crewAvailTasks, managerCrewTasks };
 }
 
 /** Phase 4: blocked + review tasks + blocker details */
