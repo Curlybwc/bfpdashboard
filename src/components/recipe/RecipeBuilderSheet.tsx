@@ -38,6 +38,8 @@ const RecipeBuilderSheet = ({
   const [keywords, setKeywords] = useState(initialKeywords);
   const [estimatedCost, setEstimatedCost] = useState(initialEstimatedCost);
 
+  const { variants, fetchVariants } = useRecipeVariants(recipeId);
+
   const handleSave = async () => {
     const kwArray = keywords.split(',').map(k => k.trim()).filter(Boolean);
     const { error } = await supabase.from('task_recipes').update({
