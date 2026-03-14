@@ -312,7 +312,13 @@ function addCrewWorkerCounts(tasks: any[], crewWorkerCounts: Record<string, numb
   return tasks.map((task) => ({ ...task, active_worker_count: crewWorkerCounts[task.id] || 0 }));
 }
 
-function splitTodaySections(tasks: any[], childTasksByParent: Record<string, any[]>, isAdminOrManager: boolean, userId: string) {
+function splitTodaySections(
+  tasks: any[],
+  childTasksByParent: Record<string, any[]>,
+  isAdminOrManager: boolean,
+  userId: string,
+  crewCandidateTaskIds: Set<string>,
+) {
   const inProgress: any[] = [];
   const assigned: any[] = [];
   const available: any[] = [];
@@ -343,8 +349,9 @@ function splitTodaySections(tasks: any[], childTasksByParent: Record<string, any
     }
 
     if (status === 'ready') {
-      const canTake = !task.assigned_to_user_id && task.assignment_mode === 'solo' && !task.is_outside_vendor;
-      if (canTake) available.push(task);
+      const isSoloAvailable = !task.assigned_to_user_id && task.assignment_mode === 'solo' && !task.is_outside_vendor;
+      const isCrewAvailable = task.assignment_mode === 'crew' && crewCandidateTaskIds.has(task.id);
+      if (isSoloAvailable || isCrewAvailable) available.push(task);
       else if (task.assigned_to_user_id === userId) assigned.push(task);
     }
   });
