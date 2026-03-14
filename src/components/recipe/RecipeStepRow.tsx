@@ -31,6 +31,7 @@ interface ProfileOption {
 
 interface RecipeStepRowProps {
   step: RecipeStep;
+  recipeId: string;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onDelete: () => void;
@@ -42,6 +43,7 @@ interface RecipeStepRowProps {
 
 const RecipeStepRow = ({
   step,
+  recipeId,
   isExpanded,
   onToggleExpand,
   onDelete,
@@ -58,6 +60,8 @@ const RecipeStepRow = ({
   const [editCrewMode, setEditCrewMode] = useState(step.assignment_mode === 'crew');
   const [editCandidates, setEditCandidates] = useState<string[]>(step.default_candidate_user_ids || []);
   const [materialCount, setMaterialCount] = useState(0);
+  const [pushPromptOpen, setPushPromptOpen] = useState(false);
+  const [pushPromptLoading, setPushPromptLoading] = useState(false);
 
   useEffect(() => {
     supabase
