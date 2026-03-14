@@ -24,6 +24,7 @@ interface RecipeStep {
   is_optional: boolean;
   assignment_mode?: string;
   default_candidate_user_ids?: string[];
+  variant_id?: string | null;
 }
 
 interface ProfileOption {
