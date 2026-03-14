@@ -83,22 +83,6 @@ const Today = () => {
   /* ── Derived state ── */
   const isContractor = !isAdmin && !isManager;
 
-  const nextUpTask = useMemo(() => {
-    if (!isContractor) return null;
-    const candidates = [...inProgress, ...assigned].filter(t => getTaskOperationalStatus(t) !== 'blocked');
-    candidates.sort(rankTasks);
-    return candidates[0] || null;
-  }, [isContractor, inProgress, assigned]);
-
-  const filteredInProgress = useMemo(() => {
-    if (!nextUpTask) return inProgress;
-    return inProgress.filter(t => t.id !== nextUpTask.id);
-  }, [inProgress, nextUpTask]);
-
-  const filteredAssigned = useMemo(() => {
-    if (!nextUpTask) return assigned;
-    return assigned.filter(t => t.id !== nextUpTask.id);
-  }, [assigned, nextUpTask]);
 
   const showShiftReminder = isContractor && !hasShiftToday && new Date().getHours() >= 10;
 
