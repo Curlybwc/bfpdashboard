@@ -869,6 +869,11 @@ const TaskDetail = () => {
           <Card className="p-3 flex items-center gap-2 border-muted">
             <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
+            {task.variant_name_snapshot && (
+              <Badge variant="secondary" className="text-[10px] shrink-0">
+                Variant: {task.variant_name_snapshot}{task.expanded_recipe_variant_id && !variants.find(v => v.id === task.expanded_recipe_variant_id) ? ' (removed)' : ''}
+              </Badge>
+            )}
           </Card>
         )}
         {/* Recipe linked but not yet expanded — show edit + expand */}
