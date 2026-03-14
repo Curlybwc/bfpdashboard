@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, ChevronUp, Package, GripVertical, Pencil, Check, Users } from 'lucide-react';
+import { Trash2, ChevronUp, ChevronDown, GripVertical, Pencil, Check, Users, Package } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
@@ -56,6 +56,15 @@ const RecipeStepRow = ({
   const [editOptional, setEditOptional] = useState(step.is_optional);
   const [editCrewMode, setEditCrewMode] = useState(step.assignment_mode === 'crew');
   const [editCandidates, setEditCandidates] = useState<string[]>(step.default_candidate_user_ids || []);
+  const [materialCount, setMaterialCount] = useState(0);
+
+  useEffect(() => {
+    supabase
+      .from('task_recipe_step_materials')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipe_step_id', step.id)
+      .then(({ count }) => setMaterialCount(count ?? 0));
+  }, [step.id, isExpanded]);
 
   const {
     attributes,
@@ -222,13 +231,18 @@ const RecipeStepRow = ({
           </Badge>
         )}
         {step.is_optional && <Badge variant="outline" className="text-[10px]">Optional</Badge>}
-        <button onClick={handleStartEdit} className="text-muted-foreground hover:text-foreground shrink-0">
+        <button onClick={onToggleExpand} className={cn(
+          "shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors",
+          isExpanded ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        )} title="Materials & Tools">
+          <Package className="h-3.5 w-3.5" />
+          {materialCount > 0 && <span className="font-medium">{materialCount}</span>}
+          {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </button>
+        <button onClick={handleStartEdit} className="text-muted-foreground hover:text-foreground shrink-0 p-1">
           <Pencil className="h-3.5 w-3.5" />
         </button>
-        <button onClick={onToggleExpand} className="text-muted-foreground hover:text-foreground shrink-0" title="Materials & Tools">
-          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <Package className="h-3.5 w-3.5" />}
-        </button>
-        <button onClick={onDelete} className="text-muted-foreground hover:text-destructive shrink-0">
+        <button onClick={onDelete} className="text-muted-foreground hover:text-destructive shrink-0 p-1">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </Card>
