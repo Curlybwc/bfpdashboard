@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Plus } from 'lucide-react';
+import type { RecipeVariant } from './VariantManager';
 import {
   DndContext,
   closestCenter,
