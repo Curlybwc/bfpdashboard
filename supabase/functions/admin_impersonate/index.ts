@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { target_user_id } = await req.json();
+    const { target_user_id, app_url } = await req.json();
     if (!target_user_id) {
       return new Response(
         JSON.stringify({ error: "target_user_id required" }),
@@ -101,8 +101,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build verification URL
-    const verifyUrl = `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink`;
+    // Build verification URL with redirect back to app with impersonation flag
+    const redirectTo = app_url
+      ? `${app_url}/today?impersonating=true`
+      : `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink`;
+
+    const verifyUrl = app_url
+      ? `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`
+      : `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink`;
 
     return new Response(
       JSON.stringify({
