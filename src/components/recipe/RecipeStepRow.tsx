@@ -55,6 +55,7 @@ const RecipeStepRow = ({
   allProfiles,
   profileNameMap,
   profilesLoading,
+  variants = [],
 }: RecipeStepRowProps) => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
