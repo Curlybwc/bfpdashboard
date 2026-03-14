@@ -253,7 +253,7 @@ const RecipeStepRow = ({
             currentVariantId={step.variant_id ?? null}
             variants={variants}
             onChange={async (newVariantId) => {
-              await supabase.from('task_recipe_steps').update({ variant_id: newVariantId }).eq('id', step.id);
+              await supabase.from('task_recipe_steps').update({ variant_id: newVariantId } as any).eq('id', step.id);
               onUpdated();
             }}
           />
