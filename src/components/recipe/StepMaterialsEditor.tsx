@@ -10,7 +10,7 @@ import { useStoreSections } from '@/hooks/useStoreSections';
 import { useToast } from '@/hooks/use-toast';
 import { inferStoreSection } from '@/lib/inferStoreSection';
 import MaterialAutocomplete, { type LibraryMaterial, type LibraryTool } from '@/components/MaterialAutocomplete';
-import { Checkbox } from '@/components/ui/checkbox';
+import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
 import { Plus, Trash2, Pencil, X, Save } from 'lucide-react';
 
 interface StepMaterial {
@@ -90,7 +90,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const [editStoreSection, setEditStoreSection] = useState('');
   const [editFormula, setEditFormula] = useState('');
   const [editLoading, setEditLoading] = useState(false);
-  const [editSyncToLibrary, setEditSyncToLibrary] = useState(false);
+  const [syncPromptOpen, setSyncPromptOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [pendingSyncData, setPendingSyncData] = useState<{
+    name: string; itemType: string; sku: string; vendorUrl: string;
+    unitCost: string; unit: string; storeSection: string;
+  } | null>(null);
 
   const fetchMaterials = async () => {
     const { data } = await supabase
@@ -229,7 +234,6 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     setEditProvidedBy(m.provided_by ?? 'either');
     setEditStoreSection(m.store_section ?? '');
     setEditFormula(m.qty_formula ?? '');
-    setEditSyncToLibrary(false);
     setEditOpen(true);
   };
 
@@ -249,38 +253,6 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       qty_formula: editFormula.trim() || null,
     } as any).eq('id', editMat.id);
 
-    if (!error && editSyncToLibrary) {
-      if (editItemType === 'tool') {
-        const normalized = editName.trim();
-        const { error: toolErr } = await supabase.from('tool_types').upsert({
-          name: normalized,
-          sku: editSku.trim() || null,
-          vendor_url: normalizeUrl(editVendorUrl),
-        }, { onConflict: 'name' });
-        if (toolErr && toolErr.code !== '23505') {
-          toast({ title: 'Tool library update failed', description: toolErr.message, variant: 'destructive' });
-        } else {
-          toast({ title: `"${editName.trim()}" synced to Tool Types` });
-        }
-      } else {
-        const normalized = editName.toLowerCase().trim().replace(/\s+/g, ' ');
-        const { error: libErr } = await supabase.from('material_library').upsert({
-          name: editName.trim(),
-          normalized_name: normalized,
-          unit_cost: editUnitCost ? parseFloat(editUnitCost) : null,
-          sku: editSku.trim() || null,
-          vendor_url: normalizeUrl(editVendorUrl),
-          unit: editUnit.trim() || null,
-          store_section: editStoreSection.trim() || null,
-        }, { onConflict: 'normalized_name' });
-        if (libErr && libErr.code !== '23505') {
-          toast({ title: 'Library update failed', description: libErr.message, variant: 'destructive' });
-        } else {
-          toast({ title: `"${editName.trim()}" synced to Materials Library` });
-        }
-      }
-    }
-
     setEditLoading(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -288,6 +260,53 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     }
     setEditOpen(false);
     fetchMaterials();
+
+    // Prompt to sync to library
+    setPendingSyncData({
+      name: editName, itemType: editItemType, sku: editSku, vendorUrl: editVendorUrl,
+      unitCost: editUnitCost, unit: editUnit, storeSection: editStoreSection,
+    });
+    setSyncPromptOpen(true);
+  };
+
+  const handleSyncConfirm = async () => {
+    if (!pendingSyncData) return;
+    setSyncLoading(true);
+    const { name, itemType, sku, vendorUrl, unitCost, unit, storeSection } = pendingSyncData;
+
+    if (itemType === 'tool') {
+      const normalized = name.trim();
+      const { error: toolErr } = await supabase.from('tool_types').upsert({
+        name: normalized,
+        sku: sku.trim() || null,
+        vendor_url: normalizeUrl(vendorUrl),
+      }, { onConflict: 'name' });
+      if (toolErr && toolErr.code !== '23505') {
+        toast({ title: 'Tool library update failed', description: toolErr.message, variant: 'destructive' });
+      } else {
+        toast({ title: `"${name.trim()}" synced to Tool Types` });
+      }
+    } else {
+      const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+      const { error: libErr } = await supabase.from('material_library').upsert({
+        name: name.trim(),
+        normalized_name: normalized,
+        unit_cost: unitCost ? parseFloat(unitCost) : null,
+        sku: sku.trim() || null,
+        vendor_url: normalizeUrl(vendorUrl),
+        unit: unit.trim() || null,
+        store_section: storeSection.trim() || null,
+      }, { onConflict: 'normalized_name' });
+      if (libErr && libErr.code !== '23505') {
+        toast({ title: 'Library update failed', description: libErr.message, variant: 'destructive' });
+      } else {
+        toast({ title: `"${name.trim()}" synced to Materials Library` });
+      }
+    }
+
+    setSyncLoading(false);
+    setSyncPromptOpen(false);
+    setPendingSyncData(null);
   };
 
   const materialItems = materials.filter(m => m.item_type !== 'tool');
@@ -518,22 +537,21 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
               <p className="text-[10px] text-muted-foreground mt-0.5">Variables: room_sqft, perimeter_ft, task_qty</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 pt-1 border-t">
-            <Checkbox
-              id="sync-to-library"
-              checked={editSyncToLibrary}
-              onCheckedChange={(v) => setEditSyncToLibrary(!!v)}
-            />
-            <Label htmlFor="sync-to-library" className="text-xs cursor-pointer">
-              Also update {editItemType === 'tool' ? 'Tool Types' : 'Materials Library'}
-            </Label>
-          </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button onClick={handleEditSave} disabled={editLoading || !editName.trim()}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SyncToLibraryDialog
+        open={syncPromptOpen}
+        onOpenChange={setSyncPromptOpen}
+        title={`Update ${pendingSyncData?.itemType === 'tool' ? 'Tool Types' : 'Materials Library'}?`}
+        description="Would you like to sync these changes to the global library so future recipes and tasks use the updated data?"
+        loading={syncLoading}
+        onConfirm={handleSyncConfirm}
+      />
     </div>
   );
 };

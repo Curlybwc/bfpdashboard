@@ -309,8 +309,8 @@ const TaskDetail = () => {
       toast({ title: 'Saved' });
       fetchTask();
       fetchChildren();
-      // Prompt recipe sync if task was expanded from a recipe and has children
-      if (task.expanded_recipe_id && children.length > 0) {
+      // Prompt recipe sync if task is connected to a recipe in any way
+      if (task.expanded_recipe_id || task.recipe_hint_id || task.source_recipe_id || task.source_recipe_step_id) {
         setRecipeSyncOpen(true);
       }
     }
@@ -1433,9 +1433,9 @@ const TaskDetail = () => {
       <AlertDialog open={recipeSyncOpen} onOpenChange={setRecipeSyncOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Update Recipe in Library?</AlertDialogTitle>
+            <AlertDialogTitle>Update Recipe / Library?</AlertDialogTitle>
             <AlertDialogDescription>
-              This task was expanded from a recipe. Would you like to sync these changes back to the recipe library so future projects use the updated steps and materials?
+              This task is connected to a recipe. Would you like to sync these changes back to the recipe library so future projects use the updated data?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1443,19 +1443,54 @@ const TaskDetail = () => {
             <AlertDialogAction
               disabled={syncingRecipe}
               onClick={async () => {
-                if (!taskId || !task?.expanded_recipe_id) return;
+                if (!taskId || !task) return;
                 setSyncingRecipe(true);
-                const { data, error: syncErr } = await supabase.rpc('capture_recipe_from_task', {
-                  p_parent_task_id: taskId,
-                  p_recipe_id: task.expanded_recipe_id,
-                });
-                setSyncingRecipe(false);
-                if (syncErr) {
-                  toast({ title: 'Sync failed', description: syncErr.message, variant: 'destructive' });
-                } else {
-                  const result = data as any;
-                  toast({ title: 'Recipe updated', description: `${result?.steps_written ?? 0} steps, ${result?.materials_written ?? 0} materials synced.` });
+
+                // If expanded recipe with children, use full capture RPC
+                if (task.expanded_recipe_id && children.length > 0) {
+                  const { data, error: syncErr } = await supabase.rpc('capture_recipe_from_task', {
+                    p_parent_task_id: taskId,
+                    p_recipe_id: task.expanded_recipe_id,
+                  });
+                  if (syncErr) {
+                    toast({ title: 'Sync failed', description: syncErr.message, variant: 'destructive' });
+                  } else {
+                    const result = data as any;
+                    toast({ title: 'Recipe updated', description: `${result?.steps_written ?? 0} steps, ${result?.materials_written ?? 0} materials synced.` });
+                  }
                 }
+
+                // If task has recipe_hint_id, sync metadata (trade, name)
+                const recipeId = task.recipe_hint_id || task.expanded_recipe_id || task.source_recipe_id;
+                if (recipeId && !(task.expanded_recipe_id && children.length > 0)) {
+                  const recipeUpdate: any = {};
+                  if (trade) recipeUpdate.trade = trade;
+                  if (Object.keys(recipeUpdate).length > 0) {
+                    const { error } = await supabase.from('task_recipes').update(recipeUpdate).eq('id', recipeId);
+                    if (error) {
+                      toast({ title: 'Sync failed', description: error.message, variant: 'destructive' });
+                    } else {
+                      toast({ title: 'Recipe metadata updated' });
+                    }
+                  }
+                }
+
+                // If task is a subtask with source_recipe_step_id, sync step data
+                if (task.source_recipe_step_id) {
+                  const stepUpdate: any = { title: taskText };
+                  if (trade) stepUpdate.trade = trade;
+                  const { error } = await supabase
+                    .from('task_recipe_steps')
+                    .update(stepUpdate)
+                    .eq('id', task.source_recipe_step_id);
+                  if (error) {
+                    toast({ title: 'Step sync failed', description: error.message, variant: 'destructive' });
+                  } else {
+                    toast({ title: 'Recipe step updated' });
+                  }
+                }
+
+                setSyncingRecipe(false);
                 setRecipeSyncOpen(false);
               }}
             >
