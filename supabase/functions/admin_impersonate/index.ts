@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { target_user_id, app_url } = await req.json();
+    const { target_user_id, published_url } = await req.json();
     if (!target_user_id) {
       return new Response(
         JSON.stringify({ error: "target_user_id required" }),
@@ -101,12 +101,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build verification URL with redirect back to app with impersonation flag
-    const redirectTo = app_url
-      ? `${app_url}/today?impersonating=true`
-      : `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink`;
+    // Build verification URL — redirect to published URL (different origin)
+    // so the impersonated session doesn't overwrite the admin's preview session
+    const redirectTo = published_url
+      ? `${published_url}/today?impersonating=true`
+      : undefined;
 
-    const verifyUrl = app_url
+    const verifyUrl = redirectTo
       ? `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`
       : `${supabaseUrl}/auth/v1/verify?token=${linkData.properties.hashed_token}&type=magiclink`;
 
