@@ -45,7 +45,7 @@ interface RecipeStepsEditorProps {
   variants?: RecipeVariant[];
 }
 
-const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps) => {
+const RecipeStepsEditor = ({ recipeId, onStepsChanged, variants = [] }: RecipeStepsEditorProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [steps, setSteps] = useState<RecipeStep[]>([]);
