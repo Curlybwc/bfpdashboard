@@ -818,9 +818,9 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       <AlertDialog open={syncPromptOpen} onOpenChange={(o) => { if (!o) { setSyncPromptOpen(false); setPendingSyncData(null); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Update Library & Recipe?</AlertDialogTitle>
+            <AlertDialogTitle>Update Library {"&"} Recipe?</AlertDialogTitle>
             <AlertDialogDescription>
-              Do you want to sync these changes for "{pendingSyncData?.name.trim()}" back to the {pendingSyncData?.itemType === 'tool' ? 'Tool Types' : 'Materials Library'}
+              Do you want to sync these changes for &ldquo;{pendingSyncData?.name.trim()}&rdquo; back to the {pendingSyncData?.itemType === 'tool' ? 'Tool Types' : 'Materials Library'}
               {sourceRecipeStepId ? ' and the recipe template' : ''}?
             </AlertDialogDescription>
           </AlertDialogHeader>
