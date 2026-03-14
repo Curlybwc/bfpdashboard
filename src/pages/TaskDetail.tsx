@@ -118,6 +118,8 @@ const TaskDetail = () => {
     fetchLinkedRecipeStepCount,
   } = useTaskDetailData(taskId, user?.id);
 
+  const { variants, fetchVariants, defaultVariant } = useRecipeVariants(suggestedRecipe?.id);
+
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
