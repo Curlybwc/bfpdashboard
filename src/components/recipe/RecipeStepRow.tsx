@@ -114,15 +114,15 @@ const RecipeStepRow = ({
     setPushPromptOpen(true);
   };
 
-  const handlePushConfirm = async () => {
+  const handlePushStepOnly = async () => {
     setPushPromptLoading(true);
-    const { data, error } = await supabase.rpc('push_recipe_to_tasks', { p_recipe_id: recipeId });
+    const { data, error } = await supabase.rpc('push_recipe_step_to_tasks' as any, { p_step_id: step.id });
     setPushPromptLoading(false);
     if (error) {
-      toast({ title: 'Error pushing to tasks', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error pushing step', description: error.message, variant: 'destructive' });
     } else {
       const result = data as any;
-      toast({ title: `Pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
+      toast({ title: `Step pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
     }
     setPushPromptOpen(false);
   };
