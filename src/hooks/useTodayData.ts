@@ -387,10 +387,10 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
       const isAdminOrManager = isAdmin || hasManagerRole;
 
       const core = await fetchCoreTasks(userId, memberProjectIds);
-      const crew = await fetchCrewTasks(core.myActiveTaskIds, core.myCandidateIds);
+      const crew = await fetchCrewTasks(core.myActiveTaskIds, core.myCandidateIds, isAdminOrManager, memberProjectIds);
 
       const mergedIp = mergeAndDedupe(core.soloIp, crew.crewIpTasks);
-      const mergedAvail = mergeAndDedupe(core.soloAvail, crew.crewAvailTasks);
+      const mergedAvail = mergeAndDedupe(core.soloAvail, [...crew.crewAvailTasks, ...crew.managerCrewTasks]);
 
       const { blockedTasks, blockerMap, reviewTasks } = await fetchBlockedAndReview(
         isAdminOrManager,
