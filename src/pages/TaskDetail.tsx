@@ -327,15 +327,20 @@ const TaskDetail = () => {
   const handleExpandRecipe = async (recipeId: string) => {
     if (!taskId || !task || !user) return;
     setExpandingRecipe(true);
-    // Clear stale expanded_recipe_id if set but no children exist (orphaned state)
     if (task.expanded_recipe_id && children.length === 0) {
       await supabase.from('tasks').update({ expanded_recipe_id: null }).eq('id', taskId);
     }
-    const { data, error } = await supabase.rpc('expand_recipe', {
+    const rpcArgs: any = {
       p_parent_task_id: taskId,
       p_recipe_id: recipeId,
       p_user_id: user.id,
-    });
+    };
+    // Pass variant if variants exist
+    const resolvedVariantId = selectedVariantId || defaultVariant?.id || null;
+    if (variants.length > 0 && resolvedVariantId) {
+      rpcArgs.p_variant_id = resolvedVariantId;
+    }
+    const { data, error } = await supabase.rpc('expand_recipe', rpcArgs);
     if (error) {
       toast({ title: 'Error expanding recipe', description: error.message, variant: 'destructive' });
       setExpandingRecipe(false);
