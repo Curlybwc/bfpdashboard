@@ -247,6 +247,17 @@ export default function AdminMaterialLibrary() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <SyncToLibraryDialog
+        open={pushPromptOpen}
+        onOpenChange={setPushPromptOpen}
+        title="Push to all recipes & tasks?"
+        description="This material was updated in the library. Would you like to push these changes to all recipe templates and active tasks that use it?"
+        confirmLabel="Yes, push everywhere"
+        cancelLabel="No, library only"
+        loading={pushPromptLoading}
+        onConfirm={handlePushPromptConfirm}
+      />
     </div>
   );
 }
