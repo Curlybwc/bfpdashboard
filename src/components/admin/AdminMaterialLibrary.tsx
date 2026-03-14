@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Plus, Pencil, Search, ExternalLink, RefreshCw } from 'lucide-react';
+import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
 
 interface MaterialItem {
   id: string;
