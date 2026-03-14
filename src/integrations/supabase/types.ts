@@ -1862,6 +1862,7 @@ export type Database = {
         Args: { p_material_id: string }
         Returns: Json
       }
+      push_recipe_step_to_tasks: { Args: { p_step_id: string }; Returns: Json }
       push_recipe_to_tasks: { Args: { p_recipe_id: string }; Returns: Json }
       upsert_shift_with_allocations: {
         Args: {
