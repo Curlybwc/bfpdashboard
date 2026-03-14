@@ -42,6 +42,7 @@ interface ProfileOption {
 interface RecipeStepsEditorProps {
   recipeId: string;
   onStepsChanged?: () => void;
+  variants?: RecipeVariant[];
 }
 
 const RecipeStepsEditor = ({ recipeId, onStepsChanged }: RecipeStepsEditorProps) => {
