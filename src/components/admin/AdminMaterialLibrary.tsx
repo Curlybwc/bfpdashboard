@@ -112,8 +112,13 @@ export default function AdminMaterialLibrary() {
       const { error } = await supabase.from('material_library').update(payload).eq('id', editItem.id);
       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
       toast({ title: 'Material updated' });
+      setDialogOpen(false);
+      fetchItems();
+      // Prompt to push changes to all recipes & tasks
+      setPushPromptItemId(editItem.id);
+      setPushPromptOpen(true);
     } else {
-      const { error } = await supabase.from('material_library').insert(payload);
+      const { error, data: inserted } = await supabase.from('material_library').insert(payload).select('id').single();
       if (error) {
         if (error.code === '23505') {
           toast({ title: 'Duplicate material name', variant: 'destructive' });
@@ -123,9 +128,27 @@ export default function AdminMaterialLibrary() {
         return;
       }
       toast({ title: 'Material added' });
+      setDialogOpen(false);
+      fetchItems();
     }
-    setDialogOpen(false);
-    fetchItems();
+  };
+
+  const handlePushPromptConfirm = async () => {
+    if (!pushPromptItemId) return;
+    setPushPromptLoading(true);
+    const { data, error } = await supabase.rpc('push_material_library_to_all' as any, { p_material_id: pushPromptItemId });
+    setPushPromptLoading(false);
+    if (error) {
+      toast({ title: 'Error pushing updates', description: error.message, variant: 'destructive' });
+    } else {
+      const result = data as any;
+      toast({
+        title: 'Material synced everywhere',
+        description: `${result?.recipe_materials_updated ?? 0} recipe items, ${result?.task_materials_updated ?? 0} task items updated`,
+      });
+    }
+    setPushPromptOpen(false);
+    setPushPromptItemId(null);
   };
 
   const toggleActive = async (item: MaterialItem) => {
