@@ -814,7 +814,25 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
         </AlertDialogContent>
       </AlertDialog>
 
-      {leftoverTarget && (
+      {/* Sync to Library prompt */}
+      <AlertDialog open={syncPromptOpen} onOpenChange={(o) => { if (!o) { setSyncPromptOpen(false); setPendingSyncData(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Library & Recipe?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Do you want to sync these changes for "{pendingSyncData?.name.trim()}" back to the {pendingSyncData?.itemType === 'tool' ? 'Tool Types' : 'Materials Library'}
+              {sourceRecipeStepId ? ' and the recipe template' : ''}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, just this task</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSyncConfirm}>
+              Yes, update library{sourceRecipeStepId ? ' & recipe' : ''}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
         <RecordLeftoverSheet
           open={!!leftoverTarget}
           onOpenChange={(o) => { if (!o) setLeftoverTarget(null); }}
