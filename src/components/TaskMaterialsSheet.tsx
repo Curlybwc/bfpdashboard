@@ -367,6 +367,81 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     setEditOpen(false);
     await fetchMaterials();
     await runDerivation();
+
+    // Prompt to sync changes to library & recipe
+    setPendingSyncData({
+      name: editName, itemType: editItemType, sku: editSku, vendorUrl: editVendorUrl,
+      unitCost: editUnitCost, unit: editUnit, storeSection: section || '', qty: editQty,
+    });
+    setSyncPromptOpen(true);
+  };
+
+  const handleSyncConfirm = async () => {
+    if (!pendingSyncData) return;
+    const { name, itemType, sku, vendorUrl, unitCost, unit, storeSection } = pendingSyncData;
+
+    if (itemType === 'tool') {
+      const normalized = name.toLowerCase().trim();
+      const { data: existing } = await supabase.from('tool_types')
+        .select('id').ilike('name', normalized).limit(1);
+      if (existing?.length) {
+        await supabase.from('tool_types').update({
+          sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
+        }).ilike('name', normalized);
+      } else {
+        await supabase.from('tool_types').insert({
+          name: name.trim(), sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
+        });
+      }
+      toast({ title: `"${name.trim()}" synced to Tool Types` });
+    } else {
+      const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+      const { data: existing } = await supabase.from('material_library')
+        .select('id').eq('normalized_name', normalized).limit(1);
+      if (existing?.length) {
+        await supabase.from('material_library').update({
+          unit_cost: unitCost ? parseFloat(unitCost) : null,
+          sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
+          unit: unit.trim() || null, store_section: storeSection.trim() || null,
+        }).eq('normalized_name', normalized);
+      } else {
+        await supabase.from('material_library').insert({
+          name: name.trim(), normalized_name: normalized,
+          unit_cost: unitCost ? parseFloat(unitCost) : null,
+          sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
+          unit: unit.trim() || null, store_section: storeSection.trim() || null,
+        });
+      }
+      toast({ title: `"${name.trim()}" synced to Materials Library` });
+    }
+
+    // Also sync to recipe step if applicable
+    if (sourceRecipeStepId) {
+      const matName = pendingSyncData.name.trim();
+      const { data: existingStep } = await supabase.from('task_recipe_step_materials')
+        .select('id').eq('recipe_step_id', sourceRecipeStepId)
+        .ilike('material_name', matName).limit(1);
+      if (existingStep?.length) {
+        await supabase.from('task_recipe_step_materials').update({
+          unit_cost: unitCost ? parseFloat(unitCost) : null,
+          sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
+          unit: unit.trim() || null, store_section: storeSection.trim() || null,
+          item_type: itemType,
+        } as any).eq('id', existingStep[0].id);
+      } else {
+        await supabase.from('task_recipe_step_materials').insert({
+          recipe_step_id: sourceRecipeStepId, material_name: matName,
+          item_type: itemType, qty: pendingSyncData.qty ? parseFloat(pendingSyncData.qty) : null,
+          unit: unit.trim() || null, unit_cost: unitCost ? parseFloat(unitCost) : null,
+          sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
+          store_section: storeSection.trim() || null,
+        } as any);
+      }
+      toast({ title: `Recipe template also updated` });
+    }
+
+    setSyncPromptOpen(false);
+    setPendingSyncData(null);
   };
 
   const copyToClipboard = async (text: string, label: string) => {
