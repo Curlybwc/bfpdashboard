@@ -248,6 +248,16 @@ const RecipeStepRow = ({
             </p>
           )}
         </div>
+        {variants.length > 0 && (
+          <VariantBadge
+            currentVariantId={step.variant_id ?? null}
+            variants={variants}
+            onChange={async (newVariantId) => {
+              await supabase.from('task_recipe_steps').update({ variant_id: newVariantId }).eq('id', step.id);
+              onUpdated();
+            }}
+          />
+        )}
         {isCrew && (
           <Badge variant="secondary" className="text-[10px] gap-1">
             <Users className="h-3 w-3" />
