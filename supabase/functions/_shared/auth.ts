@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +8,7 @@ export const corsHeaders = {
 
 export interface AdminAuthResult {
   userId: string;
-  adminClient: ReturnType<typeof createClient>;
+  adminClient: SupabaseClient;
 }
 
 export async function requireAdminAuth(req: Request): Promise<AdminAuthResult> {

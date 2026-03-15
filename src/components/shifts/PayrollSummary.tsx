@@ -24,11 +24,6 @@ interface PayrollSummaryProps {
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
 }
 
-type WorkerPayoutProfile = Tables<'worker_payout_profiles'>;
-type WorkerTaxProfile = Tables<'worker_tax_profiles'>;
-
-type PayoutUiStatus = 'not_connected' | 'in_progress' | 'ready' | 'action_required';
-
 interface ContractorSummary {
   user_id: string;
   full_name: string;
@@ -532,7 +527,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     const csv = [
       headers.join(','),
-      ...rows.map((row) => headers.map((h) => `"${String(row[h as keyof typeof row]).replaceAll('"', '""')}"`).join(',')),
+      ...rows.map((row) => headers.map((h) => `"${String(row[h as keyof typeof row]).replace(/"/g, '""')}"`).join(',')),
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

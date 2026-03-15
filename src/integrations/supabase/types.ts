@@ -373,6 +373,53 @@ export type Database = {
         }
         Relationships: []
       }
+      payout_runs: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          payout_date: string | null
+          period_end: string
+          period_start: string
+          status: Database["public"]["Enums"]["payout_run_status"]
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          payout_date?: string | null
+          period_end: string
+          period_start: string
+          status?: Database["public"]["Enums"]["payout_run_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          payout_date?: string | null
+          period_end?: string
+          period_start?: string
+          status?: Database["public"]["Enums"]["payout_run_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_aliases: {
         Row: {
           alias: string
@@ -1825,9 +1872,9 @@ export type Database = {
           external_reference: string | null
           id: string
           memo: string | null
+          paid_date: string
           pay_period_end: string | null
           pay_period_start: string | null
-          paid_date: string
           payment_source: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id: string | null
           status: Database["public"]["Enums"]["worker_payment_status"]
@@ -1843,9 +1890,9 @@ export type Database = {
           external_reference?: string | null
           id?: string
           memo?: string | null
+          paid_date: string
           pay_period_end?: string | null
           pay_period_start?: string | null
-          paid_date: string
           payment_source: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id?: string | null
           status?: Database["public"]["Enums"]["worker_payment_status"]
@@ -1861,9 +1908,9 @@ export type Database = {
           external_reference?: string | null
           id?: string
           memo?: string | null
+          paid_date?: string
           pay_period_end?: string | null
           pay_period_start?: string | null
-          paid_date?: string
           payment_source?: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id?: string | null
           status?: Database["public"]["Enums"]["worker_payment_status"]
@@ -1934,7 +1981,7 @@ export type Database = {
           {
             foreignKeyName: "worker_payout_profiles_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1963,54 +2010,7 @@ export type Database = {
           {
             foreignKeyName: "worker_tax_profiles_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payout_runs: {
-        Row: {
-          created_at: string
-          created_by: string
-          id: string
-          notes: string | null
-          payout_date: string | null
-          period_end: string
-          period_start: string
-          status: Database["public"]["Enums"]["payout_run_status"]
-          submitted_at: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by: string
-          id?: string
-          notes?: string | null
-          payout_date?: string | null
-          period_end: string
-          period_start: string
-          status?: Database["public"]["Enums"]["payout_run_status"]
-          submitted_at?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string
-          id?: string
-          notes?: string | null
-          payout_date?: string | null
-          period_end?: string
-          period_start?: string
-          status?: Database["public"]["Enums"]["payout_run_status"]
-          submitted_at?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payout_runs_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -2115,7 +2115,12 @@ export type Database = {
       task_stage: "Ready" | "In Progress" | "Not Ready" | "Hold" | "Done"
       unit_type: "each" | "sqft" | "lf" | "piece"
       worker_payment_source: "stripe_connect" | "manual_quickbooks"
-      worker_payment_status: "pending" | "processing" | "paid" | "failed" | "voided"
+      worker_payment_status:
+        | "pending"
+        | "processing"
+        | "paid"
+        | "failed"
+        | "voided"
       worker_tax_classification: "contractor_1099" | "employee_w2"
     }
     CompositeTypes: {
@@ -2254,6 +2259,20 @@ export const Constants = {
         "other",
       ],
       materials_status: ["Yes", "Partial", "No"],
+      payout_onboarding_status: [
+        "not_started",
+        "in_progress",
+        "completed",
+        "restricted",
+      ],
+      payout_run_status: [
+        "draft",
+        "submitted",
+        "completed",
+        "canceled",
+        "failed",
+        "partially_failed",
+      ],
       pricing_status: ["Priced", "Needs Pricing"],
       project_member_role: ["contractor", "manager", "read_only"],
       project_status: ["active", "paused", "complete"],
@@ -2269,6 +2288,15 @@ export const Constants = {
       ],
       task_stage: ["Ready", "In Progress", "Not Ready", "Hold", "Done"],
       unit_type: ["each", "sqft", "lf", "piece"],
+      worker_payment_source: ["stripe_connect", "manual_quickbooks"],
+      worker_payment_status: [
+        "pending",
+        "processing",
+        "paid",
+        "failed",
+        "voided",
+      ],
+      worker_tax_classification: ["contractor_1099", "employee_w2"],
     },
   },
 } as const
