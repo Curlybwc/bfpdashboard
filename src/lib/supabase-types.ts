@@ -10,6 +10,11 @@ export type ScopeStatus = 'active' | 'archived';
 export type ScopeMemberRole = 'viewer' | 'editor' | 'manager';
 export type UnitType = 'each' | 'sqft' | 'lf' | 'piece';
 export type PricingStatus = 'Priced' | 'Needs Pricing';
+export type PayoutOnboardingStatus = 'not_started' | 'in_progress' | 'completed' | 'restricted';
+export type PayoutRunStatus = 'draft' | 'submitted' | 'completed' | 'canceled';
+export type WorkerPaymentSource = 'stripe_connect' | 'manual_quickbooks';
+export type WorkerPaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'voided';
+export type WorkerTaxClassification = 'contractor_1099' | 'employee_w2';
 
 export const TASK_STAGES: TaskStage[] = ['Ready', 'In Progress', 'Not Ready', 'Hold', 'Done'];
 export const TASK_PRIORITIES: TaskPriority[] = ['1 – Now', '2 – This Week', '3 – Soon', '4 – When Time', '5 – Later'];
@@ -17,6 +22,11 @@ export const MATERIALS_OPTIONS: MaterialsStatus[] = ['Yes', 'Partial', 'No'];
 export const PROJECT_STATUSES: ProjectStatus[] = ['active', 'paused', 'complete'];
 export const SCOPE_STATUSES: ScopeStatus[] = ['active', 'archived'];
 export const PRICING_STATUSES: PricingStatus[] = ['Priced', 'Needs Pricing'];
+export const PAYOUT_ONBOARDING_STATUSES: PayoutOnboardingStatus[] = ['not_started', 'in_progress', 'completed', 'restricted'];
+export const PAYOUT_RUN_STATUSES: PayoutRunStatus[] = ['draft', 'submitted', 'completed', 'canceled'];
+export const WORKER_PAYMENT_SOURCES: WorkerPaymentSource[] = ['stripe_connect', 'manual_quickbooks'];
+export const WORKER_PAYMENT_STATUSES: WorkerPaymentStatus[] = ['pending', 'processing', 'paid', 'failed', 'voided'];
+export const WORKER_TAX_CLASSIFICATIONS: WorkerTaxClassification[] = ['contractor_1099', 'employee_w2'];
 
 export type AssignmentMode = 'solo' | 'crew';
 
