@@ -38,6 +38,9 @@ interface EditingRow {
   notes: string;
 }
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEK_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+
 type ViewMode = 'week' | 'month';
 
 const AvailabilityForm = () => {
