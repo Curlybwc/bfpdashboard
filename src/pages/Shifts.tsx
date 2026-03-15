@@ -28,7 +28,7 @@ const Shifts = () => {
     setShowForm(true);
   };
 
-  const handleEditShift = async (shift: Shift) => {
+  const handleEditShift = async (shift: Pick<Shift, 'id'>) => {
     // Fetch full shift data if needed
     const [fullShift, allocs] = await Promise.all([
       fetchShiftById(shift.id),
