@@ -105,7 +105,17 @@ serve(async (req) => {
         });
       }
 
-      const url = await createAccountLink(stripeAccountId, linkType);
+      let url: string;
+      try {
+        url = await createAccountLink(stripeAccountId, linkType);
+      } catch (linkError) {
+        // Stripe rejects account_update for accounts that haven't finished onboarding
+        if (linkType === "account_update" && linkError instanceof Error && linkError.message.includes("account_onboarding")) {
+          url = await createAccountLink(stripeAccountId, "account_onboarding");
+        } else {
+          throw linkError;
+        }
+      }
 
       return new Response(JSON.stringify({
         worker_user_id: workerUserId,
