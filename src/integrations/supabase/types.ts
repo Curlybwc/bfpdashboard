@@ -2093,7 +2093,13 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "restricted"
-      payout_run_status: "draft" | "submitted" | "completed" | "canceled"
+      payout_run_status:
+        | "draft"
+        | "submitted"
+        | "completed"
+        | "canceled"
+        | "failed"
+        | "partially_failed"
       pricing_status: "Priced" | "Needs Pricing"
       project_member_role: "contractor" | "manager" | "read_only"
       project_status: "active" | "paused" | "complete"
@@ -2259,7 +2265,14 @@ export const Constants = {
         "completed",
         "restricted",
       ],
-      payout_run_status: ["draft", "submitted", "completed", "canceled"],
+      payout_run_status: [
+        "draft",
+        "submitted",
+        "completed",
+        "canceled",
+        "failed",
+        "partially_failed",
+      ],
       pricing_status: ["Priced", "Needs Pricing"],
       project_member_role: ["contractor", "manager", "read_only"],
       project_status: ["active", "paused", "complete"],
