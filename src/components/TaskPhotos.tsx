@@ -167,7 +167,6 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     className="hidden"
                     onChange={handleFileChange(key)}
                     disabled={uploading !== null}

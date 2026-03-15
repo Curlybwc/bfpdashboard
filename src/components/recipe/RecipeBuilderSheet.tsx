@@ -3,9 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, RefreshCw } from 'lucide-react';
 import RecipeMetaEditor from './RecipeMetaEditor';
 import RecipeStepsEditor from './RecipeStepsEditor';
+import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
+import VariantManager from './VariantManager';
+import { useRecipeVariants } from '@/hooks/useRecipeVariants';
 
 interface RecipeBuilderSheetProps {
   recipeId: string;
@@ -26,11 +29,16 @@ const RecipeBuilderSheet = ({
   onSaved, onDeleted,
 }: RecipeBuilderSheetProps) => {
   const { toast } = useToast();
+  const [pushing, setPushing] = useState(false);
+  const [pushPromptOpen, setPushPromptOpen] = useState(false);
+  const [pushPromptLoading, setPushPromptLoading] = useState(false);
 
   const [name, setName] = useState(initialName);
   const [trade, setTrade] = useState(initialTrade);
   const [keywords, setKeywords] = useState(initialKeywords);
   const [estimatedCost, setEstimatedCost] = useState(initialEstimatedCost);
+
+  const { variants, fetchVariants } = useRecipeVariants(recipeId);
 
   const handleSave = async () => {
     const kwArray = keywords.split(',').map(k => k.trim()).filter(Boolean);
@@ -46,6 +54,8 @@ const RecipeBuilderSheet = ({
     }
     toast({ title: 'Recipe updated' });
     onSaved();
+    // Prompt to push to active tasks
+    setPushPromptOpen(true);
   };
 
   const handleDelete = async () => {
@@ -56,6 +66,19 @@ const RecipeBuilderSheet = ({
     }
     toast({ title: 'Recipe deleted' });
     onDeleted();
+  };
+
+  const handlePushToTasks = async () => {
+    setPushPromptLoading(true);
+    const { data, error } = await supabase.rpc('push_recipe_to_tasks', { p_recipe_id: recipeId });
+    setPushPromptLoading(false);
+    if (error) {
+      toast({ title: 'Error pushing to tasks', description: error.message, variant: 'destructive' });
+    } else {
+      const result = data as any;
+      toast({ title: `Pushed to ${result?.tasks_updated ?? 0} active tasks`, description: `${result?.materials_synced ?? 0} material entries synced` });
+    }
+    setPushPromptOpen(false);
   };
 
   return (
@@ -76,7 +99,20 @@ const RecipeBuilderSheet = ({
         </Button>
       </div>
 
-      <RecipeStepsEditor recipeId={recipeId} />
+      <VariantManager recipeId={recipeId} variants={variants} onChanged={fetchVariants} />
+
+      <RecipeStepsEditor recipeId={recipeId} variants={variants} />
+
+      <SyncToLibraryDialog
+        open={pushPromptOpen}
+        onOpenChange={setPushPromptOpen}
+        title="Push to active tasks?"
+        description="This recipe was updated. Would you like to push these changes to all active tasks that were expanded from it?"
+        confirmLabel="Yes, push to tasks"
+        cancelLabel="No, recipe only"
+        loading={pushPromptLoading}
+        onConfirm={handlePushToTasks}
+      />
     </div>
   );
 };

@@ -32,6 +32,9 @@ import { claimTask, completeTask, startTask } from '@/lib/taskLifecycle';
 import { useTaskDetailData } from '@/hooks/useTaskDetailData';
 import TaskLifecycleActions from '@/components/task-detail/TaskLifecycleActions';
 import SubtaskRow from '@/components/task-detail/SubtaskRow';
+import TaskCard from '@/components/TaskCard';
+import VariantManager from '@/components/recipe/VariantManager';
+import { useRecipeVariants } from '@/hooks/useRecipeVariants';
 
 const TaskDetail = () => {
   const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>();
@@ -72,6 +75,7 @@ const TaskDetail = () => {
   const [newlyCreatedRecipeId, setNewlyCreatedRecipeId] = useState<string | null>(null);
   const [newRecipeStepCount, setNewRecipeStepCount] = useState(0);
   const [recipeEditorOpen, setRecipeEditorOpen] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [recipeSearchOpen, setRecipeSearchOpen] = useState(false);
@@ -113,6 +117,8 @@ const TaskDetail = () => {
     fetchCrewData,
     fetchLinkedRecipeStepCount,
   } = useTaskDetailData(taskId, user?.id);
+
+  const { variants, fetchVariants, defaultVariant } = useRecipeVariants(suggestedRecipe?.id);
 
   // Editable fields
   const [taskText, setTaskText] = useState('');
@@ -308,8 +314,8 @@ const TaskDetail = () => {
       toast({ title: 'Saved' });
       fetchTask();
       fetchChildren();
-      // Prompt recipe sync if task was expanded from a recipe and has children
-      if (task.expanded_recipe_id && children.length > 0) {
+      // Prompt recipe sync if task is connected to a recipe in any way
+      if (task.expanded_recipe_id || task.recipe_hint_id || task.source_recipe_id || task.source_recipe_step_id) {
         setRecipeSyncOpen(true);
       }
     }
@@ -321,11 +327,20 @@ const TaskDetail = () => {
   const handleExpandRecipe = async (recipeId: string) => {
     if (!taskId || !task || !user) return;
     setExpandingRecipe(true);
-    const { data, error } = await supabase.rpc('expand_recipe', {
+    if (task.expanded_recipe_id && children.length === 0) {
+      await supabase.from('tasks').update({ expanded_recipe_id: null }).eq('id', taskId);
+    }
+    const rpcArgs: any = {
       p_parent_task_id: taskId,
       p_recipe_id: recipeId,
       p_user_id: user.id,
-    });
+    };
+    // Pass variant if variants exist
+    const resolvedVariantId = selectedVariantId || defaultVariant?.id || null;
+    if (variants.length > 0 && resolvedVariantId) {
+      rpcArgs.p_variant_id = resolvedVariantId;
+    }
+    const { data, error } = await supabase.rpc('expand_recipe', rpcArgs);
     if (error) {
       toast({ title: 'Error expanding recipe', description: error.message, variant: 'destructive' });
       setExpandingRecipe(false);
@@ -362,7 +377,7 @@ const TaskDetail = () => {
   };
 
   const handleSaveAsRecipe = async () => {
-    if (!user || !saveRecipeName.trim() || children.length === 0) return;
+    if (!user || !task || !saveRecipeName.trim()) return;
     setSavingRecipe(true);
     const { data: recipe, error: recipeErr } = await supabase.from('task_recipes').insert({
       name: saveRecipeName.trim(),
@@ -375,19 +390,124 @@ const TaskDetail = () => {
       setSavingRecipe(false);
       return;
     }
-    const stepInserts = children.map((c, idx) => ({
+
+    const sourceTasks = children.length > 0 ? children : [task];
+
+    const sourceTaskIds = sourceTasks.map((sourceTask) => sourceTask.id);
+    const [{ data: allCandidates, error: candidateErr }, { data: activeWorkers, error: workersErr }] = await Promise.all([
+      supabase
+        .from('task_candidates')
+        .select('task_id, user_id')
+        .in('task_id', sourceTaskIds),
+      supabase
+        .from('task_workers')
+        .select('task_id, user_id')
+        .in('task_id', sourceTaskIds)
+        .eq('active', true),
+    ]);
+
+    if (candidateErr || workersErr) {
+      toast({
+        title: 'Error',
+        description: candidateErr?.message || workersErr?.message || 'Unable to save worker assignments',
+        variant: 'destructive',
+      });
+      setSavingRecipe(false);
+      return;
+    }
+
+    const candidatesByTask = new Map<string, Set<string>>();
+    const addCandidate = (sourceTaskId: string, userId: string | null | undefined) => {
+      if (!userId) return;
+      const existing = candidatesByTask.get(sourceTaskId) || new Set<string>();
+      existing.add(userId);
+      candidatesByTask.set(sourceTaskId, existing);
+    };
+
+    (allCandidates || []).forEach(({ task_id, user_id }) => addCandidate(task_id, user_id));
+    (activeWorkers || []).forEach(({ task_id, user_id }) => addCandidate(task_id, user_id));
+
+    sourceTasks.forEach((sourceTask) => {
+      if (sourceTask.assignment_mode === 'crew') {
+        addCandidate(sourceTask.id, sourceTask.lead_user_id);
+        addCandidate(sourceTask.id, sourceTask.assigned_to_user_id);
+      }
+    });
+
+    const stepInserts = sourceTasks.map((sourceTask, idx) => ({
       recipe_id: recipe.id,
-      title: c.task,
+      title: sourceTask.task,
       sort_order: (idx + 1) * 10,
-      trade: null as string | null,
+      trade: sourceTask.trade || null,
       created_by: user.id,
+      assignment_mode: sourceTask.assignment_mode || 'solo',
+      default_candidate_user_ids: Array.from(candidatesByTask.get(sourceTask.id) || []),
     }));
-    await supabase.from('task_recipe_steps').insert(stepInserts);
+
+    const { data: insertedSteps, error: stepErr } = await supabase
+      .from('task_recipe_steps')
+      .insert(stepInserts)
+      .select('id, sort_order');
+
+    if (stepErr || !insertedSteps) {
+      toast({ title: 'Error', description: stepErr?.message || 'Unable to save recipe steps', variant: 'destructive' });
+      setSavingRecipe(false);
+      return;
+    }
+
+    const { data: sourceMaterials, error: matsErr } = await supabase
+      .from('task_materials')
+      .select('task_id, name, quantity, unit, sku, vendor_url, store_section, provided_by, item_type, unit_cost')
+      .in('task_id', sourceTaskIds)
+      .eq('is_active', true);
+
+    if (matsErr) {
+      toast({ title: 'Error', description: matsErr.message, variant: 'destructive' });
+      setSavingRecipe(false);
+      return;
+    }
+
+    const stepIdByTaskId = new Map<string, string>();
+    sourceTasks.forEach((sourceTask, index) => {
+      const sortOrder = (index + 1) * 10;
+      const step = insertedSteps.find((insertedStep) => insertedStep.sort_order === sortOrder);
+      if (step?.id) stepIdByTaskId.set(sourceTask.id, step.id);
+    });
+
+    const materialInserts = (sourceMaterials || []).flatMap((material) => {
+      const stepId = stepIdByTaskId.get(material.task_id);
+      if (!stepId) return [];
+      return [{
+        recipe_step_id: stepId,
+        material_name: material.name,
+        qty: material.quantity,
+        unit: material.unit,
+        sku: material.sku,
+        vendor_url: material.vendor_url,
+        store_section: material.store_section,
+        provided_by: material.provided_by,
+        item_type: material.item_type,
+        unit_cost: material.unit_cost,
+      }];
+    });
+
+    if (materialInserts.length > 0) {
+      const { error: insertMatsErr } = await supabase.from('task_recipe_step_materials').insert(materialInserts);
+      if (insertMatsErr) {
+        toast({ title: 'Error', description: insertMatsErr.message, variant: 'destructive' });
+        setSavingRecipe(false);
+        return;
+      }
+    }
+
+    await supabase.from('tasks').update({ recipe_hint_id: recipe.id }).eq('id', taskId);
+    setSuggestedRecipe({ id: recipe.id, name: saveRecipeName.trim() });
+    fetchLinkedRecipeStepCount();
     setSavingRecipe(false);
     setSaveRecipeOpen(false);
     setSaveRecipeName('');
     setSaveRecipeTrade('');
-    toast({ title: 'Recipe saved from tasks' });
+    toast({ title: children.length > 0 ? 'Workflow recipe saved from subtasks' : 'Single-step recipe saved from task' });
   };
 
   const handleCreateRecipeAndExpand = async () => {
@@ -744,21 +864,29 @@ const TaskDetail = () => {
           canComment={isAdmin || projectRole === 'manager' || projectRole === 'contractor'}
         />
 
-        {/* Recipe: read-only badge if already expanded */}
-        {task.expanded_recipe_id && suggestedRecipe && (
+        {/* Recipe: read-only badge if already expanded AND has children */}
+        {task.expanded_recipe_id && suggestedRecipe && hasChildren && (
           <Card className="p-3 flex items-center gap-2 border-muted">
             <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-sm text-muted-foreground truncate">Recipe: {suggestedRecipe.name}</p>
+            {task.variant_name_snapshot && (
+              <Badge variant="secondary" className="text-[10px] shrink-0">
+                Variant: {task.variant_name_snapshot}{task.expanded_recipe_variant_id && !variants.find(v => v.id === task.expanded_recipe_variant_id) ? ' (removed)' : ''}
+              </Badge>
+            )}
           </Card>
         )}
         {/* Recipe linked but not yet expanded — show edit + expand */}
-        {!task.expanded_recipe_id && suggestedRecipe && children.length === 0 && (
+        {((!task.expanded_recipe_id || !hasChildren) && suggestedRecipe && children.length === 0) && (
           <Card className="p-3 space-y-3 border-primary/30 bg-primary/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
                 <BookOpen className="h-4 w-4 text-primary shrink-0" />
                 <p className="text-sm font-medium truncate">Recipe: {suggestedRecipe.name}</p>
                 <Badge variant="secondary" className="text-xs">{linkedRecipeStepCount} steps</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {linkedRecipeStepCount <= 1 ? 'Single-step template' : 'Multi-step workflow'}
+                </Badge>
               </div>
               <div className="flex gap-2 shrink-0">
                 {(isAdmin || projectRole === 'manager') && (
@@ -772,8 +900,29 @@ const TaskDetail = () => {
               </div>
             </div>
             {recipeEditorOpen && (
-              <div className="border-t pt-3">
-                <RecipeStepsEditor recipeId={suggestedRecipe.id} onStepsChanged={fetchLinkedRecipeStepCount} />
+              <div className="border-t pt-3 space-y-3">
+                {variants.length > 0 && (
+                  <VariantManager recipeId={suggestedRecipe.id} variants={variants} onChanged={fetchVariants} readOnly={!isAdmin && projectRole !== 'manager'} />
+                )}
+                <RecipeStepsEditor recipeId={suggestedRecipe.id} onStepsChanged={fetchLinkedRecipeStepCount} variants={variants} />
+              </div>
+            )}
+            {!recipeEditorOpen && variants.length > 0 && (
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Select variant to expand:</p>
+                <RadioGroup
+                  value={selectedVariantId || defaultVariant?.id || ''}
+                  onValueChange={setSelectedVariantId}
+                >
+                  {variants.map(v => (
+                    <div key={v.id} className="flex items-center space-x-2">
+                      <RadioGroupItem value={v.id} id={`variant-${v.id}`} />
+                      <Label htmlFor={`variant-${v.id}`} className="font-normal cursor-pointer text-sm">
+                        {v.name}{v.is_default ? ' (default)' : ''}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
               </div>
             )}
           </Card>
@@ -1075,27 +1224,48 @@ const TaskDetail = () => {
           </Button>
         )}
 
-        {hasChildren && (
+        {(canDelete || hasChildren) && (
           <div className="space-y-1">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-1">
               <Label>Subtasks ({children.length})</Label>
-              {canDelete && (
-                <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
-                  <Save className="h-3.5 w-3.5 mr-1" />Save as Recipe
-                </Button>
-              )}
+              <div className="flex gap-1">
+                {canDelete && task.expanded_recipe_id && hasChildren && (
+                  <Button size="sm" variant="outline" onClick={() => setRecipeSyncOpen(true)}>
+                    <BookOpen className="h-3.5 w-3.5 mr-1" />Sync to Recipe
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button size="sm" variant="ghost" onClick={() => { setSaveRecipeName(task.task || ''); setSaveRecipeTrade(task.trade || ''); setSaveRecipeOpen(true); }}>
+                    <Save className="h-3.5 w-3.5 mr-1" />{hasChildren ? 'Save as Workflow Recipe' : 'Save as Single-Step Recipe'}
+                  </Button>
+                )}
+              </div>
             </div>
-            {children.map(c => (
-              <SubtaskRow
-                key={c.id}
-                child={c}
-                projectId={projectId!}
-                projectMembers={projectMembers}
-                canEdit={canEditTaskMetadata}
-                onNavigate={() => navigate(`/projects/${projectId}/tasks/${c.id}`)}
-                onUpdated={() => { fetchChildren(); fetchTask(); }}
-              />
-            ))}
+            {!hasChildren && (
+              <p className="text-xs text-muted-foreground">No subtasks yet. Saving now creates a 1-step reusable task template from this task + materials.</p>
+            )}
+            {children.map(c => {
+              const assigneeName = c.assigned_to_user_id
+                ? projectMembers.find(m => m.user_id === c.assigned_to_user_id)?.profiles?.full_name || undefined
+                : undefined;
+              return (
+                <TaskCard
+                  key={c.id}
+                  task={c}
+                  projectName=""
+                  userId={user?.id ?? ''}
+                  isAdmin={isAdmin}
+                  onUpdate={() => { fetchChildren(); fetchTask(); }}
+                  showProjectName={false}
+                  isChild
+                  parentTitle={task.task}
+                  assigneeName={assigneeName}
+                  canReportIssue={projectRole === 'contractor'}
+                  canDelete={canDelete}
+                  allProfiles={projectMembers.map(m => ({ id: m.user_id, full_name: m.profiles?.full_name || null }))}
+                />
+              );
+            })}
             {canEditTaskMetadata && (
               <div className="flex gap-2 pt-1">
                 <Input
@@ -1173,7 +1343,11 @@ const TaskDetail = () => {
               <Label>Trade</Label>
               <Input value={saveRecipeTrade} onChange={(e) => setSaveRecipeTrade(e.target.value)} />
             </div>
-            <p className="text-sm text-muted-foreground">{children.length} step(s) will be saved.</p>
+            <p className="text-sm text-muted-foreground">
+              {children.length > 0
+                ? `${children.length} steps will be saved as a reusable workflow.`
+                : '1 step will be saved as a reusable standalone task template.'}
+            </p>
             <Button className="w-full" onClick={handleSaveAsRecipe} disabled={savingRecipe || !saveRecipeName.trim()}>
               {savingRecipe ? 'Saving…' : 'Save Recipe'}
             </Button>
@@ -1295,9 +1469,9 @@ const TaskDetail = () => {
       <AlertDialog open={recipeSyncOpen} onOpenChange={setRecipeSyncOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Update Recipe in Library?</AlertDialogTitle>
+            <AlertDialogTitle>Update Recipe / Library?</AlertDialogTitle>
             <AlertDialogDescription>
-              This task was expanded from a recipe. Would you like to sync these changes back to the recipe library so future projects use the updated steps and materials?
+              This task is connected to a recipe. Would you like to sync these changes back to the recipe library so future projects use the updated data?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1305,19 +1479,54 @@ const TaskDetail = () => {
             <AlertDialogAction
               disabled={syncingRecipe}
               onClick={async () => {
-                if (!taskId || !task?.expanded_recipe_id) return;
+                if (!taskId || !task) return;
                 setSyncingRecipe(true);
-                const { data, error: syncErr } = await supabase.rpc('capture_recipe_from_task', {
-                  p_parent_task_id: taskId,
-                  p_recipe_id: task.expanded_recipe_id,
-                });
-                setSyncingRecipe(false);
-                if (syncErr) {
-                  toast({ title: 'Sync failed', description: syncErr.message, variant: 'destructive' });
-                } else {
-                  const result = data as any;
-                  toast({ title: 'Recipe updated', description: `${result?.steps_written ?? 0} steps, ${result?.materials_written ?? 0} materials synced.` });
+
+                // If expanded recipe with children, use full capture RPC
+                if (task.expanded_recipe_id && children.length > 0) {
+                  const { data, error: syncErr } = await supabase.rpc('capture_recipe_from_task', {
+                    p_parent_task_id: taskId,
+                    p_recipe_id: task.expanded_recipe_id,
+                  });
+                  if (syncErr) {
+                    toast({ title: 'Sync failed', description: syncErr.message, variant: 'destructive' });
+                  } else {
+                    const result = data as any;
+                    toast({ title: 'Recipe updated', description: `${result?.steps_written ?? 0} steps, ${result?.materials_written ?? 0} materials synced.` });
+                  }
                 }
+
+                // If task has recipe_hint_id, sync metadata (trade, name)
+                const recipeId = task.recipe_hint_id || task.expanded_recipe_id || task.source_recipe_id;
+                if (recipeId && !(task.expanded_recipe_id && children.length > 0)) {
+                  const recipeUpdate: any = {};
+                  if (trade) recipeUpdate.trade = trade;
+                  if (Object.keys(recipeUpdate).length > 0) {
+                    const { error } = await supabase.from('task_recipes').update(recipeUpdate).eq('id', recipeId);
+                    if (error) {
+                      toast({ title: 'Sync failed', description: error.message, variant: 'destructive' });
+                    } else {
+                      toast({ title: 'Recipe metadata updated' });
+                    }
+                  }
+                }
+
+                // If task is a subtask with source_recipe_step_id, sync step data
+                if (task.source_recipe_step_id) {
+                  const stepUpdate: any = { title: taskText };
+                  if (trade) stepUpdate.trade = trade;
+                  const { error } = await supabase
+                    .from('task_recipe_steps')
+                    .update(stepUpdate)
+                    .eq('id', task.source_recipe_step_id);
+                  if (error) {
+                    toast({ title: 'Step sync failed', description: error.message, variant: 'destructive' });
+                  } else {
+                    toast({ title: 'Recipe step updated' });
+                  }
+                }
+
+                setSyncingRecipe(false);
                 setRecipeSyncOpen(false);
               }}
             >

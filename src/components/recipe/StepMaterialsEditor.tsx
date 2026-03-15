@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useStoreSections } from '@/hooks/useStoreSections';
 import { useToast } from '@/hooks/use-toast';
 import { inferStoreSection } from '@/lib/inferStoreSection';
-import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import MaterialAutocomplete, { type LibraryMaterial, type LibraryTool } from '@/components/MaterialAutocomplete';
+import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
+import { Plus, Trash2, Pencil, X, Save } from 'lucide-react';
 
 interface StepMaterial {
   id: string;
@@ -24,6 +24,20 @@ interface StepMaterial {
   store_section: string | null;
   provided_by: string | null;
   notes: string | null;
+  qty_formula: string | null;
+  item_type: string;
+  unit_cost: number | null;
+}
+
+interface QueuedItem {
+  _key: string;
+  material_name: string;
+  qty: number | null;
+  unit: string | null;
+  sku: string | null;
+  vendor_url: string | null;
+  store_section: string | null;
+  provided_by: string;
   qty_formula: string | null;
   item_type: string;
   unit_cost: number | null;
@@ -58,6 +72,10 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const [newStoreSection, setNewStoreSection] = useState('');
   const [newFormula, setNewFormula] = useState('');
 
+  // Batch queue
+  const [queue, setQueue] = useState<QueuedItem[]>([]);
+  const [savingQueue, setSavingQueue] = useState(false);
+
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
   const [editMat, setEditMat] = useState<StepMaterial | null>(null);
@@ -72,7 +90,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const [editStoreSection, setEditStoreSection] = useState('');
   const [editFormula, setEditFormula] = useState('');
   const [editLoading, setEditLoading] = useState(false);
-  const [editSyncToLibrary, setEditSyncToLibrary] = useState(false);
+  const [syncPromptOpen, setSyncPromptOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [pendingSyncData, setPendingSyncData] = useState<{
+    name: string; itemType: string; sku: string; vendorUrl: string;
+    unitCost: string; unit: string; storeSection: string;
+  } | null>(null);
 
   const fetchMaterials = async () => {
     const { data } = await supabase
@@ -145,11 +168,11 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     }
   };
 
-  const handleAdd = async () => {
+  const handleQueueItem = () => {
     if (!newName.trim()) return;
     const autoSection = newStoreSection || inferStoreSection(newName.trim(), activeNames);
-    const { error } = await supabase.from('task_recipe_step_materials').insert({
-      recipe_step_id: stepId,
+    setQueue(prev => [...prev, {
+      _key: crypto.randomUUID(),
       material_name: newName.trim(),
       qty: newQty ? parseFloat(newQty) : null,
       unit: newUnit.trim() || null,
@@ -160,14 +183,33 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       provided_by: newItemType === 'tool' ? newProvidedBy : 'either',
       qty_formula: newFormula.trim() || null,
       item_type: newItemType,
-    } as any);
+    }]);
+    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost('');
+    setNewSku(''); setNewVendorUrl(''); setNewStoreSection('');
+    setNewFormula('');
+    // Keep itemType and providedBy for convenience when adding multiple of same type
+  };
+
+  const handleRemoveFromQueue = (key: string) => {
+    setQueue(prev => prev.filter(i => i._key !== key));
+  };
+
+  const handleSaveQueue = async () => {
+    if (queue.length === 0) return;
+    setSavingQueue(true);
+    const rows = queue.map(({ _key, ...rest }) => ({
+      recipe_step_id: stepId,
+      ...rest,
+    }));
+    const { error } = await supabase.from('task_recipe_step_materials').insert(rows as any);
+    setSavingQueue(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost('');
-    setNewSku(''); setNewVendorUrl(''); setNewStoreSection('');
-    setNewItemType('material'); setNewProvidedBy('either'); setNewFormula('');
+    toast({ title: `${queue.length} item(s) added` });
+    setQueue([]);
+    setNewItemType('material'); setNewProvidedBy('either');
     fetchMaterials();
   };
 
@@ -192,7 +234,6 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     setEditProvidedBy(m.provided_by ?? 'either');
     setEditStoreSection(m.store_section ?? '');
     setEditFormula(m.qty_formula ?? '');
-    setEditSyncToLibrary(false);
     setEditOpen(true);
   };
 
@@ -212,38 +253,6 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       qty_formula: editFormula.trim() || null,
     } as any).eq('id', editMat.id);
 
-    if (!error && editSyncToLibrary) {
-      if (editItemType === 'tool') {
-        const normalized = editName.trim();
-        const { error: toolErr } = await supabase.from('tool_types').upsert({
-          name: normalized,
-          sku: editSku.trim() || null,
-          vendor_url: normalizeUrl(editVendorUrl),
-        }, { onConflict: 'name' });
-        if (toolErr && toolErr.code !== '23505') {
-          toast({ title: 'Tool library update failed', description: toolErr.message, variant: 'destructive' });
-        } else {
-          toast({ title: `"${editName.trim()}" synced to Tool Types` });
-        }
-      } else {
-        const normalized = editName.toLowerCase().trim().replace(/\s+/g, ' ');
-        const { error: libErr } = await supabase.from('material_library').upsert({
-          name: editName.trim(),
-          normalized_name: normalized,
-          unit_cost: editUnitCost ? parseFloat(editUnitCost) : null,
-          sku: editSku.trim() || null,
-          vendor_url: normalizeUrl(editVendorUrl),
-          unit: editUnit.trim() || null,
-          store_section: editStoreSection.trim() || null,
-        }, { onConflict: 'normalized_name' });
-        if (libErr && libErr.code !== '23505') {
-          toast({ title: 'Library update failed', description: libErr.message, variant: 'destructive' });
-        } else {
-          toast({ title: `"${editName.trim()}" synced to Materials Library` });
-        }
-      }
-    }
-
     setEditLoading(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -251,6 +260,53 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
     }
     setEditOpen(false);
     fetchMaterials();
+
+    // Prompt to sync to library
+    setPendingSyncData({
+      name: editName, itemType: editItemType, sku: editSku, vendorUrl: editVendorUrl,
+      unitCost: editUnitCost, unit: editUnit, storeSection: editStoreSection,
+    });
+    setSyncPromptOpen(true);
+  };
+
+  const handleSyncConfirm = async () => {
+    if (!pendingSyncData) return;
+    setSyncLoading(true);
+    const { name, itemType, sku, vendorUrl, unitCost, unit, storeSection } = pendingSyncData;
+
+    if (itemType === 'tool') {
+      const normalized = name.trim();
+      const { error: toolErr } = await supabase.from('tool_types').upsert({
+        name: normalized,
+        sku: sku.trim() || null,
+        vendor_url: normalizeUrl(vendorUrl),
+      }, { onConflict: 'name' });
+      if (toolErr && toolErr.code !== '23505') {
+        toast({ title: 'Tool library update failed', description: toolErr.message, variant: 'destructive' });
+      } else {
+        toast({ title: `"${name.trim()}" synced to Tool Types` });
+      }
+    } else {
+      const normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+      const { error: libErr } = await supabase.from('material_library').upsert({
+        name: name.trim(),
+        normalized_name: normalized,
+        unit_cost: unitCost ? parseFloat(unitCost) : null,
+        sku: sku.trim() || null,
+        vendor_url: normalizeUrl(vendorUrl),
+        unit: unit.trim() || null,
+        store_section: storeSection.trim() || null,
+      }, { onConflict: 'normalized_name' });
+      if (libErr && libErr.code !== '23505') {
+        toast({ title: 'Library update failed', description: libErr.message, variant: 'destructive' });
+      } else {
+        toast({ title: `"${name.trim()}" synced to Materials Library` });
+      }
+    }
+
+    setSyncLoading(false);
+    setSyncPromptOpen(false);
+    setPendingSyncData(null);
   };
 
   const materialItems = materials.filter(m => m.item_type !== 'tool');
@@ -336,6 +392,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
             onSelect={(item) => handleSelectFromLibrary(item, 'new')}
             onAddToLibrary={(name) => handleAddToLibrary(name, 'new')}
             className="flex-1"
+            itemType={newItemType as 'material' | 'tool'}
+            onSelectTool={(tool) => {
+              setNewName(tool.name);
+              if (tool.sku) setNewSku(tool.sku);
+              if (tool.vendor_url) setNewVendorUrl(tool.vendor_url);
+            }}
           />
           <Input placeholder="Qty" type="number" value={newQty} onChange={e => setNewQty(e.target.value)} className="h-7 text-xs w-14" />
           <Input placeholder="Unit" value={newUnit} onChange={e => setNewUnit(e.target.value)} className="h-7 text-xs w-14" />
@@ -360,10 +422,37 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
           <Input placeholder="Qty Formula (e.g. room_sqft * 1.1)" value={newFormula} onChange={e => setNewFormula(e.target.value)} className="h-7 text-xs flex-1" />
         </div>
         <p className="text-[10px] text-muted-foreground">Formula variables: room_sqft, perimeter_ft, task_qty</p>
-        <Button size="sm" onClick={handleAdd} disabled={!newName.trim()} className="h-7 text-xs w-full">
-          <Plus className="h-3 w-3 mr-1" />Add {newItemType === 'tool' ? 'Tool' : 'Material'}
+        <Button size="sm" onClick={handleQueueItem} disabled={!newName.trim()} className="h-7 text-xs w-full">
+          <Plus className="h-3 w-3 mr-1" />Queue {newItemType === 'tool' ? 'Tool' : 'Material'}
         </Button>
       </div>
+
+      {/* Queued items */}
+      {queue.length > 0 && (
+        <div className="space-y-1.5 border rounded-lg p-2 bg-muted/30">
+          <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            Queued ({queue.length})
+          </h4>
+          {queue.map(item => (
+            <div key={item._key} className="flex items-center justify-between gap-2 rounded border bg-background px-2 py-1">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-medium">{item.material_name}</span>
+                <span className="text-[10px] text-muted-foreground ml-1">
+                  {item.item_type === 'tool' ? '🔧' : '📦'}
+                  {item.qty != null && <> · {item.qty}{item.unit ? ` ${item.unit}` : ''}</>}
+                  {item.unit_cost != null && <> · ${item.unit_cost.toFixed(2)}</>}
+                </span>
+              </div>
+              <button onClick={() => handleRemoveFromQueue(item._key)} className="p-0.5 text-muted-foreground hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+          <Button size="sm" onClick={handleSaveQueue} disabled={savingQueue} className="h-7 text-xs w-full">
+            <Save className="h-3 w-3 mr-1" />{savingQueue ? 'Saving…' : `Save All (${queue.length})`}
+          </Button>
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -402,6 +491,12 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
                 onChange={setEditName}
                 onSelect={(item) => handleSelectFromLibrary(item, 'edit')}
                 onAddToLibrary={(name) => handleAddToLibrary(name, 'edit')}
+                itemType={editItemType as 'material' | 'tool'}
+                onSelectTool={(tool) => {
+                  setEditName(tool.name);
+                  if (tool.sku) setEditSku(tool.sku);
+                  if (tool.vendor_url) setEditVendorUrl(tool.vendor_url);
+                }}
               />
             </div>
             <div className="flex gap-2">
@@ -442,22 +537,21 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
               <p className="text-[10px] text-muted-foreground mt-0.5">Variables: room_sqft, perimeter_ft, task_qty</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 pt-1 border-t">
-            <Checkbox
-              id="sync-to-library"
-              checked={editSyncToLibrary}
-              onCheckedChange={(v) => setEditSyncToLibrary(!!v)}
-            />
-            <Label htmlFor="sync-to-library" className="text-xs cursor-pointer">
-              Also update {editItemType === 'tool' ? 'Tool Types' : 'Materials Library'}
-            </Label>
-          </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button onClick={handleEditSave} disabled={editLoading || !editName.trim()}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SyncToLibraryDialog
+        open={syncPromptOpen}
+        onOpenChange={setSyncPromptOpen}
+        title={`Update ${pendingSyncData?.itemType === 'tool' ? 'Tool Types' : 'Materials Library'}?`}
+        description="Would you like to sync these changes to the global library so future recipes and tasks use the updated data?"
+        loading={syncLoading}
+        onConfirm={handleSyncConfirm}
+      />
     </div>
   );
 };

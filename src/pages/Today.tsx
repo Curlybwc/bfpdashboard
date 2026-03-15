@@ -5,7 +5,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useTodayData } from '@/hooks/useTodayData';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
-import NextUpCard from '@/components/NextUpCard';
+
 import DailyReminders from '@/components/DailyReminders';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -83,22 +83,6 @@ const Today = () => {
   /* ── Derived state ── */
   const isContractor = !isAdmin && !isManager;
 
-  const nextUpTask = useMemo(() => {
-    if (!isContractor) return null;
-    const candidates = [...inProgress, ...assigned].filter(t => getTaskOperationalStatus(t) !== 'blocked');
-    candidates.sort(rankTasks);
-    return candidates[0] || null;
-  }, [isContractor, inProgress, assigned]);
-
-  const filteredInProgress = useMemo(() => {
-    if (!nextUpTask) return inProgress;
-    return inProgress.filter(t => t.id !== nextUpTask.id);
-  }, [inProgress, nextUpTask]);
-
-  const filteredAssigned = useMemo(() => {
-    if (!nextUpTask) return assigned;
-    return assigned.filter(t => t.id !== nextUpTask.id);
-  }, [assigned, nextUpTask]);
 
   const showShiftReminder = isContractor && !hasShiftToday && new Date().getHours() >= 10;
 
@@ -244,25 +228,6 @@ const Today = () => {
   /* ── Contractor layout ── */
   const ContractorView = () => (
     <>
-      <div className="mb-6">
-        <NextUpCard
-          task={nextUpTask}
-          projectName={nextUpTask ? (projectMap[nextUpTask.project_id]?.name || '') : ''}
-          projectAddress={nextUpTask ? projectMap[nextUpTask.project_id]?.address : undefined}
-          parentTitle={nextUpTask?.parent_task_id ? parentTitles[nextUpTask.parent_task_id] : undefined}
-          userId={user!.id}
-          isAdmin={isAdmin}
-          onUpdate={refresh}
-          isCrewTask={nextUpTask?.assignment_mode === 'crew'}
-          isActiveWorker={nextUpTask ? crewActiveTaskIds.has(nextUpTask.id) : false}
-          isCandidate={nextUpTask ? crewCandidateTaskIds.has(nextUpTask.id) : false}
-          activeWorkerCount={nextUpTask ? (crewWorkerCounts[nextUpTask.id] || 0) : 0}
-          blockerInfo={nextUpTask ? (blockerMap[nextUpTask.id] || null) : null}
-          photoCount={nextUpTask ? (photoCountMap[nextUpTask.id] || 0) : 0}
-          materialCount={nextUpTask ? (materialCountMap[nextUpTask.id] || 0) : 0}
-        />
-      </div>
-
       {showShiftReminder && (
         <div className="mb-6">
           <DailyReminders
@@ -272,13 +237,13 @@ const Today = () => {
         </div>
       )}
 
+      <Section title="Working Now" tasks={inProgress} emptyText="No tasks in progress." />
+      <Section title="Up Next" tasks={assigned} emptyText="No assigned tasks." />
+      <Section title="Available to Take" tasks={available} emptyText="No tasks available for dibs." />
+
       {blocked.length > 0 && (
         <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="" isBlockedSection />
       )}
-
-      <Section title="Working Now" tasks={filteredInProgress} emptyText="No tasks in progress." />
-      <Section title="Up Next" tasks={filteredAssigned} emptyText="No assigned tasks." />
-      <Section title="Available to Take" tasks={available} emptyText="No tasks available for dibs." />
     </>
   );
 
@@ -286,10 +251,10 @@ const Today = () => {
   const ManagerView = () => (
     <>
       <Section title="Needs Review (Contractor / Field Reports)" tasks={needsReview} emptyText="No tasks pending review." />
-      <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
       <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
       <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />
       <Section title="Available" tasks={available} emptyText="No tasks available for dibs." />
+      <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
     </>
   );
 

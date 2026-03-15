@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
-import { format, addDays, startOfDay } from 'date-fns';
+import { useEffect, useState, useMemo } from 'react';
+import { format, addDays, addWeeks, addMonths, startOfDay, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, isAfter, getDay } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useAvailability, AvailabilityWindow } from '@/hooks/useAvailability';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const DAYS_AHEAD = 7;
+const MAX_WEEKS_AHEAD = 8;
 
 const formatDateLabel = (dateStr: string) => {
   const d = new Date(dateStr + 'T00:00:00');
@@ -34,20 +38,80 @@ interface EditingRow {
   notes: string;
 }
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEK_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+type ViewMode = 'week' | 'month';
+
 const AvailabilityForm = () => {
   const { user } = useAuth();
   const { windows, loading, fetchMyAvailability, addWindow, updateWindow, deleteWindow } = useAvailability(user?.id);
   const { toast } = useToast();
   const [editing, setEditing] = useState<EditingRow | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [offset, setOffset] = useState(0);
+  const [repeatSource, setRepeatSource] = useState<{ date: string; windowId: string } | null>(null);
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [repeatWeeks, setRepeatWeeks] = useState(4);
 
   const today = startOfDay(new Date());
-  const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => format(addDays(today, i), 'yyyy-MM-dd'));
-  const from = dates[0];
-  const to = dates[dates.length - 1];
+  const maxDate = addWeeks(today, MAX_WEEKS_AHEAD);
+
+  const { dates, rangeLabel, from, to } = useMemo(() => {
+    if (viewMode === 'week') {
+      const weekStart = addWeeks(startOfWeek(today, { weekStartsOn: 1 }), offset);
+      const weekEnd = addDays(weekStart, 6);
+      const clampedStart = isBefore(weekStart, today) ? today : weekStart;
+      const clampedEnd = isAfter(weekEnd, maxDate) ? maxDate : weekEnd;
+      if (isAfter(clampedStart, clampedEnd)) {
+        return { dates: [], rangeLabel: '', from: '', to: '' };
+      }
+      const days = eachDayOfInterval({ start: clampedStart, end: clampedEnd });
+      return {
+        dates: days.map(d => format(d, 'yyyy-MM-dd')),
+        rangeLabel: `${format(clampedStart, 'MMM d')} – ${format(clampedEnd, 'MMM d')}`,
+        from: format(clampedStart, 'yyyy-MM-dd'),
+        to: format(clampedEnd, 'yyyy-MM-dd'),
+      };
+    } else {
+      const monthStart = startOfMonth(addMonths(today, offset));
+      const monthEnd = endOfMonth(monthStart);
+      const clampedStart = isBefore(monthStart, today) ? today : monthStart;
+      const clampedEnd = isAfter(monthEnd, maxDate) ? maxDate : monthEnd;
+      if (isAfter(clampedStart, clampedEnd)) {
+        return { dates: [], rangeLabel: '', from: '', to: '' };
+      }
+      const days = eachDayOfInterval({ start: clampedStart, end: clampedEnd });
+      return {
+        dates: days.map(d => format(d, 'yyyy-MM-dd')),
+        rangeLabel: format(monthStart, 'MMMM yyyy'),
+        from: format(clampedStart, 'yyyy-MM-dd'),
+        to: format(clampedEnd, 'yyyy-MM-dd'),
+      };
+    }
+  }, [viewMode, offset, today.getTime()]);
+
+  // Reset offset when switching view modes
+  useEffect(() => {
+    setOffset(0);
+    setEditing(null);
+  }, [viewMode]);
 
   useEffect(() => {
-    if (user) fetchMyAvailability(from, to);
+    if (user && from && to) fetchMyAvailability(from, to);
   }, [user, from, to, fetchMyAvailability]);
+
+  // Navigation limits
+  const canGoBack = offset > 0;
+  const canGoForward = useMemo(() => {
+    if (viewMode === 'week') {
+      const nextWeekStart = addWeeks(startOfWeek(today, { weekStartsOn: 1 }), offset + 1);
+      return isBefore(nextWeekStart, maxDate);
+    } else {
+      const nextMonthStart = startOfMonth(addMonths(today, offset + 1));
+      return isBefore(nextMonthStart, maxDate);
+    }
+  }, [viewMode, offset, today.getTime()]);
 
   const windowsByDate = (date: string) => windows.filter(w => w.available_date === date);
 
@@ -97,11 +161,99 @@ const AvailabilityForm = () => {
     if (ok) fetchMyAvailability(from, to);
   };
 
+  // Open repeat popover for a specific availability window
+  const openRepeat = (date: string, windowId: string) => {
+    const dayOfWeek = getDay(new Date(date + 'T00:00:00'));
+    setRepeatSource({ date, windowId });
+    setRepeatDays([dayOfWeek]);
+    setRepeatWeeks(4);
+  };
+
+  const handleRepeat = async () => {
+    if (!repeatSource) return;
+    const sourceWindow = windows.find(w => w.id === repeatSource.windowId);
+    if (!sourceWindow) return;
+
+    const startDate = startOfDay(new Date());
+    const endDate = addWeeks(startDate, repeatWeeks);
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+    let created = 0;
+    for (const day of allDays) {
+      const dow = getDay(day);
+      if (!repeatDays.includes(dow)) continue;
+      const dateStr = format(day, 'yyyy-MM-dd');
+      if (dateStr === repeatSource.date) continue;
+      // Skip dates that already have availability
+      const existing = windows.filter(w => w.available_date === dateStr);
+      if (existing.length > 0) continue;
+      await addWindow({
+        available_date: dateStr,
+        start_time: sourceWindow.start_time.slice(0, 5),
+        end_time: sourceWindow.end_time.slice(0, 5),
+        notes: sourceWindow.notes || undefined,
+      });
+      created++;
+    }
+    setRepeatSource(null);
+    if (created > 0) {
+      fetchMyAvailability(from, to);
+      toast({ title: `Created ${created} availability entries` });
+    }
+  };
+
+  const toggleRepeatDay = (day: number) => {
+    setRepeatDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  const totalHoursInRange = windows.reduce((sum, w) => sum + computeHours(w.start_time, w.end_time), 0);
+  const daysWithAvailability = new Set(windows.map(w => w.available_date)).size;
+
   return (
     <div>
-      <p className="text-sm text-muted-foreground mb-4">Enter when you're available over the next week.</p>
+      {/* View mode toggle */}
+      <Tabs value={viewMode} onValueChange={v => setViewMode(v as ViewMode)} className="mb-3">
+        <TabsList className="w-full">
+          <TabsTrigger value="week" className="flex-1">Week</TabsTrigger>
+          <TabsTrigger value="month" className="flex-1">Month</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setOffset(o => o - 1)}
+          disabled={!canGoBack}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm font-medium">{rangeLabel}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => setOffset(o => o + 1)}
+          disabled={!canGoForward}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Summary */}
+      {!loading && windows.length > 0 && (
+        <p className="text-xs text-muted-foreground mb-3 text-center">
+          {daysWithAvailability} day{daysWithAvailability !== 1 ? 's' : ''} · {formatHours(totalHoursInRange)} total
+        </p>
+      )}
 
       {loading && <p className="text-sm text-muted-foreground text-center py-8">Loading...</p>}
+
+      {!loading && dates.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-8">No dates in this range.</p>
+      )}
 
       {!loading && dates.map(date => {
         const dayWindows = windowsByDate(date);
@@ -109,15 +261,17 @@ const AvailabilityForm = () => {
           <div key={date} className="mb-4">
             <div className="flex items-center justify-between mb-1.5">
               <h3 className="text-sm font-semibold">{formatDateLabel(date)}</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => startAdd(date)}
-                disabled={editing !== null}
-              >
-                <Plus className="h-3.5 w-3.5" /> Add
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => startAdd(date)}
+                  disabled={editing !== null}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </Button>
+              </div>
             </div>
 
             {dayWindows.length === 0 && (!editing || editing.date !== date) && (
@@ -137,7 +291,55 @@ const AvailabilityForm = () => {
                     </span>
                     {w.notes && <p className="text-xs text-muted-foreground truncate mt-0.5">{w.notes}</p>}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
+                    <Popover open={repeatSource?.windowId === w.id} onOpenChange={open => { if (!open) setRepeatSource(null); }}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openRepeat(date, w.id)} disabled={editing !== null} title="Repeat">
+                          <Repeat className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-3" align="end">
+                        <p className="text-xs font-medium mb-2">
+                          Repeat {w.start_time.slice(0, 5)}–{w.end_time.slice(0, 5)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-1.5">On these days:</p>
+                        <div className="flex gap-1 mb-3">
+                          {DAY_LABELS.map((label, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => toggleRepeatDay(i)}
+                              className={`h-8 w-8 rounded-md text-xs font-medium border transition-colors ${
+                                repeatDays.includes(i)
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background text-muted-foreground border-input hover:bg-accent'
+                              }`}
+                            >
+                              {label.charAt(0)}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1.5">For how long:</p>
+                        <Select value={String(repeatWeeks)} onValueChange={v => setRepeatWeeks(Number(v))}>
+                          <SelectTrigger className="h-8 text-xs mb-3">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {WEEK_OPTIONS.map(n => (
+                              <SelectItem key={n} value={String(n)}>{n} week{n > 1 ? 's' : ''}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          className="w-full h-8 text-xs"
+                          disabled={repeatDays.length === 0}
+                          onClick={handleRepeat}
+                        >
+                          Apply
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(w)} disabled={editing !== null}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>

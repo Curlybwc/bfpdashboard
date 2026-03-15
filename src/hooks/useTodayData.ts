@@ -121,7 +121,12 @@ async function fetchCoreTasks(userId: string, memberProjectIds: string[]) {
 }
 
 /** Phase 3: crew task hydration */
-async function fetchCrewTasks(myActiveTaskIds: Set<string>, myCandidateIds: Set<string>) {
+async function fetchCrewTasks(
+  myActiveTaskIds: Set<string>,
+  myCandidateIds: Set<string>,
+  isAdminOrManager: boolean,
+  memberProjectIds: string[],
+) {
   let crewIpTasks: any[] = [];
   if (myActiveTaskIds.size > 0) {
     const res = await supabase
@@ -143,7 +148,19 @@ async function fetchCrewTasks(myActiveTaskIds: Set<string>, myCandidateIds: Set<
     crewAvailTasks = unwrap(res, 'Crew available tasks');
   }
 
-  return { crewIpTasks, crewAvailTasks };
+  // For managers/admins: fetch all crew tasks from their projects
+  let managerCrewTasks: any[] = [];
+  if (isAdminOrManager && memberProjectIds.length > 0) {
+    const res = await supabase
+      .from('tasks').select('*')
+      .eq('assignment_mode', 'crew')
+      .neq('stage', 'Done')
+      .in('project_id', memberProjectIds)
+      .limit(200);
+    managerCrewTasks = unwrap(res, 'Manager crew tasks');
+  }
+
+  return { crewIpTasks, crewAvailTasks, managerCrewTasks };
 }
 
 /** Phase 4: blocked + review tasks + blocker details */
@@ -312,7 +329,13 @@ function addCrewWorkerCounts(tasks: any[], crewWorkerCounts: Record<string, numb
   return tasks.map((task) => ({ ...task, active_worker_count: crewWorkerCounts[task.id] || 0 }));
 }
 
-function splitTodaySections(tasks: any[], childTasksByParent: Record<string, any[]>, isAdminOrManager: boolean, userId: string) {
+function splitTodaySections(
+  tasks: any[],
+  childTasksByParent: Record<string, any[]>,
+  isAdminOrManager: boolean,
+  userId: string,
+  crewCandidateTaskIds: Set<string>,
+) {
   const inProgress: any[] = [];
   const assigned: any[] = [];
   const available: any[] = [];
@@ -343,8 +366,9 @@ function splitTodaySections(tasks: any[], childTasksByParent: Record<string, any
     }
 
     if (status === 'ready') {
-      const canTake = !task.assigned_to_user_id && task.assignment_mode === 'solo' && !task.is_outside_vendor;
-      if (canTake) available.push(task);
+      const isSoloAvailable = !task.assigned_to_user_id && task.assignment_mode === 'solo' && !task.is_outside_vendor;
+      const isCrewAvailable = task.assignment_mode === 'crew' && (crewCandidateTaskIds.has(task.id) || isAdminOrManager);
+      if (isSoloAvailable || isCrewAvailable) available.push(task);
       else if (task.assigned_to_user_id === userId) assigned.push(task);
     }
   });
@@ -363,10 +387,10 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
       const isAdminOrManager = isAdmin || hasManagerRole;
 
       const core = await fetchCoreTasks(userId, memberProjectIds);
-      const crew = await fetchCrewTasks(core.myActiveTaskIds, core.myCandidateIds);
+      const crew = await fetchCrewTasks(core.myActiveTaskIds, core.myCandidateIds, isAdminOrManager, memberProjectIds);
 
       const mergedIp = mergeAndDedupe(core.soloIp, crew.crewIpTasks);
-      const mergedAvail = mergeAndDedupe(core.soloAvail, crew.crewAvailTasks);
+      const mergedAvail = mergeAndDedupe(core.soloAvail, [...crew.crewAvailTasks, ...crew.managerCrewTasks]);
 
       const { blockedTasks, blockerMap, reviewTasks } = await fetchBlockedAndReview(
         isAdminOrManager,
@@ -388,7 +412,7 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
         material_count: enrichment.materialCountMap[task.id] || 0,
       }));
 
-      const sections = splitTodaySections(allTasksWithCounts, childTasksByParent, isAdminOrManager, userId);
+      const sections = splitTodaySections(allTasksWithCounts, childTasksByParent, isAdminOrManager, userId, core.myCandidateIds);
 
       return {
         ...sections,
