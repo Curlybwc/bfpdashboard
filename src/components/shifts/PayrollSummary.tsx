@@ -467,6 +467,41 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     await fetchYearLedger(reportYear);
   };
 
+  const handleStartEditRate = (userId: string, currentRate: number | null) => {
+    setEditingRateUserId(userId);
+    setEditingRateValue(currentRate != null ? String(currentRate) : '');
+  };
+
+  const handleCancelEditRate = () => {
+    setEditingRateUserId(null);
+    setEditingRateValue('');
+  };
+
+  const handleSaveRate = async (userId: string) => {
+    const numRate = Number(editingRateValue);
+    if (!Number.isFinite(numRate) || numRate < 0) {
+      toast({ title: 'Invalid rate', description: 'Enter a valid hourly rate (≥ 0).', variant: 'destructive' });
+      return;
+    }
+
+    setSavingRate(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ hourly_rate: numRate })
+      .eq('id', userId);
+    setSavingRate(false);
+
+    if (error) {
+      toast({ title: 'Failed to save rate', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    setEditingRateUserId(null);
+    setEditingRateValue('');
+    toast({ title: 'Hourly rate updated' });
+    fetchPayroll();
+  };
+
   const yearGroup = useMemo(() => {
     const grouped = new Map<string, WorkerPaymentRecord[]>();
     for (const row of yearPayments) {
