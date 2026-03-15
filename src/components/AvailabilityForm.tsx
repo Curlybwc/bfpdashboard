@@ -319,7 +319,7 @@ const AvailabilityForm = () => {
                     </PopoverContent>
                   </Popover>
                 ))}
-                {dayWindows.length > 0 && dayWindows.length > 1 && null}
+                
                 <Button
                   variant="ghost"
                   size="sm"
