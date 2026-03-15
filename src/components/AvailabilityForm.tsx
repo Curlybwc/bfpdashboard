@@ -1,13 +1,16 @@
 import { useEffect, useState, useMemo } from 'react';
-import { format, addDays, addWeeks, addMonths, startOfDay, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, isAfter } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, startOfDay, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, isAfter, getDay } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useAvailability, AvailabilityWindow } from '@/hooks/useAvailability';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const MAX_WEEKS_AHEAD = 8;
 
@@ -35,6 +38,9 @@ interface EditingRow {
   notes: string;
 }
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEK_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+
 type ViewMode = 'week' | 'month';
 
 const AvailabilityForm = () => {
@@ -43,7 +49,10 @@ const AvailabilityForm = () => {
   const { toast } = useToast();
   const [editing, setEditing] = useState<EditingRow | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [offset, setOffset] = useState(0); // weeks or months offset from today
+  const [offset, setOffset] = useState(0);
+  const [repeatSource, setRepeatSource] = useState<{ date: string; windowId: string } | null>(null);
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [repeatWeeks, setRepeatWeeks] = useState(4);
 
   const today = startOfDay(new Date());
   const maxDate = addWeeks(today, MAX_WEEKS_AHEAD);
@@ -152,30 +161,49 @@ const AvailabilityForm = () => {
     if (ok) fetchMyAvailability(from, to);
   };
 
-  // Copy a day's availability to all remaining empty days in the visible range
-  const handleCopyToWeek = async (sourceDate: string) => {
-    const sourceWindows = windowsByDate(sourceDate);
-    if (sourceWindows.length === 0) return;
+  // Open repeat popover for a specific availability window
+  const openRepeat = (date: string, windowId: string) => {
+    const dayOfWeek = getDay(new Date(date + 'T00:00:00'));
+    setRepeatSource({ date, windowId });
+    setRepeatDays([dayOfWeek]);
+    setRepeatWeeks(4);
+  };
 
-    let copied = 0;
-    for (const date of dates) {
-      if (date === sourceDate) continue;
-      const existing = windowsByDate(date);
+  const handleRepeat = async () => {
+    if (!repeatSource) return;
+    const sourceWindow = windows.find(w => w.id === repeatSource.windowId);
+    if (!sourceWindow) return;
+
+    const startDate = startOfDay(new Date());
+    const endDate = addWeeks(startDate, repeatWeeks);
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+    let created = 0;
+    for (const day of allDays) {
+      const dow = getDay(day);
+      if (!repeatDays.includes(dow)) continue;
+      const dateStr = format(day, 'yyyy-MM-dd');
+      if (dateStr === repeatSource.date) continue;
+      // Skip dates that already have availability
+      const existing = windows.filter(w => w.available_date === dateStr);
       if (existing.length > 0) continue;
-      for (const w of sourceWindows) {
-        await addWindow({
-          available_date: date,
-          start_time: w.start_time.slice(0, 5),
-          end_time: w.end_time.slice(0, 5),
-          notes: w.notes || undefined,
-        });
-        copied++;
-      }
+      await addWindow({
+        available_date: dateStr,
+        start_time: sourceWindow.start_time.slice(0, 5),
+        end_time: sourceWindow.end_time.slice(0, 5),
+        notes: sourceWindow.notes || undefined,
+      });
+      created++;
     }
-    if (copied > 0) {
+    setRepeatSource(null);
+    if (created > 0) {
       fetchMyAvailability(from, to);
-      toast({ title: `Copied to ${dates.length - 1} days` });
+      toast({ title: `Created ${created} availability entries` });
     }
+  };
+
+  const toggleRepeatDay = (day: number) => {
+    setRepeatDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   };
 
   const totalHoursInRange = windows.reduce((sum, w) => sum + computeHours(w.start_time, w.end_time), 0);
@@ -234,18 +262,64 @@ const AvailabilityForm = () => {
             <div className="flex items-center justify-between mb-1.5">
               <h3 className="text-sm font-semibold">{formatDateLabel(date)}</h3>
               <div className="flex items-center gap-1">
-                {dayWindows.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => handleCopyToWeek(date)}
-                    disabled={editing !== null}
-                    title="Copy to empty days"
-                  >
-                    <Copy className="h-3 w-3" /> Copy
-                  </Button>
-                )}
+                {dayWindows.map(w => (
+                  <Popover key={w.id} open={repeatSource?.windowId === w.id} onOpenChange={open => { if (!open) setRepeatSource(null); }}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => openRepeat(date, w.id)}
+                        disabled={editing !== null}
+                        title="Repeat this window"
+                      >
+                        <Repeat className="h-3 w-3" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-3" align="end">
+                      <p className="text-xs font-medium mb-2">
+                        Repeat {w.start_time.slice(0, 5)}–{w.end_time.slice(0, 5)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-1.5">On these days:</p>
+                      <div className="flex gap-1 mb-3">
+                        {DAY_LABELS.map((label, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => toggleRepeatDay(i)}
+                            className={`h-8 w-8 rounded-md text-xs font-medium border transition-colors ${
+                              repeatDays.includes(i)
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-background text-muted-foreground border-input hover:bg-accent'
+                            }`}
+                          >
+                            {label.charAt(0)}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-1.5">For how long:</p>
+                      <Select value={String(repeatWeeks)} onValueChange={v => setRepeatWeeks(Number(v))}>
+                        <SelectTrigger className="h-8 text-xs mb-3">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WEEK_OPTIONS.map(n => (
+                            <SelectItem key={n} value={String(n)}>{n} week{n > 1 ? 's' : ''}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        className="w-full h-8 text-xs"
+                        disabled={repeatDays.length === 0}
+                        onClick={handleRepeat}
+                      >
+                        Apply
+                      </Button>
+                    </PopoverContent>
+                  </Popover>
+                ))}
+                
                 <Button
                   variant="ghost"
                   size="sm"
