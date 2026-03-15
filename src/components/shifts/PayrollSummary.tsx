@@ -803,13 +803,68 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                   </Card>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pl-4 pt-2 space-y-2">
-                  <div className="rounded border border-border bg-card p-2">
-                    <p className="text-xs font-medium mb-1">Payout setup</p>
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      <p>Connected account: {cs.payout_profile?.stripe_connected_account_id ? 'Connected' : 'Not connected'}</p>
-                      <p>Details submitted: {cs.payout_profile?.details_submitted ? 'Yes' : 'No'}</p>
-                      <p>Payouts enabled: {cs.payout_profile?.payouts_enabled ? 'Yes' : 'No'}</p>
-                      <p>Charges enabled: {cs.payout_profile?.charges_enabled ? 'Yes' : 'No'}</p>
+                  <div className="rounded border border-border bg-card p-2 space-y-2">
+                    <div>
+                      <p className="text-xs font-medium mb-1">Hourly Rate</p>
+                      {editingRateUserId === cs.user_id ? (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className="h-7 w-24 text-xs"
+                            value={editingRateValue}
+                            onChange={(e) => setEditingRateValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveRate(cs.user_id);
+                              if (e.key === 'Escape') handleCancelEditRate();
+                            }}
+                            autoFocus
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            disabled={savingRate}
+                            onClick={(e) => { e.stopPropagation(); handleSaveRate(cs.user_id); }}
+                          >
+                            {savingRate ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            disabled={savingRate}
+                            onClick={(e) => { e.stopPropagation(); handleCancelEditRate(); }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs text-muted-foreground">
+                            {cs.rate != null ? `$${cs.rate}/hr` : <span className="text-destructive">Not set</span>}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => { e.stopPropagation(); handleStartEditRate(cs.user_id, cs.rate); }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium mb-1">Payout setup</p>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p>Connected account: {cs.payout_profile?.stripe_connected_account_id ? 'Connected' : 'Not connected'}</p>
+                        <p>Details submitted: {cs.payout_profile?.details_submitted ? 'Yes' : 'No'}</p>
+                        <p>Payouts enabled: {cs.payout_profile?.payouts_enabled ? 'Yes' : 'No'}</p>
+                        <p>Charges enabled: {cs.payout_profile?.charges_enabled ? 'Yes' : 'No'}</p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-1 pt-2">
                       {!cs.payout_profile?.stripe_connected_account_id ? (
