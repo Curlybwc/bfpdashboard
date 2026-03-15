@@ -527,7 +527,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     const csv = [
       headers.join(','),
-      ...rows.map((row) => headers.map((h) => `"${String(row[h as keyof typeof row]).replaceAll('"', '""')}"`).join(',')),
+      ...rows.map((row) => headers.map((h) => `"${String(row[h as keyof typeof row]).replace(/"/g, '""')}"`).join(',')),
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

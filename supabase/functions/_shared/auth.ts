@@ -8,7 +8,7 @@ export const corsHeaders = {
 
 export interface AdminAuthResult {
   userId: string;
-  adminClient: ReturnType<typeof createClient>;
+  adminClient: SupabaseClient;
 }
 
 export async function requireAdminAuth(req: Request): Promise<AdminAuthResult> {
