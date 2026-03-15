@@ -17,3 +17,12 @@ verify_jwt = false
 
 [functions.stripe_sync_payout_profile]
 verify_jwt = false
+
+[functions.stripe_create_payout_run]
+verify_jwt = false
+
+[functions.stripe_submit_payout_run]
+verify_jwt = false
+
+[functions.admin_add_manual_payment]
+verify_jwt = false

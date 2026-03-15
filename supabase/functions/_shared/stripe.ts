@@ -19,6 +19,14 @@ export interface WorkerPayoutUpdate {
   onboarding_status: "not_started" | "in_progress" | "completed" | "restricted";
 }
 
+export interface StripeTransfer {
+  id: string;
+  amount: number;
+  currency: string;
+  destination: string;
+  balance_transaction?: string | null;
+}
+
 function requireStripeSecret(): string {
   const key = Deno.env.get("STRIPE_SECRET_KEY");
   if (!key) {
@@ -62,6 +70,31 @@ export async function createConnectedAccount(workerUserId: string, email: string
 
 export async function getConnectedAccount(accountId: string): Promise<StripeAccount> {
   return await stripeRequest(`/accounts/${accountId}`);
+}
+
+export async function createTransfer(params: {
+  amountCents: number;
+  destinationAccountId: string;
+  transferGroup: string;
+  description?: string;
+  metadata?: Record<string, string>;
+}): Promise<StripeTransfer> {
+  const body = new URLSearchParams();
+  body.set("amount", String(params.amountCents));
+  body.set("currency", "usd");
+  body.set("destination", params.destinationAccountId);
+  body.set("transfer_group", params.transferGroup);
+  if (params.description) body.set("description", params.description);
+
+  for (const [key, value] of Object.entries(params.metadata || {})) {
+    body.set(`metadata[${key}]`, value);
+  }
+
+  return await stripeRequest("/transfers", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
 }
 
 export async function createAccountLink(accountId: string, linkType: "account_onboarding" | "account_update"): Promise<string> {
