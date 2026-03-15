@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { ChevronDown, Trash2, Pencil, Loader2, RefreshCw, Link as LinkIcon, CreditCard, Send, FileDown } from 'lucide-react';
+import { ChevronDown, Trash2, Pencil, Loader2, RefreshCw, Link as LinkIcon, CreditCard, Send, FileDown, DollarSign, Check, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
@@ -76,6 +76,9 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [creatingRun, setCreatingRun] = useState(false);
   const [submittingRun, setSubmittingRun] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
+  const [editingRateUserId, setEditingRateUserId] = useState<string | null>(null);
+  const [editingRateValue, setEditingRateValue] = useState('');
+  const [savingRate, setSavingRate] = useState(false);
   const [activeRun, setActiveRun] = useState<PayoutRunRecord | null>(null);
   const [runPayments, setRunPayments] = useState<WorkerPaymentRecord[]>([]);
   const [yearPayments, setYearPayments] = useState<WorkerPaymentRecord[]>([]);
@@ -464,6 +467,41 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     await fetchYearLedger(reportYear);
   };
 
+  const handleStartEditRate = (userId: string, currentRate: number | null) => {
+    setEditingRateUserId(userId);
+    setEditingRateValue(currentRate != null ? String(currentRate) : '');
+  };
+
+  const handleCancelEditRate = () => {
+    setEditingRateUserId(null);
+    setEditingRateValue('');
+  };
+
+  const handleSaveRate = async (userId: string) => {
+    const numRate = Number(editingRateValue);
+    if (!Number.isFinite(numRate) || numRate < 0) {
+      toast({ title: 'Invalid rate', description: 'Enter a valid hourly rate (≥ 0).', variant: 'destructive' });
+      return;
+    }
+
+    setSavingRate(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ hourly_rate: numRate })
+      .eq('id', userId);
+    setSavingRate(false);
+
+    if (error) {
+      toast({ title: 'Failed to save rate', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    setEditingRateUserId(null);
+    setEditingRateValue('');
+    toast({ title: 'Hourly rate updated' });
+    fetchPayroll();
+  };
+
   const yearGroup = useMemo(() => {
     const grouped = new Map<string, WorkerPaymentRecord[]>();
     for (const row of yearPayments) {
@@ -756,23 +794,77 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                       </div>
                       <div className="text-right text-sm space-y-0.5">
                         <p>{cs.total_hours}h</p>
-                        {cs.rate != null && (
-                          <p className="text-xs text-muted-foreground">
-                            ${cs.rate}/hr · <span className="font-medium text-foreground">${cs.total_pay.toFixed(2)}</span>
-                          </p>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {cs.rate != null ? `$${cs.rate}/hr · ` : <span className="text-destructive">No rate · </span>}
+                          <span className="font-medium text-foreground">${cs.total_pay.toFixed(2)}</span>
+                        </p>
                       </div>
                     </div>
                   </Card>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pl-4 pt-2 space-y-2">
-                  <div className="rounded border border-border bg-card p-2">
-                    <p className="text-xs font-medium mb-1">Payout setup</p>
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      <p>Connected account: {cs.payout_profile?.stripe_connected_account_id ? 'Connected' : 'Not connected'}</p>
-                      <p>Details submitted: {cs.payout_profile?.details_submitted ? 'Yes' : 'No'}</p>
-                      <p>Payouts enabled: {cs.payout_profile?.payouts_enabled ? 'Yes' : 'No'}</p>
-                      <p>Charges enabled: {cs.payout_profile?.charges_enabled ? 'Yes' : 'No'}</p>
+                  <div className="rounded border border-border bg-card p-2 space-y-2">
+                    <div>
+                      <p className="text-xs font-medium mb-1">Hourly Rate</p>
+                      {editingRateUserId === cs.user_id ? (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className="h-7 w-24 text-xs"
+                            value={editingRateValue}
+                            onChange={(e) => setEditingRateValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveRate(cs.user_id);
+                              if (e.key === 'Escape') handleCancelEditRate();
+                            }}
+                            autoFocus
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            disabled={savingRate}
+                            onClick={(e) => { e.stopPropagation(); handleSaveRate(cs.user_id); }}
+                          >
+                            {savingRate ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            disabled={savingRate}
+                            onClick={(e) => { e.stopPropagation(); handleCancelEditRate(); }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs text-muted-foreground">
+                            {cs.rate != null ? `$${cs.rate}/hr` : <span className="text-destructive">Not set</span>}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => { e.stopPropagation(); handleStartEditRate(cs.user_id, cs.rate); }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium mb-1">Payout setup</p>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p>Connected account: {cs.payout_profile?.stripe_connected_account_id ? 'Connected' : 'Not connected'}</p>
+                        <p>Details submitted: {cs.payout_profile?.details_submitted ? 'Yes' : 'No'}</p>
+                        <p>Payouts enabled: {cs.payout_profile?.payouts_enabled ? 'Yes' : 'No'}</p>
+                        <p>Charges enabled: {cs.payout_profile?.charges_enabled ? 'Yes' : 'No'}</p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-1 pt-2">
                       {!cs.payout_profile?.stripe_connected_account_id ? (
