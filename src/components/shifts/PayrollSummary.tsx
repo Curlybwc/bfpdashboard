@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { ChevronDown, Trash2, Pencil, Loader2, RefreshCw, Link as LinkIcon, CreditCard, Send, FileDown } from 'lucide-react';
+import { ChevronDown, Trash2, Pencil, Loader2, RefreshCw, Link as LinkIcon, CreditCard, Send, FileDown, DollarSign, Check, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
