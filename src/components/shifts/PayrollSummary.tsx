@@ -24,6 +24,11 @@ interface PayrollSummaryProps {
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
 }
 
+type WorkerPayoutProfile = Tables<'worker_payout_profiles'>;
+type WorkerTaxProfile = Tables<'worker_tax_profiles'>;
+
+type PayoutUiStatus = 'not_connected' | 'in_progress' | 'ready' | 'action_required';
+
 interface ContractorSummary {
   user_id: string;
   full_name: string;
