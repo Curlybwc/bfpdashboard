@@ -794,11 +794,10 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                       </div>
                       <div className="text-right text-sm space-y-0.5">
                         <p>{cs.total_hours}h</p>
-                        {cs.rate != null && (
-                          <p className="text-xs text-muted-foreground">
-                            ${cs.rate}/hr · <span className="font-medium text-foreground">${cs.total_pay.toFixed(2)}</span>
-                          </p>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {cs.rate != null ? `$${cs.rate}/hr · ` : <span className="text-destructive">No rate · </span>}
+                          <span className="font-medium text-foreground">${cs.total_pay.toFixed(2)}</span>
+                        </p>
                       </div>
                     </div>
                   </Card>
