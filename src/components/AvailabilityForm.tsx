@@ -1,13 +1,16 @@
 import { useEffect, useState, useMemo } from 'react';
-import { format, addDays, addWeeks, addMonths, startOfDay, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, isAfter } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, startOfDay, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, isAfter, getDay } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useAvailability, AvailabilityWindow } from '@/hooks/useAvailability';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const MAX_WEEKS_AHEAD = 8;
 
