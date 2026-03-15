@@ -76,6 +76,9 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [creatingRun, setCreatingRun] = useState(false);
   const [submittingRun, setSubmittingRun] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
+  const [editingRateUserId, setEditingRateUserId] = useState<string | null>(null);
+  const [editingRateValue, setEditingRateValue] = useState('');
+  const [savingRate, setSavingRate] = useState(false);
   const [activeRun, setActiveRun] = useState<PayoutRunRecord | null>(null);
   const [runPayments, setRunPayments] = useState<WorkerPaymentRecord[]>([]);
   const [yearPayments, setYearPayments] = useState<WorkerPaymentRecord[]>([]);
