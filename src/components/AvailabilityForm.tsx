@@ -161,30 +161,49 @@ const AvailabilityForm = () => {
     if (ok) fetchMyAvailability(from, to);
   };
 
-  // Copy a day's availability to all remaining empty days in the visible range
-  const handleCopyToWeek = async (sourceDate: string) => {
-    const sourceWindows = windowsByDate(sourceDate);
-    if (sourceWindows.length === 0) return;
+  // Open repeat popover for a specific availability window
+  const openRepeat = (date: string, windowId: string) => {
+    const dayOfWeek = getDay(new Date(date + 'T00:00:00'));
+    setRepeatSource({ date, windowId });
+    setRepeatDays([dayOfWeek]);
+    setRepeatWeeks(4);
+  };
 
-    let copied = 0;
-    for (const date of dates) {
-      if (date === sourceDate) continue;
-      const existing = windowsByDate(date);
+  const handleRepeat = async () => {
+    if (!repeatSource) return;
+    const sourceWindow = windows.find(w => w.id === repeatSource.windowId);
+    if (!sourceWindow) return;
+
+    const startDate = startOfDay(new Date());
+    const endDate = addWeeks(startDate, repeatWeeks);
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+    let created = 0;
+    for (const day of allDays) {
+      const dow = getDay(day);
+      if (!repeatDays.includes(dow)) continue;
+      const dateStr = format(day, 'yyyy-MM-dd');
+      if (dateStr === repeatSource.date) continue;
+      // Skip dates that already have availability
+      const existing = windows.filter(w => w.available_date === dateStr);
       if (existing.length > 0) continue;
-      for (const w of sourceWindows) {
-        await addWindow({
-          available_date: date,
-          start_time: w.start_time.slice(0, 5),
-          end_time: w.end_time.slice(0, 5),
-          notes: w.notes || undefined,
-        });
-        copied++;
-      }
+      await addWindow({
+        available_date: dateStr,
+        start_time: sourceWindow.start_time.slice(0, 5),
+        end_time: sourceWindow.end_time.slice(0, 5),
+        notes: sourceWindow.notes || undefined,
+      });
+      created++;
     }
-    if (copied > 0) {
+    setRepeatSource(null);
+    if (created > 0) {
       fetchMyAvailability(from, to);
-      toast({ title: `Copied to ${dates.length - 1} days` });
+      toast({ title: `Created ${created} availability entries` });
     }
+  };
+
+  const toggleRepeatDay = (day: number) => {
+    setRepeatDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   };
 
   const totalHoursInRange = windows.reduce((sum, w) => sum + computeHours(w.start_time, w.end_time), 0);
