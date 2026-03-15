@@ -1817,6 +1817,205 @@ export type Database = {
           },
         ]
       }
+      worker_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          external_reference: string | null
+          id: string
+          memo: string | null
+          pay_period_end: string | null
+          pay_period_start: string | null
+          paid_date: string
+          payment_source: Database["public"]["Enums"]["worker_payment_source"]
+          payout_run_id: string | null
+          status: Database["public"]["Enums"]["worker_payment_status"]
+          stripe_balance_transaction_id: string | null
+          stripe_payout_id: string | null
+          stripe_transfer_id: string | null
+          worker_user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          external_reference?: string | null
+          id?: string
+          memo?: string | null
+          pay_period_end?: string | null
+          pay_period_start?: string | null
+          paid_date: string
+          payment_source: Database["public"]["Enums"]["worker_payment_source"]
+          payout_run_id?: string | null
+          status?: Database["public"]["Enums"]["worker_payment_status"]
+          stripe_balance_transaction_id?: string | null
+          stripe_payout_id?: string | null
+          stripe_transfer_id?: string | null
+          worker_user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          external_reference?: string | null
+          id?: string
+          memo?: string | null
+          pay_period_end?: string | null
+          pay_period_start?: string | null
+          paid_date?: string
+          payment_source?: Database["public"]["Enums"]["worker_payment_source"]
+          payout_run_id?: string | null
+          status?: Database["public"]["Enums"]["worker_payment_status"]
+          stripe_balance_transaction_id?: string | null
+          stripe_payout_id?: string | null
+          stripe_transfer_id?: string | null
+          worker_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payments_payout_run_id_fkey"
+            columns: ["payout_run_id"]
+            isOneToOne: false
+            referencedRelation: "payout_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payments_worker_user_id_fkey"
+            columns: ["worker_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worker_payout_profiles: {
+        Row: {
+          charges_enabled: boolean
+          created_at: string
+          default_payment_source: Database["public"]["Enums"]["worker_payment_source"]
+          details_submitted: boolean
+          onboarding_status: Database["public"]["Enums"]["payout_onboarding_status"]
+          payouts_enabled: boolean
+          stripe_connected_account_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          charges_enabled?: boolean
+          created_at?: string
+          default_payment_source?: Database["public"]["Enums"]["worker_payment_source"]
+          details_submitted?: boolean
+          onboarding_status?: Database["public"]["Enums"]["payout_onboarding_status"]
+          payouts_enabled?: boolean
+          stripe_connected_account_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          charges_enabled?: boolean
+          created_at?: string
+          default_payment_source?: Database["public"]["Enums"]["worker_payment_source"]
+          details_submitted?: boolean
+          onboarding_status?: Database["public"]["Enums"]["payout_onboarding_status"]
+          payouts_enabled?: boolean
+          stripe_connected_account_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_payout_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worker_tax_profiles: {
+        Row: {
+          created_at: string
+          tax_classification: Database["public"]["Enums"]["worker_tax_classification"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          tax_classification?: Database["public"]["Enums"]["worker_tax_classification"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          tax_classification?: Database["public"]["Enums"]["worker_tax_classification"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_tax_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payout_runs: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          payout_date: string | null
+          period_end: string
+          period_start: string
+          status: Database["public"]["Enums"]["payout_run_status"]
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          payout_date?: string | null
+          period_end: string
+          period_start: string
+          status?: Database["public"]["Enums"]["payout_run_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          payout_date?: string | null
+          period_end?: string
+          period_start?: string
+          status?: Database["public"]["Enums"]["payout_run_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1889,6 +2088,12 @@ export type Database = {
         | "waiting_on_trade"
         | "other"
       materials_status: "Yes" | "Partial" | "No"
+      payout_onboarding_status:
+        | "not_started"
+        | "in_progress"
+        | "completed"
+        | "restricted"
+      payout_run_status: "draft" | "submitted" | "completed" | "canceled"
       pricing_status: "Priced" | "Needs Pricing"
       project_member_role: "contractor" | "manager" | "read_only"
       project_status: "active" | "paused" | "complete"
@@ -1903,6 +2108,9 @@ export type Database = {
         | "5 – Later"
       task_stage: "Ready" | "In Progress" | "Not Ready" | "Hold" | "Done"
       unit_type: "each" | "sqft" | "lf" | "piece"
+      worker_payment_source: "stripe_connect" | "manual_quickbooks"
+      worker_payment_status: "pending" | "processing" | "paid" | "failed" | "voided"
+      worker_tax_classification: "contractor_1099" | "employee_w2"
     }
     CompositeTypes: {
       [_ in never]: never
