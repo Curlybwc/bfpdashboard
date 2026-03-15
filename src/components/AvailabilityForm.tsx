@@ -49,7 +49,10 @@ const AvailabilityForm = () => {
   const { toast } = useToast();
   const [editing, setEditing] = useState<EditingRow | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [offset, setOffset] = useState(0); // weeks or months offset from today
+  const [offset, setOffset] = useState(0);
+  const [repeatSource, setRepeatSource] = useState<{ date: string; windowId: string } | null>(null);
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [repeatWeeks, setRepeatWeeks] = useState(4);
 
   const today = startOfDay(new Date());
   const maxDate = addWeeks(today, MAX_WEEKS_AHEAD);
