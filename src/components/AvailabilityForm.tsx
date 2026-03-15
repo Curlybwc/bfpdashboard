@@ -291,7 +291,55 @@ const AvailabilityForm = () => {
                     </span>
                     {w.notes && <p className="text-xs text-muted-foreground truncate mt-0.5">{w.notes}</p>}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
+                    <Popover open={repeatSource?.windowId === w.id} onOpenChange={open => { if (!open) setRepeatSource(null); }}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openRepeat(date, w.id)} disabled={editing !== null} title="Repeat">
+                          <Repeat className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-3" align="end">
+                        <p className="text-xs font-medium mb-2">
+                          Repeat {w.start_time.slice(0, 5)}–{w.end_time.slice(0, 5)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-1.5">On these days:</p>
+                        <div className="flex gap-1 mb-3">
+                          {DAY_LABELS.map((label, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => toggleRepeatDay(i)}
+                              className={`h-8 w-8 rounded-md text-xs font-medium border transition-colors ${
+                                repeatDays.includes(i)
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background text-muted-foreground border-input hover:bg-accent'
+                              }`}
+                            >
+                              {label.charAt(0)}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1.5">For how long:</p>
+                        <Select value={String(repeatWeeks)} onValueChange={v => setRepeatWeeks(Number(v))}>
+                          <SelectTrigger className="h-8 text-xs mb-3">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {WEEK_OPTIONS.map(n => (
+                              <SelectItem key={n} value={String(n)}>{n} week{n > 1 ? 's' : ''}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          className="w-full h-8 text-xs"
+                          disabled={repeatDays.length === 0}
+                          onClick={handleRepeat}
+                        >
+                          Apply
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(w)} disabled={editing !== null}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
