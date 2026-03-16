@@ -12,7 +12,7 @@ export type UnitType = 'each' | 'sqft' | 'lf' | 'piece';
 export type PricingStatus = 'Priced' | 'Needs Pricing';
 export type PayoutOnboardingStatus = 'not_started' | 'in_progress' | 'completed' | 'restricted';
 export type PayoutRunStatus = 'draft' | 'submitted' | 'completed' | 'canceled' | 'failed' | 'partially_failed';
-export type WorkerPaymentSource = 'stripe_connect' | 'manual_quickbooks';
+export type WorkerPaymentSource = 'stripe_connect' | 'manual_quickbooks' | 'venmo_manual';
 export type WorkerPaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'voided';
 export type WorkerTaxClassification = 'contractor_1099' | 'employee_w2';
 
@@ -24,7 +24,7 @@ export const SCOPE_STATUSES: ScopeStatus[] = ['active', 'archived'];
 export const PRICING_STATUSES: PricingStatus[] = ['Priced', 'Needs Pricing'];
 export const PAYOUT_ONBOARDING_STATUSES: PayoutOnboardingStatus[] = ['not_started', 'in_progress', 'completed', 'restricted'];
 export const PAYOUT_RUN_STATUSES: PayoutRunStatus[] = ['draft', 'submitted', 'completed', 'canceled', 'failed', 'partially_failed'];
-export const WORKER_PAYMENT_SOURCES: WorkerPaymentSource[] = ['stripe_connect', 'manual_quickbooks'];
+export const WORKER_PAYMENT_SOURCES: WorkerPaymentSource[] = ['stripe_connect', 'manual_quickbooks', 'venmo_manual'];
 export const WORKER_PAYMENT_STATUSES: WorkerPaymentStatus[] = ['pending', 'processing', 'paid', 'failed', 'voided'];
 export const WORKER_TAX_CLASSIFICATIONS: WorkerTaxClassification[] = ['contractor_1099', 'employee_w2'];
 
