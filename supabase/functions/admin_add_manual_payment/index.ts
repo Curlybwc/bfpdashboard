@@ -5,7 +5,7 @@ interface RequestBody {
   worker_user_id?: string;
   paid_date?: string;
   amount?: number;
-  payment_source?: "manual_quickbooks" | "stripe_connect";
+  payment_source?: "manual_quickbooks" | "stripe_connect" | "venmo_manual";
   pay_period_start?: string | null;
   pay_period_end?: string | null;
   external_reference?: string | null;
@@ -72,6 +72,8 @@ serve(async (req) => {
         amount: Number(body.amount.toFixed(2)),
         payment_source: paymentSource,
         status: "paid",
+        paid_at: new Date().toISOString(),
+        marked_paid_by: userId,
         stripe_transfer_id: null,
         stripe_payout_id: null,
         stripe_balance_transaction_id: null,

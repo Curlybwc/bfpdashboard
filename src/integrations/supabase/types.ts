@@ -1868,10 +1868,13 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          confirmation_note: string | null
           created_by: string
           external_reference: string | null
           id: string
+          marked_paid_by: string | null
           memo: string | null
+          paid_at: string | null
           paid_date: string
           pay_period_end: string | null
           pay_period_start: string | null
@@ -1886,10 +1889,13 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          confirmation_note?: string | null
           created_by: string
           external_reference?: string | null
           id?: string
+          marked_paid_by?: string | null
           memo?: string | null
+          paid_at?: string | null
           paid_date: string
           pay_period_end?: string | null
           pay_period_start?: string | null
@@ -1904,10 +1910,13 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          confirmation_note?: string | null
           created_by?: string
           external_reference?: string | null
           id?: string
+          marked_paid_by?: string | null
           memo?: string | null
+          paid_at?: string | null
           paid_date?: string
           pay_period_end?: string | null
           pay_period_start?: string | null
@@ -1935,6 +1944,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "worker_payments_marked_paid_by_fkey"
+            columns: ["marked_paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "worker_payments_worker_user_id_fkey"
             columns: ["worker_user_id"]
             isOneToOne: false
@@ -1953,6 +1969,8 @@ export type Database = {
           payouts_enabled: boolean
           stripe_connected_account_id: string | null
           updated_at: string
+          venmo_handle: string | null
+          venmo_note_template: string | null
           user_id: string
         }
         Insert: {
@@ -1964,6 +1982,8 @@ export type Database = {
           payouts_enabled?: boolean
           stripe_connected_account_id?: string | null
           updated_at?: string
+          venmo_handle?: string | null
+          venmo_note_template?: string | null
           user_id: string
         }
         Update: {
@@ -1975,6 +1995,8 @@ export type Database = {
           payouts_enabled?: boolean
           stripe_connected_account_id?: string | null
           updated_at?: string
+          venmo_handle?: string | null
+          venmo_note_template?: string | null
           user_id?: string
         }
         Relationships: [
@@ -2114,7 +2136,7 @@ export type Database = {
         | "5 – Later"
       task_stage: "Ready" | "In Progress" | "Not Ready" | "Hold" | "Done"
       unit_type: "each" | "sqft" | "lf" | "piece"
-      worker_payment_source: "stripe_connect" | "manual_quickbooks"
+      worker_payment_source: "stripe_connect" | "manual_quickbooks" | "venmo_manual"
       worker_payment_status:
         | "pending"
         | "processing"
@@ -2288,7 +2310,7 @@ export const Constants = {
       ],
       task_stage: ["Ready", "In Progress", "Not Ready", "Hold", "Done"],
       unit_type: ["each", "sqft", "lf", "piece"],
-      worker_payment_source: ["stripe_connect", "manual_quickbooks"],
+      worker_payment_source: ["stripe_connect", "manual_quickbooks", "venmo_manual"],
       worker_payment_status: [
         "pending",
         "processing",
