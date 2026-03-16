@@ -17,6 +17,7 @@ type WorkerPayoutProfile = Tables<'worker_payout_profiles'>;
 type WorkerTaxProfile = Tables<'worker_tax_profiles'>;
 type PayoutRunRecord = Tables<'payout_runs'>;
 type WorkerPaymentRecord = Tables<'worker_payments'>;
+type WorkerPaymentShiftLink = Tables<'worker_payment_shifts'>;
 type ProfileRow = Tables<'profiles'>;
 
 interface PayrollSummaryProps {
@@ -27,8 +28,11 @@ interface ContractorSummary {
   user_id: string;
   full_name: string;
   total_hours: number;
+  total_unpaid_hours: number;
   rate: number | null;
-  total_pay: number;
+  total_pay_all: number;
+  total_unpaid_pay: number;
+  total_paid_pay: number;
   tax_classification: WorkerTaxProfile['tax_classification'] | null;
   payout_profile: WorkerPayoutProfile | null;
   shifts: ShiftDetail[];
@@ -36,10 +40,17 @@ interface ContractorSummary {
 
 interface ShiftDetail {
   id: string;
+  user_id: string;
   project_name: string;
   project_id: string;
   shift_date: string;
   total_hours: number;
+  hourly_rate_used: number;
+  calculated_amount: number;
+  payment_status: 'paid' | 'unpaid';
+  paid_date: string | null;
+  worker_payment_id: string | null;
+  payment_source: WorkerPaymentRecord['payment_source'] | null;
   admin_edited_at: string | null;
   allocations: { task_name: string; hours: number }[];
 }
@@ -84,6 +95,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [activeRun, setActiveRun] = useState<PayoutRunRecord | null>(null);
   const [runPayments, setRunPayments] = useState<WorkerPaymentRecord[]>([]);
   const [yearPayments, setYearPayments] = useState<WorkerPaymentRecord[]>([]);
+  const [yearShiftDetails, setYearShiftDetails] = useState<ShiftDetail[]>([]);
+  const [reportWorkerId, setReportWorkerId] = useState('');
   const [profileMap, setProfileMap] = useState<Record<string, Pick<ProfileRow, 'id' | 'full_name' | 'hourly_rate' | 'is_active'>>>({});
   const [taxMap, setTaxMap] = useState<Record<string, WorkerTaxProfile['tax_classification']>>({});
   const [manualForm, setManualForm] = useState<ManualPaymentFormState>({
@@ -96,6 +109,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     external_reference: '',
     memo: '',
   });
+  const [markingWorkerId, setMarkingWorkerId] = useState<string | null>(null);
 
   const fetchRunSnapshot = useCallback(async (runId: string) => {
     const [{ data: run, error: runError }, { data: payments, error: paymentsError }] = await Promise.all([
@@ -121,16 +135,90 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const fetchYearLedger = useCallback(async (year: string) => {
     const start = `${year}-01-01`;
     const end = `${year}-12-31`;
-    const { data, error } = await supabase
-      .from('worker_payments')
-      .select('*')
-      .gte('paid_date', start)
-      .lte('paid_date', end)
-      .order('paid_date', { ascending: false });
+    const [{ data: payments, error: paymentsError }, { data: yearShifts, error: yearShiftsError }] = await Promise.all([
+      supabase
+        .from('worker_payments')
+        .select('*')
+        .gte('paid_date', start)
+        .lte('paid_date', end)
+        .order('paid_date', { ascending: false }),
+      supabase
+        .from('shifts')
+        .select('*')
+        .gte('shift_date', start)
+        .lte('shift_date', end)
+        .order('shift_date', { ascending: false }),
+    ]);
 
-    if (error) throw new Error(error.message);
-    setYearPayments(data || []);
-  }, []);
+    if (paymentsError) throw new Error(paymentsError.message);
+    if (yearShiftsError) throw new Error(yearShiftsError.message);
+
+    const yearlyShiftRows = yearShifts || [];
+    const yearShiftIds = yearlyShiftRows.map((s) => s.id);
+
+    const [{ data: yearProjects }, { data: yearAllocations }, { data: yearLinks }] = await Promise.all([
+      supabase
+        .from('projects')
+        .select('id, name')
+        .in('id', [...new Set(yearlyShiftRows.map((s) => s.project_id))]),
+      yearShiftIds.length > 0
+        ? supabase.from('shift_task_allocations').select('shift_id, task_id, hours').in('shift_id', yearShiftIds)
+        : Promise.resolve({ data: [], error: null } as const),
+      yearShiftIds.length > 0
+        ? supabase
+          .from('worker_payment_shifts')
+          .select('shift_id, worker_payment_id, amount_paid, hourly_rate_used, hours_paid, worker_payments!inner(id, paid_date, payment_source)')
+          .in('shift_id', yearShiftIds)
+        : Promise.resolve({ data: [], error: null } as const),
+    ]);
+
+    const yearTaskIds = [...new Set((yearAllocations || []).map((a) => a.task_id))];
+    const { data: yearTasks } = yearTaskIds.length > 0
+      ? await supabase.from('tasks').select('id, task').in('id', yearTaskIds)
+      : { data: [] };
+
+    const yearProjectMap: Record<string, string> = {};
+    (yearProjects || []).forEach((row) => { yearProjectMap[row.id] = row.name; });
+    const yearTaskMap: Record<string, string> = {};
+    (yearTasks || []).forEach((row) => { yearTaskMap[row.id] = row.task; });
+
+    const yearAllocByShift: Record<string, { task_name: string; hours: number }[]> = {};
+    (yearAllocations || []).forEach((a) => {
+      if (!yearAllocByShift[a.shift_id]) yearAllocByShift[a.shift_id] = [];
+      yearAllocByShift[a.shift_id].push({ task_name: yearTaskMap[a.task_id] || 'Unknown task', hours: a.hours });
+    });
+
+    const yearLinkMap: Record<string, WorkerPaymentShiftLink & { worker_payments?: Pick<WorkerPaymentRecord, 'id' | 'paid_date' | 'payment_source'> }> = {};
+    ((yearLinks || []) as Array<WorkerPaymentShiftLink & { worker_payments?: Pick<WorkerPaymentRecord, 'id' | 'paid_date' | 'payment_source'> }>).forEach((link) => {
+      yearLinkMap[link.shift_id] = link;
+    });
+
+    const yearDetails: ShiftDetail[] = yearlyShiftRows.map((s) => {
+      const linked = yearLinkMap[s.id];
+      const paidInfo = linked?.worker_payments;
+      const hourlyRateUsed = linked?.hourly_rate_used ?? s.hourly_rate_snapshot ?? profileMap[s.user_id]?.hourly_rate ?? 0;
+      const calcAmount = linked?.amount_paid ?? Number((s.total_hours * hourlyRateUsed).toFixed(2));
+      return {
+        id: s.id,
+        user_id: s.user_id,
+        project_name: yearProjectMap[s.project_id] || 'Unknown',
+        project_id: s.project_id,
+        shift_date: s.shift_date,
+        total_hours: s.total_hours,
+        hourly_rate_used: Number(hourlyRateUsed || 0),
+        calculated_amount: Number(calcAmount || 0),
+        payment_status: linked ? 'paid' : 'unpaid',
+        paid_date: paidInfo?.paid_date || null,
+        worker_payment_id: linked?.worker_payment_id || null,
+        payment_source: paidInfo?.payment_source || null,
+        admin_edited_at: s.admin_edited_at,
+        allocations: yearAllocByShift[s.id] || [],
+      };
+    });
+
+    setYearPayments(payments || []);
+    setYearShiftDetails(yearDetails);
+  }, [profileMap]);
 
   const fetchPayroll = useCallback(async () => {
     setLoading(true);
@@ -151,9 +239,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     if (taxError) throw new Error(taxError.message);
 
     const nextProfileMap: Record<string, Pick<ProfileRow, 'id' | 'full_name' | 'hourly_rate' | 'is_active'>> = {};
-    (profiles || []).forEach((p) => {
-      nextProfileMap[p.id] = p;
-    });
+    (profiles || []).forEach((row) => { nextProfileMap[row.id] = row; });
     setProfileMap(nextProfileMap);
 
     const allTaxMap: Record<string, WorkerTaxProfile['tax_classification']> = {};
@@ -172,68 +258,101 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     const userIds = [...new Set(shiftRows.map((s) => s.user_id))];
     const { data: payoutProfiles } = await supabase
-        .from('worker_payout_profiles')
-        .select('*')
-        .in('user_id', userIds);
+      .from('worker_payout_profiles')
+      .select('*')
+      .in('user_id', userIds);
 
     const payoutProfileMap: Record<string, WorkerPayoutProfile> = {};
     (payoutProfiles || []).forEach((pp) => { payoutProfileMap[pp.user_id] = pp; });
 
-    const projectIds = [...new Set(shiftRows.map(s => s.project_id))];
+    const projectIds = [...new Set(shiftRows.map((s) => s.project_id))];
     const { data: projects } = await supabase
       .from('projects')
       .select('id, name')
       .in('id', projectIds);
     const projectMap: Record<string, string> = {};
-    (projects || []).forEach(p => { projectMap[p.id] = p.name; });
+    (projects || []).forEach((row) => { projectMap[row.id] = row.name; });
 
-    const shiftIds = shiftRows.map(s => s.id);
-    const { data: allAllocations } = await supabase
-      .from('shift_task_allocations')
-      .select('shift_id, task_id, hours')
-      .in('shift_id', shiftIds);
+    const shiftIds = shiftRows.map((s) => s.id);
+    const [{ data: allAllocations }, { data: paidLinks }] = await Promise.all([
+      supabase
+        .from('shift_task_allocations')
+        .select('shift_id, task_id, hours')
+        .in('shift_id', shiftIds),
+      supabase
+        .from('worker_payment_shifts')
+        .select('shift_id, worker_payment_id, amount_paid, hourly_rate_used, hours_paid, worker_payments!inner(id, paid_date, payment_source)')
+        .in('shift_id', shiftIds),
+    ]);
 
-    const taskIds = [...new Set((allAllocations || []).map(a => a.task_id))];
+    const taskIds = [...new Set((allAllocations || []).map((a) => a.task_id))];
     const taskMap: Record<string, string> = {};
     if (taskIds.length > 0) {
       const { data: taskData } = await supabase
         .from('tasks')
         .select('id, task')
         .in('id', taskIds);
-      (taskData || []).forEach(t => { taskMap[t.id] = t.task; });
+      (taskData || []).forEach((row) => { taskMap[row.id] = row.task; });
     }
 
     const allocByShift: Record<string, { task_name: string; hours: number }[]> = {};
-    (allAllocations || []).forEach(a => {
+    (allAllocations || []).forEach((a) => {
       if (!allocByShift[a.shift_id]) allocByShift[a.shift_id] = [];
       allocByShift[a.shift_id].push({ task_name: taskMap[a.task_id] || 'Unknown task', hours: a.hours });
     });
 
+    const paidLinkMap: Record<string, WorkerPaymentShiftLink & { worker_payments?: Pick<WorkerPaymentRecord, 'id' | 'paid_date' | 'payment_source'> }> = {};
+    ((paidLinks || []) as Array<WorkerPaymentShiftLink & { worker_payments?: Pick<WorkerPaymentRecord, 'id' | 'paid_date' | 'payment_source'> }>).forEach((link) => {
+      paidLinkMap[link.shift_id] = link;
+    });
+
     const byUser: Record<string, ContractorSummary> = {};
-    shiftRows.forEach(s => {
+    shiftRows.forEach((s) => {
       if (!byUser[s.user_id]) {
         const profile = nextProfileMap[s.user_id];
         byUser[s.user_id] = {
           user_id: s.user_id,
           full_name: profile?.full_name || 'Unknown',
           total_hours: 0,
+          total_unpaid_hours: 0,
           rate: profile?.hourly_rate ?? null,
-          total_pay: 0,
+          total_pay_all: 0,
+          total_unpaid_pay: 0,
+          total_paid_pay: 0,
           tax_classification: allTaxMap[s.user_id] || null,
           payout_profile: payoutProfileMap[s.user_id] || null,
           shifts: [],
         };
       }
 
-      const rate = s.hourly_rate_snapshot ?? byUser[s.user_id].rate ?? 0;
+      const linked = paidLinkMap[s.id];
+      const paidInfo = linked?.worker_payments;
+      const hourlyRateUsed = linked?.hourly_rate_used ?? s.hourly_rate_snapshot ?? byUser[s.user_id].rate ?? 0;
+      const amount = linked?.amount_paid ?? Number((s.total_hours * (hourlyRateUsed || 0)).toFixed(2));
+      const isPaid = !!linked;
+
       byUser[s.user_id].total_hours += s.total_hours;
-      byUser[s.user_id].total_pay += s.total_hours * (rate || 0);
+      byUser[s.user_id].total_pay_all += amount;
+      if (isPaid) {
+        byUser[s.user_id].total_paid_pay += amount;
+      } else {
+        byUser[s.user_id].total_unpaid_hours += s.total_hours;
+        byUser[s.user_id].total_unpaid_pay += amount;
+      }
+
       byUser[s.user_id].shifts.push({
         id: s.id,
+        user_id: s.user_id,
         project_name: projectMap[s.project_id] || 'Unknown',
         project_id: s.project_id,
         shift_date: s.shift_date,
         total_hours: s.total_hours,
+        hourly_rate_used: Number(hourlyRateUsed || 0),
+        calculated_amount: Number(amount || 0),
+        payment_status: isPaid ? 'paid' : 'unpaid',
+        paid_date: paidInfo?.paid_date || null,
+        worker_payment_id: linked?.worker_payment_id || null,
+        payment_source: paidInfo?.payment_source || null,
         admin_edited_at: s.admin_edited_at,
         allocations: allocByShift[s.id] || [],
       });
@@ -335,10 +454,10 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     }
 
     const workers = summaries
-      .filter((s) => s.total_pay > 0)
+      .filter((s) => s.total_unpaid_pay > 0)
       .map((s) => ({
         worker_user_id: s.user_id,
-        amount: Number(s.total_pay.toFixed(2)),
+        amount: Number(s.total_unpaid_pay.toFixed(2)),
         memo: `Payroll ${fromDate} to ${toDate}`,
       }));
 
@@ -370,6 +489,35 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     toast({ title: 'Payout run created' });
     await fetchRunSnapshot(run.id);
+  };
+
+  const handleMarkVisibleUnpaidShiftsPaid = async (summary: ContractorSummary) => {
+    const unpaidShiftIds = summary.shifts.filter((s) => s.payment_status === 'unpaid').map((s) => s.id);
+    if (unpaidShiftIds.length === 0) {
+      toast({ title: 'No unpaid shifts', description: 'All visible shifts for this worker are already paid.' });
+      return;
+    }
+
+    setMarkingWorkerId(summary.user_id);
+    const { data, error } = await supabase.rpc('admin_mark_visible_shifts_paid', {
+      p_worker_user_id: summary.user_id,
+      p_period_start: fromDate,
+      p_period_end: toDate,
+      p_shift_ids: unpaidShiftIds,
+      p_payment_source: 'manual_quickbooks',
+      p_memo: `Payroll ${fromDate} to ${toDate}`,
+      p_confirmation_note: 'Marked paid from payroll summary',
+    });
+    setMarkingWorkerId(null);
+
+    if (error) {
+      toast({ title: 'Mark paid failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    const linkedCount = (data as { linked_shift_count?: number } | null)?.linked_shift_count || unpaidShiftIds.length;
+    toast({ title: 'Shifts marked paid', description: `${summary.full_name}: ${linkedCount} shift(s) linked to a payment record.` });
+    await fetchPayroll();
   };
 
   const handleSaveVenmoProfile = async (userId: string) => {
@@ -573,6 +721,63 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       });
   }, [yearGroup, profileMap]);
 
+  const ytd1099Summary = useMemo(() => (
+    ytdSummary.filter((row) => taxMap[row.workerId] === 'contractor_1099')
+  ), [ytdSummary, taxMap]);
+
+  const annualWorkerDetails = useMemo(() => {
+    if (!reportWorkerId) return [] as ShiftDetail[];
+    return yearShiftDetails.filter((row) => row.user_id === reportWorkerId);
+  }, [reportWorkerId, yearShiftDetails]);
+
+  const exportYear1099SummaryCsv = () => {
+    const rows = ytd1099Summary.map((row) => ({
+      worker_name: profileMap[row.workerId]?.full_name || row.workerId,
+      year: reportYear,
+      total_paid: row.total.toFixed(2),
+      payment_count: String(row.count),
+    }));
+    const headers = ['worker_name', 'year', 'total_paid', 'payment_count'];
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => headers.map((h) => `"${String(row[h as keyof typeof row]).replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `contractor-1099-summary-${reportYear}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportWorkerDetailCsv = () => {
+    const rows = annualWorkerDetails.map((row) => ({
+      shift_date: row.shift_date,
+      project: row.project_name,
+      hours: row.total_hours,
+      hourly_rate_used: Number(row.hourly_rate_used).toFixed(2),
+      calculated_amount: Number(row.calculated_amount).toFixed(2),
+      payment_status: row.payment_status,
+      paid_date: row.paid_date || '',
+      payment_source: row.payment_source || '',
+      worker_payment_id: row.worker_payment_id || '',
+    }));
+    const headers = ['shift_date', 'project', 'hours', 'hourly_rate_used', 'calculated_amount', 'payment_status', 'paid_date', 'payment_source', 'worker_payment_id'];
+    const csv = [headers.join(','), ...rows.map((row) => headers.map((h) => `"${String(row[h as keyof typeof row]).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `contractor-detail-${reportWorkerId || 'worker'}-${reportYear}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printAnnualReport = () => {
+    window.print();
+  };
+
   const exportYearCsv = () => {
     const rows = yearPayments.map((p) => {
       const name = profileMap[p.worker_user_id]?.full_name || p.worker_user_id;
@@ -627,6 +832,13 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const selectableWorkers = Object.values(profileMap)
     .filter((p) => p.is_active)
     .sort((a, b) => (a.full_name || 'Unknown').localeCompare(b.full_name || 'Unknown'));
+
+  const annualWorkerOptions = useMemo(() => {
+    const ids = [...new Set(yearShiftDetails.map((row) => row.user_id))];
+    return ids
+      .map((id) => ({ id, name: profileMap[id]?.full_name || id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [yearShiftDetails, profileMap]);
 
   const runWorkerNameMap = summaries.reduce<Record<string, string>>((acc, s) => {
     acc[s.user_id] = s.full_name;
@@ -794,22 +1006,26 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       <Card className="p-3 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-sm font-medium">Yearly Payment History & Totals</p>
-            <p className="text-xs text-muted-foreground">Source of truth: worker_payments ledger</p>
+            <p className="text-sm font-medium">Annual Reports</p>
+            <p className="text-xs text-muted-foreground">1099 summary + contractor detail from durable payment records</p>
           </div>
           <div className="flex items-center gap-2">
             <Input type="number" className="w-28" min="2000" max="2100" value={reportYear} onChange={(e) => setReportYear(e.target.value)} />
-            <Button variant="outline" size="sm" onClick={exportYearCsv} disabled={yearPayments.length === 0}>
-              <FileDown className="h-4 w-4 mr-1" />Export CSV
+            <Button variant="outline" size="sm" onClick={exportYear1099SummaryCsv} disabled={ytd1099Summary.length === 0}>
+              <FileDown className="h-4 w-4 mr-1" />Export 1099 Summary
             </Button>
+            <Button variant="outline" size="sm" onClick={exportYearCsv} disabled={yearPayments.length === 0}>
+              <FileDown className="h-4 w-4 mr-1" />Export Payments CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={printAnnualReport}>Print</Button>
           </div>
         </div>
 
-        {ytdSummary.length === 0 ? (
+        {ytd1099Summary.length === 0 ? (
           <p className="text-xs text-muted-foreground">No payments found for {reportYear}.</p>
         ) : (
           <div className="space-y-2">
-            {ytdSummary.map((row) => {
+            {ytd1099Summary.map((row) => {
               const workerPayments = yearGroup.get(row.workerId) || [];
               const workerName = profileMap[row.workerId]?.full_name || row.workerId;
               const workerClass = formatClassification(taxMap[row.workerId] || null);
@@ -852,6 +1068,40 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
             })}
           </div>
         )}
+
+        <div className="pt-2 border-t border-border space-y-2">
+          <p className="text-sm font-medium">Contractor Annual Detail</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={reportWorkerId}
+              onChange={(e) => setReportWorkerId(e.target.value)}
+            >
+              <option value="">Select contractor</option>
+                            {annualWorkerOptions.map((worker) => (
+                <option key={worker.id} value={worker.id}>{worker.name}</option>
+              ))}
+            </select>
+            <Button variant="outline" size="sm" onClick={exportWorkerDetailCsv} disabled={!reportWorkerId || annualWorkerDetails.length === 0}>
+              <FileDown className="h-4 w-4 mr-1" />Export Contractor Detail
+            </Button>
+          </div>
+          {reportWorkerId && annualWorkerDetails.length > 0 ? (
+            <div className="space-y-1 max-h-64 overflow-auto pr-1">
+              {annualWorkerDetails.map((row) => (
+                <div key={row.id} className="text-xs rounded border border-border p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{row.shift_date} · {row.project_name}</span>
+                    <Badge variant={row.payment_status === 'paid' ? 'secondary' : 'outline'}>{row.payment_status}</Badge>
+                  </div>
+                  <p className="text-muted-foreground">{row.total_hours}h @ ${row.hourly_rate_used.toFixed(2)} = ${row.calculated_amount.toFixed(2)}{row.paid_date ? ` · paid ${row.paid_date}` : ''}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Select a contractor to view annual shift-level paid/unpaid detail.</p>
+          )}
+        </div>
       </Card>
 
       {loading ? (
@@ -877,10 +1127,10 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                         </div>
                       </div>
                       <div className="text-right text-sm space-y-0.5">
-                        <p>{cs.total_hours}h</p>
+                        <p>{cs.total_unpaid_hours}h unpaid / {cs.total_hours}h total</p>
                         <p className="text-xs text-muted-foreground">
                           {cs.rate != null ? `$${cs.rate}/hr · ` : <span className="text-destructive">No rate · </span>}
-                          <span className="font-medium text-foreground">${cs.total_pay.toFixed(2)}</span>
+                          <span className="font-medium text-foreground">Ready ${cs.total_unpaid_pay.toFixed(2)}</span>
                         </p>
                       </div>
                     </div>
@@ -1000,6 +1250,22 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                     </div>
                   </div>
 
+                  <div className="flex items-center justify-between rounded border border-border bg-muted/30 px-2 py-1">
+                    <p className="text-xs text-muted-foreground">Paid: ${cs.total_paid_pay.toFixed(2)} · Total: ${cs.total_pay_all.toFixed(2)}</p>
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={markingWorkerId === cs.user_id || cs.total_unpaid_pay <= 0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkVisibleUnpaidShiftsPaid(cs);
+                      }}
+                    >
+                      {markingWorkerId === cs.user_id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                      Mark Visible Unpaid Shifts Paid
+                    </Button>
+                  </div>
+
                   {cs.shifts.map(sd => (
                     <Collapsible key={sd.id} open={expandedShifts.has(sd.id)} onOpenChange={() => toggleShift(sd.id)}>
                       <CollapsibleTrigger asChild>
@@ -1010,10 +1276,11 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                             <p className="text-xs text-muted-foreground">{sd.shift_date}</p>
                           </div>
                           <div className="flex items-center gap-2">
+                            <Badge variant={sd.payment_status === 'paid' ? 'secondary' : 'outline'} className="text-xs">{sd.payment_status}</Badge>
                             {sd.admin_edited_at && (
                               <Badge variant="outline" className="text-xs">Admin edited</Badge>
                             )}
-                            <span className="text-sm font-medium">{sd.total_hours}h</span>
+                            <span className="text-sm font-medium">{sd.total_hours}h · ${sd.calculated_amount.toFixed(2)}</span>
                           </div>
                         </div>
                       </CollapsibleTrigger>
@@ -1024,6 +1291,11 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                             <span className="shrink-0 ml-2">{a.hours}h</span>
                           </div>
                         ))}
+                        {sd.payment_status === 'paid' ? (
+                          <p className="text-[11px] text-muted-foreground">Paid {sd.paid_date || '—'} · {sd.payment_source || 'unknown source'} · payment {sd.worker_payment_id?.slice(0, 8)}</p>
+                        ) : (
+                          <p className="text-[11px] text-amber-700 dark:text-amber-400">Unpaid and included in ready-to-pay totals.</p>
+                        )}
                         <div className="flex gap-1 pt-1">
                           <Button
                             variant="ghost"

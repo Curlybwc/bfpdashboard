@@ -1864,6 +1864,61 @@ export type Database = {
           },
         ]
       }
+      worker_payment_shifts: {
+        Row: {
+          amount_paid: number
+          created_at: string
+          hourly_rate_used: number
+          hours_paid: number
+          id: string
+          shift_id: string
+          worker_payment_id: string
+          worker_user_id: string
+        }
+        Insert: {
+          amount_paid: number
+          created_at?: string
+          hourly_rate_used: number
+          hours_paid: number
+          id?: string
+          shift_id: string
+          worker_payment_id: string
+          worker_user_id: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string
+          hourly_rate_used?: number
+          hours_paid?: number
+          id?: string
+          shift_id?: string
+          worker_payment_id?: string
+          worker_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_payment_shifts_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payment_shifts_worker_payment_id_fkey"
+            columns: ["worker_payment_id"]
+            isOneToOne: false
+            referencedRelation: "worker_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payment_shifts_worker_user_id_fkey"
+            columns: ["worker_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       worker_payments: {
         Row: {
           amount: number
@@ -2043,6 +2098,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_mark_visible_shifts_paid: {
+        Args: {
+          p_confirmation_note?: string
+          p_memo?: string
+          p_payment_source?: Database["public"]["Enums"]["worker_payment_source"]
+          p_period_end: string
+          p_period_start: string
+          p_shift_ids: string[]
+          p_worker_user_id: string
+        }
+        Returns: Json
+      }
       apply_assignment_rules: {
         Args: { p_task_id: string }
         Returns: undefined
