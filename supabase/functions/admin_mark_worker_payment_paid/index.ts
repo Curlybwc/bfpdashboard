@@ -54,7 +54,7 @@ serve(async (req) => {
     const nowIso = new Date().toISOString();
     const paidDate = nowIso.slice(0, 10);
 
-    const { data: updated, error: updateError } = await adminClient
+    const { data: updatedRows, error: updateError } = await adminClient
       .from("worker_payments")
       .update({
         status: "paid",
@@ -65,12 +65,22 @@ serve(async (req) => {
         confirmation_note: body.confirmation_note || null,
       })
       .eq("id", body.payment_id)
-      .select("*")
-      .single();
+      .neq("status", "paid")
+      .select("*");
+
+    const updated = Array.isArray(updatedRows) ? updatedRows[0] : null;
+
 
     if (updateError) {
       return new Response(JSON.stringify({ error: "payment_update_failed", message: updateError.message }), {
         status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!updated) {
+      return new Response(JSON.stringify({ error: "already_paid", message: "Payment is already marked as paid" }), {
+        status: 409,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
