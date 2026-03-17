@@ -35,6 +35,7 @@ import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Eula from "./pages/Eula";
+import QBDisconnected from "./pages/QBDisconnected";
 import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
 import MobileNav from "./components/MobileNav";
