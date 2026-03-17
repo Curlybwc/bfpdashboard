@@ -562,6 +562,38 @@ export type Database = {
           },
         ]
       }
+      quickbooks_class_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          qb_class_id: string
+          qb_class_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          qb_class_id: string
+          qb_class_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          qb_class_id?: string
+          qb_class_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_class_mappings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quickbooks_connections: {
         Row: {
           access_token: string
@@ -605,6 +637,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      quickbooks_settings: {
+        Row: {
+          id: string
+          labor_expense_account_id: string | null
+          labor_expense_account_name: string | null
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          labor_expense_account_id?: string | null
+          labor_expense_account_name?: string | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          labor_expense_account_id?: string | null
+          labor_expense_account_name?: string | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       quickbooks_vendor_mappings: {
         Row: {
