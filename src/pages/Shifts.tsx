@@ -14,7 +14,7 @@ import { fetchShiftAllocations, fetchShiftById, useMyShifts, type Shift, type Sh
 
 const Shifts = () => {
   const { user } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const [showForm, setShowForm] = useState(false);
   const [editShift, setEditShift] = useState<Shift | null>(null);
   const [editAllocations, setEditAllocations] = useState<ShiftAllocation[]>([]);
