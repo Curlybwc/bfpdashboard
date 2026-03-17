@@ -495,10 +495,12 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         </div>
       </div>
 
+      <p className="text-xs text-muted-foreground">This page groups unpaid shifts by contractor and project so you can prepare payments without paying the same shift twice.</p>
+
       <Card className="p-3 text-xs text-muted-foreground">
-        <p>Eligible unpaid: <span className="text-foreground font-medium">${totals.candidateDollars.toFixed(2)}</span></p>
-        <p>Exported (selected period): <span className="text-foreground font-medium">${totals.exportedDollars.toFixed(2)}</span></p>
-        <p>Paid (selected period): <span className="text-foreground font-medium">${totals.paidDollars.toFixed(2)}</span></p>
+        <p>Ready to prepare: <span className="text-foreground font-medium">${totals.candidateDollars.toFixed(2)}</span></p>
+        <p>Prepared (not yet paid): <span className="text-foreground font-medium">${totals.exportedDollars.toFixed(2)}</span></p>
+        <p>Already paid: <span className="text-foreground font-medium">${totals.paidDollars.toFixed(2)}</span></p>
       </Card>
 
       {/* Unpaid Eligible Groups */}
