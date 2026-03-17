@@ -55,6 +55,7 @@ type ExistingPayableGroup = {
 type ExcludedShift = {
   shift: ShiftWithComputed;
   reason: string;
+  linkedBatchId?: string;
 };
 
 type QBConnectionStatus = {
