@@ -278,9 +278,10 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     for (const shift of computedShifts) {
       const linked = activeLinkByShiftId.get(shift.shift.id);
       if (linked) {
+        const statusLabel = linked.status === 'paid' ? 'paid' : linked.status === 'exported' ? 'sent to QuickBooks' : 'prepared';
         excluded.push({
           shift,
-          reason: `Linked to ${linked.status} payable (${linked.periodStart} → ${linked.periodEnd}, #${linked.batchId.slice(0, 8)})`,
+          reason: `Part of a ${statusLabel} payment (${linked.periodStart} → ${linked.periodEnd})`,
         });
       } else {
         eligible.push(shift);
@@ -400,7 +401,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     if (batchError || !batch) {
       setCreatingGroupKey(null);
-      toast({ title: 'Create payable failed', description: batchError?.message || 'Unknown error', variant: 'destructive' });
+      toast({ title: 'Failed to prepare payment', description: batchError?.message || 'Unknown error', variant: 'destructive' });
       return;
     }
 
@@ -414,7 +415,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     }
 
     setCreatingGroupKey(null);
-    toast({ title: 'Payable created', description: `Created batch #${batch.id.slice(0, 8)} (${group.contractorName} · ${group.projectName})` });
+    toast({ title: 'Payment prepared', description: `${group.contractorName} · ${group.projectName}` });
     await loadPayroll();
   };
 
@@ -436,7 +437,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       return;
     }
 
-    toast({ title: 'Payable marked paid' });
+    toast({ title: 'Payment recorded', description: 'Marked as paid' });
     await loadPayroll();
   };
 
@@ -495,23 +496,25 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         </div>
       </div>
 
+      <p className="text-xs text-muted-foreground">This page groups unpaid shifts by contractor and project so you can prepare payments without paying the same shift twice.</p>
+
       <Card className="p-3 text-xs text-muted-foreground">
-        <p>Eligible unpaid: <span className="text-foreground font-medium">${totals.candidateDollars.toFixed(2)}</span></p>
-        <p>Exported (selected period): <span className="text-foreground font-medium">${totals.exportedDollars.toFixed(2)}</span></p>
-        <p>Paid (selected period): <span className="text-foreground font-medium">${totals.paidDollars.toFixed(2)}</span></p>
+        <p>Ready to prepare: <span className="text-foreground font-medium">${totals.candidateDollars.toFixed(2)}</span></p>
+        <p>Prepared (not yet paid): <span className="text-foreground font-medium">${totals.exportedDollars.toFixed(2)}</span></p>
+        <p>Already paid: <span className="text-foreground font-medium">${totals.paidDollars.toFixed(2)}</span></p>
       </Card>
 
       {/* Unpaid Eligible Groups */}
       <Card className="p-3 space-y-2">
         <div>
-          <p className="text-sm font-medium">Unpaid Eligible Payable Groups</p>
-          <p className="text-xs text-muted-foreground">Grouped by contractor + project + selected period. Already-linked shifts are excluded.</p>
+          <p className="text-sm font-medium">Ready to Pay</p>
+          <p className="text-xs text-muted-foreground">These contractor/project groups have unpaid shifts that can be prepared as a payment now.</p>
         </div>
 
         {loading ? (
           <p className="text-xs text-muted-foreground flex items-center"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Loading…</p>
         ) : candidateGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No eligible unpaid shift groups in this range.</p>
+          <p className="text-xs text-muted-foreground">No unpaid shifts available to prepare in this date range.</p>
         ) : (
           <div className="space-y-2">
             {candidateGroups.map((group) => (
@@ -545,7 +548,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                   ))}
                   <Button size="sm" disabled={creatingGroupKey === group.key} onClick={() => handleCreatePayable(group)}>
                     {creatingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                    Create Payable Batch
+                    Prepare Payment
                   </Button>
                 </CollapsibleContent>
               </Collapsible>
@@ -557,11 +560,11 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       {/* Exported / Draft Payables */}
       <Card className="p-3 space-y-2">
         <div>
-          <p className="text-sm font-medium">Exported / Draft Payables</p>
-          <p className="text-xs text-muted-foreground">These groups are already linked and excluded from new candidates.</p>
+          <p className="text-sm font-medium">Prepared Payments</p>
+          <p className="text-xs text-muted-foreground">These payments have been prepared. Their shifts won't appear in Ready to Pay.</p>
         </div>
         {exportedGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No draft/exported payables for this selected period.</p>
+          <p className="text-xs text-muted-foreground">No prepared payments for this date range.</p>
         ) : (
           <div className="space-y-2">
             {exportedGroups.map((group) => {
@@ -581,7 +584,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                           <div className="flex items-center gap-2">
                             <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
                             <Badge variant={isExported ? 'default' : 'secondary'} className="text-[10px] h-5">
-                              {group.batch.status}
+                              {isExported ? 'Sent to QuickBooks' : 'Prepared'}
                             </Badge>
                             {group.batch.qb_bill_doc_number && (
                               <Badge variant="outline" className="text-[10px] h-5">
@@ -604,7 +607,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                             }}
                           >
                             {updatingBatchId === group.batch.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
-                            Mark Paid
+                             Record Manual Payment
                           </Button>
                         )}
                       </div>
@@ -653,14 +656,14 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                         </Button>
                       )}
 
-                      {/* Mark Paid — manual fallback for draft and exported */}
+                      {/* Record Manual Payment — manual fallback for draft and exported */}
                       <Button
                         size="sm"
                         disabled={updatingBatchId === group.batch.id}
                         onClick={() => handleMarkPaid(group.batch.id)}
                       >
                         {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                        Mark Paid
+                        Record Manual Payment
                       </Button>
                     </div>
                   </CollapsibleContent>
@@ -674,11 +677,11 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       {/* Paid Payables */}
       <Card className="p-3 space-y-2">
         <div>
-          <p className="text-sm font-medium">Paid Payables</p>
-          <p className="text-xs text-muted-foreground">Paid groups remain visible for audit and overlap safety.</p>
+          <p className="text-sm font-medium">Already Paid</p>
+          <p className="text-xs text-muted-foreground">These payments were already recorded as paid.</p>
         </div>
         {paidGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No paid payables for this selected period.</p>
+          <p className="text-xs text-muted-foreground">No paid records for this date range.</p>
         ) : (
           <div className="space-y-1">
             {paidGroups.map((group) => {
@@ -694,7 +697,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · paid {group.batch.paid_at || '—'}</p>
+                    <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · Paid on {group.batch.paid_at ? new Date(group.batch.paid_at).toLocaleDateString() : '—'}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {qbBillUrl && (
@@ -714,11 +717,11 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       {/* Excluded Shifts */}
       <Card className="p-3 space-y-2">
         <div>
-          <p className="text-sm font-medium">Excluded Shifts (why not eligible)</p>
-          <p className="text-xs text-muted-foreground">These shifts are already linked to non-voided payables and are blocked from new candidate creation.</p>
+          <p className="text-sm font-medium">Already Included Elsewhere</p>
+          <p className="text-xs text-muted-foreground">These shifts are already part of another payment group, so they can't be included again.</p>
         </div>
         {excludedShifts.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No excluded shifts in this range.</p>
+          <p className="text-xs text-muted-foreground">All shifts in this range are available.</p>
         ) : (
           <div className="space-y-1">
             {excludedShifts.map((row) => (
