@@ -559,8 +559,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       {/* Exported / Draft Payables */}
       <Card className="p-3 space-y-2">
         <div>
-          <p className="text-sm font-medium">Exported / Draft Payables</p>
-          <p className="text-xs text-muted-foreground">These groups are already linked and excluded from new candidates.</p>
+          <p className="text-sm font-medium">Prepared Payments</p>
+          <p className="text-xs text-muted-foreground">These payments have been prepared. Their shifts won't appear in Ready to Pay.</p>
         </div>
         {exportedGroups.length === 0 ? (
           <p className="text-xs text-muted-foreground">No draft/exported payables for this selected period.</p>
