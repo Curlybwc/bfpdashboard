@@ -33,6 +33,8 @@ import FieldModeCapture from "./pages/FieldModeCapture";
 import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Eula from "./pages/Eula";
 import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
 import MobileNav from "./components/MobileNav";
@@ -66,7 +68,7 @@ const AppRoutes = () => {
     if (user && (location.pathname === '/login' || location.pathname === '/')) {
       navigate('/today', { replace: true });
     }
-    const publicRoutes = ['/login', '/', '/reset-password'];
+    const publicRoutes = ['/login', '/', '/reset-password', '/privacy', '/eula'];
     if (!user && !publicRoutes.includes(location.pathname)) {
       navigate('/login', { replace: true });
     }
@@ -83,6 +85,8 @@ const AppRoutes = () => {
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/eula" element={<Eula />} />
         <Route path="/today" element={<Today />} />
         <Route path="/today/field-mode" element={<ManagerGuard><FieldModeCapture /></ManagerGuard>} />
         <Route path="/today/field-mode/preview" element={<ManagerGuard><FieldModePreview /></ManagerGuard>} />
