@@ -491,6 +491,40 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
             })}
           </div>
         )}
+
+        <div className="pt-2 border-t border-border space-y-2">
+          <p className="text-sm font-medium">Contractor Annual Detail</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={reportWorkerId}
+              onChange={(e) => setReportWorkerId(e.target.value)}
+            >
+              <option value="">Select contractor</option>
+                            {annualWorkerOptions.map((worker) => (
+                <option key={worker.id} value={worker.id}>{worker.name}</option>
+              ))}
+            </select>
+            <Button variant="outline" size="sm" onClick={exportWorkerDetailCsv} disabled={!reportWorkerId || annualWorkerDetails.length === 0}>
+              <FileDown className="h-4 w-4 mr-1" />Export Contractor Detail
+            </Button>
+          </div>
+          {reportWorkerId && annualWorkerDetails.length > 0 ? (
+            <div className="space-y-1 max-h-64 overflow-auto pr-1">
+              {annualWorkerDetails.map((row) => (
+                <div key={row.id} className="text-xs rounded border border-border p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{row.shift_date} · {row.project_name}</span>
+                    <Badge variant={row.payment_status === 'paid' ? 'secondary' : 'outline'}>{row.payment_status}</Badge>
+                  </div>
+                  <p className="text-muted-foreground">{row.total_hours}h @ ${row.hourly_rate_used.toFixed(2)} = ${row.calculated_amount.toFixed(2)}{row.paid_date ? ` · paid ${row.paid_date}` : ''}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Select a contractor to view annual shift-level paid/unpaid detail.</p>
+          )}
+        </div>
       </Card>
 
       <Card className="p-3 space-y-2">
