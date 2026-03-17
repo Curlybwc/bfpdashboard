@@ -312,8 +312,6 @@ const QBSettingsCard = () => {
                   </div>
                 </div>
               </div>
-                </div>
-              </div>
 
               {/* B. Project → Class Mappings */}
               <div className="space-y-2">
