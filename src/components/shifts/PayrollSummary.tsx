@@ -603,10 +603,16 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                       </Button>
                     </div>
                   ))}
-                  <Button size="sm" disabled={creatingGroupKey === group.key} onClick={() => handleCreatePayable(group)}>
-                    {creatingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                    Prepare Payment
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" disabled={creatingGroupKey === group.key || payingGroupKey === group.key} onClick={() => handleCreatePayable(group)}>
+                      {creatingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                      Prepare Payment
+                    </Button>
+                    <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)}>
+                      {payingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                      Mark Paid Now
+                    </Button>
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
             ))}
