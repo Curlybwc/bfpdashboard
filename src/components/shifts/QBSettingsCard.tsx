@@ -55,6 +55,7 @@ const QBSettingsCard = () => {
     if (settingsRes.data) {
       setExpAccountId(settingsRes.data.labor_expense_account_id || '');
       setExpAccountName(settingsRes.data.labor_expense_account_name || '');
+      setExpDirty(false);
     }
 
     setProjects((projectsRes.data || []) as ProjectRow[]);
