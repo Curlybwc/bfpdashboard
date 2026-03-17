@@ -280,7 +280,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       if (linked) {
         excluded.push({
           shift,
-          reason: `Linked to ${linked.status} payable (${linked.periodStart} → ${linked.periodEnd}, #${linked.batchId.slice(0, 8)})`,
+          const statusLabel = linked.status === 'paid' ? 'paid' : linked.status === 'exported' ? 'sent to QuickBooks' : 'prepared';
+          reason: `Part of a ${statusLabel} payment (${linked.periodStart} → ${linked.periodEnd})`,
         });
       } else {
         eligible.push(shift);
