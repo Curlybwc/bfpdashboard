@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Pencil } from 'lucide-react';
+import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
 import type { Tables } from '@/integrations/supabase/types';
@@ -55,6 +57,14 @@ type ExcludedShift = {
   reason: string;
 };
 
+type QBConnectionStatus = {
+  connected: boolean;
+  company_name?: string;
+  realm_id?: string;
+  connected_at?: string;
+  token_healthy?: boolean;
+};
+
 interface PayrollSummaryProps {
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
 }
@@ -62,6 +72,7 @@ interface PayrollSummaryProps {
 const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const today = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
@@ -78,6 +89,102 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [exportedGroups, setExportedGroups] = useState<ExistingPayableGroup[]>([]);
   const [paidGroups, setPaidGroups] = useState<ExistingPayableGroup[]>([]);
   const [excludedShifts, setExcludedShifts] = useState<ExcludedShift[]>([]);
+
+  // QuickBooks connection state
+  const [qbStatus, setQbStatus] = useState<QBConnectionStatus | null>(null);
+  const [qbStatusLoading, setQbStatusLoading] = useState(true);
+  const [qbConnecting, setQbConnecting] = useState(false);
+  const [exportingBatchIds, setExportingBatchIds] = useState<Set<string>>(new Set());
+
+  // Handle QB callback URL params
+  useEffect(() => {
+    const qbParam = searchParams.get('qb');
+    if (qbParam === 'connected') {
+      toast({ title: 'QuickBooks connected', description: 'Your QuickBooks account has been linked.' });
+      searchParams.delete('qb');
+      setSearchParams(searchParams, { replace: true });
+      fetchQBStatus();
+    } else if (qbParam === 'error') {
+      const msg = searchParams.get('msg') || 'Unknown error';
+      toast({ title: 'QuickBooks connection failed', description: msg, variant: 'destructive' });
+      searchParams.delete('qb');
+      searchParams.delete('msg');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []); // Run once on mount
+
+  const fetchQBStatus = useCallback(async () => {
+    setQbStatusLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_connection_status');
+      if (error) {
+        console.error('QB status fetch error:', error);
+        setQbStatus(null);
+      } else {
+        setQbStatus(data as QBConnectionStatus);
+      }
+    } catch {
+      setQbStatus(null);
+    }
+    setQbStatusLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchQBStatus();
+  }, [fetchQBStatus]);
+
+  const handleConnectQB = async () => {
+    setQbConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_connect_begin');
+      if (error || !data?.auth_url) {
+        toast({ title: 'Failed to start QuickBooks connection', description: error?.message || 'No auth URL returned', variant: 'destructive' });
+        setQbConnecting(false);
+        return;
+      }
+      // Redirect to Intuit OAuth
+      window.location.href = data.auth_url;
+    } catch {
+      toast({ title: 'Failed to start QuickBooks connection', variant: 'destructive' });
+      setQbConnecting(false);
+    }
+  };
+
+  const handleExportToQB = async (batchId: string) => {
+    setExportingBatchIds((prev) => new Set(prev).add(batchId));
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
+        body: { batch_ids: [batchId] },
+      });
+
+      if (error) {
+        toast({ title: 'Export failed', description: error.message, variant: 'destructive' });
+      } else {
+        const results = data?.results || [];
+        for (const r of results) {
+          if (r.success) {
+            toast({ title: 'Exported to QuickBooks', description: `Bill created (ID: ${r.qb_bill_id})` });
+          } else {
+            toast({ title: 'Export failed', description: r.error || 'Unknown error', variant: 'destructive' });
+          }
+        }
+        await loadPayroll();
+      }
+    } catch {
+      toast({ title: 'Export failed', variant: 'destructive' });
+    }
+    setExportingBatchIds((prev) => {
+      const next = new Set(prev);
+      next.delete(batchId);
+      return next;
+    });
+  };
+
+  const getQBBillUrl = (batch: PayableBatchRow) => {
+    const billId = batch.qb_bill_id;
+    if (!billId || !qbStatus?.realm_id) return null;
+    return `https://app.qbo.intuit.com/app/bill?txnId=${billId}`;
+  };
 
   const toggleCandidate = (key: string) => {
     setExpandedCandidates((prev) => {
@@ -285,7 +392,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         period_end: group.periodEnd,
         total_amount: Number(group.totalDollars.toFixed(2)),
         status: 'draft',
-        accounting_source: 'quickbooks_placeholder',
         settlement_method: 'off_platform_manual',
         created_by: user.id,
       })
@@ -309,23 +415,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     setCreatingGroupKey(null);
     toast({ title: 'Payable created', description: `Created batch #${batch.id.slice(0, 8)} (${group.contractorName} · ${group.projectName})` });
-    await loadPayroll();
-  };
-
-  const handleMarkExportedPlaceholder = async (batchId: string) => {
-    setUpdatingBatchId(batchId);
-    const { error } = await supabase
-      .from('worker_payable_batches')
-      .update({ status: 'exported', accounting_source: 'quickbooks_placeholder' })
-      .eq('id', batchId);
-    setUpdatingBatchId(null);
-
-    if (error) {
-      toast({ title: 'Export mark failed', description: error.message, variant: 'destructive' });
-      return;
-    }
-
-    toast({ title: 'Marked exported', description: 'QuickBooks export placeholder set on payable batch.' });
     await loadPayroll();
   };
 
@@ -355,15 +444,46 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     const candidateDollars = candidateGroups.reduce((sum, row) => sum + row.totalDollars, 0);
     const exportedDollars = exportedGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
     const paidDollars = paidGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
-    return {
-      candidateDollars,
-      exportedDollars,
-      paidDollars,
-    };
+    return { candidateDollars, exportedDollars, paidDollars };
   }, [candidateGroups, exportedGroups, paidGroups]);
 
   return (
     <div className="space-y-4">
+      {/* QuickBooks Connection Banner */}
+      <Card className="p-3">
+        {qbStatusLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Checking QuickBooks connection…
+          </div>
+        ) : qbStatus?.connected ? (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">QuickBooks: {qbStatus.company_name || 'Connected'}</p>
+                {!qbStatus.token_healthy && (
+                  <p className="text-xs text-destructive">Token expired — reconnect required</p>
+                )}
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleConnectQB} disabled={qbConnecting}>
+              {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
+              Reconnect
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">QuickBooks not connected</p>
+            <Button size="sm" onClick={handleConnectQB} disabled={qbConnecting}>
+              {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
+              Connect QuickBooks
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* Date range */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs">From</Label>
@@ -381,6 +501,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         <p>Paid (selected period): <span className="text-foreground font-medium">${totals.paidDollars.toFixed(2)}</span></p>
       </Card>
 
+      {/* Unpaid Eligible Groups */}
       <Card className="p-3 space-y-2">
         <div>
           <p className="text-sm font-medium">Unpaid Eligible Payable Groups</p>
@@ -433,6 +554,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         )}
       </Card>
 
+      {/* Exported / Draft Payables */}
       <Card className="p-3 space-y-2">
         <div>
           <p className="text-sm font-medium">Exported / Draft Payables</p>
@@ -444,6 +566,11 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
           <div className="space-y-2">
             {exportedGroups.map((group) => {
               const key = `existing-${group.batch.id}`;
+              const qbBillUrl = getQBBillUrl(group.batch);
+              const isDraft = group.batch.status === 'draft';
+              const isExported = group.batch.status === 'exported';
+              const exportError = group.batch.qb_export_error;
+
               return (
                 <Collapsible key={group.batch.id} open={expandedExisting.has(key)} onOpenChange={() => toggleExisting(key)}>
                   <CollapsibleTrigger asChild>
@@ -451,14 +578,32 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                       <div className="flex items-center gap-2">
                         <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedExisting.has(key) ? 'rotate-180' : ''}`} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
-                          <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · {group.batch.status}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
+                            <Badge variant={isExported ? 'default' : 'secondary'} className="text-[10px] h-5">
+                              {group.batch.status}
+                            </Badge>
+                            {group.batch.qb_bill_doc_number && (
+                              <Badge variant="outline" className="text-[10px] h-5">
+                                QB #{group.batch.qb_bill_doc_number}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end}</p>
                         </div>
                         <p className="text-sm font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
                       </div>
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-1 pl-4 space-y-1">
+                    {/* Export error display */}
+                    {exportError && (
+                      <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 rounded p-2">
+                        <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                        <span>{exportError}</span>
+                      </div>
+                    )}
+
                     {group.shifts.map((row) => (
                       <div key={row.shift.id} className="text-xs border rounded p-2 flex justify-between">
                         <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h</span>
@@ -466,15 +611,34 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                       </div>
                     ))}
                     <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={updatingBatchId === group.batch.id || group.batch.status === 'exported'}
-                        onClick={() => handleMarkExportedPlaceholder(group.batch.id)}
-                      >
-                        {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                        Mark Exported (QB Placeholder)
-                      </Button>
+                      {/* Export to QuickBooks — only for draft batches with active QB connection */}
+                      {isDraft && qbStatus?.connected && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={exportingBatchIds.has(group.batch.id)}
+                          onClick={() => handleExportToQB(group.batch.id)}
+                        >
+                          {exportingBatchIds.has(group.batch.id) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                          Export to QuickBooks
+                        </Button>
+                      )}
+
+                      {/* Open in QuickBooks — for exported batches with a QB reference */}
+                      {isExported && qbBillUrl && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          asChild
+                        >
+                          <a href={qbBillUrl} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Open in QuickBooks
+                          </a>
+                        </Button>
+                      )}
+
+                      {/* Mark Paid — manual fallback for draft and exported */}
                       <Button
                         size="sm"
                         disabled={updatingBatchId === group.batch.id}
@@ -492,6 +656,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         )}
       </Card>
 
+      {/* Paid Payables */}
       <Card className="p-3 space-y-2">
         <div>
           <p className="text-sm font-medium">Paid Payables</p>
@@ -501,19 +666,37 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
           <p className="text-xs text-muted-foreground">No paid payables for this selected period.</p>
         ) : (
           <div className="space-y-1">
-            {paidGroups.map((group) => (
-              <div key={group.batch.id} className="text-xs border rounded p-2 flex items-center justify-between">
-                <div>
-                  <p>{group.contractorName} · {group.projectName}</p>
-                  <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · paid {group.batch.paid_at || '—'}</p>
+            {paidGroups.map((group) => {
+              const qbBillUrl = getQBBillUrl(group.batch);
+              return (
+                <div key={group.batch.id} className="text-xs border rounded p-2 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p>{group.contractorName} · {group.projectName}</p>
+                      {group.batch.qb_bill_doc_number && (
+                        <Badge variant="outline" className="text-[10px] h-5">
+                          QB #{group.batch.qb_bill_doc_number}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · paid {group.batch.paid_at || '—'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {qbBillUrl && (
+                      <a href={qbBillUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    <p className="font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
+                  </div>
                 </div>
-                <p className="font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
 
+      {/* Excluded Shifts */}
       <Card className="p-3 space-y-2">
         <div>
           <p className="text-sm font-medium">Excluded Shifts (why not eligible)</p>
