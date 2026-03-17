@@ -716,8 +716,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       {/* Excluded Shifts */}
       <Card className="p-3 space-y-2">
         <div>
-          <p className="text-sm font-medium">Excluded Shifts (why not eligible)</p>
-          <p className="text-xs text-muted-foreground">These shifts are already linked to non-voided payables and are blocked from new candidate creation.</p>
+          <p className="text-sm font-medium">Already Included Elsewhere</p>
+          <p className="text-xs text-muted-foreground">These shifts are already part of another payment group, so they can't be included again.</p>
         </div>
         {excludedShifts.length === 0 ? (
           <p className="text-xs text-muted-foreground">No excluded shifts in this range.</p>
