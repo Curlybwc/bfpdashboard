@@ -88,6 +88,7 @@ const AppRoutes = () => {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/eula" element={<Eula />} />
+        <Route path="/qb-disconnected" element={<QBDisconnected />} />
         <Route path="/today" element={<Today />} />
         <Route path="/today/field-mode" element={<ManagerGuard><FieldModeCapture /></ManagerGuard>} />
         <Route path="/today/field-mode/preview" element={<ManagerGuard><FieldModePreview /></ManagerGuard>} />
