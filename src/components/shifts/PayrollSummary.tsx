@@ -672,6 +672,9 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         )}
       </Card>
 
+      {/* QuickBooks Settings (admin-only, visible when connected) */}
+      {qbStatus?.connected && <QBSettingsCard />}
+
       {/* Pay period selector */}
       <div className="space-y-1">
         <Label className="text-xs">Pay Period</Label>
