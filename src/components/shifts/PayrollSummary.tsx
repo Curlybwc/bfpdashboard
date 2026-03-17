@@ -420,6 +420,62 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     await loadPayroll();
   };
 
+  const handleCreateAndMarkPaid = async (group: CandidateGroup) => {
+    if (!user?.id) {
+      toast({ title: 'Auth required', description: 'Please sign in again.', variant: 'destructive' });
+      return;
+    }
+
+    setPayingGroupKey(group.key);
+
+    // Step 1: Create the batch as draft
+    const { data: batch, error: batchError } = await supabase
+      .from('worker_payable_batches')
+      .insert({
+        worker_user_id: group.worker_user_id,
+        project_id: group.project_id,
+        period_start: group.periodStart,
+        period_end: group.periodEnd,
+        total_amount: Number(group.totalDollars.toFixed(2)),
+        status: 'draft',
+        settlement_method: 'off_platform_manual',
+        created_by: user.id,
+      })
+      .select('*')
+      .single();
+
+    if (batchError || !batch) {
+      setPayingGroupKey(null);
+      toast({ title: 'Failed to record payment', description: batchError?.message || 'Unknown error', variant: 'destructive' });
+      return;
+    }
+
+    // Step 2: Link shifts
+    const linkRows = group.shifts.map((row) => ({ payable_batch_id: batch.id, shift_id: row.shift.id }));
+    const { error: linksError } = await supabase.from('worker_payable_batch_shifts').insert(linkRows);
+
+    if (linksError) {
+      setPayingGroupKey(null);
+      toast({ title: 'Link shifts failed', description: linksError.message, variant: 'destructive' });
+      return;
+    }
+
+    // Step 3: Immediately mark as paid
+    const { error: paidError } = await supabase
+      .from('worker_payable_batches')
+      .update({ status: 'paid', paid_at: new Date().toISOString(), marked_paid_by: user.id })
+      .eq('id', batch.id);
+
+    setPayingGroupKey(null);
+
+    if (paidError) {
+      toast({ title: 'Payment created but failed to mark paid', description: paidError.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Payment recorded', description: `${group.contractorName} · ${group.projectName} — marked as paid` });
+    }
+    await loadPayroll();
+  };
+
   const handleMarkPaid = async (batchId: string) => {
     if (!user?.id) {
       toast({ title: 'Auth required', description: 'Please sign in again.', variant: 'destructive' });
