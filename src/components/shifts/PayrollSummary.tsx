@@ -428,34 +428,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     await fetchPayroll();
   };
 
-  const handleMarkVisibleUnpaidShiftsPaid = async (summary: ContractorSummary) => {
-    const unpaidShiftIds = summary.shifts.filter((s) => s.payment_status === 'unpaid').map((s) => s.id);
-    if (unpaidShiftIds.length === 0) {
-      toast({ title: 'No unpaid shifts', description: 'All visible shifts for this worker are already paid.' });
-      return;
-    }
-
-    setMarkingWorkerId(summary.user_id);
-    const { data, error } = await supabase.rpc('admin_mark_visible_shifts_paid', {
-      p_worker_user_id: summary.user_id,
-      p_period_start: fromDate,
-      p_period_end: toDate,
-      p_shift_ids: unpaidShiftIds,
-      p_payment_source: 'manual_quickbooks',
-      p_memo: `Payroll ${fromDate} to ${toDate}`,
-      p_confirmation_note: 'Marked paid from payroll summary',
-    });
-    setMarkingWorkerId(null);
-
-    if (error) {
-      toast({ title: 'Mark paid failed', description: error.message, variant: 'destructive' });
-      return;
-    }
-
-    const linkedCount = (data as { linked_shift_count?: number } | null)?.linked_shift_count || unpaidShiftIds.length;
-    toast({ title: 'Shifts marked paid', description: `${summary.full_name}: ${linkedCount} shift(s) linked to a payment record.` });
-    await fetchPayroll();
-  };
 
   const handleSaveVenmoProfile = async (userId: string) => {
     const draft = venmoDraftByUser[userId] || { handle: '', noteTemplate: '' };

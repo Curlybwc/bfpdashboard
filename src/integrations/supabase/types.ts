@@ -1873,17 +1873,15 @@ export type Database = {
           id: string
           shift_id: string
           worker_payment_id: string
-          worker_user_id: string
         }
         Insert: {
-          amount_paid: number
+          amount_paid?: number
           created_at?: string
-          hourly_rate_used: number
-          hours_paid: number
+          hourly_rate_used?: number
+          hours_paid?: number
           id?: string
           shift_id: string
           worker_payment_id: string
-          worker_user_id: string
         }
         Update: {
           amount_paid?: number
@@ -1893,7 +1891,6 @@ export type Database = {
           id?: string
           shift_id?: string
           worker_payment_id?: string
-          worker_user_id?: string
         }
         Relationships: [
           {
@@ -1908,13 +1905,6 @@ export type Database = {
             columns: ["worker_payment_id"]
             isOneToOne: false
             referencedRelation: "worker_payments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "worker_payment_shifts_worker_user_id_fkey"
-            columns: ["worker_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
