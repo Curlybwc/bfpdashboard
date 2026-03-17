@@ -2078,6 +2078,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_mark_visible_shifts_paid: {
+        Args: {
+          p_confirmation_note?: string
+          p_memo?: string
+          p_payment_source?: Database["public"]["Enums"]["worker_payment_source"]
+          p_period_end: string
+          p_period_start: string
+          p_shift_ids: string[]
+          p_worker_user_id: string
+        }
+        Returns: Json
+      }
       apply_assignment_rules: {
         Args: { p_task_id: string }
         Returns: undefined
