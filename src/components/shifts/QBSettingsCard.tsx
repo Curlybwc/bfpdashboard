@@ -526,7 +526,26 @@ const QBSettingsCard = () => {
 
               {/* C. Vendor Mappings */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contractor → QB Vendor</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">Contractor → QB Vendor</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs px-2"
+                    disabled={qbVendorsLoading}
+                    onClick={loadQBVendors}
+                  >
+                    {qbVendorsLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    {qbVendorsLoaded ? 'Refresh Vendors' : 'Load QB Vendors'}
+                  </Button>
+                </div>
+                {qbVendorsError && (
+                  <p className="text-xs text-destructive">{qbVendorsError} — use manual entry below.</p>
+                )}
                 {profiles.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No active profiles.</p>
                 ) : (
@@ -534,21 +553,42 @@ const QBSettingsCard = () => {
                     {profiles.map((prof) => {
                       const edit = getVendorEdit(prof.id);
                       const hasUnsaved = !!vendorEdits[prof.id];
+                      const showDropdown = qbVendorsLoaded && qbVendors.length > 0;
                       return (
                         <div key={prof.id} className="flex flex-wrap items-center gap-2 text-xs border rounded p-2">
                           <p className="min-w-0 flex-1 truncate font-medium">{prof.full_name || prof.id}</p>
-                          <Input
-                            className="h-7 text-xs w-24"
-                            value={edit.qb_vendor_id}
-                            onChange={(e) => setVendorEdit(prof.id, 'qb_vendor_id', e.target.value)}
-                            placeholder="Vendor ID"
-                          />
-                          <Input
-                            className="h-7 text-xs w-36"
-                            value={edit.qb_vendor_name}
-                            onChange={(e) => setVendorEdit(prof.id, 'qb_vendor_name', e.target.value)}
-                            placeholder="Vendor Name"
-                          />
+                          {showDropdown ? (
+                            <Select
+                              value={edit.qb_vendor_id || undefined}
+                              onValueChange={(val) => selectVendorForUser(prof.id, val)}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-56">
+                                <SelectValue placeholder="Select a vendor…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {qbVendors.map((v) => (
+                                  <SelectItem key={v.id} value={v.id} className="text-xs">
+                                    {v.display_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <>
+                              <Input
+                                className="h-7 text-xs w-24"
+                                value={edit.qb_vendor_id}
+                                onChange={(e) => setVendorEdit(prof.id, 'qb_vendor_id', e.target.value)}
+                                placeholder="Vendor ID"
+                              />
+                              <Input
+                                className="h-7 text-xs w-36"
+                                value={edit.qb_vendor_name}
+                                onChange={(e) => setVendorEdit(prof.id, 'qb_vendor_name', e.target.value)}
+                                placeholder="Vendor Name"
+                              />
+                            </>
+                          )}
                           <Button
                             size="sm"
                             variant={hasUnsaved ? 'default' : 'outline'}
