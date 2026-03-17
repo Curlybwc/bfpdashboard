@@ -308,12 +308,10 @@ const QBSettingsCard = () => {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Display Name</Label>
-                    <Input className="h-8 text-xs w-48" value={expAccountName} onChange={(e) => setExpAccountName(e.target.value)} placeholder="e.g. Contract Labor" />
+                    <Input className="h-8 text-xs w-48" value={expAccountName} onChange={(e) => setExpAccountNameTracked(e.target.value)} placeholder="e.g. Contract Labor" />
                   </div>
-                  <Button size="sm" className="h-8" disabled={expSaving} onClick={saveExpenseAccount}>
-                    {expSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
-                    Save
-                  </Button>
+                </div>
+              </div>
                 </div>
               </div>
 
