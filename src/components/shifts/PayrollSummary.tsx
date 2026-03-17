@@ -69,16 +69,65 @@ interface PayrollSummaryProps {
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
 }
 
+// Generate biweekly pay periods (Monday → second Sunday)
+// Anchor: a known Monday. We'll generate periods going back ~6 months and forward ~1 month.
+function generatePayPeriods(): { label: string; from: string; to: string }[] {
+  // Use 2026-01-05 as anchor Monday (adjust if needed — it's a Monday)
+  const anchor = new Date('2026-01-05T00:00:00');
+  const periods: { label: string; from: string; to: string }[] = [];
+  const now = new Date();
+
+  // Start 6 months back, go up to 1 month ahead
+  const rangeStart = new Date(now);
+  rangeStart.setMonth(rangeStart.getMonth() - 6);
+  const rangeEnd = new Date(now);
+  rangeEnd.setMonth(rangeEnd.getMonth() + 1);
+
+  // Find first period start on or before rangeStart
+  const anchorMs = anchor.getTime();
+  const periodMs = 14 * 86400000;
+  const diffMs = rangeStart.getTime() - anchorMs;
+  const periodsBack = Math.floor(diffMs / periodMs);
+  let cursor = new Date(anchorMs + periodsBack * periodMs);
+
+  while (cursor.getTime() <= rangeEnd.getTime()) {
+    const periodStart = new Date(cursor);
+    const periodEnd = new Date(cursor.getTime() + 13 * 86400000); // 14 days inclusive
+    const from = periodStart.toISOString().slice(0, 10);
+    const to = periodEnd.toISOString().slice(0, 10);
+    const fmtDate = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+    const label = `${fmtDate(periodStart)} – ${fmtDate(periodEnd)}`;
+    periods.push({ label, from, to });
+    cursor = new Date(cursor.getTime() + periodMs);
+  }
+
+  return periods.reverse(); // Most recent first
+}
+
+const PAY_PERIODS = generatePayPeriods();
+
+function getCurrentPeriodKey(): string {
+  const now = new Date();
+  const nowStr = now.toISOString().slice(0, 10);
+  // Find the period containing today, or the most recent past one
+  for (const p of PAY_PERIODS) {
+    if (p.from <= nowStr && p.to >= nowStr) return `${p.from}::${p.to}`;
+  }
+  // Fallback: most recent past period
+  for (const p of PAY_PERIODS) {
+    if (p.to < nowStr) return `${p.from}::${p.to}`;
+  }
+  return PAY_PERIODS.length > 0 ? `${PAY_PERIODS[0].from}::${PAY_PERIODS[0].to}` : '';
+}
+
 const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-
-  const [fromDate, setFromDate] = useState(weekAgo);
-  const [toDate, setToDate] = useState(today);
+  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriodKey);
+  const fromDate = selectedPeriod.split('::')[0] || '';
+  const toDate = selectedPeriod.split('::')[1] || '';
   const [loading, setLoading] = useState(false);
   const [creatingGroupKey, setCreatingGroupKey] = useState<string | null>(null);
   const [payingGroupKey, setPayingGroupKey] = useState<string | null>(null);
