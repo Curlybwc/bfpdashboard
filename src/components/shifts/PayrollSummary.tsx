@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2 } from 'lucide-react';
+import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2, X, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
 import type { Tables } from '@/integrations/supabase/types';
@@ -133,6 +133,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [creatingGroupKey, setCreatingGroupKey] = useState<string | null>(null);
   const [payingGroupKey, setPayingGroupKey] = useState<string | null>(null);
   const [updatingBatchId, setUpdatingBatchId] = useState<string | null>(null);
+  const [voidingBatchId, setVoidingBatchId] = useState<string | null>(null);
+  const [removingShiftId, setRemovingShiftId] = useState<string | null>(null);
   const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
   const [expandedExisting, setExpandedExisting] = useState<Set<string>>(new Set());
 
@@ -553,6 +555,76 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     await loadPayroll();
   };
 
+  const handleVoidBatch = async (batchId: string) => {
+    setVoidingBatchId(batchId);
+
+    // Void all shift links
+    const { error: voidLinksError } = await supabase
+      .from('worker_payable_batch_shifts')
+      .update({ voided_at: new Date().toISOString() })
+      .eq('payable_batch_id', batchId);
+
+    if (voidLinksError) {
+      setVoidingBatchId(null);
+      toast({ title: 'Failed to void links', description: voidLinksError.message, variant: 'destructive' });
+      return;
+    }
+
+    // Set batch status to voided
+    const { error: voidBatchError } = await supabase
+      .from('worker_payable_batches')
+      .update({ status: 'voided' })
+      .eq('id', batchId);
+
+    setVoidingBatchId(null);
+
+    if (voidBatchError) {
+      toast({ title: 'Failed to void group', description: voidBatchError.message, variant: 'destructive' });
+      return;
+    }
+
+    toast({ title: 'Payment group voided', description: 'All shifts released back to Ready to Pay.' });
+    await loadPayroll();
+  };
+
+  const handleRemoveShiftFromBatch = async (shiftId: string, batchId: string) => {
+    setRemovingShiftId(shiftId);
+
+    // Void just this one link
+    const { error: voidError } = await supabase
+      .from('worker_payable_batch_shifts')
+      .update({ voided_at: new Date().toISOString() })
+      .eq('payable_batch_id', batchId)
+      .eq('shift_id', shiftId);
+
+    if (voidError) {
+      setRemovingShiftId(null);
+      toast({ title: 'Failed to remove shift', description: voidError.message, variant: 'destructive' });
+      return;
+    }
+
+    // Recalculate batch total: check remaining active links
+    const { data: remainingLinks } = await supabase
+      .from('worker_payable_batch_shifts')
+      .select('shift_id')
+      .eq('payable_batch_id', batchId)
+      .is('voided_at', null);
+
+    if (!remainingLinks || remainingLinks.length === 0) {
+      // No shifts left — void the whole batch
+      await supabase
+        .from('worker_payable_batches')
+        .update({ status: 'voided' })
+        .eq('id', batchId);
+      toast({ title: 'Shift removed', description: 'No shifts remain — group has been voided.' });
+    } else {
+      toast({ title: 'Shift removed', description: 'Shift released back to Ready to Pay.' });
+    }
+
+    setRemovingShiftId(null);
+    await loadPayroll();
+  };
+
   const totals = useMemo(() => {
     const candidateDollars = candidateGroups.reduce((sum, row) => sum + row.totalDollars, 0);
     const exportedDollars = exportedGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
@@ -746,9 +818,20 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                     )}
 
                     {group.shifts.map((row) => (
-                      <div key={row.shift.id} className="text-xs border rounded p-2 flex justify-between">
-                        <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h</span>
-                        <span>${row.dollars.toFixed(2)}</span>
+                      <div key={row.shift.id} className="text-xs border rounded p-2 flex items-center justify-between">
+                        <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h · ${row.dollars.toFixed(2)}</span>
+                        {isDraft && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                            disabled={removingShiftId === row.shift.id}
+                            onClick={() => handleRemoveShiftFromBatch(row.shift.id, group.batch.id)}
+                            title="Remove this shift from group"
+                          >
+                            {removingShiftId === row.shift.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                          </Button>
+                        )}
                       </div>
                     ))}
                     <div className="flex flex-wrap gap-2">
@@ -788,6 +871,18 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                         {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                         Record Manual Payment
                       </Button>
+                      {/* Void entire group */}
+                      {isDraft && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={voidingBatchId === group.batch.id}
+                          onClick={() => handleVoidBatch(group.batch.id)}
+                        >
+                          {voidingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                          Void Group
+                        </Button>
+                      )}
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
@@ -848,9 +943,37 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         ) : (
           <div className="space-y-1">
             {excludedShifts.map((row) => (
-              <div key={row.shift.shift.id} className="text-xs border rounded p-2">
-                <p>{row.shift.workerName} · {row.shift.projectName} · {row.shift.shift.shift_date} · {Number(row.shift.shift.total_hours)}h</p>
-                <p className="text-muted-foreground">{row.reason}</p>
+              <div key={row.shift.shift.id} className="text-xs border rounded p-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p>{row.shift.workerName} · {row.shift.projectName} · {row.shift.shift.shift_date} · {Number(row.shift.shift.total_hours)}h</p>
+                  <p className="text-muted-foreground">{row.reason}</p>
+                </div>
+                {row.linkedBatchId && (
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs px-2"
+                      disabled={removingShiftId === row.shift.shift.id}
+                      onClick={() => handleRemoveShiftFromBatch(row.shift.shift.id, row.linkedBatchId!)}
+                      title="Remove this shift from its group"
+                    >
+                      {removingShiftId === row.shift.shift.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3 mr-1" />}
+                      Remove
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs px-2 text-destructive hover:text-destructive"
+                      disabled={voidingBatchId === row.linkedBatchId}
+                      onClick={() => handleVoidBatch(row.linkedBatchId!)}
+                      title="Void the entire payment group"
+                    >
+                      {voidingBatchId === row.linkedBatchId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                      Void Group
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
