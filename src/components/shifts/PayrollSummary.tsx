@@ -563,7 +563,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
           <p className="text-xs text-muted-foreground">These payments have been prepared. Their shifts won't appear in Ready to Pay.</p>
         </div>
         {exportedGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No draft/exported payables for this selected period.</p>
+          <p className="text-xs text-muted-foreground">No prepared payments for this date range.</p>
         ) : (
           <div className="space-y-2">
             {exportedGroups.map((group) => {
