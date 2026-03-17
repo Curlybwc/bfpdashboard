@@ -278,9 +278,9 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     for (const shift of computedShifts) {
       const linked = activeLinkByShiftId.get(shift.shift.id);
       if (linked) {
+        const statusLabel = linked.status === 'paid' ? 'paid' : linked.status === 'exported' ? 'sent to QuickBooks' : 'prepared';
         excluded.push({
           shift,
-          const statusLabel = linked.status === 'paid' ? 'paid' : linked.status === 'exported' ? 'sent to QuickBooks' : 'prepared';
           reason: `Part of a ${statusLabel} payment (${linked.periodStart} → ${linked.periodEnd})`,
         });
       } else {
