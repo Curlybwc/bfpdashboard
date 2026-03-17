@@ -1864,47 +1864,153 @@ export type Database = {
           },
         ]
       }
-      worker_payment_shifts: {
+      worker_payable_batch_shifts: {
         Row: {
-          amount_paid: number
           created_at: string
-          hourly_rate_used: number
-          hours_paid: number
           id: string
+          payable_batch_id: string
           shift_id: string
-          worker_payment_id: string
+          voided_at: string | null
+          voided_by: string | null
         }
         Insert: {
-          amount_paid?: number
           created_at?: string
-          hourly_rate_used?: number
-          hours_paid?: number
           id?: string
+          payable_batch_id: string
           shift_id: string
-          worker_payment_id: string
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Update: {
-          amount_paid?: number
           created_at?: string
-          hourly_rate_used?: number
-          hours_paid?: number
           id?: string
+          payable_batch_id?: string
           shift_id?: string
-          worker_payment_id?: string
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "worker_payment_shifts_shift_id_fkey"
+            foreignKeyName: "worker_payable_batch_shifts_payable_batch_id_fkey"
+            columns: ["payable_batch_id"]
+            isOneToOne: false
+            referencedRelation: "worker_payable_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payable_batch_shifts_shift_id_fkey"
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "worker_payment_shifts_worker_payment_id_fkey"
-            columns: ["worker_payment_id"]
+            foreignKeyName: "worker_payable_batch_shifts_voided_by_fkey"
+            columns: ["voided_by"]
             isOneToOne: false
-            referencedRelation: "worker_payments"
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worker_payable_batches: {
+        Row: {
+          accounting_source: string | null
+          created_at: string
+          created_by: string
+          external_reference: string | null
+          id: string
+          marked_paid_by: string | null
+          paid_at: string | null
+          period_end: string
+          period_start: string
+          project_id: string | null
+          quickbooks_reference: string | null
+          settlement_method: string | null
+          status: Database["public"]["Enums"]["worker_payable_batch_status"]
+          total_amount: number
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+          worker_user_id: string
+        }
+        Insert: {
+          accounting_source?: string | null
+          created_at?: string
+          created_by: string
+          external_reference?: string | null
+          id?: string
+          marked_paid_by?: string | null
+          paid_at?: string | null
+          period_end: string
+          period_start: string
+          project_id?: string | null
+          quickbooks_reference?: string | null
+          settlement_method?: string | null
+          status?: Database["public"]["Enums"]["worker_payable_batch_status"]
+          total_amount?: number
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          worker_user_id: string
+        }
+        Update: {
+          accounting_source?: string | null
+          created_at?: string
+          created_by?: string
+          external_reference?: string | null
+          id?: string
+          marked_paid_by?: string | null
+          paid_at?: string | null
+          period_end?: string
+          period_start?: string
+          project_id?: string | null
+          quickbooks_reference?: string | null
+          settlement_method?: string | null
+          status?: Database["public"]["Enums"]["worker_payable_batch_status"]
+          total_amount?: number
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          worker_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_payable_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payable_batches_marked_paid_by_fkey"
+            columns: ["marked_paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payable_batches_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payable_batches_voided_by_fkey"
+            columns: ["voided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payable_batches_worker_user_id_fkey"
+            columns: ["worker_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2183,10 +2289,8 @@ export type Database = {
         | "5 – Later"
       task_stage: "Ready" | "In Progress" | "Not Ready" | "Hold" | "Done"
       unit_type: "each" | "sqft" | "lf" | "piece"
-      worker_payment_source:
-        | "stripe_connect"
-        | "manual_quickbooks"
-        | "venmo_manual"
+      worker_payable_batch_status: "draft" | "exported" | "paid" | "voided"
+      worker_payment_source: "stripe_connect" | "manual_quickbooks" | "venmo_manual"
       worker_payment_status:
         | "pending"
         | "processing"
@@ -2360,11 +2464,8 @@ export const Constants = {
       ],
       task_stage: ["Ready", "In Progress", "Not Ready", "Hold", "Done"],
       unit_type: ["each", "sqft", "lf", "piece"],
-      worker_payment_source: [
-        "stripe_connect",
-        "manual_quickbooks",
-        "venmo_manual",
-      ],
+      worker_payable_batch_status: ["draft", "exported", "paid", "voided"],
+      worker_payment_source: ["stripe_connect", "manual_quickbooks", "venmo_manual"],
       worker_payment_status: [
         "pending",
         "processing",
