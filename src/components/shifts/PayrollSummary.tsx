@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +55,7 @@ type ExistingPayableGroup = {
 type ExcludedShift = {
   shift: ShiftWithComputed;
   reason: string;
+  linkedBatchId?: string;
 };
 
 type QBConnectionStatus = {
@@ -69,16 +70,65 @@ interface PayrollSummaryProps {
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
 }
 
+// Generate biweekly pay periods (Monday → second Sunday)
+// Anchor: a known Monday. We'll generate periods going back ~6 months and forward ~1 month.
+function generatePayPeriods(): { label: string; from: string; to: string }[] {
+  // Use 2026-01-05 as anchor Monday (adjust if needed — it's a Monday)
+  const anchor = new Date('2026-01-05T00:00:00');
+  const periods: { label: string; from: string; to: string }[] = [];
+  const now = new Date();
+
+  // Start 6 months back, go up to 1 month ahead
+  const rangeStart = new Date(now);
+  rangeStart.setMonth(rangeStart.getMonth() - 6);
+  const rangeEnd = new Date(now);
+  rangeEnd.setMonth(rangeEnd.getMonth() + 1);
+
+  // Find first period start on or before rangeStart
+  const anchorMs = anchor.getTime();
+  const periodMs = 14 * 86400000;
+  const diffMs = rangeStart.getTime() - anchorMs;
+  const periodsBack = Math.floor(diffMs / periodMs);
+  let cursor = new Date(anchorMs + periodsBack * periodMs);
+
+  while (cursor.getTime() <= rangeEnd.getTime()) {
+    const periodStart = new Date(cursor);
+    const periodEnd = new Date(cursor.getTime() + 13 * 86400000); // 14 days inclusive
+    const from = periodStart.toISOString().slice(0, 10);
+    const to = periodEnd.toISOString().slice(0, 10);
+    const fmtDate = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+    const label = `${fmtDate(periodStart)} – ${fmtDate(periodEnd)}`;
+    periods.push({ label, from, to });
+    cursor = new Date(cursor.getTime() + periodMs);
+  }
+
+  return periods.reverse(); // Most recent first
+}
+
+const PAY_PERIODS = generatePayPeriods();
+
+function getCurrentPeriodKey(): string {
+  const now = new Date();
+  const nowStr = now.toISOString().slice(0, 10);
+  // Find the period containing today, or the most recent past one
+  for (const p of PAY_PERIODS) {
+    if (p.from <= nowStr && p.to >= nowStr) return `${p.from}::${p.to}`;
+  }
+  // Fallback: most recent past period
+  for (const p of PAY_PERIODS) {
+    if (p.to < nowStr) return `${p.from}::${p.to}`;
+  }
+  return PAY_PERIODS.length > 0 ? `${PAY_PERIODS[0].from}::${PAY_PERIODS[0].to}` : '';
+}
+
 const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-
-  const [fromDate, setFromDate] = useState(weekAgo);
-  const [toDate, setToDate] = useState(today);
+  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriodKey);
+  const fromDate = selectedPeriod.split('::')[0] || '';
+  const toDate = selectedPeriod.split('::')[1] || '';
   const [loading, setLoading] = useState(false);
   const [creatingGroupKey, setCreatingGroupKey] = useState<string | null>(null);
   const [payingGroupKey, setPayingGroupKey] = useState<string | null>(null);
@@ -283,6 +333,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         excluded.push({
           shift,
           reason: `Part of a ${statusLabel} payment (${linked.periodStart} → ${linked.periodEnd})`,
+          linkedBatchId: linked.batchId,
         });
       } else {
         eligible.push(shift);
@@ -364,10 +415,14 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       };
     });
 
+    // Filter out excluded shifts whose batch is already shown in Prepared/Paid sections
+    const displayedBatchIds = new Set(batchRows.map((b) => b.id));
+    const filteredExcluded = excluded.filter((ex) => !ex.linkedBatchId || !displayedBatchIds.has(ex.linkedBatchId));
+
     setCandidateGroups([...groupsMap.values()].sort((a, b) => a.contractorName.localeCompare(b.contractorName) || a.projectName.localeCompare(b.projectName)));
     setExportedGroups(existingGroups.filter((row) => row.batch.status === 'exported' || row.batch.status === 'draft'));
     setPaidGroups(existingGroups.filter((row) => row.batch.status === 'paid'));
-    setExcludedShifts(excluded.sort((a, b) => a.shift.workerName.localeCompare(b.shift.workerName) || a.shift.projectName.localeCompare(b.shift.projectName)));
+    setExcludedShifts(filteredExcluded.sort((a, b) => a.shift.workerName.localeCompare(b.shift.workerName) || a.shift.projectName.localeCompare(b.shift.projectName)));
     setLoading(false);
   }, [fromDate, toDate]);
 
@@ -541,16 +596,21 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         )}
       </Card>
 
-      {/* Date range */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">From</Label>
-          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">To</Label>
-          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-        </div>
+      {/* Pay period selector */}
+      <div className="space-y-1">
+        <Label className="text-xs">Pay Period</Label>
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select a pay period" />
+          </SelectTrigger>
+          <SelectContent>
+            {PAY_PERIODS.map((p) => (
+              <SelectItem key={`${p.from}::${p.to}`} value={`${p.from}::${p.to}`}>
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <p className="text-xs text-muted-foreground">This page groups unpaid shifts by contractor and project so you can prepare payments without paying the same shift twice.</p>
