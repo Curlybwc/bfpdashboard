@@ -30,6 +30,35 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Fetch QB settings (singleton row)
+    const { data: qbSettings, error: settingsErr } = await adminClient
+      .from("quickbooks_settings")
+      .select("labor_expense_account_id, labor_expense_account_name")
+      .limit(1)
+      .maybeSingle();
+
+    if (settingsErr) {
+      return new Response(
+        JSON.stringify({ error: "query_failed", message: settingsErr.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (!qbSettings?.labor_expense_account_id) {
+      return new Response(
+        JSON.stringify({
+          error: "missing_settings",
+          message: "Configure a QuickBooks expense account in Payroll → QB Settings before exporting.",
+          results: batch_ids.map((id) => ({
+            batch_id: id,
+            success: false,
+            error: "Configure a QuickBooks expense account in Payroll → QB Settings before exporting.",
+          })),
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Fetch all requested batches
     const { data: batches, error: batchErr } = await adminClient
       .from("worker_payable_batches")
@@ -61,12 +90,18 @@ Deno.serve(async (req) => {
       .in("id", workerIds);
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name || "Unknown"]));
 
-    // Fetch project names for bill memo
+    // Fetch project names and addresses for bill memo
     const projectIds = [...new Set((batches || []).filter((b: any) => b.project_id).map((b: any) => b.project_id))];
     const { data: projects } = projectIds.length > 0
-      ? await adminClient.from("projects").select("id, name").in("id", projectIds)
+      ? await adminClient.from("projects").select("id, name, address").in("id", projectIds)
       : { data: [] };
-    const projectMap = new Map((projects || []).map((p: any) => [p.id, p.name]));
+    const projectMap = new Map((projects || []).map((p: any) => [p.id, p]));
+
+    // Fetch QB class mappings for all project IDs
+    const { data: classMappings } = projectIds.length > 0
+      ? await adminClient.from("quickbooks_class_mappings").select("project_id, qb_class_id, qb_class_name").in("project_id", projectIds)
+      : { data: [] };
+    const classMap = new Map((classMappings || []).map((c: any) => [c.project_id, c]));
 
     // Process each batch independently
     const results: { batch_id: string; success: boolean; qb_bill_id?: string; error?: string }[] = [];
@@ -97,9 +132,25 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Check class mapping (hard blocker)
+      const classMapping = batch.project_id ? classMap.get(batch.project_id) : null;
+      if (!classMapping) {
+        const proj = batch.project_id ? projectMap.get(batch.project_id) : null;
+        const projectLabel = proj?.name || batch.project_id || "Unknown project";
+        const errorMsg = `No QuickBooks class mapped for project "${projectLabel}". Add a class mapping in QB Settings before exporting.`;
+        await adminClient
+          .from("worker_payable_batches")
+          .update({ qb_export_error: errorMsg })
+          .eq("id", batchId);
+        results.push({ batch_id: batchId, success: false, error: errorMsg });
+        continue;
+      }
+
       // Build QB Bill payload
-      const projectName = batch.project_id ? (projectMap.get(batch.project_id) || "Project") : "Multiple Projects";
-      const memo = `Payroll: ${batch.period_start} to ${batch.period_end} · ${projectName}`;
+      const proj = batch.project_id ? projectMap.get(batch.project_id) : null;
+      const projectName = proj?.name || "Project";
+      const projectAddress = proj?.address || null;
+      const description = `Payroll: ${batch.period_start} to ${batch.period_end} · ${projectAddress || projectName}`;
 
       const billPayload = {
         VendorRef: { value: vendor.qb_vendor_id, name: vendor.qb_vendor_name || undefined },
@@ -107,13 +158,20 @@ Deno.serve(async (req) => {
           {
             DetailType: "AccountBasedExpenseLineDetail",
             Amount: Number(batch.total_amount),
-            Description: memo,
+            Description: description,
             AccountBasedExpenseLineDetail: {
-              AccountRef: { value: "1" }, // Default expense account — admin can reclassify in QB
+              AccountRef: {
+                value: qbSettings.labor_expense_account_id,
+                name: qbSettings.labor_expense_account_name || undefined,
+              },
+              ClassRef: {
+                value: classMapping.qb_class_id,
+                name: classMapping.qb_class_name || undefined,
+              },
             },
           },
         ],
-        PrivateNote: `Lovable Payroll Batch #${batchId.slice(0, 8)}`,
+        PrivateNote: `Lovable Payroll Batch #${batchId.slice(0, 8)} · ${projectName}`,
       };
 
       const result = await qbApiFetch(conn, "POST", "/bill", billPayload);

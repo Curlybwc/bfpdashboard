@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2, X, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
+import QBSettingsCard from './QBSettingsCard';
 import type { Tables } from '@/integrations/supabase/types';
 
 type ShiftRow = Tables<'shifts'>;
@@ -670,6 +671,9 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
           </div>
         )}
       </Card>
+
+      {/* QuickBooks Settings (admin-only, visible when connected) */}
+      {qbStatus?.connected && <QBSettingsCard />}
 
       {/* Pay period selector */}
       <div className="space-y-1">
