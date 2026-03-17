@@ -341,17 +341,55 @@ const QBSettingsCard = () => {
             <>
               {/* A. Expense Account */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Labor Expense Account</p>
-                <div className="flex flex-wrap gap-2 items-end">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Account ID</Label>
-                    <Input className="h-8 text-xs w-40" value={expAccountId} onChange={(e) => setExpAccountIdTracked(e.target.value)} placeholder="e.g. 68" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Display Name</Label>
-                    <Input className="h-8 text-xs w-48" value={expAccountName} onChange={(e) => setExpAccountNameTracked(e.target.value)} placeholder="e.g. Contract Labor" />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">Labor Expense Account</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs px-2"
+                    disabled={qbAccountsLoading}
+                    onClick={loadQBAccounts}
+                  >
+                    {qbAccountsLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    {qbAccountsLoaded ? 'Refresh Accounts' : 'Load QB Accounts'}
+                  </Button>
                 </div>
+                {qbAccountsError && (
+                  <p className="text-xs text-destructive">{qbAccountsError} — use manual entry below.</p>
+                )}
+                {qbAccountsLoaded && qbAccounts.length > 0 ? (
+                  <Select
+                    value={expAccountId || undefined}
+                    onValueChange={selectExpenseAccount}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select an expense account…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {qbAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id} className="text-xs">
+                          {a.fully_qualified_name}
+                          {a.account_sub_type ? ` (${a.account_sub_type})` : a.account_type ? ` (${a.account_type})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Account ID</Label>
+                      <Input className="h-8 text-xs w-40" value={expAccountId} onChange={(e) => setExpAccountIdTracked(e.target.value)} placeholder="e.g. 68" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Display Name</Label>
+                      <Input className="h-8 text-xs w-48" value={expAccountName} onChange={(e) => setExpAccountNameTracked(e.target.value)} placeholder="e.g. Contract Labor" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* B. Project → Class Mappings */}
