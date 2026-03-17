@@ -169,14 +169,17 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const fetchQBStatus = useCallback(async () => {
     setQbStatusLoading(true);
     try {
+      console.log('[PayrollSummary] Fetching QB connection status...');
       const { data, error } = await supabase.functions.invoke('quickbooks_connection_status');
       if (error) {
-        console.error('QB status fetch error:', error);
+        console.error('[PayrollSummary] QB status fetch error:', error);
         setQbStatus(null);
       } else {
+        console.log('[PayrollSummary] QB status response:', data);
         setQbStatus(data as QBConnectionStatus);
       }
-    } catch {
+    } catch (e) {
+      console.error('[PayrollSummary] QB status exception:', e);
       setQbStatus(null);
     }
     setQbStatusLoading(false);
