@@ -592,6 +592,21 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                           <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end}</p>
                         </div>
                         <p className="text-sm font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
+                        {(isDraft || isExported) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="ml-2 h-7 text-xs gap-1"
+                            disabled={updatingBatchId === group.batch.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkPaid(group.batch.id);
+                            }}
+                          >
+                            {updatingBatchId === group.batch.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                            Mark Paid
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CollapsibleTrigger>
