@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.quickbooks_list_classes]
 verify_jwt = false
+
+[functions.quickbooks_list_accounts]
+verify_jwt = false
