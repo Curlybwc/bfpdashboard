@@ -720,7 +720,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
           <p className="text-xs text-muted-foreground">These shifts are already part of another payment group, so they can't be included again.</p>
         </div>
         {excludedShifts.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No excluded shifts in this range.</p>
+          <p className="text-xs text-muted-foreground">All shifts in this range are available.</p>
         ) : (
           <div className="space-y-1">
             {excludedShifts.map((row) => (
