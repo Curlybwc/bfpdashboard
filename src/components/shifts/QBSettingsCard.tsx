@@ -109,10 +109,10 @@ const QBSettingsCard = () => {
     setQbClassesLoading(false);
   };
 
-  const saveExpenseAccount = async () => {
+  const saveExpenseAccount = async (): Promise<boolean> => {
     if (!expAccountId.trim()) {
       toast({ title: 'Account ID required', variant: 'destructive' });
-      return;
+      return false;
     }
     setExpSaving(true);
 
@@ -122,34 +122,30 @@ const QBSettingsCard = () => {
       .limit(1)
       .maybeSingle();
 
+    let error;
     if (existing) {
-      const { error } = await supabase
+      ({ error } = await supabase
         .from('quickbooks_settings')
         .update({
           labor_expense_account_id: expAccountId.trim(),
           labor_expense_account_name: expAccountName.trim() || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', existing.id);
-      if (error) {
-        toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Expense account saved' });
-      }
+        .eq('id', existing.id));
     } else {
-      const { error } = await supabase
+      ({ error } = await supabase
         .from('quickbooks_settings')
         .insert({
           labor_expense_account_id: expAccountId.trim(),
           labor_expense_account_name: expAccountName.trim() || null,
-        });
-      if (error) {
-        toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Expense account saved' });
-      }
+        }));
     }
     setExpSaving(false);
+    if (error) {
+      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    return true;
   };
 
   const getClassEdit = (projectId: string) => {
