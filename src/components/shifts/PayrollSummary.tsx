@@ -547,7 +547,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                   ))}
                   <Button size="sm" disabled={creatingGroupKey === group.key} onClick={() => handleCreatePayable(group)}>
                     {creatingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                    Create Payable Batch
+                    Prepare Payment
                   </Button>
                 </CollapsibleContent>
               </Collapsible>
