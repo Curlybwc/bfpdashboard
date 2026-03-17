@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Loader2, ChevronDown, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -491,7 +490,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
             })}
           </div>
         )}
-
       </Card>
 
       <Card className="p-3 space-y-2">
