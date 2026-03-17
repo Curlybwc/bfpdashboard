@@ -1991,6 +1991,7 @@ export type Database = {
           period_start: string
           project_id: string | null
           qb_bill_doc_number: string | null
+          qb_bill_id: string | null
           qb_export_error: string | null
           qb_exported_at: string | null
           settlement_method: string | null
@@ -2011,6 +2012,7 @@ export type Database = {
           period_start: string
           project_id?: string | null
           qb_bill_doc_number?: string | null
+          qb_bill_id?: string | null
           qb_export_error?: string | null
           qb_exported_at?: string | null
           settlement_method?: string | null
@@ -2031,6 +2033,7 @@ export type Database = {
           period_start?: string
           project_id?: string | null
           qb_bill_doc_number?: string | null
+          qb_bill_id?: string | null
           qb_export_error?: string | null
           qb_exported_at?: string | null
           settlement_method?: string | null
