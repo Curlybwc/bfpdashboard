@@ -168,11 +168,10 @@ const QBSettingsCard = () => {
     }));
   };
 
-  const saveClassMapping = async (projectId: string) => {
+  const saveClassMapping = async (projectId: string): Promise<boolean> => {
     const edit = getClassEdit(projectId);
     if (!edit.qb_class_id.trim()) {
-      toast({ title: 'Class ID required', variant: 'destructive' });
-      return;
+      return false;
     }
     setClassSaving(projectId);
 
@@ -184,13 +183,13 @@ const QBSettingsCard = () => {
       );
 
     if (error) {
-      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-    } else {
-      setClassMappings((prev) => ({ ...prev, [projectId]: { qb_class_id: edit.qb_class_id.trim(), qb_class_name: edit.qb_class_name.trim() } }));
-      setClassEdits((prev) => { const n = { ...prev }; delete n[projectId]; return n; });
-      toast({ title: 'Class mapping saved' });
+      setClassSaving(null);
+      return false;
     }
+    setClassMappings((prev) => ({ ...prev, [projectId]: { qb_class_id: edit.qb_class_id.trim(), qb_class_name: edit.qb_class_name.trim() } }));
+    setClassEdits((prev) => { const n = { ...prev }; delete n[projectId]; return n; });
     setClassSaving(null);
+    return true;
   };
 
   const getVendorEdit = (userId: string) => {
