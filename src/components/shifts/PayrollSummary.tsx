@@ -943,9 +943,37 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         ) : (
           <div className="space-y-1">
             {excludedShifts.map((row) => (
-              <div key={row.shift.shift.id} className="text-xs border rounded p-2">
-                <p>{row.shift.workerName} · {row.shift.projectName} · {row.shift.shift.shift_date} · {Number(row.shift.shift.total_hours)}h</p>
-                <p className="text-muted-foreground">{row.reason}</p>
+              <div key={row.shift.shift.id} className="text-xs border rounded p-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p>{row.shift.workerName} · {row.shift.projectName} · {row.shift.shift.shift_date} · {Number(row.shift.shift.total_hours)}h</p>
+                  <p className="text-muted-foreground">{row.reason}</p>
+                </div>
+                {row.linkedBatchId && (
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs px-2"
+                      disabled={removingShiftId === row.shift.shift.id}
+                      onClick={() => handleRemoveShiftFromBatch(row.shift.shift.id, row.linkedBatchId!)}
+                      title="Remove this shift from its group"
+                    >
+                      {removingShiftId === row.shift.shift.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3 mr-1" />}
+                      Remove
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs px-2 text-destructive hover:text-destructive"
+                      disabled={voidingBatchId === row.linkedBatchId}
+                      onClick={() => handleVoidBatch(row.linkedBatchId!)}
+                      title="Void the entire payment group"
+                    >
+                      {voidingBatchId === row.linkedBatchId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                      Void Group
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
