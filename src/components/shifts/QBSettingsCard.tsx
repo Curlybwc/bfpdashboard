@@ -203,11 +203,10 @@ const QBSettingsCard = () => {
     setVendorEdits((prev) => ({ ...prev, [userId]: { ...current, [field]: value } }));
   };
 
-  const saveVendorMapping = async (userId: string) => {
+  const saveVendorMapping = async (userId: string): Promise<boolean> => {
     const edit = getVendorEdit(userId);
     if (!edit.qb_vendor_id.trim()) {
-      toast({ title: 'Vendor ID required', variant: 'destructive' });
-      return;
+      return false;
     }
     setVendorSaving(userId);
 
@@ -219,14 +218,68 @@ const QBSettingsCard = () => {
       );
 
     if (error) {
-      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-    } else {
-      setVendorMappings((prev) => ({ ...prev, [userId]: { qb_vendor_id: edit.qb_vendor_id.trim(), qb_vendor_name: edit.qb_vendor_name.trim() } }));
-      setVendorEdits((prev) => { const n = { ...prev }; delete n[userId]; return n; });
-      toast({ title: 'Vendor mapping saved' });
+      setVendorSaving(null);
+      return false;
     }
+    setVendorMappings((prev) => ({ ...prev, [userId]: { qb_vendor_id: edit.qb_vendor_id.trim(), qb_vendor_name: edit.qb_vendor_name.trim() } }));
+    setVendorEdits((prev) => { const n = { ...prev }; delete n[userId]; return n; });
     setVendorSaving(null);
+    return true;
   };
+
+  // Track whether expense account was edited from its loaded value
+  const [expDirty, setExpDirty] = useState(false);
+  const setExpAccountIdTracked = (v: string) => { setExpAccountId(v); setExpDirty(true); };
+  const setExpAccountNameTracked = (v: string) => { setExpAccountName(v); setExpDirty(true); };
+
+  const [saveAllLoading, setSaveAllLoading] = useState(false);
+
+  const saveAll = async () => {
+    setSaveAllLoading(true);
+    const saved: string[] = [];
+    let failures = 0;
+
+    // 1. Expense account — only if dirty
+    if (expDirty) {
+      const ok = await saveExpenseAccount();
+      if (ok) { saved.push('labor account'); setExpDirty(false); }
+      else failures++;
+    }
+
+    // 2. Class mappings — only rows with edits
+    const classEditIds = Object.keys(classEdits);
+    let classSaved = 0;
+    for (const pid of classEditIds) {
+      const ok = await saveClassMapping(pid);
+      if (ok) classSaved++;
+      else failures++;
+    }
+    if (classSaved > 0) saved.push(`${classSaved} class mapping${classSaved > 1 ? 's' : ''}`);
+
+    // 3. Vendor mappings — only rows with edits
+    const vendorEditIds = Object.keys(vendorEdits);
+    let vendorSaved = 0;
+    for (const uid of vendorEditIds) {
+      const ok = await saveVendorMapping(uid);
+      if (ok) vendorSaved++;
+      else failures++;
+    }
+    if (vendorSaved > 0) saved.push(`${vendorSaved} vendor mapping${vendorSaved > 1 ? 's' : ''}`);
+
+    setSaveAllLoading(false);
+
+    if (saved.length === 0 && failures === 0) {
+      toast({ title: 'Nothing to save', description: 'No changes detected.' });
+    } else if (failures > 0 && saved.length > 0) {
+      toast({ title: 'Some QuickBooks settings could not be saved', description: `Saved ${saved.join(' and ')}.`, variant: 'destructive' });
+    } else if (failures > 0) {
+      toast({ title: 'Some QuickBooks settings could not be saved', variant: 'destructive' });
+    } else {
+      toast({ title: 'QuickBooks settings saved', description: `Saved ${saved.join(' and ')}.` });
+    }
+  };
+
+  const hasAnyUnsaved = expDirty || Object.keys(classEdits).length > 0 || Object.keys(vendorEdits).length > 0;
 
   return (
     <Card className="p-3">
