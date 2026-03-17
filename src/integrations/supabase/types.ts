@@ -2114,7 +2114,10 @@ export type Database = {
         | "5 – Later"
       task_stage: "Ready" | "In Progress" | "Not Ready" | "Hold" | "Done"
       unit_type: "each" | "sqft" | "lf" | "piece"
-      worker_payment_source: "stripe_connect" | "manual_quickbooks"
+      worker_payment_source:
+        | "stripe_connect"
+        | "manual_quickbooks"
+        | "venmo_manual"
       worker_payment_status:
         | "pending"
         | "processing"
@@ -2288,7 +2291,11 @@ export const Constants = {
       ],
       task_stage: ["Ready", "In Progress", "Not Ready", "Hold", "Done"],
       unit_type: ["each", "sqft", "lf", "piece"],
-      worker_payment_source: ["stripe_connect", "manual_quickbooks"],
+      worker_payment_source: [
+        "stripe_connect",
+        "manual_quickbooks",
+        "venmo_manual",
+      ],
       worker_payment_status: [
         "pending",
         "processing",
