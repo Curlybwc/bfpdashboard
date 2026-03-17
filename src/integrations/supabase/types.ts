@@ -562,6 +562,82 @@ export type Database = {
           },
         ]
       }
+      quickbooks_connections: {
+        Row: {
+          access_token: string
+          company_name: string | null
+          connected_at: string
+          connected_by: string
+          disconnected_at: string | null
+          id: string
+          realm_id: string
+          refresh_token: string
+          token_expires_at: string
+        }
+        Insert: {
+          access_token: string
+          company_name?: string | null
+          connected_at?: string
+          connected_by: string
+          disconnected_at?: string | null
+          id?: string
+          realm_id: string
+          refresh_token: string
+          token_expires_at: string
+        }
+        Update: {
+          access_token?: string
+          company_name?: string | null
+          connected_at?: string
+          connected_by?: string
+          disconnected_at?: string | null
+          id?: string
+          realm_id?: string
+          refresh_token?: string
+          token_expires_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_connections_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quickbooks_vendor_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          qb_vendor_id: string
+          qb_vendor_name: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          qb_vendor_id: string
+          qb_vendor_name?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          qb_vendor_id?: string
+          qb_vendor_name?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_vendor_mappings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rehab_library: {
         Row: {
           active: boolean
@@ -1914,6 +1990,9 @@ export type Database = {
           period_end: string
           period_start: string
           project_id: string | null
+          qb_bill_doc_number: string | null
+          qb_export_error: string | null
+          qb_exported_at: string | null
           settlement_method: string | null
           status: string
           total_amount: number
@@ -1931,6 +2010,9 @@ export type Database = {
           period_end: string
           period_start: string
           project_id?: string | null
+          qb_bill_doc_number?: string | null
+          qb_export_error?: string | null
+          qb_exported_at?: string | null
           settlement_method?: string | null
           status?: string
           total_amount?: number
@@ -1948,6 +2030,9 @@ export type Database = {
           period_end?: string
           period_start?: string
           project_id?: string | null
+          qb_bill_doc_number?: string | null
+          qb_export_error?: string | null
+          qb_exported_at?: string | null
           settlement_method?: string | null
           status?: string
           total_amount?: number
