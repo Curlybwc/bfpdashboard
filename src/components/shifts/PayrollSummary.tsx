@@ -414,7 +414,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     }
 
     setCreatingGroupKey(null);
-    toast({ title: 'Payable created', description: `Created batch #${batch.id.slice(0, 8)} (${group.contractorName} · ${group.projectName})` });
+    toast({ title: 'Payment prepared', description: `${group.contractorName} · ${group.projectName}` });
     await loadPayroll();
   };
 
