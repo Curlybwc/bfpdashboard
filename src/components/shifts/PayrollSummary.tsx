@@ -81,6 +81,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [toDate, setToDate] = useState(today);
   const [loading, setLoading] = useState(false);
   const [creatingGroupKey, setCreatingGroupKey] = useState<string | null>(null);
+  const [payingGroupKey, setPayingGroupKey] = useState<string | null>(null);
   const [updatingBatchId, setUpdatingBatchId] = useState<string | null>(null);
   const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
   const [expandedExisting, setExpandedExisting] = useState<Set<string>>(new Set());
