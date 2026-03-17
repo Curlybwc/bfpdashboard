@@ -680,7 +680,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
           <p className="text-xs text-muted-foreground">These payments were already recorded as paid.</p>
         </div>
         {paidGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No paid payables for this selected period.</p>
+          <p className="text-xs text-muted-foreground">No paid records for this date range.</p>
         ) : (
           <div className="space-y-1">
             {paidGroups.map((group) => {
