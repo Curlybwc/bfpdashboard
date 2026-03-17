@@ -436,7 +436,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       return;
     }
 
-    toast({ title: 'Payable marked paid' });
+    toast({ title: 'Payment recorded', description: 'Marked as paid' });
     await loadPayroll();
   };
 
