@@ -555,6 +555,76 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     await loadPayroll();
   };
 
+  const handleVoidBatch = async (batchId: string) => {
+    setVoidingBatchId(batchId);
+
+    // Void all shift links
+    const { error: voidLinksError } = await supabase
+      .from('worker_payable_batch_shifts')
+      .update({ voided_at: new Date().toISOString() })
+      .eq('payable_batch_id', batchId);
+
+    if (voidLinksError) {
+      setVoidingBatchId(null);
+      toast({ title: 'Failed to void links', description: voidLinksError.message, variant: 'destructive' });
+      return;
+    }
+
+    // Set batch status to voided
+    const { error: voidBatchError } = await supabase
+      .from('worker_payable_batches')
+      .update({ status: 'voided' })
+      .eq('id', batchId);
+
+    setVoidingBatchId(null);
+
+    if (voidBatchError) {
+      toast({ title: 'Failed to void group', description: voidBatchError.message, variant: 'destructive' });
+      return;
+    }
+
+    toast({ title: 'Payment group voided', description: 'All shifts released back to Ready to Pay.' });
+    await loadPayroll();
+  };
+
+  const handleRemoveShiftFromBatch = async (shiftId: string, batchId: string) => {
+    setRemovingShiftId(shiftId);
+
+    // Void just this one link
+    const { error: voidError } = await supabase
+      .from('worker_payable_batch_shifts')
+      .update({ voided_at: new Date().toISOString() })
+      .eq('payable_batch_id', batchId)
+      .eq('shift_id', shiftId);
+
+    if (voidError) {
+      setRemovingShiftId(null);
+      toast({ title: 'Failed to remove shift', description: voidError.message, variant: 'destructive' });
+      return;
+    }
+
+    // Recalculate batch total: check remaining active links
+    const { data: remainingLinks } = await supabase
+      .from('worker_payable_batch_shifts')
+      .select('shift_id')
+      .eq('payable_batch_id', batchId)
+      .is('voided_at', null);
+
+    if (!remainingLinks || remainingLinks.length === 0) {
+      // No shifts left — void the whole batch
+      await supabase
+        .from('worker_payable_batches')
+        .update({ status: 'voided' })
+        .eq('id', batchId);
+      toast({ title: 'Shift removed', description: 'No shifts remain — group has been voided.' });
+    } else {
+      toast({ title: 'Shift removed', description: 'Shift released back to Ready to Pay.' });
+    }
+
+    setRemovingShiftId(null);
+    await loadPayroll();
+  };
+
   const totals = useMemo(() => {
     const candidateDollars = candidateGroups.reduce((sum, row) => sum + row.totalDollars, 0);
     const exportedDollars = exportedGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
