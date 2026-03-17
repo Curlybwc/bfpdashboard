@@ -181,7 +181,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   };
 
   const getQBBillUrl = (batch: PayableBatchRow) => {
-    const billId = batch.quickbooks_reference;
+    const billId = batch.qb_bill_id;
     if (!billId || !qbStatus?.realm_id) return null;
     return `https://app.qbo.intuit.com/app/bill?txnId=${billId}`;
   };

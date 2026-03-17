@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
         .update({
           status: "exported",
           accounting_source: "quickbooks",
-          quickbooks_reference: qbBillId,
+          qb_bill_id: qbBillId,
           qb_bill_doc_number: qbDocNumber,
           qb_exported_at: new Date().toISOString(),
           qb_export_error: null,
