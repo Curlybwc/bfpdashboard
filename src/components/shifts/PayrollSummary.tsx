@@ -513,7 +513,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         {loading ? (
           <p className="text-xs text-muted-foreground flex items-center"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Loading…</p>
         ) : candidateGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No eligible unpaid shift groups in this range.</p>
+          <p className="text-xs text-muted-foreground">No unpaid shifts available to prepare in this date range.</p>
         ) : (
           <div className="space-y-2">
             {candidateGroups.map((group) => (
