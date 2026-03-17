@@ -871,6 +871,18 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                         {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                         Record Manual Payment
                       </Button>
+                      {/* Void entire group */}
+                      {isDraft && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={voidingBatchId === group.batch.id}
+                          onClick={() => handleVoidBatch(group.batch.id)}
+                        >
+                          {voidingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                          Void Group
+                        </Button>
+                      )}
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
