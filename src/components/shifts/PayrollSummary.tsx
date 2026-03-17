@@ -2,12 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { ChevronDown, Trash2, Pencil, Loader2, CreditCard, FileDown, DollarSign, Check, X, ExternalLink } from 'lucide-react';
+import { ChevronDown, Trash2, Pencil, Loader2, FileDown, DollarSign, Check, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
@@ -15,7 +14,6 @@ import type { Tables } from '@/integrations/supabase/types';
 
 type WorkerPayoutProfile = Tables<'worker_payout_profiles'>;
 type WorkerTaxProfile = Tables<'worker_tax_profiles'>;
-type PayoutRunRecord = Tables<'payout_runs'>;
 type WorkerPaymentRecord = Tables<'worker_payments'>;
 type WorkerPaymentShiftLink = Tables<'worker_payment_shifts'>;
 type ProfileRow = Tables<'profiles'>;
@@ -81,19 +79,12 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [expandedHistoryUsers, setExpandedHistoryUsers] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [creatingRun, setCreatingRun] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
-  const [markPaidTarget, setMarkPaidTarget] = useState<WorkerPaymentRecord | null>(null);
-  const [markPaidNote, setMarkPaidNote] = useState('');
-  const [markPaidSource, setMarkPaidSource] = useState<WorkerPaymentRecord['payment_source']>('manual_quickbooks');
-  const [markingPaid, setMarkingPaid] = useState(false);
   const [venmoDraftByUser, setVenmoDraftByUser] = useState<Record<string, { handle: string; noteTemplate: string }>>({});
   const [savingVenmoUser, setSavingVenmoUser] = useState<string | null>(null);
   const [editingRateUserId, setEditingRateUserId] = useState<string | null>(null);
   const [editingRateValue, setEditingRateValue] = useState('');
   const [savingRate, setSavingRate] = useState(false);
-  const [activeRun, setActiveRun] = useState<PayoutRunRecord | null>(null);
-  const [runPayments, setRunPayments] = useState<WorkerPaymentRecord[]>([]);
   const [yearPayments, setYearPayments] = useState<WorkerPaymentRecord[]>([]);
   const [yearShiftDetails, setYearShiftDetails] = useState<ShiftDetail[]>([]);
   const [reportWorkerId, setReportWorkerId] = useState('');
@@ -110,27 +101,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     memo: '',
   });
   const [markingWorkerId, setMarkingWorkerId] = useState<string | null>(null);
-
-  const fetchRunSnapshot = useCallback(async (runId: string) => {
-    const [{ data: run, error: runError }, { data: payments, error: paymentsError }] = await Promise.all([
-      supabase
-        .from('payout_runs')
-        .select('*')
-        .eq('id', runId)
-        .maybeSingle(),
-      supabase
-        .from('worker_payments')
-        .select('*')
-        .eq('payout_run_id', runId)
-        .order('created_at', { ascending: true }),
-    ]);
-
-    if (runError || !run) throw new Error(runError?.message || 'Failed to load payout run');
-    if (paymentsError) throw new Error(paymentsError.message);
-
-    setActiveRun(run);
-    setRunPayments(payments || []);
-  }, []);
 
   const fetchYearLedger = useCallback(async (year: string) => {
     const start = `${year}-01-01`;
@@ -249,8 +219,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     const shiftRows = shifts || [];
     if (shiftRows.length === 0) {
       setSummaries([]);
-      setActiveRun(null);
-      setRunPayments([]);
       await fetchYearLedger(reportYear);
       setLoading(false);
       return;
@@ -360,25 +328,9 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     setSummaries(Object.values(byUser).sort((a, b) => a.full_name.localeCompare(b.full_name)));
 
-    const { data: latestRun } = await supabase
-      .from('payout_runs')
-      .select('*')
-      .eq('period_start', fromDate)
-      .eq('period_end', toDate)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (latestRun) {
-      await fetchRunSnapshot(latestRun.id);
-    } else {
-      setActiveRun(null);
-      setRunPayments([]);
-    }
-
     await fetchYearLedger(reportYear);
     setLoading(false);
-  }, [fromDate, toDate, reportYear, fetchRunSnapshot, fetchYearLedger]);
+  }, [fromDate, toDate, reportYear, fetchYearLedger]);
 
   useEffect(() => {
     fetchPayroll().catch((error) => {
@@ -447,48 +399,33 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     return 'Unspecified';
   };
 
-  const handleCreatePayoutRun = async () => {
-    if (summaries.length === 0) {
-      toast({ title: 'No payroll data', description: 'Select a period with shifts first.', variant: 'destructive' });
+  const handleMarkVisibleUnpaidShiftsPaid = async (summary: ContractorSummary) => {
+    const unpaidShiftIds = summary.shifts.filter((s) => s.payment_status === 'unpaid').map((s) => s.id);
+    if (unpaidShiftIds.length === 0) {
+      toast({ title: 'No unpaid shifts', description: 'All visible shifts for this worker are already paid.' });
       return;
     }
 
-    const workers = summaries
-      .filter((s) => s.total_unpaid_pay > 0)
-      .map((s) => ({
-        worker_user_id: s.user_id,
-        amount: Number(s.total_unpaid_pay.toFixed(2)),
-        memo: `Payroll ${fromDate} to ${toDate}`,
-      }));
-
-    if (workers.length === 0) {
-      toast({ title: 'No payable workers', description: 'All calculated amounts are zero.', variant: 'destructive' });
-      return;
-    }
-
-    setCreatingRun(true);
-    const { data, error } = await supabase.functions.invoke('stripe_create_payout_run', {
-      body: {
-        period_start: fromDate,
-        period_end: toDate,
-        workers,
-      },
+    setMarkingWorkerId(summary.user_id);
+    const { data, error } = await supabase.rpc('admin_mark_visible_shifts_paid', {
+      p_worker_user_id: summary.user_id,
+      p_period_start: fromDate,
+      p_period_end: toDate,
+      p_shift_ids: unpaidShiftIds,
+      p_payment_source: 'manual_quickbooks',
+      p_memo: `Payroll ${fromDate} to ${toDate}`,
+      p_confirmation_note: 'Marked paid from payroll summary',
     });
-    setCreatingRun(false);
+    setMarkingWorkerId(null);
 
     if (error) {
-      toast({ title: 'Create payout run failed', description: error.message, variant: 'destructive' });
+      toast({ title: 'Mark paid failed', description: error.message, variant: 'destructive' });
       return;
     }
 
-    const run = data?.payout_run as PayoutRunRecord | undefined;
-    if (!run?.id) {
-      toast({ title: 'Invalid payout run response', variant: 'destructive' });
-      return;
-    }
-
-    toast({ title: 'Payout run created' });
-    await fetchRunSnapshot(run.id);
+    const linkedCount = (data as { linked_shift_count?: number } | null)?.linked_shift_count || unpaidShiftIds.length;
+    toast({ title: 'Shifts marked paid', description: `${summary.full_name}: ${linkedCount} shift(s) linked to a payment record.` });
+    await fetchPayroll();
   };
 
   const handleMarkVisibleUnpaidShiftsPaid = async (summary: ContractorSummary) => {
@@ -543,86 +480,9 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     await fetchPayroll();
   };
 
-  const formatMoney = (value: number) => `$${Number(value).toFixed(2)}`;
-
   const sanitizeVenmoHandle = (raw: string | null | undefined) => {
     const trimmed = (raw || '').trim().replace(/^@/, '');
     return trimmed.replace(/[^a-zA-Z0-9_-]/g, '');
-  };
-
-  const sanitizeNote = (raw: string) => raw.replace(/\s+/g, ' ').trim().slice(0, 120);
-
-  const getPaymentSummary = (workerUserId: string) => {
-    const summary = summaries.find((item) => item.user_id === workerUserId);
-    const propertyLabel = summary?.shifts.length
-      ? [...new Set(summary.shifts.map((shift) => shift.project_name))].join(', ')
-      : '';
-    return { summary, propertyLabel };
-  };
-
-  const getVenmoNote = (payment: WorkerPaymentRecord) => {
-    const { summary, propertyLabel } = getPaymentSummary(payment.worker_user_id);
-    const defaultPeriod = activeRun ? `${activeRun.period_start} to ${activeRun.period_end}` : `${fromDate} to ${toDate}`;
-    const template = summary?.payout_profile?.venmo_note_template;
-    const base = template && template.trim().length > 0
-      ? template
-      : `Payroll ${defaultPeriod}${propertyLabel ? ` · ${propertyLabel}` : ''}`;
-    return sanitizeNote(base);
-  };
-
-  const openVenmoHelper = (payment: WorkerPaymentRecord) => {
-    const { summary } = getPaymentSummary(payment.worker_user_id);
-    const venmoHandle = sanitizeVenmoHandle(summary?.payout_profile?.venmo_handle);
-
-    if (!venmoHandle) {
-      toast({ title: 'Missing Venmo handle', description: 'Add a Venmo handle for this worker before using the helper.', variant: 'destructive' });
-      return;
-    }
-
-    const amountNum = Number(payment.amount);
-    if (!Number.isFinite(amountNum) || amountNum <= 0) {
-      toast({ title: 'Invalid amount', description: 'Cannot open Venmo helper for a non-positive payment amount.', variant: 'destructive' });
-      return;
-    }
-
-    const note = getVenmoNote(payment);
-    const params = new URLSearchParams({
-      recipients: venmoHandle,
-      amount: amountNum.toFixed(2),
-      note,
-    });
-    window.open(`https://account.venmo.com/pay?${params.toString()}`, '_blank', 'noopener,noreferrer');
-    toast({ title: 'Venmo helper opened', description: 'Complete the payment manually in Venmo, then return to mark paid.' });
-  };
-
-  const handleOpenGusto = () => {
-    window.open('https://app.gusto.com/payroll', '_blank', 'noopener,noreferrer');
-    toast({ title: 'Gusto opened', description: 'Complete the batch payment in Gusto, then return here and mark each payment as paid.' });
-  };
-
-  const handleConfirmMarkPaid = async () => {
-    if (!markPaidTarget) return;
-    setMarkingPaid(true);
-    const { error } = await supabase.functions.invoke('admin_mark_worker_payment_paid', {
-      body: {
-        payment_id: markPaidTarget.id,
-        payment_source: markPaidSource,
-        confirmation_note: markPaidNote || null,
-      },
-    });
-    setMarkingPaid(false);
-
-    if (error) {
-      toast({ title: 'Mark paid failed', description: error.message, variant: 'destructive' });
-      return;
-    }
-
-    toast({ title: 'Payment marked paid' });
-    setMarkPaidTarget(null);
-    setMarkPaidNote('');
-    setMarkPaidSource('manual_quickbooks');
-    if (activeRun?.id) await fetchRunSnapshot(activeRun.id);
-    await fetchYearLedger(reportYear);
   };
 
   const handleSaveManualPayment = async () => {
@@ -792,9 +652,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         payment_source: p.payment_source,
         status: p.status,
         external_reference: p.external_reference || '',
-        stripe_transfer_id: p.stripe_transfer_id || '',
-        stripe_payout_id: p.stripe_payout_id || '',
-        stripe_balance_transaction_id: p.stripe_balance_transaction_id || '',
         memo: p.memo || '',
       };
     });
@@ -809,9 +666,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       'payment_source',
       'status',
       'external_reference',
-      'stripe_transfer_id',
-      'stripe_payout_id',
-      'stripe_balance_transaction_id',
       'memo',
     ];
 
@@ -840,10 +694,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [yearShiftDetails, profileMap]);
 
-  const runWorkerNameMap = summaries.reduce<Record<string, string>>((acc, s) => {
-    acc[s.user_id] = s.full_name;
-    return acc;
-  }, {});
+
 
   return (
     <div className="space-y-4">
@@ -857,90 +708,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
           <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
         </div>
       </div>
-
-      <Card className="p-3 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-medium">Payout Run</p>
-            <p className="text-xs text-muted-foreground">Snapshot and submit payouts for selected period</p>
-          </div>
-          <Button size="sm" onClick={handleCreatePayoutRun} disabled={creatingRun || loading}>
-            {creatingRun ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CreditCard className="h-4 w-4 mr-1" />}
-            Create Payout Run
-          </Button>
-        </div>
-
-        {activeRun ? (
-          <div className="rounded border border-border p-2 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium">Run #{activeRun.id.slice(0, 8)}</p>
-              <Badge variant={activeRun.status === 'draft' ? 'outline' : activeRun.status === 'submitted' ? 'secondary' : 'destructive'} className="text-xs">
-                {activeRun.status}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">Period: {activeRun.period_start} → {activeRun.period_end}</p>
-            <p className="text-xs text-amber-700 dark:text-amber-400">Pay with Venmo or Pay in Gusto only opens helper pages. It does not mark anything paid.</p>
-            <Button size="sm" variant="outline" onClick={handleOpenGusto}>
-              <ExternalLink className="h-4 w-4 mr-1" />Pay in Gusto
-            </Button>
-            <div className="space-y-2">
-              {runPayments.map((payment) => {
-                const workerName = runWorkerNameMap[payment.worker_user_id] || profileMap[payment.worker_user_id]?.full_name || payment.worker_user_id;
-                const { propertyLabel, summary } = getPaymentSummary(payment.worker_user_id);
-                const venmoHandle = sanitizeVenmoHandle(summary?.payout_profile?.venmo_handle);
-                const canOpenVenmo = !!venmoHandle && Number(payment.amount) > 0;
-                const payPeriodLabel = payment.pay_period_start && payment.pay_period_end
-                  ? `${payment.pay_period_start} → ${payment.pay_period_end}`
-                  : `${fromDate} → ${toDate}`;
-
-                return (
-                  <div key={payment.id} className="text-xs rounded border border-border px-2 py-2 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate pr-2 font-medium">{workerName}</span>
-                      <span className="shrink-0">{formatMoney(Number(payment.amount))} · {payment.status === 'pending' ? 'ready_to_pay' : payment.status}</span>
-                    </div>
-                    <div className="text-muted-foreground space-y-1">
-                      {propertyLabel ? <p>Property: {propertyLabel}</p> : null}
-                      <p>Pay period: {payPeriodLabel}</p>
-                      <p>Venmo: {venmoHandle ? `@${venmoHandle}` : 'Not set on payout profile'}</p>
-                      {payment.status === 'paid' ? (
-                        <p>Paid: {payment.paid_at || payment.paid_date} by {payment.marked_paid_by ? (profileMap[payment.marked_paid_by]?.full_name || payment.marked_paid_by) : 'unknown'}</p>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setMarkPaidSource('venmo_manual');
-                          openVenmoHelper(payment);
-                        }}
-                        disabled={!canOpenVenmo}
-                        title={!canOpenVenmo ? 'Cannot open Venmo helper without a valid Venmo handle and positive amount.' : undefined}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-1" />Pay with Venmo
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setMarkPaidTarget(payment);
-                          setMarkPaidNote('');
-                          setMarkPaidSource('manual_quickbooks');
-                        }}
-                        disabled={payment.status === 'paid' || markingPaid}
-                      >
-                        <Check className="h-4 w-4 mr-1" />Mark Paid
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">No payout run exists for this date range yet.</p>
-        )}
-      </Card>
 
       <Card className="p-3 space-y-3">
         <div>
@@ -1056,8 +823,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                           <span>Source: {payment.payment_source}</span>
                           <span>Status: {payment.status}</span>
                           <span>Ref: {payment.external_reference || '—'}</span>
-                          <span>Transfer: {payment.stripe_transfer_id || '—'}</span>
-                          <span>Payout: {payment.stripe_payout_id || '—'}</span>
                         </div>
                         {payment.memo && <p className="text-muted-foreground">Memo: {payment.memo}</p>}
                       </div>
@@ -1246,7 +1011,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                       </div>
                     </div>
                     <div className="pt-1">
-                      <p className="text-[11px] text-muted-foreground">Stripe onboarding controls removed from active payroll workflow.</p>
+                      <p className="text-[11px] text-muted-foreground">External payout helpers are available for off-platform payments.</p>
                     </div>
                   </div>
 
@@ -1330,42 +1095,6 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         </div>
       )}
 
-      <AlertDialog open={!!markPaidTarget} onOpenChange={(open) => { if (!open) { setMarkPaidTarget(null); setMarkPaidNote(''); setMarkPaidSource('manual_quickbooks'); } }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm payment was sent</AlertDialogTitle>
-            <AlertDialogDescription>
-              Confirm only after payment is completed in Venmo or Gusto. This action marks the ledger row as paid in this app.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-1">
-            <Label className="text-xs">Payment source</Label>
-            <select
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={markPaidSource}
-              onChange={(e) => setMarkPaidSource(e.target.value as WorkerPaymentRecord['payment_source'])}
-              disabled={markingPaid}
-            >
-              <option value="manual_quickbooks">manual_quickbooks (Gusto/external batch)</option>
-              <option value="venmo_manual">venmo_manual</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Confirmation note (optional)</Label>
-            <Textarea
-              value={markPaidNote}
-              onChange={(e) => setMarkPaidNote(e.target.value)}
-              placeholder="Example: Sent in Venmo app at 3:42 PM"
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={markingPaid}>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={markingPaid} onClick={handleConfirmMarkPaid}>
-              {markingPaid ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving...</> : 'Mark Paid'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
