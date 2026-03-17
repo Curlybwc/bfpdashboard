@@ -55,6 +55,7 @@ const QBSettingsCard = () => {
     if (settingsRes.data) {
       setExpAccountId(settingsRes.data.labor_expense_account_id || '');
       setExpAccountName(settingsRes.data.labor_expense_account_name || '');
+      setExpDirty(false);
     }
 
     setProjects((projectsRes.data || []) as ProjectRow[]);
@@ -109,10 +110,10 @@ const QBSettingsCard = () => {
     setQbClassesLoading(false);
   };
 
-  const saveExpenseAccount = async () => {
+  const saveExpenseAccount = async (): Promise<boolean> => {
     if (!expAccountId.trim()) {
       toast({ title: 'Account ID required', variant: 'destructive' });
-      return;
+      return false;
     }
     setExpSaving(true);
 
@@ -122,34 +123,30 @@ const QBSettingsCard = () => {
       .limit(1)
       .maybeSingle();
 
+    let error;
     if (existing) {
-      const { error } = await supabase
+      ({ error } = await supabase
         .from('quickbooks_settings')
         .update({
           labor_expense_account_id: expAccountId.trim(),
           labor_expense_account_name: expAccountName.trim() || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', existing.id);
-      if (error) {
-        toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Expense account saved' });
-      }
+        .eq('id', existing.id));
     } else {
-      const { error } = await supabase
+      ({ error } = await supabase
         .from('quickbooks_settings')
         .insert({
           labor_expense_account_id: expAccountId.trim(),
           labor_expense_account_name: expAccountName.trim() || null,
-        });
-      if (error) {
-        toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Expense account saved' });
-      }
+        }));
     }
     setExpSaving(false);
+    if (error) {
+      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    return true;
   };
 
   const getClassEdit = (projectId: string) => {
@@ -172,11 +169,10 @@ const QBSettingsCard = () => {
     }));
   };
 
-  const saveClassMapping = async (projectId: string) => {
+  const saveClassMapping = async (projectId: string): Promise<boolean> => {
     const edit = getClassEdit(projectId);
     if (!edit.qb_class_id.trim()) {
-      toast({ title: 'Class ID required', variant: 'destructive' });
-      return;
+      return false;
     }
     setClassSaving(projectId);
 
@@ -188,13 +184,13 @@ const QBSettingsCard = () => {
       );
 
     if (error) {
-      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-    } else {
-      setClassMappings((prev) => ({ ...prev, [projectId]: { qb_class_id: edit.qb_class_id.trim(), qb_class_name: edit.qb_class_name.trim() } }));
-      setClassEdits((prev) => { const n = { ...prev }; delete n[projectId]; return n; });
-      toast({ title: 'Class mapping saved' });
+      setClassSaving(null);
+      return false;
     }
+    setClassMappings((prev) => ({ ...prev, [projectId]: { qb_class_id: edit.qb_class_id.trim(), qb_class_name: edit.qb_class_name.trim() } }));
+    setClassEdits((prev) => { const n = { ...prev }; delete n[projectId]; return n; });
     setClassSaving(null);
+    return true;
   };
 
   const getVendorEdit = (userId: string) => {
@@ -208,11 +204,10 @@ const QBSettingsCard = () => {
     setVendorEdits((prev) => ({ ...prev, [userId]: { ...current, [field]: value } }));
   };
 
-  const saveVendorMapping = async (userId: string) => {
+  const saveVendorMapping = async (userId: string): Promise<boolean> => {
     const edit = getVendorEdit(userId);
     if (!edit.qb_vendor_id.trim()) {
-      toast({ title: 'Vendor ID required', variant: 'destructive' });
-      return;
+      return false;
     }
     setVendorSaving(userId);
 
@@ -224,14 +219,68 @@ const QBSettingsCard = () => {
       );
 
     if (error) {
-      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
-    } else {
-      setVendorMappings((prev) => ({ ...prev, [userId]: { qb_vendor_id: edit.qb_vendor_id.trim(), qb_vendor_name: edit.qb_vendor_name.trim() } }));
-      setVendorEdits((prev) => { const n = { ...prev }; delete n[userId]; return n; });
-      toast({ title: 'Vendor mapping saved' });
+      setVendorSaving(null);
+      return false;
     }
+    setVendorMappings((prev) => ({ ...prev, [userId]: { qb_vendor_id: edit.qb_vendor_id.trim(), qb_vendor_name: edit.qb_vendor_name.trim() } }));
+    setVendorEdits((prev) => { const n = { ...prev }; delete n[userId]; return n; });
     setVendorSaving(null);
+    return true;
   };
+
+  // Track whether expense account was edited from its loaded value
+  const [expDirty, setExpDirty] = useState(false);
+  const setExpAccountIdTracked = (v: string) => { setExpAccountId(v); setExpDirty(true); };
+  const setExpAccountNameTracked = (v: string) => { setExpAccountName(v); setExpDirty(true); };
+
+  const [saveAllLoading, setSaveAllLoading] = useState(false);
+
+  const saveAll = async () => {
+    setSaveAllLoading(true);
+    const saved: string[] = [];
+    let failures = 0;
+
+    // 1. Expense account — only if dirty
+    if (expDirty) {
+      const ok = await saveExpenseAccount();
+      if (ok) { saved.push('labor account'); setExpDirty(false); }
+      else failures++;
+    }
+
+    // 2. Class mappings — only rows with edits
+    const classEditIds = Object.keys(classEdits);
+    let classSaved = 0;
+    for (const pid of classEditIds) {
+      const ok = await saveClassMapping(pid);
+      if (ok) classSaved++;
+      else failures++;
+    }
+    if (classSaved > 0) saved.push(`${classSaved} class mapping${classSaved > 1 ? 's' : ''}`);
+
+    // 3. Vendor mappings — only rows with edits
+    const vendorEditIds = Object.keys(vendorEdits);
+    let vendorSaved = 0;
+    for (const uid of vendorEditIds) {
+      const ok = await saveVendorMapping(uid);
+      if (ok) vendorSaved++;
+      else failures++;
+    }
+    if (vendorSaved > 0) saved.push(`${vendorSaved} vendor mapping${vendorSaved > 1 ? 's' : ''}`);
+
+    setSaveAllLoading(false);
+
+    if (saved.length === 0 && failures === 0) {
+      toast({ title: 'Nothing to save', description: 'No changes detected.' });
+    } else if (failures > 0 && saved.length > 0) {
+      toast({ title: 'Some QuickBooks settings could not be saved', description: `Saved ${saved.join(' and ')}.`, variant: 'destructive' });
+    } else if (failures > 0) {
+      toast({ title: 'Some QuickBooks settings could not be saved', variant: 'destructive' });
+    } else {
+      toast({ title: 'QuickBooks settings saved', description: `Saved ${saved.join(' and ')}.` });
+    }
+  };
+
+  const hasAnyUnsaved = expDirty || Object.keys(classEdits).length > 0 || Object.keys(vendorEdits).length > 0;
 
   return (
     <Card className="p-3">
@@ -256,16 +305,12 @@ const QBSettingsCard = () => {
                 <div className="flex flex-wrap gap-2 items-end">
                   <div className="space-y-1">
                     <Label className="text-xs">Account ID</Label>
-                    <Input className="h-8 text-xs w-40" value={expAccountId} onChange={(e) => setExpAccountId(e.target.value)} placeholder="e.g. 68" />
+                    <Input className="h-8 text-xs w-40" value={expAccountId} onChange={(e) => setExpAccountIdTracked(e.target.value)} placeholder="e.g. 68" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Display Name</Label>
-                    <Input className="h-8 text-xs w-48" value={expAccountName} onChange={(e) => setExpAccountName(e.target.value)} placeholder="e.g. Contract Labor" />
+                    <Input className="h-8 text-xs w-48" value={expAccountName} onChange={(e) => setExpAccountNameTracked(e.target.value)} placeholder="e.g. Contract Labor" />
                   </div>
-                  <Button size="sm" className="h-8" disabled={expSaving} onClick={saveExpenseAccount}>
-                    {expSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
-                    Save
-                  </Button>
                 </div>
               </div>
 
@@ -392,6 +437,21 @@ const QBSettingsCard = () => {
                       );
                     })}
                   </div>
+                )}
+              </div>
+
+              {/* Save All button */}
+              <div className="pt-2 border-t">
+                <Button
+                  className="w-full"
+                  disabled={saveAllLoading || !hasAnyUnsaved}
+                  onClick={saveAll}
+                >
+                  {saveAllLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                  Save All QuickBooks Settings
+                </Button>
+                {!hasAnyUnsaved && (
+                  <p className="text-xs text-muted-foreground text-center mt-1">No unsaved changes</p>
                 )}
               </div>
             </>
