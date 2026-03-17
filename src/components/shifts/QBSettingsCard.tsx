@@ -13,6 +13,7 @@ type ProjectRow = { id: string; name: string; address: string | null; status: st
 type ProfileRow = { id: string; full_name: string | null; is_active: boolean };
 type QBClass = { id: string; name: string; fully_qualified_name: string };
 type QBAccount = { id: string; name: string; fully_qualified_name: string; account_type: string | null; account_sub_type: string | null };
+type QBVendor = { id: string; display_name: string };
 
 const QBSettingsCard = () => {
   const { toast } = useToast();
