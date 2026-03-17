@@ -818,9 +818,20 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                     )}
 
                     {group.shifts.map((row) => (
-                      <div key={row.shift.id} className="text-xs border rounded p-2 flex justify-between">
-                        <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h</span>
-                        <span>${row.dollars.toFixed(2)}</span>
+                      <div key={row.shift.id} className="text-xs border rounded p-2 flex items-center justify-between">
+                        <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h · ${row.dollars.toFixed(2)}</span>
+                        {isDraft && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                            disabled={removingShiftId === row.shift.id}
+                            onClick={() => handleRemoveShiftFromBatch(row.shift.id, group.batch.id)}
+                            title="Remove this shift from group"
+                          >
+                            {removingShiftId === row.shift.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                          </Button>
+                        )}
                       </div>
                     ))}
                     <div className="flex flex-wrap gap-2">
