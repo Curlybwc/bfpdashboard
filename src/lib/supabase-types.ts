@@ -53,9 +53,10 @@ export const SCOPE_ITEM_STATUSES: ScopeItemStatus[] = ['Not Checked', 'OK', 'Rep
 
 export type AssignmentOutcome = 'assign_user' | 'outside_vendor' | 'crew';
 
-export type RecurrenceFrequency = 'weekly' | 'monthly' | 'yearly';
+export type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 export const RECURRENCE_FREQUENCIES: { value: RecurrenceFrequency; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Bi-Weekly' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },
 ];
