@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Save, Settings } from 'lucide-react';
+import { Loader2, ChevronDown, Save, Settings, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type ProjectRow = { id: string; name: string; address: string | null; status: string };
 type ProfileRow = { id: string; full_name: string | null; is_active: boolean };
+type QBClass = { id: string; name: string; fully_qualified_name: string };
 
 const QBSettingsCard = () => {
   const { toast } = useToast();
@@ -26,6 +28,12 @@ const QBSettingsCard = () => {
   const [classMappings, setClassMappings] = useState<Record<string, { qb_class_id: string; qb_class_name: string }>>({});
   const [classEdits, setClassEdits] = useState<Record<string, { qb_class_id: string; qb_class_name: string }>>({});
   const [classSaving, setClassSaving] = useState<string | null>(null);
+
+  // QB classes from API
+  const [qbClasses, setQbClasses] = useState<QBClass[]>([]);
+  const [qbClassesLoading, setQbClassesLoading] = useState(false);
+  const [qbClassesLoaded, setQbClassesLoaded] = useState(false);
+  const [qbClassesError, setQbClassesError] = useState<string | null>(null);
 
   // Vendor mappings state
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
@@ -73,6 +81,34 @@ const QBSettingsCard = () => {
     if (open) loadAll();
   }, [open, loadAll]);
 
+  const loadQBClasses = async () => {
+    setQbClassesLoading(true);
+    setQbClassesError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_list_classes');
+      if (error) {
+        setQbClassesError(error.message);
+        toast({ title: 'Failed to load QB classes', description: error.message, variant: 'destructive' });
+      } else if (data?.error) {
+        setQbClassesError(data.message || data.error);
+        toast({ title: 'Failed to load QB classes', description: data.message || data.error, variant: 'destructive' });
+      } else {
+        const classes = (data?.classes || []) as QBClass[];
+        setQbClasses(classes);
+        setQbClassesLoaded(true);
+        if (classes.length === 0) {
+          toast({ title: 'No classes found', description: 'No active classes in your QuickBooks account.' });
+        } else {
+          toast({ title: `Loaded ${classes.length} QB classes` });
+        }
+      }
+    } catch {
+      setQbClassesError('Unexpected error');
+      toast({ title: 'Failed to load QB classes', variant: 'destructive' });
+    }
+    setQbClassesLoading(false);
+  };
+
   const saveExpenseAccount = async () => {
     if (!expAccountId.trim()) {
       toast({ title: 'Account ID required', variant: 'destructive' });
@@ -80,7 +116,6 @@ const QBSettingsCard = () => {
     }
     setExpSaving(true);
 
-    // Upsert: try update first, then insert if no row exists
     const { data: existing } = await supabase
       .from('quickbooks_settings')
       .select('id')
@@ -126,6 +161,15 @@ const QBSettingsCard = () => {
   const setClassEdit = (projectId: string, field: 'qb_class_id' | 'qb_class_name', value: string) => {
     const current = getClassEdit(projectId);
     setClassEdits((prev) => ({ ...prev, [projectId]: { ...current, [field]: value } }));
+  };
+
+  const selectClassForProject = (projectId: string, classId: string) => {
+    const qbClass = qbClasses.find((c) => c.id === classId);
+    if (!qbClass) return;
+    setClassEdits((prev) => ({
+      ...prev,
+      [projectId]: { qb_class_id: qbClass.id, qb_class_name: qbClass.fully_qualified_name },
+    }));
   };
 
   const saveClassMapping = async (projectId: string) => {
@@ -227,7 +271,26 @@ const QBSettingsCard = () => {
 
               {/* B. Project → Class Mappings */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project → QB Class</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">Project → QB Class</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs px-2"
+                    disabled={qbClassesLoading}
+                    onClick={loadQBClasses}
+                  >
+                    {qbClassesLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    {qbClassesLoaded ? 'Refresh Classes' : 'Load QB Classes'}
+                  </Button>
+                </div>
+                {qbClassesError && (
+                  <p className="text-xs text-destructive">{qbClassesError} — use manual entry below.</p>
+                )}
                 {projects.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No active projects.</p>
                 ) : (
@@ -235,24 +298,46 @@ const QBSettingsCard = () => {
                     {projects.map((proj) => {
                       const edit = getClassEdit(proj.id);
                       const hasUnsaved = !!classEdits[proj.id];
+                      const showDropdown = qbClassesLoaded && qbClasses.length > 0;
+
                       return (
                         <div key={proj.id} className="flex flex-wrap items-center gap-2 text-xs border rounded p-2">
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-medium">{proj.name}</p>
                             {proj.address && <p className="truncate text-muted-foreground">{proj.address}</p>}
                           </div>
-                          <Input
-                            className="h-7 text-xs w-24"
-                            value={edit.qb_class_id}
-                            onChange={(e) => setClassEdit(proj.id, 'qb_class_id', e.target.value)}
-                            placeholder="Class ID"
-                          />
-                          <Input
-                            className="h-7 text-xs w-36"
-                            value={edit.qb_class_name}
-                            onChange={(e) => setClassEdit(proj.id, 'qb_class_name', e.target.value)}
-                            placeholder="Class Name"
-                          />
+                          {showDropdown ? (
+                            <Select
+                              value={edit.qb_class_id || undefined}
+                              onValueChange={(val) => selectClassForProject(proj.id, val)}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-56">
+                                <SelectValue placeholder="Select a class…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {qbClasses.map((c) => (
+                                  <SelectItem key={c.id} value={c.id} className="text-xs">
+                                    {c.fully_qualified_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <>
+                              <Input
+                                className="h-7 text-xs w-24"
+                                value={edit.qb_class_id}
+                                onChange={(e) => setClassEdit(proj.id, 'qb_class_id', e.target.value)}
+                                placeholder="Class ID"
+                              />
+                              <Input
+                                className="h-7 text-xs w-36"
+                                value={edit.qb_class_name}
+                                onChange={(e) => setClassEdit(proj.id, 'qb_class_name', e.target.value)}
+                                placeholder="Class Name"
+                              />
+                            </>
+                          )}
                           <Button
                             size="sm"
                             variant={hasUnsaved ? 'default' : 'outline'}

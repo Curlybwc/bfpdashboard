@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.quickbooks_export_payables]
 verify_jwt = false
+
+[functions.quickbooks_list_classes]
+verify_jwt = false
