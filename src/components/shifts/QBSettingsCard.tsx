@@ -304,7 +304,7 @@ const QBSettingsCard = () => {
                 <div className="flex flex-wrap gap-2 items-end">
                   <div className="space-y-1">
                     <Label className="text-xs">Account ID</Label>
-                    <Input className="h-8 text-xs w-40" value={expAccountId} onChange={(e) => setExpAccountId(e.target.value)} placeholder="e.g. 68" />
+                    <Input className="h-8 text-xs w-40" value={expAccountId} onChange={(e) => setExpAccountIdTracked(e.target.value)} placeholder="e.g. 68" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Display Name</Label>
