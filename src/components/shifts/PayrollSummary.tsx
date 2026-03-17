@@ -506,8 +506,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       {/* Unpaid Eligible Groups */}
       <Card className="p-3 space-y-2">
         <div>
-          <p className="text-sm font-medium">Unpaid Eligible Payable Groups</p>
-          <p className="text-xs text-muted-foreground">Grouped by contractor + project + selected period. Already-linked shifts are excluded.</p>
+          <p className="text-sm font-medium">Ready to Pay</p>
+          <p className="text-xs text-muted-foreground">These contractor/project groups have unpaid shifts that can be prepared as a payment now.</p>
         </div>
 
         {loading ? (
