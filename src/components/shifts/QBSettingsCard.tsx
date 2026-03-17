@@ -43,6 +43,12 @@ const QBSettingsCard = () => {
   const [qbAccountsLoaded, setQbAccountsLoaded] = useState(false);
   const [qbAccountsError, setQbAccountsError] = useState<string | null>(null);
 
+  // QB vendors from API (for vendor picker)
+  const [qbVendors, setQbVendors] = useState<QBVendor[]>([]);
+  const [qbVendorsLoading, setQbVendorsLoading] = useState(false);
+  const [qbVendorsLoaded, setQbVendorsLoaded] = useState(false);
+  const [qbVendorsError, setQbVendorsError] = useState<string | null>(null);
+
   // Vendor mappings state
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [vendorMappings, setVendorMappings] = useState<Record<string, { qb_vendor_id: string; qb_vendor_name: string }>>({});
