@@ -1864,6 +1864,51 @@ export type Database = {
           },
         ]
       }
+      worker_payment_shifts: {
+        Row: {
+          amount_paid: number
+          created_at: string
+          hourly_rate_used: number
+          hours_paid: number
+          id: string
+          shift_id: string
+          worker_payment_id: string
+        }
+        Insert: {
+          amount_paid?: number
+          created_at?: string
+          hourly_rate_used?: number
+          hours_paid?: number
+          id?: string
+          shift_id: string
+          worker_payment_id: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string
+          hourly_rate_used?: number
+          hours_paid?: number
+          id?: string
+          shift_id?: string
+          worker_payment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_payment_shifts_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payment_shifts_worker_payment_id_fkey"
+            columns: ["worker_payment_id"]
+            isOneToOne: false
+            referencedRelation: "worker_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       worker_payments: {
         Row: {
           amount: number
@@ -1871,7 +1916,9 @@ export type Database = {
           created_by: string
           external_reference: string | null
           id: string
+          marked_paid_by: string | null
           memo: string | null
+          paid_at: string | null
           paid_date: string
           pay_period_end: string | null
           pay_period_start: string | null
@@ -1889,7 +1936,9 @@ export type Database = {
           created_by: string
           external_reference?: string | null
           id?: string
+          marked_paid_by?: string | null
           memo?: string | null
+          paid_at?: string | null
           paid_date: string
           pay_period_end?: string | null
           pay_period_start?: string | null
@@ -1907,7 +1956,9 @@ export type Database = {
           created_by?: string
           external_reference?: string | null
           id?: string
+          marked_paid_by?: string | null
           memo?: string | null
+          paid_at?: string | null
           paid_date?: string
           pay_period_end?: string | null
           pay_period_start?: string | null
@@ -1954,6 +2005,8 @@ export type Database = {
           stripe_connected_account_id: string | null
           updated_at: string
           user_id: string
+          venmo_handle: string | null
+          venmo_note_template: string | null
         }
         Insert: {
           charges_enabled?: boolean
@@ -1965,6 +2018,8 @@ export type Database = {
           stripe_connected_account_id?: string | null
           updated_at?: string
           user_id: string
+          venmo_handle?: string | null
+          venmo_note_template?: string | null
         }
         Update: {
           charges_enabled?: boolean
@@ -1976,6 +2031,8 @@ export type Database = {
           stripe_connected_account_id?: string | null
           updated_at?: string
           user_id?: string
+          venmo_handle?: string | null
+          venmo_note_template?: string | null
         }
         Relationships: [
           {
