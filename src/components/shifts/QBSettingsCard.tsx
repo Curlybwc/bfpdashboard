@@ -454,6 +454,7 @@ const QBSettingsCard = () => {
                 )}
               </div>
             </>
+          )}
         </CollapsibleContent>
       </Collapsible>
     </Card>
