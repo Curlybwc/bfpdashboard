@@ -590,16 +590,21 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         )}
       </Card>
 
-      {/* Date range */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">From</Label>
-          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">To</Label>
-          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-        </div>
+      {/* Pay period selector */}
+      <div className="space-y-1">
+        <Label className="text-xs">Pay Period</Label>
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select a pay period" />
+          </SelectTrigger>
+          <SelectContent>
+            {PAY_PERIODS.map((p) => (
+              <SelectItem key={`${p.from}::${p.to}`} value={`${p.from}::${p.to}`}>
+                {p.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <p className="text-xs text-muted-foreground">This page groups unpaid shifts by contractor and project so you can prepare payments without paying the same shift twice.</p>
