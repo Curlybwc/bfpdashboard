@@ -33,6 +33,8 @@ import FieldModeCapture from "./pages/FieldModeCapture";
 import FieldModePreview from "./pages/FieldModePreview";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Eula from "./pages/Eula";
 import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
 import MobileNav from "./components/MobileNav";
