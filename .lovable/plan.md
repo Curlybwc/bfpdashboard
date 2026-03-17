@@ -1,97 +1,108 @@
 
 
-## Plan: Crew Tasks (Multi-Person, Multi-Day)
+## Plan: QuickBooks Export — Real Expense Account + Class Mapping
 
-### 1. Database Migration
+### 1. Database Migration (one migration, three changes)
 
-Single migration adding columns, tables, indexes, RLS, and a helper function.
+**A. `quickbooks_settings` — single-row app-wide config**
 
-**New columns on `tasks`:**
-- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
-- `lead_user_id uuid NULL`
-
-**New table `task_candidates` (eligibility pool):**
 ```sql
-CREATE TABLE public.task_candidates (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  PRIMARY KEY (task_id, user_id)
+CREATE TABLE public.quickbooks_settings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  labor_expense_account_id text,
+  labor_expense_account_name text,
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
+
+-- Enforce single-row via unique constraint on a constant column
+ALTER TABLE public.quickbooks_settings
+  ADD COLUMN singleton boolean NOT NULL DEFAULT true,
+  ADD CONSTRAINT quickbooks_settings_singleton UNIQUE (singleton),
+  ADD CONSTRAINT quickbooks_settings_singleton_check CHECK (singleton = true);
+
+ALTER TABLE public.quickbooks_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can select qb settings" ON public.quickbooks_settings
+  FOR SELECT TO authenticated USING (is_admin(auth.uid()));
+CREATE POLICY "Admins can insert qb settings" ON public.quickbooks_settings
+  FOR INSERT TO authenticated WITH CHECK (is_admin(auth.uid()));
+CREATE POLICY "Admins can update qb settings" ON public.quickbooks_settings
+  FOR UPDATE TO authenticated USING (is_admin(auth.uid()));
 ```
 
-**New table `task_workers` (active crew):**
+**B. `quickbooks_class_mappings` — one QB class per project**
+
 ```sql
-CREATE TABLE public.task_workers (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  active boolean NOT NULL DEFAULT true,
-  joined_at timestamptz NOT NULL DEFAULT now(),
-  left_at timestamptz NULL,
-  PRIMARY KEY (task_id, user_id)
+CREATE TABLE public.quickbooks_class_mappings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  qb_class_id text NOT NULL,
+  qb_class_name text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (project_id)
 );
-CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
-CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
+
+ALTER TABLE public.quickbooks_class_mappings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can select class mappings" ON public.quickbooks_class_mappings
+  FOR SELECT TO authenticated USING (is_admin(auth.uid()));
+CREATE POLICY "Admins can insert class mappings" ON public.quickbooks_class_mappings
+  FOR INSERT TO authenticated WITH CHECK (is_admin(auth.uid()));
+CREATE POLICY "Admins can update class mappings" ON public.quickbooks_class_mappings
+  FOR UPDATE TO authenticated USING (is_admin(auth.uid()));
+CREATE POLICY "Admins can delete class mappings" ON public.quickbooks_class_mappings
+  FOR DELETE TO authenticated USING (is_admin(auth.uid()));
 ```
 
-**RLS on `task_candidates`:**
-- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
-- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
+### 2. Edge Function Changes — `quickbooks_export_payables/index.ts`
 
-**RLS on `task_workers`:**
-- SELECT: same as task_candidates SELECT
-- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
-- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
-- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
+Add two new lookups before the per-batch loop:
 
-### 2. Today Tab (`src/pages/Today.tsx`)
+1. Fetch the single `quickbooks_settings` row. If missing or `labor_expense_account_id` is null, return an immediate error for all batches: *"Configure a QuickBooks expense account in Payroll → QB Settings before exporting."*
 
-Add two additional queries in `fetchTasks` after existing solo queries:
+2. Fetch `quickbooks_class_mappings` for all `project_id`s in the batch set. Build a `classMap` keyed by `project_id`.
 
-**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
+In the per-batch loop, add a new check after vendor mapping:
 
-**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
+- If the batch's `project_id` has no class mapping → **fail that batch** with error: *"No QuickBooks class mapped for project \"{projectName}\". Add a class mapping in QB Settings before exporting."* (write error to `qb_export_error`, same pattern as vendor check)
 
-Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
+Update the bill payload:
 
-### 3. TaskCard (`src/components/TaskCard.tsx`)
+```text
+AccountBasedExpenseLineDetail: {
+  AccountRef: { value: settings.labor_expense_account_id, name: settings.labor_expense_account_name },
+  ClassRef: { value: classMapping.qb_class_id, name: classMapping.qb_class_name }
+}
+```
 
-Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+Update Description/PrivateNote to include project address:
 
-When `isCrewTask`:
-- Show a small crew icon + "N active" badge next to status
-- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
-- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
-- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
-- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+```text
+Description: "Payroll: {period_start} to {period_end} · {projectAddress || projectName}"
+PrivateNote: "Lovable Payroll Batch #{batchId.slice(0,8)} · {projectName}"
+```
 
-### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+### 3. Admin UI — new section in `PayrollSummary.tsx`
 
-**Crew toggle** (visible to admin/manager only, below Assigned To):
-- Switch labeled "Crew Task"
-- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
-- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+Add a collapsible **"QuickBooks Settings"** card between the connection banner and the pay period selector. Visible only when `qbStatus?.connected` is true. Three sub-sections:
 
-**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
-- "Active Crew" list showing names from `task_workers` joined to `profiles`
-- Join/Leave button for current user
-- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+**A. Expense Account** — single row with two text inputs (Account ID, Display Name) and a Save button. On mount, fetch from `quickbooks_settings`; upsert on save.
 
-**Solo mode**: keep existing Assigned To UI unchanged.
+**B. Project → Class Mappings** — table of active projects (fetched from `projects` where status = 'active'). Each row shows project name + address, with text inputs for QB Class ID and Class Name. Inline save per row (upsert into `quickbooks_class_mappings`).
 
-### 5. Files to Modify
+**C. Vendor Mappings** — table of active profiles. Each row shows contractor name, with text inputs for QB Vendor ID and Vendor Name. Inline save per row (upsert into `quickbooks_vendor_mappings`).
 
-1. **Migration SQL** — new columns, tables, indexes, RLS
-2. `src/pages/Today.tsx` — crew task queries merged into sections
-3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
-4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
-5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
+### 4. Files Changed
 
-### 6. Key Edge Cases
+| File | Change |
+|------|--------|
+| New migration SQL | Create `quickbooks_settings` + `quickbooks_class_mappings` |
+| `supabase/functions/quickbooks_export_payables/index.ts` | Read settings + class mappings; fail on missing; use real AccountRef + ClassRef |
+| `src/components/shifts/PayrollSummary.tsx` | Add QB Settings collapsible card with 3 sub-sections |
 
-- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
-- Crew Available shows even when task is 'In Progress' (multiple people can join)
-- Upsert PK on `task_workers` prevents duplicate joins
-- Done tasks filtered out everywhere by existing stage checks
-- Crew→Solo cleanup deletes both tables to prevent orphan rows
+### 5. Fallback / Error Behavior
+
+- **Missing expense account** → All batches in the request fail with one clear error message
+- **Missing class mapping for a project** → That specific batch fails with actionable error naming the project (hard blocker per user request)
+- **Missing vendor mapping** → Unchanged; already fails per-batch with actionable error
 
