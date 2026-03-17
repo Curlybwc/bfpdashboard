@@ -254,6 +254,43 @@ const QBSettingsCard = () => {
     setVendorEdits((prev) => ({ ...prev, [userId]: { ...current, [field]: value } }));
   };
 
+  const loadQBVendors = async () => {
+    setQbVendorsLoading(true);
+    setQbVendorsError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_list_vendors');
+      if (error) {
+        setQbVendorsError(error.message);
+        toast({ title: 'Failed to load QB vendors', description: error.message, variant: 'destructive' });
+      } else if (data?.error) {
+        setQbVendorsError(data.message || data.error);
+        toast({ title: 'Failed to load QB vendors', description: data.message || data.error, variant: 'destructive' });
+      } else {
+        const vendors = (data?.vendors || []) as QBVendor[];
+        setQbVendors(vendors);
+        setQbVendorsLoaded(true);
+        if (vendors.length === 0) {
+          toast({ title: 'No vendors found', description: 'No active vendors in your QuickBooks account.' });
+        } else {
+          toast({ title: `Loaded ${vendors.length} QB vendors` });
+        }
+      }
+    } catch {
+      setQbVendorsError('Unexpected error');
+      toast({ title: 'Failed to load QB vendors', variant: 'destructive' });
+    }
+    setQbVendorsLoading(false);
+  };
+
+  const selectVendorForUser = (userId: string, vendorId: string) => {
+    const vendor = qbVendors.find((v) => v.id === vendorId);
+    if (!vendor) return;
+    setVendorEdits((prev) => ({
+      ...prev,
+      [userId]: { qb_vendor_id: vendor.id, qb_vendor_name: vendor.display_name },
+    }));
+  };
+
   const saveVendorMapping = async (userId: string): Promise<boolean> => {
     const edit = getVendorEdit(userId);
     if (!edit.qb_vendor_id.trim()) {
