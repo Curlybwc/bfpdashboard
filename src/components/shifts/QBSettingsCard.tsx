@@ -440,8 +440,22 @@ const QBSettingsCard = () => {
                   </div>
                 )}
               </div>
+
+              {/* Save All button */}
+              <div className="pt-2 border-t">
+                <Button
+                  className="w-full"
+                  disabled={saveAllLoading || !hasAnyUnsaved}
+                  onClick={saveAll}
+                >
+                  {saveAllLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                  Save All QuickBooks Settings
+                </Button>
+                {!hasAnyUnsaved && (
+                  <p className="text-xs text-muted-foreground text-center mt-1">No unsaved changes</p>
+                )}
+              </div>
             </>
-          )}
         </CollapsibleContent>
       </Collapsible>
     </Card>
