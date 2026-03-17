@@ -151,6 +151,9 @@ const QBSettingsCard = () => {
     setExpAccountId(account.id);
     setExpAccountName(account.fully_qualified_name);
     setExpDirty(true);
+  };
+
+  const saveExpenseAccount = async (): Promise<boolean> => {
     if (!expAccountId.trim()) {
       toast({ title: 'Account ID required', variant: 'destructive' });
       return false;
