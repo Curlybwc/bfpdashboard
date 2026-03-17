@@ -332,6 +332,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         excluded.push({
           shift,
           reason: `Part of a ${statusLabel} payment (${linked.periodStart} → ${linked.periodEnd})`,
+          linkedBatchId: linked.batchId,
         });
       } else {
         eligible.push(shift);
@@ -413,10 +414,14 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       };
     });
 
+    // Filter out excluded shifts whose batch is already shown in Prepared/Paid sections
+    const displayedBatchIds = new Set(batchRows.map((b) => b.id));
+    const filteredExcluded = excluded.filter((ex) => !ex.linkedBatchId || !displayedBatchIds.has(ex.linkedBatchId));
+
     setCandidateGroups([...groupsMap.values()].sort((a, b) => a.contractorName.localeCompare(b.contractorName) || a.projectName.localeCompare(b.projectName)));
     setExportedGroups(existingGroups.filter((row) => row.batch.status === 'exported' || row.batch.status === 'draft'));
     setPaidGroups(existingGroups.filter((row) => row.batch.status === 'paid'));
-    setExcludedShifts(excluded.sort((a, b) => a.shift.workerName.localeCompare(b.shift.workerName) || a.shift.projectName.localeCompare(b.shift.projectName)));
+    setExcludedShifts(filteredExcluded.sort((a, b) => a.shift.workerName.localeCompare(b.shift.workerName) || a.shift.projectName.localeCompare(b.shift.projectName)));
     setLoading(false);
   }, [fromDate, toDate]);
 
