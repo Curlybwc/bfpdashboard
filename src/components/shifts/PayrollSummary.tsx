@@ -133,6 +133,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [creatingGroupKey, setCreatingGroupKey] = useState<string | null>(null);
   const [payingGroupKey, setPayingGroupKey] = useState<string | null>(null);
   const [updatingBatchId, setUpdatingBatchId] = useState<string | null>(null);
+  const [voidingBatchId, setVoidingBatchId] = useState<string | null>(null);
+  const [removingShiftId, setRemovingShiftId] = useState<string | null>(null);
   const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
   const [expandedExisting, setExpandedExisting] = useState<Set<string>>(new Set());
 
