@@ -13,6 +13,7 @@ type ProjectRow = { id: string; name: string; address: string | null; status: st
 type ProfileRow = { id: string; full_name: string | null; is_active: boolean };
 type QBClass = { id: string; name: string; fully_qualified_name: string };
 type QBAccount = { id: string; name: string; fully_qualified_name: string; account_type: string | null; account_sub_type: string | null };
+type QBVendor = { id: string; display_name: string };
 
 const QBSettingsCard = () => {
   const { toast } = useToast();
@@ -41,6 +42,12 @@ const QBSettingsCard = () => {
   const [qbAccountsLoading, setQbAccountsLoading] = useState(false);
   const [qbAccountsLoaded, setQbAccountsLoaded] = useState(false);
   const [qbAccountsError, setQbAccountsError] = useState<string | null>(null);
+
+  // QB vendors from API (for vendor picker)
+  const [qbVendors, setQbVendors] = useState<QBVendor[]>([]);
+  const [qbVendorsLoading, setQbVendorsLoading] = useState(false);
+  const [qbVendorsLoaded, setQbVendorsLoaded] = useState(false);
+  const [qbVendorsError, setQbVendorsError] = useState<string | null>(null);
 
   // Vendor mappings state
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
@@ -245,6 +252,43 @@ const QBSettingsCard = () => {
   const setVendorEdit = (userId: string, field: 'qb_vendor_id' | 'qb_vendor_name', value: string) => {
     const current = getVendorEdit(userId);
     setVendorEdits((prev) => ({ ...prev, [userId]: { ...current, [field]: value } }));
+  };
+
+  const loadQBVendors = async () => {
+    setQbVendorsLoading(true);
+    setQbVendorsError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_list_vendors');
+      if (error) {
+        setQbVendorsError(error.message);
+        toast({ title: 'Failed to load QB vendors', description: error.message, variant: 'destructive' });
+      } else if (data?.error) {
+        setQbVendorsError(data.message || data.error);
+        toast({ title: 'Failed to load QB vendors', description: data.message || data.error, variant: 'destructive' });
+      } else {
+        const vendors = (data?.vendors || []) as QBVendor[];
+        setQbVendors(vendors);
+        setQbVendorsLoaded(true);
+        if (vendors.length === 0) {
+          toast({ title: 'No vendors found', description: 'No active vendors in your QuickBooks account.' });
+        } else {
+          toast({ title: `Loaded ${vendors.length} QB vendors` });
+        }
+      }
+    } catch {
+      setQbVendorsError('Unexpected error');
+      toast({ title: 'Failed to load QB vendors', variant: 'destructive' });
+    }
+    setQbVendorsLoading(false);
+  };
+
+  const selectVendorForUser = (userId: string, vendorId: string) => {
+    const vendor = qbVendors.find((v) => v.id === vendorId);
+    if (!vendor) return;
+    setVendorEdits((prev) => ({
+      ...prev,
+      [userId]: { qb_vendor_id: vendor.id, qb_vendor_name: vendor.display_name },
+    }));
   };
 
   const saveVendorMapping = async (userId: string): Promise<boolean> => {
@@ -482,7 +526,26 @@ const QBSettingsCard = () => {
 
               {/* C. Vendor Mappings */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contractor → QB Vendor</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">Contractor → QB Vendor</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs px-2"
+                    disabled={qbVendorsLoading}
+                    onClick={loadQBVendors}
+                  >
+                    {qbVendorsLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    {qbVendorsLoaded ? 'Refresh Vendors' : 'Load QB Vendors'}
+                  </Button>
+                </div>
+                {qbVendorsError && (
+                  <p className="text-xs text-destructive">{qbVendorsError} — use manual entry below.</p>
+                )}
                 {profiles.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No active profiles.</p>
                 ) : (
@@ -490,21 +553,42 @@ const QBSettingsCard = () => {
                     {profiles.map((prof) => {
                       const edit = getVendorEdit(prof.id);
                       const hasUnsaved = !!vendorEdits[prof.id];
+                      const showDropdown = qbVendorsLoaded && qbVendors.length > 0;
                       return (
                         <div key={prof.id} className="flex flex-wrap items-center gap-2 text-xs border rounded p-2">
                           <p className="min-w-0 flex-1 truncate font-medium">{prof.full_name || prof.id}</p>
-                          <Input
-                            className="h-7 text-xs w-24"
-                            value={edit.qb_vendor_id}
-                            onChange={(e) => setVendorEdit(prof.id, 'qb_vendor_id', e.target.value)}
-                            placeholder="Vendor ID"
-                          />
-                          <Input
-                            className="h-7 text-xs w-36"
-                            value={edit.qb_vendor_name}
-                            onChange={(e) => setVendorEdit(prof.id, 'qb_vendor_name', e.target.value)}
-                            placeholder="Vendor Name"
-                          />
+                          {showDropdown ? (
+                            <Select
+                              value={edit.qb_vendor_id || undefined}
+                              onValueChange={(val) => selectVendorForUser(prof.id, val)}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-56">
+                                <SelectValue placeholder="Select a vendor…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {qbVendors.map((v) => (
+                                  <SelectItem key={v.id} value={v.id} className="text-xs">
+                                    {v.display_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <>
+                              <Input
+                                className="h-7 text-xs w-24"
+                                value={edit.qb_vendor_id}
+                                onChange={(e) => setVendorEdit(prof.id, 'qb_vendor_id', e.target.value)}
+                                placeholder="Vendor ID"
+                              />
+                              <Input
+                                className="h-7 text-xs w-36"
+                                value={edit.qb_vendor_name}
+                                onChange={(e) => setVendorEdit(prof.id, 'qb_vendor_name', e.target.value)}
+                                placeholder="Vendor Name"
+                              />
+                            </>
+                          )}
                           <Button
                             size="sm"
                             variant={hasUnsaved ? 'default' : 'outline'}

@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.quickbooks_list_accounts]
 verify_jwt = false
+
+[functions.quickbooks_list_vendors]
+verify_jwt = false
