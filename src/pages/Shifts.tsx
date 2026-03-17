@@ -14,13 +14,29 @@ import { fetchShiftAllocations, fetchShiftById, useMyShifts, type Shift, type Sh
 
 const Shifts = () => {
   const { user } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const [showForm, setShowForm] = useState(false);
   const [editShift, setEditShift] = useState<Shift | null>(null);
   const [editAllocations, setEditAllocations] = useState<ShiftAllocation[]>([]);
   const { data, isLoading, refetch } = useMyShifts(user?.id);
   const myShifts = data?.shifts ?? [];
   const projectMap = data?.projectMap ?? {};
+
+  if (adminLoading) {
+    return (
+      <div className="pb-20">
+        <PageHeader title="Shifts" />
+        <div className="p-4 space-y-2">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <Card key={idx} className="p-3 space-y-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-28" />
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const handleNewShift = () => {
     setEditShift(null);
