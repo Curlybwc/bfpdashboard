@@ -400,7 +400,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     if (batchError || !batch) {
       setCreatingGroupKey(null);
-      toast({ title: 'Create payable failed', description: batchError?.message || 'Unknown error', variant: 'destructive' });
+      toast({ title: 'Failed to prepare payment', description: batchError?.message || 'Unknown error', variant: 'destructive' });
       return;
     }
 
