@@ -117,7 +117,40 @@ const QBSettingsCard = () => {
     setQbClassesLoading(false);
   };
 
-  const saveExpenseAccount = async (): Promise<boolean> => {
+  const loadQBAccounts = async () => {
+    setQbAccountsLoading(true);
+    setQbAccountsError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_list_accounts');
+      if (error) {
+        setQbAccountsError(error.message);
+        toast({ title: 'Failed to load QB accounts', description: error.message, variant: 'destructive' });
+      } else if (data?.error) {
+        setQbAccountsError(data.message || data.error);
+        toast({ title: 'Failed to load QB accounts', description: data.message || data.error, variant: 'destructive' });
+      } else {
+        const accounts = (data?.accounts || []) as QBAccount[];
+        setQbAccounts(accounts);
+        setQbAccountsLoaded(true);
+        if (accounts.length === 0) {
+          toast({ title: 'No expense accounts found', description: 'No active expense accounts in your QuickBooks account.' });
+        } else {
+          toast({ title: `Loaded ${accounts.length} QB expense accounts` });
+        }
+      }
+    } catch {
+      setQbAccountsError('Unexpected error');
+      toast({ title: 'Failed to load QB accounts', variant: 'destructive' });
+    }
+    setQbAccountsLoading(false);
+  };
+
+  const selectExpenseAccount = (accountId: string) => {
+    const account = qbAccounts.find((a) => a.id === accountId);
+    if (!account) return;
+    setExpAccountId(account.id);
+    setExpAccountName(account.fully_qualified_name);
+    setExpDirty(true);
     if (!expAccountId.trim()) {
       toast({ title: 'Account ID required', variant: 'destructive' });
       return false;
