@@ -676,8 +676,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       {/* Paid Payables */}
       <Card className="p-3 space-y-2">
         <div>
-          <p className="text-sm font-medium">Paid Payables</p>
-          <p className="text-xs text-muted-foreground">Paid groups remain visible for audit and overlap safety.</p>
+          <p className="text-sm font-medium">Already Paid</p>
+          <p className="text-xs text-muted-foreground">These payments were already recorded as paid.</p>
         </div>
         {paidGroups.length === 0 ? (
           <p className="text-xs text-muted-foreground">No paid payables for this selected period.</p>
