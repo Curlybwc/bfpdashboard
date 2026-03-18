@@ -342,6 +342,7 @@ const TaskDetail = () => {
 
     setSaving(false);
     setCascadeAssign(false);
+    setCascadeCrew(false);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
     else {
       toast({ title: 'Saved' });
