@@ -255,14 +255,31 @@ const ProjectDetail = () => {
   const packageGroups = useMemo(() => buildTaskPackageGroups(filteredTasksWithParents, materialCountMap), [filteredTasksWithParents, materialCountMap]);
 
   const activePackageGroups = useMemo(
-    () => packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total)),
-    [packageGroups],
+    () => {
+      const groups = packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total));
+      if (!hideDone) return groups;
+      return groups.map((group) => ({
+        ...group,
+        childTasks: group.childTasks.filter((t) => getTaskOperationalStatus(t) !== 'done'),
+      }));
+    },
+    [packageGroups, hideDone],
   );
 
   const completedPackageGroups = useMemo(
     () => packageGroups.filter((group) => group.summary.total > 0 && group.summary.byStatus.done === group.summary.total),
     [packageGroups],
   );
+
+  const doneTaskCount = useMemo(() => {
+    let count = completedPackageGroups.reduce((sum, group) => sum + group.summary.total, 0);
+    if (hideDone) {
+      // Also count done tasks hidden from active groups
+      const activeGroups = packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total));
+      count += activeGroups.reduce((sum, group) => sum + group.childTasks.filter((t) => getTaskOperationalStatus(t) === 'done').length, 0);
+    }
+    return count;
+  }, [completedPackageGroups, packageGroups, hideDone]);
 
   const completedTaskCount = useMemo(
     () => completedPackageGroups.reduce((sum, group) => sum + group.summary.total, 0),
