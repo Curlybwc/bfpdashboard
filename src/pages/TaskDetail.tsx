@@ -100,6 +100,7 @@ const TaskDetail = () => {
     projectRole,
     children,
     projectMembers,
+    allProfiles,
     fieldCapture,
     photos,
     activeBlocker,
