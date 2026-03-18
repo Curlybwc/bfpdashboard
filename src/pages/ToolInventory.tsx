@@ -424,11 +424,26 @@ const ToolInventory = () => {
                       <p className="text-[10px] font-semibold text-muted-foreground uppercase">At Jobsites</p>
                       {projectStocks.map(ps => {
                         const proj = allProjects.find(p => p.id === ps.project_id);
+                        const moveKey = `move-${tool.id}-${ps.project_id}`;
                         return (
-                          <div key={ps.id} className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground truncate">
+                          <div key={ps.id} className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground truncate flex-1">
                               📍 {proj ? projectLabel(proj) : ps.project_id}
                             </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0"
+                                  disabled={actionLoading === moveKey || ps.qty <= 0}
+                                  onClick={() => moveOneToShop(tool.id, ps.project_id!)}
+                                >
+                                  <ArrowLeft className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Move 1 to Shop</TooltipContent>
+                            </Tooltip>
                             <StepperControl toolTypeId={tool.id} locationType="project" projectId={ps.project_id} />
                           </div>
                         );
