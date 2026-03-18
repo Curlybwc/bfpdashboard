@@ -72,11 +72,18 @@ export function useTaskDetailData(taskId: string | undefined, userId?: string): 
     if (!taskId) return;
     const { data: t } = await supabase.from('tasks').select('project_id').eq('id', taskId).single();
     if (!t?.project_id) return;
-    const { data } = await supabase
-      .from('project_members')
-      .select('user_id, role, profiles(full_name)')
-      .eq('project_id', t.project_id);
-    setProjectMembers((data as any) || []);
+    const [{ data: members }, { data: profiles }] = await Promise.all([
+      supabase
+        .from('project_members')
+        .select('user_id, role, profiles(full_name)')
+        .eq('project_id', t.project_id),
+      supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('is_active', true),
+    ]);
+    setProjectMembers((members as any) || []);
+    setAllProfiles((profiles as any) || []);
   };
 
   const fetchPhotos = async () => {
