@@ -806,8 +806,21 @@ const TaskDetail = () => {
 
   if (!task) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
-  // Members not yet candidates (for adding)
-  const nonCandidateMembers = projectMembers.filter(m => !crewCandidates.includes(m.user_id));
+  // All profiles not yet candidates (for adding to crew)
+  const memberSet = new Set(projectMembers.map(m => m.user_id));
+  const nonCandidateProfiles = allProfiles
+    .filter(p => !crewCandidates.includes(p.id))
+    .sort((a, b) => {
+      const aIsMember = memberSet.has(a.id);
+      const bIsMember = memberSet.has(b.id);
+      if (aIsMember !== bIsMember) return aIsMember ? -1 : 1;
+      return (a.full_name || '').localeCompare(b.full_name || '');
+    });
+
+  // Group profiles for solo assignment
+  const memberProfileIds = new Set(projectMembers.map(m => m.user_id));
+  const soloMemberProfiles = allProfiles.filter(p => memberProfileIds.has(p.id)).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+  const soloOtherProfiles = allProfiles.filter(p => !memberProfileIds.has(p.id)).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
 
   return (
     <div className="pb-20">
