@@ -141,7 +141,10 @@ const ToolInventory = () => {
     setActionLoading(null);
   };
 
-  const reassignUnknown = async (toolTypeId: string, targetProjectId: string) => {
+  const reassignUnknown = async (toolTypeId: string, target: string) => {
+    const isShop = target === '__shop';
+    const targetLocationType = isShop ? 'shop' : 'project';
+    const targetProjectId = isShop ? null : target;
     const stocks = stockMap[toolTypeId] || [];
     const unknownRow = stocks.find(s => s.location_type === 'unknown');
     if (!unknownRow || unknownRow.qty <= 0) return;
