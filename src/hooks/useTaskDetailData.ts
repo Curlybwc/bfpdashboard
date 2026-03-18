@@ -7,6 +7,7 @@ export interface TaskDetailDataState {
   projectRole: string | null;
   children: any[];
   projectMembers: { user_id: string; role: string; profiles: { full_name: string | null } | null }[];
+  allProfiles: { id: string; full_name: string | null }[];
   fieldCapture: any;
   photos: any[];
   activeBlocker: any;
