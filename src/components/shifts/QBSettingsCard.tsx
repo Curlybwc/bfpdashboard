@@ -409,22 +409,17 @@ const QBSettingsCard = () => {
                   <p className="text-xs text-destructive">{qbAccountsError} — use manual entry below.</p>
                 )}
                 {qbAccountsLoaded && qbAccounts.length > 0 ? (
-                  <Select
+                  <QBCombobox
+                    options={qbAccounts.map((a) => ({
+                      value: a.id,
+                      label: a.fully_qualified_name,
+                      detail: a.account_sub_type || a.account_type || undefined,
+                    }))}
                     value={expAccountId || undefined}
-                    onValueChange={selectExpenseAccount}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select an expense account…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {qbAccounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id} className="text-xs">
-                          {a.fully_qualified_name}
-                          {a.account_sub_type ? ` (${a.account_sub_type})` : a.account_type ? ` (${a.account_type})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onSelect={selectExpenseAccount}
+                    placeholder="Search expense accounts…"
+                    className="w-full"
+                  />
                 ) : (
                   <div className="flex flex-wrap gap-2 items-end">
                     <div className="space-y-1">
