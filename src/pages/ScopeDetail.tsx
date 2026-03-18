@@ -33,8 +33,9 @@ import {
   useConvertScope,
   useUpdateLibraryPrice,
   useResetToLibraryPrice,
+  useDeleteScope,
 } from '@/hooks/useScopeMutations';
-import { canArchiveScope, canDeleteScopeItem, canEditScopeTitle } from '@/lib/permissions';
+import { canArchiveScope, canDeleteScope, canDeleteScopeItem, canEditScopeTitle } from '@/lib/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 
 const ScopeDetail = () => {
@@ -60,6 +61,7 @@ const ScopeDetail = () => {
   const updateTitleMutation = useUpdateScopeTitle(id);
   const archiveMutation = useArchiveScope(id);
   const convertMutation = useConvertScope();
+  const deleteScopeMutation = useDeleteScope();
   const updateLibraryPriceMutation = useUpdateLibraryPrice(id);
   const resetToLibraryMutation = useResetToLibraryPrice(id);
 
@@ -309,6 +311,30 @@ const ScopeDetail = () => {
             )}
             {scope.status === 'archived' && canArchiveScope(isAdmin) && (
               <Button size="sm" variant="outline" onClick={() => archiveMutation.mutate('active')}>Reactivate</Button>
+            )}
+            {canDeleteScope(isAdmin) && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="destructive"><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this scope?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete the scope and all its items. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => deleteScopeMutation.mutate(id!)}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
         }

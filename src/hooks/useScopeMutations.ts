@@ -110,6 +110,25 @@ export function useUpdateScopeTitle(scopeId: string | undefined) {
   });
 }
 
+export function useDeleteScope() {
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  return useMutation({
+    mutationFn: async (scopeId: string) => {
+      const { error } = await supabase.from('scopes').delete().eq('id', scopeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: 'Scope deleted' });
+      navigate('/scopes');
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error deleting scope', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
 export function useArchiveScope(scopeId: string | undefined) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
