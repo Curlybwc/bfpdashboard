@@ -199,8 +199,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         setQbConnecting(false);
         return;
       }
-      // Redirect to Intuit OAuth
-      window.location.href = data.auth_url;
+      // Open Intuit OAuth in a new tab (iframe can't load accounts.intuit.com)
+      window.open(data.auth_url, '_blank', 'noopener');
     } catch {
       toast({ title: 'Failed to start QuickBooks connection', variant: 'destructive' });
       setQbConnecting(false);
