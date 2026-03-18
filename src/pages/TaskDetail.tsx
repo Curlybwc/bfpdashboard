@@ -1135,7 +1135,7 @@ const TaskDetail = () => {
                     );
                   })}
                 </div>
-                {nonCandidateMembers.length > 0 && (
+                {nonCandidateProfiles.length > 0 && (
                   <Dialog open={addCandidatesOpen} onOpenChange={(o) => { setAddCandidatesOpen(o); if (!o) { setSelectedCandidates([]); setCandidateSearch(''); } }}>
                     <DialogTrigger asChild>
                       <Button size="sm" variant="outline" className="w-full"><Plus className="h-4 w-4 mr-1" />Add Workers</Button>
@@ -1146,41 +1146,48 @@ const TaskDetail = () => {
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
-                            placeholder="Search members..."
+                            placeholder="Search all users..."
                             value={candidateSearch}
                             onChange={e => setCandidateSearch(e.target.value)}
                             className="pl-9"
                           />
                         </div>
                         <div className="max-h-52 overflow-auto border rounded-md">
-                          {nonCandidateMembers
-                            .filter(m => {
+                          {(() => {
+                            const filtered = nonCandidateProfiles.filter(p => {
                               if (!candidateSearch.trim()) return true;
-                              const q = candidateSearch.toLowerCase();
-                              return (m.profiles?.full_name || '').toLowerCase().includes(q);
-                            })
-                            .map(m => (
-                              <label
-                                key={m.user_id}
-                                className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0"
-                              >
-                                <Checkbox
-                                  checked={selectedCandidates.includes(m.user_id)}
-                                  onCheckedChange={() =>
-                                    setSelectedCandidates(prev =>
-                                      prev.includes(m.user_id) ? prev.filter(id => id !== m.user_id) : [...prev, m.user_id]
-                                    )
-                                  }
-                                />
-                                <span className="text-sm truncate">{m.profiles?.full_name || 'Unnamed'} ({m.role})</span>
-                              </label>
-                            ))}
-                          {nonCandidateMembers.filter(m => {
-                            if (!candidateSearch.trim()) return true;
-                            return (m.profiles?.full_name || '').toLowerCase().includes(candidateSearch.toLowerCase());
-                          }).length === 0 && (
-                            <p className="text-xs text-muted-foreground text-center py-4">No members available.</p>
-                          )}
+                              return (p.full_name || '').toLowerCase().includes(candidateSearch.toLowerCase());
+                            });
+                            const members = filtered.filter(p => memberSet.has(p.id));
+                            const others = filtered.filter(p => !memberSet.has(p.id));
+                            if (filtered.length === 0) return <p className="text-xs text-muted-foreground text-center py-4">No users available.</p>;
+                            return (
+                              <>
+                                {members.length > 0 && (
+                                  <>
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2 pb-1 font-semibold bg-muted/50">Project Members</p>
+                                    {members.map(p => (
+                                      <label key={p.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0">
+                                        <Checkbox checked={selectedCandidates.includes(p.id)} onCheckedChange={() => setSelectedCandidates(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])} />
+                                        <span className="text-sm truncate">{p.full_name || 'Unnamed'}</span>
+                                      </label>
+                                    ))}
+                                  </>
+                                )}
+                                {others.length > 0 && (
+                                  <>
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2 pb-1 font-semibold bg-muted/50">Other Users</p>
+                                    {others.map(p => (
+                                      <label key={p.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0">
+                                        <Checkbox checked={selectedCandidates.includes(p.id)} onCheckedChange={() => setSelectedCandidates(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])} />
+                                        <span className="text-sm truncate">{p.full_name || 'Unnamed'} <span className="text-muted-foreground text-xs">(will be added)</span></span>
+                                      </label>
+                                    ))}
+                                  </>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                         {selectedCandidates.length > 0 && (
                           <p className="text-xs text-muted-foreground">{selectedCandidates.length} selected</p>
