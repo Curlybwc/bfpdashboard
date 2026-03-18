@@ -1213,11 +1213,29 @@ const TaskDetail = () => {
               <SelectContent>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
                 <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
-                {projectMembers.map((m) => (
-                  <SelectItem key={m.user_id} value={m.user_id}>
-                    {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                  </SelectItem>
-                ))}
+                {soloMemberProfiles.length > 0 && (
+                  <>
+                    <SelectItem value="__header_members" disabled className="text-[10px] uppercase tracking-wide font-semibold">Project Members</SelectItem>
+                    {soloMemberProfiles.map((p) => {
+                      const role = projectMembers.find(m => m.user_id === p.id)?.role;
+                      return (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.full_name || 'Unnamed'} ({role})
+                        </SelectItem>
+                      );
+                    })}
+                  </>
+                )}
+                {soloOtherProfiles.length > 0 && (
+                  <>
+                    <SelectItem value="__header_others" disabled className="text-[10px] uppercase tracking-wide font-semibold">Other Users</SelectItem>
+                    {soloOtherProfiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name || 'Unnamed'}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
             {hasChildren && (
