@@ -289,6 +289,18 @@ export default function Shopping() {
           <Input placeholder="Search name, SKU, project..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
 
+        {vendorUrls.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 hidden md:inline-flex"
+            onClick={openAllVendorLinks}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Open All Vendor Links ({vendorUrls.length})
+          </Button>
+        )}
+
         {isLoading && (
           <div className="space-y-2 py-2">
             {Array.from({ length: 4 }).map((_, idx) => (
