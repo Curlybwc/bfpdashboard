@@ -981,6 +981,18 @@ const ProjectDetail = () => {
                 </Button>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant={hideDone ? 'default' : 'outline'}
+                size="sm"
+                className="text-xs gap-1.5"
+                onClick={() => setHideDone(!hideDone)}
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+                {hideDone ? `${doneTaskCount} done hidden` : 'Hide done'}
+              </Button>
+            </div>
             {/* Show active filter badges */}
             {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
               <div className="flex flex-wrap gap-1">
