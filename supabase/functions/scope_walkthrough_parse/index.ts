@@ -9,6 +9,42 @@ function normalize(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
+/** Stronger deterministic normalizer for cost-library matching. */
+function normalizeForCostMatch(s: string): string {
+  let t = s.toLowerCase().trim().replace(/\s+/g, ' ');
+  t = t.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const phraseReplacements: [RegExp, string][] = [
+    [/\binside of (this )?(house|home|property)\b/g, 'interior'],
+    [/\b(interior|inside)\s+painting\b/g, 'paint interior'],
+    [/\bpaint(ing)?\s+(the\s+)?(entire\s+|whole\s+|all\s+)?(inside|interior)\b/g, 'paint interior'],
+    [/\brepaint\b/g, 'paint'],
+    [/\binterior doors?\b/g, 'interior door'],
+    [/\bexterior doors?\b/g, 'exterior door'],
+    [/\blandscaping\s+(cleanup|clean up)\b/g, 'landscape cleanup'],
+    [/\bclean up\b/g, 'cleanup'],
+  ];
+  for (const [pattern, replacement] of phraseReplacements) {
+    t = t.replace(pattern, replacement);
+  }
+
+  // Strip leading command/filler verbs that add little matching value.
+  t = t.replace(/^(replace|repair|fix|install|remove|paint|repaint|do|need|needs|we need to)\s+/i, '').trim();
+
+  const stopwords = new Set([
+    'the', 'a', 'an', 'this', 'that', 'entire', 'whole', 'all', 'of', 'for', 'to',
+    'in', 'on', 'at', 'with', 'and', 'job', 'work',
+  ]);
+
+  const tokens = t
+    .split(' ')
+    .filter(Boolean)
+    .map((token) => token.replace(/s$/i, ''))
+    .filter((token) => token.length > 1 && !stopwords.has(token));
+
+  return tokens.join(' ').trim();
+}
+
 /** Normalize for checklist matching: strip verbs, apply synonyms, remove punctuation */
 function normalizeForChecklistMatch(s: string): string {
   let t = s.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -49,6 +85,82 @@ function adaptiveJaccardMatch(siNorm: string, ciNorm: string): boolean {
   const minTokens = Math.min(siTokens, ciTokens);
   const threshold = minTokens <= 2 ? 0.50 : 0.70;
   return jaccardSimilarity(siNorm, ciNorm) >= threshold;
+}
+
+type CostItemRecord = {
+  id: string;
+  name: string;
+  normalized_name: string | null;
+  default_total_cost: number | null;
+  unit_type: string | null;
+};
+
+type CostMatchCandidate = {
+  item: CostItemRecord;
+  score: number;
+};
+
+function pickUniqueBestCostCandidate(candidates: CostMatchCandidate[], minScore: number): CostItemRecord | null {
+  if (candidates.length === 0) return null;
+  const sorted = [...candidates].sort((a, b) => b.score - a.score);
+  const best = sorted[0];
+  if (!best || best.score < minScore) return null;
+  const second = sorted[1];
+  if (second && Math.abs(best.score - second.score) < 0.08) return null; // too close => ambiguous
+  return best.item;
+}
+
+/** Deterministic and conservative cost-library matching pipeline:
+ * exact normalized_name -> exact canonical -> substring containment -> adaptive Jaccard.
+ */
+function matchCostItem(
+  description: string,
+  costItemsByNorm: Map<string, CostItemRecord>,
+  preparedCostItems: Array<CostItemRecord & { canonical_norm: string }>,
+): CostItemRecord | null {
+  const descNorm = normalize(description);
+  const descCanon = normalizeForCostMatch(description);
+
+  // 1) Preserve legacy path
+  const exactLegacy = costItemsByNorm.get(descNorm);
+  if (exactLegacy) return exactLegacy;
+
+  if (!descCanon) return null;
+
+  // 2) Exact canonical
+  const exactCanonical = preparedCostItems.filter(ci => ci.canonical_norm === descCanon);
+  if (exactCanonical.length === 1) return exactCanonical[0];
+  if (exactCanonical.length > 1) return null;
+
+  // 3) Substring containment (conservative confidence)
+  const containmentCandidates: CostMatchCandidate[] = [];
+  for (const ci of preparedCostItems) {
+    const ciNorm = ci.canonical_norm;
+    if (!ciNorm) continue;
+    if (descCanon.includes(ciNorm) || ciNorm.includes(descCanon)) {
+      const score = 0.80 + (jaccardSimilarity(descCanon, ciNorm) * 0.20);
+      containmentCandidates.push({ item: ci, score });
+    }
+  }
+  const containmentBest = pickUniqueBestCostCandidate(containmentCandidates, 0.84);
+  if (containmentBest) return containmentBest;
+
+  // 4) Adaptive Jaccard
+  const similarityCandidates: CostMatchCandidate[] = [];
+  const descTokenCount = descCanon.split(' ').filter(Boolean).length;
+  for (const ci of preparedCostItems) {
+    const ciNorm = ci.canonical_norm;
+    if (!ciNorm) continue;
+    const ciTokenCount = ciNorm.split(' ').filter(Boolean).length;
+    const minTokens = Math.min(descTokenCount, ciTokenCount);
+    const threshold = minTokens <= 2 ? 0.60 : 0.72;
+    const score = jaccardSimilarity(descCanon, ciNorm);
+    if (score >= threshold) {
+      similarityCandidates.push({ item: ci, score });
+    }
+  }
+
+  return pickUniqueBestCostCandidate(similarityCandidates, 0.60);
 }
 
 // Deterministic pricing extractor — runs after LLM to fill gaps
@@ -212,7 +324,7 @@ Deno.serve(async (req) => {
     const scopeItems = itemsRes.data || [];
     const allProfiles = profilesRes.data || [];
     const allAliases = aliasesRes.data || [];
-    const costItems = costItemsRes.data || [];
+    const costItems: CostItemRecord[] = costItemsRes.data || [];
 
     // --- Fetch checklist items ---
     let checklistItems: any[] = [];
@@ -250,11 +362,15 @@ Deno.serve(async (req) => {
       aliases: aliasMap.get(p.id) || [],
     }));
 
-    // Build cost items lookup by normalized_name
-    const costItemsByNorm = new Map<string, any>();
+    // Build cost items lookup by normalized_name (legacy exact path) + canonicalized form (fuzzy path)
+    const costItemsByNorm = new Map<string, CostItemRecord>();
     for (const ci of costItems) {
       if (ci.normalized_name) costItemsByNorm.set(ci.normalized_name, ci);
     }
+    const preparedCostItems = costItems.map((ci) => ({
+      ...ci,
+      canonical_norm: normalizeForCostMatch(ci.normalized_name || ci.name || ''),
+    }));
 
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
@@ -486,7 +602,7 @@ Return ONLY valid JSON:
 
       const desc = item.description || '';
       const norm = normalize(desc);
-      const costMatch = costItemsByNorm.get(norm);
+      const costMatch = matchCostItem(desc, costItemsByNorm, preparedCostItems);
 
       const finalQty = extracted.qty;
       const finalUnit = extracted.unit;
