@@ -108,6 +108,20 @@ export default function Shopping() {
     return Array.from(map.values());
   }, [filtered, activeNames]);
 
+  const vendorUrls = useMemo(() => {
+    const urls = new Set<string>();
+    for (const c of aggregated) {
+      if (c.vendor_url) urls.add(c.vendor_url);
+    }
+    return Array.from(urls);
+  }, [aggregated]);
+
+  const openAllVendorLinks = () => {
+    for (const url of vendorUrls) {
+      window.open(url, '_blank', 'noopener');
+    }
+  };
+
   const bulkAction = async (ids: string[], action: 'purchased' | 'delivered') => {
     const update = action === 'delivered'
       ? { delivered: true, purchased: true }
