@@ -686,8 +686,18 @@ const TaskDetail = () => {
   };
 
   const handleAddCandidatesBatch = async () => {
-    if (!taskId || selectedCandidates.length === 0) return;
+    if (!taskId || selectedCandidates.length === 0 || !projectId) return;
     setAddingCandidates(true);
+
+    // Auto-onboard non-members
+    const memberSet = new Set(projectMembers.map(m => m.user_id));
+    const nonMembers = selectedCandidates.filter(uid => !memberSet.has(uid));
+    if (nonMembers.length > 0) {
+      await supabase.from('project_members').insert(
+        nonMembers.map(uid => ({ project_id: projectId, user_id: uid, role: 'contractor' as const }))
+      );
+    }
+
     const inserts = selectedCandidates.map(userId => ({ task_id: taskId, user_id: userId }));
     const { error } = await supabase.from('task_candidates').upsert(inserts, { onConflict: 'task_id,user_id' });
     if (error) {
