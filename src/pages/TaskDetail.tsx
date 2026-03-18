@@ -49,6 +49,7 @@ const TaskDetail = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [cascadeAssign, setCascadeAssign] = useState(false);
+  const [cascadeCrew, setCascadeCrew] = useState(false);
   const [markingReviewed, setMarkingReviewed] = useState(false);
 
   // Blocker state
