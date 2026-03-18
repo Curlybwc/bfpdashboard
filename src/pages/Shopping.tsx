@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ExternalLink, Copy, Search } from 'lucide-react';
+import { ExternalLink, Copy, Search, ShoppingCart } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -107,6 +107,20 @@ export default function Shopping() {
     }
     return Array.from(map.values());
   }, [filtered, activeNames]);
+
+  const vendorUrls = useMemo(() => {
+    const urls = new Set<string>();
+    for (const c of aggregated) {
+      if (c.vendor_url) urls.add(c.vendor_url);
+    }
+    return Array.from(urls);
+  }, [aggregated]);
+
+  const openAllVendorLinks = () => {
+    for (const url of vendorUrls) {
+      window.open(url, '_blank', 'noopener');
+    }
+  };
 
   const bulkAction = async (ids: string[], action: 'purchased' | 'delivered') => {
     const update = action === 'delivered'
@@ -274,6 +288,18 @@ export default function Shopping() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search name, SKU, project..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
+
+        {vendorUrls.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 hidden md:inline-flex"
+            onClick={openAllVendorLinks}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Open All Vendor Links ({vendorUrls.length})
+          </Button>
+        )}
 
         {isLoading && (
           <div className="space-y-2 py-2">
