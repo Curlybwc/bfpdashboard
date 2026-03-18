@@ -2392,6 +2392,10 @@ export type Database = {
         Args: { _scope_id: string; _user_id: string }
         Returns: boolean
       }
+      merge_projects: {
+        Args: { p_project_a: string; p_project_b: string }
+        Returns: string
+      }
       push_material_library_to_all: {
         Args: { p_material_id: string }
         Returns: Json
