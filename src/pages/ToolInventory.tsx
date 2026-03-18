@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw, MapPin } from 'lucide-react';
+import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw, MapPin, ArrowLeft } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
@@ -187,6 +187,42 @@ const ToolInventory = () => {
     setAddSiteToolId(null);
     setAddSiteProjectId('');
   };
+
+  const moveOneToShop = async (toolTypeId: string, projectId: string) => {
+    setActionLoading(`move-${toolTypeId}-${projectId}`);
+    const stocks = stockMap[toolTypeId] || [];
+    const projectRow = stocks.find(s => s.location_type === 'project' && s.project_id === projectId);
+    if (!projectRow || projectRow.qty <= 0) { setActionLoading(null); return; }
+
+    // Decrement project stock
+    await supabase.from('tool_stock').update({
+      qty: projectRow.qty - 1,
+      updated_at: new Date().toISOString(),
+      updated_by: user?.id,
+    } as any).eq('id', projectRow.id);
+
+    // Increment shop stock
+    const shopRow = stocks.find(s => s.location_type === 'shop');
+    if (shopRow) {
+      await supabase.from('tool_stock').update({
+        qty: shopRow.qty + 1,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id,
+      } as any).eq('id', shopRow.id);
+    } else {
+      await supabase.from('tool_stock').insert({
+        tool_type_id: toolTypeId,
+        location_type: 'shop',
+        project_id: null,
+        qty: 1,
+        updated_by: user?.id,
+      } as any);
+    }
+
+    await fetchData();
+    setActionLoading(null);
+  };
+
 
   const toggleActive = async (tool: ToolType) => {
     await supabase.from('tool_types').update({ is_active: !tool.is_active } as any).eq('id', tool.id);
@@ -388,11 +424,26 @@ const ToolInventory = () => {
                       <p className="text-[10px] font-semibold text-muted-foreground uppercase">At Jobsites</p>
                       {projectStocks.map(ps => {
                         const proj = allProjects.find(p => p.id === ps.project_id);
+                        const moveKey = `move-${tool.id}-${ps.project_id}`;
                         return (
-                          <div key={ps.id} className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground truncate">
+                          <div key={ps.id} className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground truncate flex-1">
                               📍 {proj ? projectLabel(proj) : ps.project_id}
                             </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0"
+                                  disabled={actionLoading === moveKey || ps.qty <= 0}
+                                  onClick={() => moveOneToShop(tool.id, ps.project_id!)}
+                                >
+                                  <ArrowLeft className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Move 1 to Shop</TooltipContent>
+                            </Tooltip>
                             <StepperControl toolTypeId={tool.id} locationType="project" projectId={ps.project_id} />
                           </div>
                         );
