@@ -151,18 +151,18 @@ const ToolInventory = () => {
 
     setActionLoading(`reassign-${toolTypeId}`);
 
-    // Move all unknown qty to the selected project
-    const existingProject = stocks.find(s => s.location_type === 'project' && s.project_id === targetProjectId);
-    if (existingProject) {
+    // Move all unknown qty to the target location
+    const existingTarget = stocks.find(s => s.location_type === targetLocationType && s.project_id === targetProjectId);
+    if (existingTarget) {
       await supabase.from('tool_stock').update({
-        qty: existingProject.qty + unknownRow.qty,
+        qty: existingTarget.qty + unknownRow.qty,
         updated_at: new Date().toISOString(),
         updated_by: user?.id,
-      } as any).eq('id', existingProject.id);
+      } as any).eq('id', existingTarget.id);
     } else {
       await supabase.from('tool_stock').insert({
         tool_type_id: toolTypeId,
-        location_type: 'project',
+        location_type: targetLocationType,
         project_id: targetProjectId,
         qty: unknownRow.qty,
         updated_by: user?.id,
