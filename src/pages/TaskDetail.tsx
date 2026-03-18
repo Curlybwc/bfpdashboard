@@ -1226,6 +1226,18 @@ const TaskDetail = () => {
                 )}
               </div>
             )}
+            {hasChildren && crewCandidates.length > 0 && (
+              <div className="flex items-center gap-2 mt-1">
+                <Checkbox
+                  id="cascade-crew"
+                  checked={cascadeCrew}
+                  onCheckedChange={(v) => setCascadeCrew(!!v)}
+                />
+                <label htmlFor="cascade-crew" className="text-sm text-muted-foreground">
+                  Also assign this crew to all subtasks
+                </label>
+              </div>
+            )}
           </Card>
         )}
 
