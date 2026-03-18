@@ -429,7 +429,7 @@ export function useTodayData(userId: string | undefined, isAdmin: boolean) {
         material_count: enrichment.materialCountMap[task.id] || 0,
       }));
 
-      const sections = splitTodaySections(allTasksWithCounts, childTasksByParent, isAdminOrManager, userId, core.myCandidateIds);
+      const sections = splitTodaySections(allTasksWithCounts, childTasksByParent, isAdminOrManager, userId, core.myCandidateIds, core.myActiveTaskIds);
 
       return {
         ...sections,
