@@ -309,11 +309,34 @@ const TaskDetail = () => {
       }
     }
 
-    // Assignment cascade (solo only)
+    // Assignment cascade (solo)
     if (!error && !isCrewMode && cascadeAssign && children.length > 0) {
       await supabase.from('tasks').update({
         assigned_to_user_id: newAssignedTo,
+        is_outside_vendor: isVendor,
       }).in('id', children.map(c => c.id));
+
+      // Auto-onboard non-members for cascaded children
+      if (newAssignedTo) {
+        const isMember = projectMembers.some(m => m.user_id === newAssignedTo);
+        if (!isMember && projectId) {
+          // already onboarded above, no need to repeat
+        }
+      }
+    }
+
+    // Crew cascade: apply crew candidates to all child tasks
+    if (!error && isCrewMode && cascadeCrew && children.length > 0 && crewCandidates.length > 0) {
+      for (const child of children) {
+        // Set child to crew mode
+        await supabase.from('tasks').update({ assignment_mode: 'crew', assigned_to_user_id: null }).eq('id', child.id);
+        // Replace child candidates
+        await supabase.from('task_candidates').delete().eq('task_id', child.id);
+        await supabase.from('task_candidates').upsert(
+          crewCandidates.map(uid => ({ task_id: child.id, user_id: uid })),
+          { onConflict: 'task_id,user_id' }
+        );
+      }
     }
 
     setSaving(false);
