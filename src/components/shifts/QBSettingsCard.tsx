@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import QBCombobox from './QBCombobox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Loader2, ChevronDown, Save, Settings, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -409,22 +409,17 @@ const QBSettingsCard = () => {
                   <p className="text-xs text-destructive">{qbAccountsError} — use manual entry below.</p>
                 )}
                 {qbAccountsLoaded && qbAccounts.length > 0 ? (
-                  <Select
+                  <QBCombobox
+                    options={qbAccounts.map((a) => ({
+                      value: a.id,
+                      label: a.fully_qualified_name,
+                      detail: a.account_sub_type || a.account_type || undefined,
+                    }))}
                     value={expAccountId || undefined}
-                    onValueChange={selectExpenseAccount}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select an expense account…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {qbAccounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id} className="text-xs">
-                          {a.fully_qualified_name}
-                          {a.account_sub_type ? ` (${a.account_sub_type})` : a.account_type ? ` (${a.account_type})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onSelect={selectExpenseAccount}
+                    placeholder="Search expense accounts…"
+                    className="w-full"
+                  />
                 ) : (
                   <div className="flex flex-wrap gap-2 items-end">
                     <div className="space-y-1">
@@ -477,21 +472,13 @@ const QBSettingsCard = () => {
                             {proj.address && <p className="truncate text-muted-foreground">{proj.address}</p>}
                           </div>
                           {showDropdown ? (
-                            <Select
+                            <QBCombobox
+                              options={qbClasses.map((c) => ({ value: c.id, label: c.fully_qualified_name }))}
                               value={edit.qb_class_id || undefined}
-                              onValueChange={(val) => selectClassForProject(proj.id, val)}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-56">
-                                <SelectValue placeholder="Select a class…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {qbClasses.map((c) => (
-                                  <SelectItem key={c.id} value={c.id} className="text-xs">
-                                    {c.fully_qualified_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onSelect={(val) => selectClassForProject(proj.id, val)}
+                              placeholder="Search classes…"
+                              className="w-56"
+                            />
                           ) : (
                             <>
                               <Input
@@ -558,21 +545,13 @@ const QBSettingsCard = () => {
                         <div key={prof.id} className="flex flex-wrap items-center gap-2 text-xs border rounded p-2">
                           <p className="min-w-0 flex-1 truncate font-medium">{prof.full_name || prof.id}</p>
                           {showDropdown ? (
-                            <Select
+                            <QBCombobox
+                              options={qbVendors.map((v) => ({ value: v.id, label: v.display_name }))}
                               value={edit.qb_vendor_id || undefined}
-                              onValueChange={(val) => selectVendorForUser(prof.id, val)}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-56">
-                                <SelectValue placeholder="Select a vendor…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {qbVendors.map((v) => (
-                                  <SelectItem key={v.id} value={v.id} className="text-xs">
-                                    {v.display_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onSelect={(val) => selectVendorForUser(prof.id, val)}
+                              placeholder="Search vendors…"
+                              className="w-56"
+                            />
                           ) : (
                             <>
                               <Input
