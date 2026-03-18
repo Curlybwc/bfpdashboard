@@ -32,7 +32,7 @@ export function useTaskDetailData(taskId: string | undefined, userId?: string): 
   const [task, setTask] = useState<any>(null);
   const [projectRole, setProjectRole] = useState<string | null>(null);
   const [children, setChildren] = useState<any[]>([]);
-  const [projectMembers, setProjectMembers] = useState<{ user_id: string; role: string; profiles: { full_name: string | null } | null }[]>([]);
+  const [allProfiles, setAllProfiles] = useState<{ id: string; full_name: string | null }[]>([]);
   const [fieldCapture, setFieldCapture] = useState<any>(null);
   const [photos, setPhotos] = useState<any[]>([]);
   const [activeBlocker, setActiveBlocker] = useState<any>(null);
