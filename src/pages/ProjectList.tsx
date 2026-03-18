@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, MapPin, AlertTriangle, Search, ArrowUpDown, Archive } from 'lucide-react';
+import { Plus, MapPin, AlertTriangle, Search, ArrowUpDown, Archive, Merge, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectList } from '@/hooks/useProjectList';
@@ -39,6 +41,11 @@ const ProjectList = () => {
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'address'>('newest');
   const [showArchived, setShowArchived] = useState(false);
 
+  // Merge mode state
+  const [mergeMode, setMergeMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
+  const [merging, setMerging] = useState(false);
 
   const filteredProjects = useMemo(() => {
     let result = [...projects];
@@ -89,6 +96,40 @@ const ProjectList = () => {
     queryClient.invalidateQueries({ queryKey: ['projects-list', activeTab] });
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      if (prev.length >= 2) return prev; // max 2
+      return [...prev, id];
+    });
+  };
+
+  const handleMerge = async () => {
+    if (selectedIds.length !== 2) return;
+    setMerging(true);
+    const { data: primaryId, error } = await supabase.rpc('merge_projects', {
+      p_project_a: selectedIds[0],
+      p_project_b: selectedIds[1],
+    });
+    setMerging(false);
+    setMergeConfirmOpen(false);
+    if (error) {
+      toast({ title: 'Merge failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Projects merged successfully' });
+    setMergeMode(false);
+    setSelectedIds([]);
+    queryClient.invalidateQueries({ queryKey: ['projects-list', activeTab] });
+  };
+
+  const exitMergeMode = () => {
+    setMergeMode(false);
+    setSelectedIds([]);
+  };
+
+  const selectedNames = selectedIds.map(id => projects.find(p => p.id === id)?.name).filter(Boolean);
+
   const entityLabel = isRental ? 'Property' : activeTab === 'general' ? 'List' : 'Project';
 
   const sortLabel = sortBy === 'name' ? 'A–Z' : sortBy === 'address' ? 'Address #' : 'Newest';
@@ -100,29 +141,80 @@ const ProjectList = () => {
       <PageHeader
         title="Projects"
         actions={
-          canCreate ? (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm"><Plus className="h-4 w-4 mr-1" />New {entityLabel}</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>New {entityLabel}</DialogTitle></DialogHeader>
-                <form onSubmit={handleCreate} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>{entityLabel} Name</Label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Address</Label>
-                    <Input value={address} onChange={(e) => setAddress(e.target.value)} />
-                  </div>
-                  <Button type="submit" className="w-full">Create {entityLabel}</Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {isAdmin && !mergeMode && (
+              <Button variant="outline" size="sm" onClick={() => setMergeMode(true)}>
+                <Merge className="h-4 w-4 mr-1" />Merge
+              </Button>
+            )}
+            {mergeMode && (
+              <Button variant="ghost" size="sm" onClick={exitMergeMode}>
+                <X className="h-4 w-4 mr-1" />Cancel
+              </Button>
+            )}
+            {canCreate && !mergeMode ? (
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm"><Plus className="h-4 w-4 mr-1" />New {entityLabel}</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>New {entityLabel}</DialogTitle></DialogHeader>
+                  <form onSubmit={handleCreate} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>{entityLabel} Name</Label>
+                      <Input value={name} onChange={(e) => setName(e.target.value)} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Address</Label>
+                      <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+                    </div>
+                    <Button type="submit" className="w-full">Create {entityLabel}</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            ) : null}
+          </div>
         }
       />
+
+      {mergeMode && (
+        <div className="px-4 pt-2">
+          <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <p className="text-sm text-muted-foreground">
+              Select <strong>2</strong> projects to merge ({selectedIds.length}/2 selected)
+            </p>
+            <Button
+              size="sm"
+              disabled={selectedIds.length !== 2}
+              onClick={() => setMergeConfirmOpen(true)}
+            >
+              <Merge className="h-4 w-4 mr-1" />Merge Selected
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={mergeConfirmOpen} onOpenChange={setMergeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Merge Projects</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will merge <strong>{selectedNames[0]}</strong> and <strong>{selectedNames[1]}</strong>.
+              The project with more tasks will be kept as primary. All tasks, shifts, members, materials,
+              and scope links from the other project will be moved over, and the secondary project will be deleted.
+              <br /><br />
+              <strong>This action cannot be undone.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={merging}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMerge} disabled={merging}>
+              {merging ? 'Merging…' : 'Merge Projects'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="px-4 pt-2">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="w-full grid grid-cols-3">
@@ -184,17 +276,28 @@ const ProjectList = () => {
             {search.trim() ? 'No matches found.' : `No ${isRental ? 'properties' : activeTab === 'general' ? 'lists' : 'projects'} yet. Create your first one!`}
           </p>
         ) : (
-          filteredProjects.map((project) => (
-            <Link key={project.id} to={`/projects/${project.id}`}>
-              <Card className="p-4 hover:shadow-md transition-shadow">
+          filteredProjects.map((project) => {
+            const isSelected = selectedIds.includes(project.id);
+            const cardContent = (
+              <Card className={`p-4 hover:shadow-md transition-shadow ${isSelected ? 'ring-2 ring-primary' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="font-medium truncate">{project.name}</h3>
-                    {project.address && (
-                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                        <MapPin className="h-3 w-3 shrink-0" />{project.address}
-                      </p>
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    {mergeMode && (
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(project.id)}
+                        disabled={!isSelected && selectedIds.length >= 2}
+                        className="mt-1 shrink-0"
+                      />
                     )}
+                    <div className="min-w-0">
+                      <h3 className="font-medium truncate">{project.name}</h3>
+                      {project.address && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                          <MapPin className="h-3 w-3 shrink-0" />{project.address}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <StatusBadge status={project.status} />
                 </div>
@@ -217,8 +320,22 @@ const ProjectList = () => {
                   </div>
                 )}
               </Card>
-            </Link>
-          ))
+            );
+
+            if (mergeMode) {
+              return (
+                <div key={project.id} className="cursor-pointer" onClick={() => toggleSelect(project.id)}>
+                  {cardContent}
+                </div>
+              );
+            }
+
+            return (
+              <Link key={project.id} to={`/projects/${project.id}`}>
+                {cardContent}
+              </Link>
+            );
+          })
         )}
       </div>
     </div>
