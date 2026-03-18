@@ -157,6 +157,7 @@ const ProjectDetail = () => {
   const [filterTrade, setFilterTrade] = useState<string>('all');
   const [filterRoomArea, setFilterRoomArea] = useState<string>('all');
   const [showCompletedSection, setShowCompletedSection] = useState(false);
+  const [hideDone, setHideDone] = useState(true);
 
   // Derived role & permissions
   const projectRole = useMemo(
@@ -254,14 +255,31 @@ const ProjectDetail = () => {
   const packageGroups = useMemo(() => buildTaskPackageGroups(filteredTasksWithParents, materialCountMap), [filteredTasksWithParents, materialCountMap]);
 
   const activePackageGroups = useMemo(
-    () => packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total)),
-    [packageGroups],
+    () => {
+      const groups = packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total));
+      if (!hideDone) return groups;
+      return groups.map((group) => ({
+        ...group,
+        childTasks: group.childTasks.filter((t) => getTaskOperationalStatus(t) !== 'done'),
+      }));
+    },
+    [packageGroups, hideDone],
   );
 
   const completedPackageGroups = useMemo(
     () => packageGroups.filter((group) => group.summary.total > 0 && group.summary.byStatus.done === group.summary.total),
     [packageGroups],
   );
+
+  const doneTaskCount = useMemo(() => {
+    let count = completedPackageGroups.reduce((sum, group) => sum + group.summary.total, 0);
+    if (hideDone) {
+      // Also count done tasks hidden from active groups
+      const activeGroups = packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total));
+      count += activeGroups.reduce((sum, group) => sum + group.childTasks.filter((t) => getTaskOperationalStatus(t) === 'done').length, 0);
+    }
+    return count;
+  }, [completedPackageGroups, packageGroups, hideDone]);
 
   const completedTaskCount = useMemo(
     () => completedPackageGroups.reduce((sum, group) => sum + group.summary.total, 0),
@@ -963,6 +981,18 @@ const ProjectDetail = () => {
                 </Button>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant={hideDone ? 'default' : 'outline'}
+                size="sm"
+                className="text-xs gap-1.5"
+                onClick={() => setHideDone(!hideDone)}
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+                {hideDone ? `${doneTaskCount} done hidden` : 'Hide done'}
+              </Button>
+            </div>
             {/* Show active filter badges */}
             {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
               <div className="flex flex-wrap gap-1">
@@ -1118,14 +1148,14 @@ const ProjectDetail = () => {
               </div>
             )}
 
-            {completedPackageGroups.length > 0 && (
+            {doneTaskCount > 0 && (
               <div className="mt-4">
                 <button
                   type="button"
                   className="w-full flex items-center justify-between rounded-lg border p-3 text-left"
                   onClick={() => setShowCompletedSection((prev) => !prev)}
                 >
-                  <span className="text-sm font-medium">{showCompletedSection ? 'Hide' : 'Show'} {completedTaskCount} completed tasks</span>
+                  <span className="text-sm font-medium">{showCompletedSection ? 'Hide' : 'Show'} {doneTaskCount} completed tasks</span>
                   {showCompletedSection ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
                 {showCompletedSection && (
