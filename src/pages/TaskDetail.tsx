@@ -260,6 +260,14 @@ const TaskDetail = () => {
     const isVendor = assignedTo === 'outside_vendor';
     const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' || isVendor ? null : assignedTo);
 
+    // Auto-onboard non-member when assigning
+    if (newAssignedTo && projectId) {
+      const isMember = projectMembers.some(m => m.user_id === newAssignedTo);
+      if (!isMember) {
+        await supabase.from('project_members').insert({ project_id: projectId, user_id: newAssignedTo, role: 'contractor' });
+      }
+    }
+
     const updatePayload: any = {
       task: taskText,
       stage,
