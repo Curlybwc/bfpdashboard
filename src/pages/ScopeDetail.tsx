@@ -33,8 +33,9 @@ import {
   useConvertScope,
   useUpdateLibraryPrice,
   useResetToLibraryPrice,
+  useDeleteScope,
 } from '@/hooks/useScopeMutations';
-import { canArchiveScope, canDeleteScopeItem, canEditScopeTitle } from '@/lib/permissions';
+import { canArchiveScope, canDeleteScope, canDeleteScopeItem, canEditScopeTitle } from '@/lib/permissions';
 import { useQueryClient } from '@tanstack/react-query';
 
 const ScopeDetail = () => {

@@ -46,6 +46,14 @@ export function canArchiveScope(isAdmin: boolean): boolean {
 }
 
 /**
+ * Whether the user can delete a scope entirely.
+ * Admin-only per RLS.
+ */
+export function canDeleteScope(isAdmin: boolean): boolean {
+  return isAdmin;
+}
+
+/**
  * Whether the user can delete individual scope items.
  * Admin-only per current UI and RLS.
  */
