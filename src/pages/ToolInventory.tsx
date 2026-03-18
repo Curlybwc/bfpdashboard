@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -9,8 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw } from 'lucide-react';
+import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw, MapPin } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
@@ -46,7 +47,7 @@ const ToolInventory = () => {
 
   const [toolTypes, setToolTypes] = useState<ToolType[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, StockRow[]>>({});
-  const [projectMap, setProjectMap] = useState<Record<string, ProjectInfo>>({});
+  const [allProjects, setAllProjects] = useState<ProjectInfo[]>([]);
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -57,6 +58,11 @@ const ToolInventory = () => {
   const [newVendorUrl, setNewVendorUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // For reassigning unknown stock
+  const [reassignToolId, setReassignToolId] = useState<string | null>(null);
+  // For adding stock at a new jobsite
+  const [addSiteToolId, setAddSiteToolId] = useState<string | null>(null);
+  const [addSiteProjectId, setAddSiteProjectId] = useState<string>('');
 
   const canManage = isAdmin || canManageProjects;
 
@@ -68,34 +74,23 @@ const ToolInventory = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [{ data: types }, { data: stock }] = await Promise.all([
+    const [{ data: types }, { data: stock }, { data: projects }] = await Promise.all([
       supabase.from('tool_types').select('*').order('name'),
       supabase.from('tool_stock').select('*'),
+      supabase.from('projects').select('id, name, address').eq('status', 'active').order('name'),
     ]);
 
     if (types) setToolTypes(types as ToolType[]);
+    if (projects) setAllProjects(projects as ProjectInfo[]);
 
     const sm: Record<string, StockRow[]> = {};
-    const projectIds = new Set<string>();
     if (stock) {
       (stock as StockRow[]).forEach(s => {
         if (!sm[s.tool_type_id]) sm[s.tool_type_id] = [];
         sm[s.tool_type_id].push(s);
-        if (s.project_id) projectIds.add(s.project_id);
       });
     }
     setStockMap(sm);
-
-    if (projectIds.size > 0) {
-      const { data: projects } = await supabase
-        .from('projects')
-        .select('id, name, address')
-        .in('id', Array.from(projectIds));
-      const pm: Record<string, ProjectInfo> = {};
-      if (projects) projects.forEach((p: any) => { pm[p.id] = p; });
-      setProjectMap(pm);
-    }
-
     setLoading(false);
   };
 
@@ -146,6 +141,53 @@ const ToolInventory = () => {
     setActionLoading(null);
   };
 
+  const reassignUnknown = async (toolTypeId: string, target: string) => {
+    const isShop = target === '__shop';
+    const targetLocationType = isShop ? 'shop' : 'project';
+    const targetProjectId = isShop ? null : target;
+    const stocks = stockMap[toolTypeId] || [];
+    const unknownRow = stocks.find(s => s.location_type === 'unknown');
+    if (!unknownRow || unknownRow.qty <= 0) return;
+
+    setActionLoading(`reassign-${toolTypeId}`);
+
+    // Move all unknown qty to the target location
+    const existingTarget = stocks.find(s => s.location_type === targetLocationType && s.project_id === targetProjectId);
+    if (existingTarget) {
+      await supabase.from('tool_stock').update({
+        qty: existingTarget.qty + unknownRow.qty,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id,
+      } as any).eq('id', existingTarget.id);
+    } else {
+      await supabase.from('tool_stock').insert({
+        tool_type_id: toolTypeId,
+        location_type: targetLocationType,
+        project_id: targetProjectId,
+        qty: unknownRow.qty,
+        updated_by: user?.id,
+      } as any);
+    }
+
+    // Zero out unknown
+    await supabase.from('tool_stock').update({
+      qty: 0,
+      updated_at: new Date().toISOString(),
+      updated_by: user?.id,
+    } as any).eq('id', unknownRow.id);
+
+    setReassignToolId(null);
+    await fetchData();
+    setActionLoading(null);
+  };
+
+  const handleAddToSite = async () => {
+    if (!addSiteToolId || !addSiteProjectId) return;
+    await adjustStock(addSiteToolId, 'project', addSiteProjectId, 1);
+    setAddSiteToolId(null);
+    setAddSiteProjectId('');
+  };
+
   const toggleActive = async (tool: ToolType) => {
     await supabase.from('tool_types').update({ is_active: !tool.is_active } as any).eq('id', tool.id);
     await fetchData();
@@ -179,6 +221,14 @@ const ToolInventory = () => {
 
   const getProjectStocks = (toolTypeId: string): StockRow[] => {
     return (stockMap[toolTypeId] || []).filter(s => s.location_type === 'project' && s.qty > 0);
+  };
+
+  const projectLabel = (p: ProjectInfo) => p.address || p.name;
+
+  // Projects that already have stock for a given tool
+  const projectsWithStock = (toolTypeId: string): Set<string> => {
+    const ps = getProjectStocks(toolTypeId);
+    return new Set(ps.map(s => s.project_id!));
   };
 
   if (adminLoading || loading) {
@@ -247,6 +297,10 @@ const ToolInventory = () => {
 
           {filtered.map(tool => {
             const projectStocks = getProjectStocks(tool.id);
+            const unknownQty = getQty(tool.id, 'unknown');
+            const existingProjectIds = projectsWithStock(tool.id);
+            const availableProjects = allProjects.filter(p => !existingProjectIds.has(p.id));
+
             return (
               <Card key={tool.id} className={`p-3 space-y-3 ${!tool.is_active ? 'opacity-60' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
@@ -289,31 +343,99 @@ const ToolInventory = () => {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Shop</span>
+                    <span className="text-xs text-muted-foreground">🏠 Shop</span>
                     <StepperControl toolTypeId={tool.id} locationType="shop" />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Unknown</span>
-                    <StepperControl toolTypeId={tool.id} locationType="unknown" />
-                  </div>
-                </div>
 
-                {projectStocks.length > 0 && (
-                  <div className="space-y-1 pt-1 border-t">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase">At Projects</p>
-                    {projectStocks.map(ps => {
-                      const proj = projectMap[ps.project_id!];
-                      return (
-                        <div key={ps.id} className="flex items-center justify-between text-xs">
-                          <span className="truncate text-muted-foreground">
-                            {proj ? (proj.name || proj.address) : ps.project_id}
-                          </span>
-                          <span className="font-medium ml-2">{ps.qty}</span>
+                  {/* Unknown stock - show with reassign option */}
+                  {unknownQty > 0 && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground">❓ Unknown</span>
+                        <span className="text-xs font-medium">({unknownQty})</span>
+                        {allProjects.length > 0 && (
+                          reassignToolId === tool.id ? (
+                            <Select onValueChange={(pid) => { reassignUnknown(tool.id, pid); }}>
+                              <SelectTrigger className="h-6 w-[160px] text-[11px]">
+                                <SelectValue placeholder="Move to jobsite..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__shop">🏠 Shop</SelectItem>
+                                {allProjects.map(p => (
+                                  <SelectItem key={p.id} value={p.id}>📍 {projectLabel(p)}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 text-[10px] px-1.5 text-primary"
+                              onClick={() => setReassignToolId(tool.id)}
+                            >
+                              Reassign
+                            </Button>
+                          )
+                        )}
+                      </div>
+                      <StepperControl toolTypeId={tool.id} locationType="unknown" />
+                    </div>
+                  )}
+
+                  {/* Project stocks */}
+                  {projectStocks.length > 0 && (
+                    <div className="space-y-1.5 pt-1 border-t">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase">At Jobsites</p>
+                      {projectStocks.map(ps => {
+                        const proj = allProjects.find(p => p.id === ps.project_id);
+                        return (
+                          <div key={ps.id} className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground truncate">
+                              📍 {proj ? projectLabel(proj) : ps.project_id}
+                            </span>
+                            <StepperControl toolTypeId={tool.id} locationType="project" projectId={ps.project_id} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Add to jobsite button */}
+                  {availableProjects.length > 0 && (
+                    <div className="pt-1">
+                      {addSiteToolId === tool.id ? (
+                        <div className="flex items-center gap-2">
+                          <Select value={addSiteProjectId} onValueChange={setAddSiteProjectId}>
+                            <SelectTrigger className="h-7 flex-1 text-xs">
+                              <SelectValue placeholder="Select jobsite..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableProjects.map(p => (
+                                <SelectItem key={p.id} value={p.id}>📍 {projectLabel(p)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button size="sm" className="h-7 text-xs" disabled={!addSiteProjectId} onClick={handleAddToSite}>
+                            Add
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setAddSiteToolId(null); setAddSiteProjectId(''); }}>
+                            Cancel
+                          </Button>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1 w-full"
+                          onClick={() => { setAddSiteToolId(tool.id); setAddSiteProjectId(''); }}
+                        >
+                          <MapPin className="h-3 w-3" />
+                          Add to Jobsite
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </Card>
             );
           })}
