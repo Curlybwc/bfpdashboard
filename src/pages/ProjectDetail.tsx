@@ -1148,14 +1148,14 @@ const ProjectDetail = () => {
               </div>
             )}
 
-            {completedPackageGroups.length > 0 && (
+            {doneTaskCount > 0 && (
               <div className="mt-4">
                 <button
                   type="button"
                   className="w-full flex items-center justify-between rounded-lg border p-3 text-left"
                   onClick={() => setShowCompletedSection((prev) => !prev)}
                 >
-                  <span className="text-sm font-medium">{showCompletedSection ? 'Hide' : 'Show'} {completedTaskCount} completed tasks</span>
+                  <span className="text-sm font-medium">{showCompletedSection ? 'Hide' : 'Show'} {doneTaskCount} completed tasks</span>
                   {showCompletedSection ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
                 {showCompletedSection && (
