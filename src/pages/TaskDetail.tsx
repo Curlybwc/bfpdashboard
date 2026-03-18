@@ -1123,8 +1123,8 @@ const TaskDetail = () => {
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Eligible Workers</Label>
                 <div className="space-y-1">
                   {crewCandidates.map(uid => {
-                    const member = projectMembers.find(m => m.user_id === uid);
-                    const name = member?.profiles?.full_name || 'Unknown';
+                    const profile = allProfiles.find(p => p.id === uid);
+                    const name = profile?.full_name || 'Unknown';
                     return (
                       <div key={uid} className="flex items-center justify-between text-sm border rounded px-2 py-1">
                         <span>{name}</span>
