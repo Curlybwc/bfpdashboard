@@ -545,21 +545,13 @@ const QBSettingsCard = () => {
                         <div key={prof.id} className="flex flex-wrap items-center gap-2 text-xs border rounded p-2">
                           <p className="min-w-0 flex-1 truncate font-medium">{prof.full_name || prof.id}</p>
                           {showDropdown ? (
-                            <Select
+                            <QBCombobox
+                              options={qbVendors.map((v) => ({ value: v.id, label: v.display_name }))}
                               value={edit.qb_vendor_id || undefined}
-                              onValueChange={(val) => selectVendorForUser(prof.id, val)}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-56">
-                                <SelectValue placeholder="Select a vendor…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {qbVendors.map((v) => (
-                                  <SelectItem key={v.id} value={v.id} className="text-xs">
-                                    {v.display_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onSelect={(val) => selectVendorForUser(prof.id, val)}
+                              placeholder="Search vendors…"
+                              className="w-56"
+                            />
                           ) : (
                             <>
                               <Input
