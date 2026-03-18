@@ -472,21 +472,13 @@ const QBSettingsCard = () => {
                             {proj.address && <p className="truncate text-muted-foreground">{proj.address}</p>}
                           </div>
                           {showDropdown ? (
-                            <Select
+                            <QBCombobox
+                              options={qbClasses.map((c) => ({ value: c.id, label: c.fully_qualified_name }))}
                               value={edit.qb_class_id || undefined}
-                              onValueChange={(val) => selectClassForProject(proj.id, val)}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-56">
-                                <SelectValue placeholder="Select a class…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {qbClasses.map((c) => (
-                                  <SelectItem key={c.id} value={c.id} className="text-xs">
-                                    {c.fully_qualified_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onSelect={(val) => selectClassForProject(proj.id, val)}
+                              placeholder="Search classes…"
+                              className="w-56"
+                            />
                           ) : (
                             <>
                               <Input
