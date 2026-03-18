@@ -61,6 +61,7 @@ const ScopeDetail = () => {
   const updateTitleMutation = useUpdateScopeTitle(id);
   const archiveMutation = useArchiveScope(id);
   const convertMutation = useConvertScope();
+  const deleteScopeMutation = useDeleteScope();
   const updateLibraryPriceMutation = useUpdateLibraryPrice(id);
   const resetToLibraryMutation = useResetToLibraryPrice(id);
 
