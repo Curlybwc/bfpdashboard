@@ -251,9 +251,8 @@ const Today = () => {
   const ManagerView = () => (
     <>
       <Section title="Needs Review (Contractor / Field Reports)" tasks={needsReview} emptyText="No tasks pending review." />
-      <Section title="In Progress" tasks={inProgress} emptyText="No tasks in progress." />
-      <Section title="Assigned" tasks={assigned} emptyText="No assigned tasks." />
-      <Section title="Available" tasks={available} emptyText="No tasks available for dibs." />
+      <Section title="My In Progress" tasks={inProgress} emptyText="No tasks you're working on." />
+      <Section title="My Assigned" tasks={assigned} emptyText="No tasks assigned to you." />
       <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
     </>
   );
