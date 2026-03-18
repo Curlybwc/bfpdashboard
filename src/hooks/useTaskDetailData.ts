@@ -204,6 +204,7 @@ export function useTaskDetailData(taskId: string | undefined, userId?: string): 
     projectRole,
     children,
     projectMembers,
+    allProfiles,
     fieldCapture,
     photos,
     activeBlocker,
