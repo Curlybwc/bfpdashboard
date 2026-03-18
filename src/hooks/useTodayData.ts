@@ -335,6 +335,7 @@ function splitTodaySections(
   isAdminOrManager: boolean,
   userId: string,
   crewCandidateTaskIds: Set<string>,
+  crewActiveTaskIds: Set<string>,
 ) {
   const inProgress: any[] = [];
   const assigned: any[] = [];
@@ -361,15 +362,31 @@ function splitTodaySections(
     }
 
     if (status === 'in_progress') {
-      inProgress.push(task);
+      // For managers: only show tasks they're actively working on or crew tasks they're in
+      if (isAdminOrManager) {
+        if (task.assigned_to_user_id === userId || crewActiveTaskIds.has(task.id)) {
+          inProgress.push(task);
+        }
+      } else {
+        inProgress.push(task);
+      }
       return;
     }
 
     if (status === 'ready') {
-      const isSoloAvailable = !task.assigned_to_user_id && task.assignment_mode === 'solo' && !task.is_outside_vendor;
-      const isCrewAvailable = task.assignment_mode === 'crew' && (crewCandidateTaskIds.has(task.id) || isAdminOrManager);
-      if (isSoloAvailable || isCrewAvailable) available.push(task);
-      else if (task.assigned_to_user_id === userId) assigned.push(task);
+      // Solo task assigned to current user
+      if (task.assigned_to_user_id === userId) {
+        assigned.push(task);
+        return;
+      }
+
+      // For contractors: show truly available solo tasks and crew tasks they're candidates for
+      if (!isAdminOrManager) {
+        const isSoloAvailable = !task.assigned_to_user_id && task.assignment_mode === 'solo' && !task.is_outside_vendor;
+        const isCrewAvailable = task.assignment_mode === 'crew' && crewCandidateTaskIds.has(task.id);
+        if (isSoloAvailable || isCrewAvailable) available.push(task);
+      }
+      // For managers: DON'T show all available tasks — only their assigned tasks appear above
     }
   });
 

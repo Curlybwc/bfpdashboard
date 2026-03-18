@@ -86,7 +86,7 @@ export function computeWhatNext(
 
   const myBlocked = blocked.filter((t) => t.assigned_to_user_id === userId);
   const myInProgress = inProgress.filter((t) => t.assigned_to_user_id === userId);
-  const available = sortedReady.filter((t) => !t.assigned_to_user_id);
+  const available = sortedReady.filter((t) => !t.assigned_to_user_id && t.assignment_mode !== 'crew' && !t.is_outside_vendor);
 
   let recommendation = '';
   let recommendationType: RecommendationType = 'done';
