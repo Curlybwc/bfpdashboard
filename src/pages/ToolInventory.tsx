@@ -188,6 +188,42 @@ const ToolInventory = () => {
     setAddSiteProjectId('');
   };
 
+  const moveOneToShop = async (toolTypeId: string, projectId: string) => {
+    setActionLoading(`move-${toolTypeId}-${projectId}`);
+    const stocks = stockMap[toolTypeId] || [];
+    const projectRow = stocks.find(s => s.location_type === 'project' && s.project_id === projectId);
+    if (!projectRow || projectRow.qty <= 0) { setActionLoading(null); return; }
+
+    // Decrement project stock
+    await supabase.from('tool_stock').update({
+      qty: projectRow.qty - 1,
+      updated_at: new Date().toISOString(),
+      updated_by: user?.id,
+    } as any).eq('id', projectRow.id);
+
+    // Increment shop stock
+    const shopRow = stocks.find(s => s.location_type === 'shop');
+    if (shopRow) {
+      await supabase.from('tool_stock').update({
+        qty: shopRow.qty + 1,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id,
+      } as any).eq('id', shopRow.id);
+    } else {
+      await supabase.from('tool_stock').insert({
+        tool_type_id: toolTypeId,
+        location_type: 'shop',
+        project_id: null,
+        qty: 1,
+        updated_by: user?.id,
+      } as any);
+    }
+
+    await fetchData();
+    setActionLoading(null);
+  };
+
+
   const toggleActive = async (tool: ToolType) => {
     await supabase.from('tool_types').update({ is_active: !tool.is_active } as any).eq('id', tool.id);
     await fetchData();
