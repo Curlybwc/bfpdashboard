@@ -49,6 +49,7 @@ const TaskDetail = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [cascadeAssign, setCascadeAssign] = useState(false);
+  const [cascadeCrew, setCascadeCrew] = useState(false);
   const [markingReviewed, setMarkingReviewed] = useState(false);
 
   // Blocker state
@@ -100,6 +101,7 @@ const TaskDetail = () => {
     projectRole,
     children,
     projectMembers,
+    allProfiles,
     fieldCapture,
     photos,
     activeBlocker,
@@ -259,6 +261,14 @@ const TaskDetail = () => {
     const isVendor = assignedTo === 'outside_vendor';
     const newAssignedTo = isCrewMode ? null : (assignedTo === 'unassigned' || isVendor ? null : assignedTo);
 
+    // Auto-onboard non-member when assigning
+    if (newAssignedTo && projectId) {
+      const isMember = projectMembers.some(m => m.user_id === newAssignedTo);
+      if (!isMember) {
+        await supabase.from('project_members').insert({ project_id: projectId, user_id: newAssignedTo, role: 'contractor' });
+      }
+    }
+
     const updatePayload: any = {
       task: taskText,
       stage,
@@ -300,15 +310,39 @@ const TaskDetail = () => {
       }
     }
 
-    // Assignment cascade (solo only)
+    // Assignment cascade (solo)
     if (!error && !isCrewMode && cascadeAssign && children.length > 0) {
       await supabase.from('tasks').update({
         assigned_to_user_id: newAssignedTo,
+        is_outside_vendor: isVendor,
       }).in('id', children.map(c => c.id));
+
+      // Auto-onboard non-members for cascaded children
+      if (newAssignedTo) {
+        const isMember = projectMembers.some(m => m.user_id === newAssignedTo);
+        if (!isMember && projectId) {
+          // already onboarded above, no need to repeat
+        }
+      }
+    }
+
+    // Crew cascade: apply crew candidates to all child tasks
+    if (!error && isCrewMode && cascadeCrew && children.length > 0 && crewCandidates.length > 0) {
+      for (const child of children) {
+        // Set child to crew mode
+        await supabase.from('tasks').update({ assignment_mode: 'crew', assigned_to_user_id: null }).eq('id', child.id);
+        // Replace child candidates
+        await supabase.from('task_candidates').delete().eq('task_id', child.id);
+        await supabase.from('task_candidates').upsert(
+          crewCandidates.map(uid => ({ task_id: child.id, user_id: uid })),
+          { onConflict: 'task_id,user_id' }
+        );
+      }
     }
 
     setSaving(false);
     setCascadeAssign(false);
+    setCascadeCrew(false);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
     else {
       toast({ title: 'Saved' });
@@ -677,8 +711,18 @@ const TaskDetail = () => {
   };
 
   const handleAddCandidatesBatch = async () => {
-    if (!taskId || selectedCandidates.length === 0) return;
+    if (!taskId || selectedCandidates.length === 0 || !projectId) return;
     setAddingCandidates(true);
+
+    // Auto-onboard non-members
+    const memberSet = new Set(projectMembers.map(m => m.user_id));
+    const nonMembers = selectedCandidates.filter(uid => !memberSet.has(uid));
+    if (nonMembers.length > 0) {
+      await supabase.from('project_members').insert(
+        nonMembers.map(uid => ({ project_id: projectId, user_id: uid, role: 'contractor' as const }))
+      );
+    }
+
     const inserts = selectedCandidates.map(userId => ({ task_id: taskId, user_id: userId }));
     const { error } = await supabase.from('task_candidates').upsert(inserts, { onConflict: 'task_id,user_id' });
     if (error) {
@@ -787,8 +831,21 @@ const TaskDetail = () => {
 
   if (!task) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
 
-  // Members not yet candidates (for adding)
-  const nonCandidateMembers = projectMembers.filter(m => !crewCandidates.includes(m.user_id));
+  // All profiles not yet candidates (for adding to crew)
+  const memberSet = new Set(projectMembers.map(m => m.user_id));
+  const nonCandidateProfiles = allProfiles
+    .filter(p => !crewCandidates.includes(p.id))
+    .sort((a, b) => {
+      const aIsMember = memberSet.has(a.id);
+      const bIsMember = memberSet.has(b.id);
+      if (aIsMember !== bIsMember) return aIsMember ? -1 : 1;
+      return (a.full_name || '').localeCompare(b.full_name || '');
+    });
+
+  // Group profiles for solo assignment
+  const memberProfileIds = new Set(projectMembers.map(m => m.user_id));
+  const soloMemberProfiles = allProfiles.filter(p => memberProfileIds.has(p.id)).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+  const soloOtherProfiles = allProfiles.filter(p => !memberProfileIds.has(p.id)).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
 
   return (
     <div className="pb-20">
@@ -1091,8 +1148,8 @@ const TaskDetail = () => {
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Eligible Workers</Label>
                 <div className="space-y-1">
                   {crewCandidates.map(uid => {
-                    const member = projectMembers.find(m => m.user_id === uid);
-                    const name = member?.profiles?.full_name || 'Unknown';
+                    const profile = allProfiles.find(p => p.id === uid);
+                    const name = profile?.full_name || 'Unknown';
                     return (
                       <div key={uid} className="flex items-center justify-between text-sm border rounded px-2 py-1">
                         <span>{name}</span>
@@ -1103,7 +1160,7 @@ const TaskDetail = () => {
                     );
                   })}
                 </div>
-                {nonCandidateMembers.length > 0 && (
+                {nonCandidateProfiles.length > 0 && (
                   <Dialog open={addCandidatesOpen} onOpenChange={(o) => { setAddCandidatesOpen(o); if (!o) { setSelectedCandidates([]); setCandidateSearch(''); } }}>
                     <DialogTrigger asChild>
                       <Button size="sm" variant="outline" className="w-full"><Plus className="h-4 w-4 mr-1" />Add Workers</Button>
@@ -1114,41 +1171,48 @@ const TaskDetail = () => {
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
-                            placeholder="Search members..."
+                            placeholder="Search all users..."
                             value={candidateSearch}
                             onChange={e => setCandidateSearch(e.target.value)}
                             className="pl-9"
                           />
                         </div>
                         <div className="max-h-52 overflow-auto border rounded-md">
-                          {nonCandidateMembers
-                            .filter(m => {
+                          {(() => {
+                            const filtered = nonCandidateProfiles.filter(p => {
                               if (!candidateSearch.trim()) return true;
-                              const q = candidateSearch.toLowerCase();
-                              return (m.profiles?.full_name || '').toLowerCase().includes(q);
-                            })
-                            .map(m => (
-                              <label
-                                key={m.user_id}
-                                className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0"
-                              >
-                                <Checkbox
-                                  checked={selectedCandidates.includes(m.user_id)}
-                                  onCheckedChange={() =>
-                                    setSelectedCandidates(prev =>
-                                      prev.includes(m.user_id) ? prev.filter(id => id !== m.user_id) : [...prev, m.user_id]
-                                    )
-                                  }
-                                />
-                                <span className="text-sm truncate">{m.profiles?.full_name || 'Unnamed'} ({m.role})</span>
-                              </label>
-                            ))}
-                          {nonCandidateMembers.filter(m => {
-                            if (!candidateSearch.trim()) return true;
-                            return (m.profiles?.full_name || '').toLowerCase().includes(candidateSearch.toLowerCase());
-                          }).length === 0 && (
-                            <p className="text-xs text-muted-foreground text-center py-4">No members available.</p>
-                          )}
+                              return (p.full_name || '').toLowerCase().includes(candidateSearch.toLowerCase());
+                            });
+                            const members = filtered.filter(p => memberSet.has(p.id));
+                            const others = filtered.filter(p => !memberSet.has(p.id));
+                            if (filtered.length === 0) return <p className="text-xs text-muted-foreground text-center py-4">No users available.</p>;
+                            return (
+                              <>
+                                {members.length > 0 && (
+                                  <>
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2 pb-1 font-semibold bg-muted/50">Project Members</p>
+                                    {members.map(p => (
+                                      <label key={p.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0">
+                                        <Checkbox checked={selectedCandidates.includes(p.id)} onCheckedChange={() => setSelectedCandidates(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])} />
+                                        <span className="text-sm truncate">{p.full_name || 'Unnamed'}</span>
+                                      </label>
+                                    ))}
+                                  </>
+                                )}
+                                {others.length > 0 && (
+                                  <>
+                                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2 pb-1 font-semibold bg-muted/50">Other Users</p>
+                                    {others.map(p => (
+                                      <label key={p.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0">
+                                        <Checkbox checked={selectedCandidates.includes(p.id)} onCheckedChange={() => setSelectedCandidates(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])} />
+                                        <span className="text-sm truncate">{p.full_name || 'Unnamed'} <span className="text-muted-foreground text-xs">(will be added)</span></span>
+                                      </label>
+                                    ))}
+                                  </>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                         {selectedCandidates.length > 0 && (
                           <p className="text-xs text-muted-foreground">{selectedCandidates.length} selected</p>
@@ -1160,6 +1224,18 @@ const TaskDetail = () => {
                     </DialogContent>
                   </Dialog>
                 )}
+              </div>
+            )}
+            {hasChildren && crewCandidates.length > 0 && (
+              <div className="flex items-center gap-2 mt-1">
+                <Checkbox
+                  id="cascade-crew"
+                  checked={cascadeCrew}
+                  onCheckedChange={(v) => setCascadeCrew(!!v)}
+                />
+                <label htmlFor="cascade-crew" className="text-sm text-muted-foreground">
+                  Also assign this crew to all subtasks
+                </label>
               </div>
             )}
           </Card>
@@ -1174,11 +1250,29 @@ const TaskDetail = () => {
               <SelectContent>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
                 <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
-                {projectMembers.map((m) => (
-                  <SelectItem key={m.user_id} value={m.user_id}>
-                    {m.profiles?.full_name || 'Unnamed'} ({m.role})
-                  </SelectItem>
-                ))}
+                {soloMemberProfiles.length > 0 && (
+                  <>
+                    <SelectItem value="__header_members" disabled className="text-[10px] uppercase tracking-wide font-semibold">Project Members</SelectItem>
+                    {soloMemberProfiles.map((p) => {
+                      const role = projectMembers.find(m => m.user_id === p.id)?.role;
+                      return (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.full_name || 'Unnamed'} ({role})
+                        </SelectItem>
+                      );
+                    })}
+                  </>
+                )}
+                {soloOtherProfiles.length > 0 && (
+                  <>
+                    <SelectItem value="__header_others" disabled className="text-[10px] uppercase tracking-wide font-semibold">Other Users</SelectItem>
+                    {soloOtherProfiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name || 'Unnamed'}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
             {hasChildren && (
