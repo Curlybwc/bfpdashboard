@@ -157,6 +157,7 @@ const ProjectDetail = () => {
   const [filterTrade, setFilterTrade] = useState<string>('all');
   const [filterRoomArea, setFilterRoomArea] = useState<string>('all');
   const [showCompletedSection, setShowCompletedSection] = useState(false);
+  const [hideDone, setHideDone] = useState(true);
 
   // Derived role & permissions
   const projectRole = useMemo(
