@@ -860,7 +860,9 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                     <div className="flex items-center gap-2">
                       <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedCandidates.has(group.key) ? 'rotate-180' : ''}`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
+                        <p className="text-sm truncate">
+                          <span className="text-muted-foreground">{group.companyName} →</span> {group.contractorName} · {group.projectName}
+                        </p>
                         <p className="text-xs text-muted-foreground">{group.periodStart} → {group.periodEnd} · {group.shifts.length} shifts</p>
                       </div>
                       <p className="text-sm font-medium">${group.totalDollars.toFixed(2)}</p>
