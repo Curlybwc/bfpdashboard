@@ -67,7 +67,7 @@ export function useProjectList(projectType: ProjectType) {
         projectSummaryMap[project.id] = computeProjectHealthSummary(tasksByProject[project.id] || []);
       });
 
-      return { projects, projectSummaryMap };
+      return { projects, projectSummaryMap, companyMap };
     },
   });
 }
