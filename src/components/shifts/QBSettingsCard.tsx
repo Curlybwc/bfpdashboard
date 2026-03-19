@@ -622,9 +622,48 @@ const QBSettingsCard = () => {
               </Select>
             )}
             {selectedCompany && !selectedCompany.qb_connection_id && (
-              <p className="text-xs text-destructive">⚠ This company has no QuickBooks connection linked.</p>
+              <div className="flex items-center justify-between gap-2 p-2 rounded border border-destructive/30 bg-destructive/5">
+                <p className="text-xs text-destructive">⚠ This company has no QuickBooks connection linked.</p>
+                <Button size="sm" variant="outline" className="h-7 text-xs px-2 shrink-0" onClick={handleConnectQBForCompany} disabled={qbConnecting}>
+                  {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
+                  Connect QuickBooks
+                </Button>
+              </div>
+            )}
+            {selectedCompany && selectedCompany.qb_connection_id && (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Linked to: {qbConnections.find(c => c.id === selectedCompany.qb_connection_id)?.company_name || 'Unknown'}
+                </p>
+                <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={handleConnectQBForCompany} disabled={qbConnecting}>
+                  {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
+                  Reconnect
+                </Button>
+              </div>
             )}
           </div>
+
+          {/* Legacy unassigned data warning */}
+          {(legacyVendorCount > 0 || legacyBatchCount > 0) && (
+            <div className="p-2 rounded border border-yellow-500/30 bg-yellow-500/5 space-y-1">
+              <div className="flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 text-yellow-600 shrink-0" />
+                <p className="text-xs font-medium text-yellow-700">Legacy data needs assignment</p>
+              </div>
+              {legacyVendorCount > 0 && (
+                <p className="text-xs text-muted-foreground">{legacyVendorCount} vendor mapping{legacyVendorCount > 1 ? 's' : ''} have no company assigned.</p>
+              )}
+              {legacyBatchCount > 0 && (
+                <p className="text-xs text-muted-foreground">{legacyBatchCount} payable batch{legacyBatchCount > 1 ? 'es' : ''} have no company assigned.</p>
+              )}
+              {legacyVendorCount > 0 && selectedCompanyId && (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleClaimLegacyVendors} disabled={claimingLegacy}>
+                  {claimingLegacy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                  Assign {legacyVendorCount} vendor mapping{legacyVendorCount > 1 ? 's' : ''} to {selectedCompany?.short_name || selectedCompany?.name || 'this company'}
+                </Button>
+              )}
+            </div>
+          )}
 
           {!selectedCompanyId ? (
             <p className="text-xs text-muted-foreground">Select a company above to configure QuickBooks settings.</p>
