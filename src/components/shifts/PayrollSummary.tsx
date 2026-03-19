@@ -749,7 +749,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                     </Button>
                     <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)}>
                       {payingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                      Mark Paid Now
+                      Record as Paid (Local Only)
                     </Button>
                   </div>
                 </CollapsibleContent>
