@@ -841,7 +841,22 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
         <p>Already paid: <span className="text-foreground font-medium">${totals.paidDollars.toFixed(2)}</span></p>
       </Card>
 
+      {/* Bill Preview — shown first in billFirstMode */}
+      {billFirstMode && billGroupPreviews.length > 0 && renderBillPreview()}
+
       {/* Unpaid Eligible Groups */}
+      {billFirstMode ? (
+        <Collapsible>
+          <Card className="p-3 space-y-2">
+            <CollapsibleTrigger className="flex items-center gap-2 w-full">
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              <p className="text-sm font-medium">Ready to Pay</p>
+              <Badge variant="secondary" className="text-[10px] ml-auto">{candidateGroups.length}</Badge>
+            </CollapsibleTrigger>
+            <CollapsibleContent>{renderReadyToPay()}</CollapsibleContent>
+          </Card>
+        </Collapsible>
+      ) : (
       <Card className="p-3 space-y-2">
         <div>
           <p className="text-sm font-medium">Ready to Pay</p>
