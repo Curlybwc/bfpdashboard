@@ -22,13 +22,22 @@ export function useProjectList(projectType: ProjectType) {
   return useQuery({
     queryKey: ['projects-list', projectType],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('project_type', projectType)
-        .order('created_at', { ascending: false });
+      const [{ data, error }, { data: companyRows, error: companyError }] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('*')
+          .eq('project_type', projectType)
+          .order('created_at', { ascending: false }),
+        supabase.from('companies').select('id, short_name, name'),
+      ]);
 
       if (error) throw error;
+      if (companyError) throw companyError;
+
+      const companyMap: Record<string, string> = {};
+      (companyRows ?? []).forEach((c) => {
+        companyMap[c.id] = c.short_name || c.name;
+      });
 
       const projects = (data ?? []) as ProjectRow[];
       if (projects.length === 0) {
