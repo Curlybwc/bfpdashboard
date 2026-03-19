@@ -26,7 +26,7 @@ export const PRICING_STATUSES: PricingStatus[] = ['Priced', 'Needs Pricing'];
 export const PAYOUT_ONBOARDING_STATUSES: PayoutOnboardingStatus[] = ['not_started', 'in_progress', 'completed', 'restricted'];
 export const PAYOUT_RUN_STATUSES: PayoutRunStatus[] = ['draft', 'submitted', 'completed', 'canceled', 'failed', 'partially_failed'];
 export const WORKER_PAYABLE_BATCH_STATUSES: WorkerPayableBatchStatus[] = ['draft', 'exported', 'paid', 'voided'];
-export const WORKER_PAYMENT_SOURCES: WorkerPaymentSource[] = ['stripe_connect', 'manual_quickbooks', 'venmo_manual'];
+export const WORKER_PAYMENT_SOURCES: WorkerPaymentSource[] = ['stripe_connect', 'manual_quickbooks', 'venmo_manual', 'quickbooks_linked'];
 export const WORKER_PAYMENT_STATUSES: WorkerPaymentStatus[] = ['pending', 'processing', 'paid', 'failed', 'voided'];
 export const WORKER_TAX_CLASSIFICATIONS: WorkerTaxClassification[] = ['contractor_1099', 'employee_w2'];
 
