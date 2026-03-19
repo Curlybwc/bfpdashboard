@@ -34,6 +34,7 @@ const ProjectList = () => {
   const queryClient = useQueryClient();
   const { data, isLoading } = useProjectList(activeTab);
   const projects = data?.projects ?? [];
+  const projectSummaryMap = data?.projectSummaryMap ?? {};
   const companyMap = data?.companyMap ?? {};
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
