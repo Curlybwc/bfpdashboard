@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.quickbooks_list_vendors]
 verify_jwt = false
+
+[functions.quickbooks_record_expense]
+verify_jwt = false
