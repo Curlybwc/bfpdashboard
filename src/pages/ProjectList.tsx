@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, MapPin, AlertTriangle, Search, ArrowUpDown, Archive, Merge, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectList } from '@/hooks/useProjectList';
@@ -34,6 +35,7 @@ const ProjectList = () => {
   const { data, isLoading } = useProjectList(activeTab);
   const projects = data?.projects ?? [];
   const projectSummaryMap = data?.projectSummaryMap ?? {};
+  const companyMap = data?.companyMap ?? {};
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -291,7 +293,14 @@ const ProjectList = () => {
                       />
                     )}
                     <div className="min-w-0">
-                      <h3 className="font-medium truncate">{project.name}</h3>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="font-medium truncate">{project.name}</h3>
+                        {project.company_id && companyMap[project.company_id] && (
+                          <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                            {companyMap[project.company_id]}
+                          </Badge>
+                        )}
+                      </div>
                       {project.address && (
                         <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                           <MapPin className="h-3 w-3 shrink-0" />{project.address}
