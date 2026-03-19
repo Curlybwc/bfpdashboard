@@ -78,7 +78,7 @@ export function useProjectList() {
       const { data, error } = await supabase
         .from('projects')
         .select('id, name')
-        .in('status', ['active', 'pre_construction'])
+        .in('status', ['active', 'paused'])
         .order('name');
       if (error) throw error;
       return (data ?? []) as { id: string; name: string }[];

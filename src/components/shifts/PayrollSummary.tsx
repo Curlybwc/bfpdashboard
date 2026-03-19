@@ -1138,32 +1138,60 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-medium">QuickBooks Bill Preview</p>
             </div>
-            <p className="text-xs text-muted-foreground">How eligible items will group into bills when exported (by company + QB vendor + period).</p>
+            <p className="text-xs text-muted-foreground">How eligible items will group into bills when exported (by company + QB vendor + project + period).</p>
           </div>
           <div className="space-y-2">
-            {billGroupPreviews.map((bp) => (
-              <div key={bp.key} className="border rounded p-3 space-y-1">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{bp.companyName} → {bp.qb_vendor_name}</p>
-                    <p className="text-xs text-muted-foreground">{bp.periodStart} → {bp.periodEnd}</p>
-                  </div>
-                  <p className="text-sm font-semibold">${bp.totalDollars.toFixed(2)}</p>
-                </div>
-                <div className="text-xs space-y-0.5 pl-2 border-l-2 border-muted">
-                  {bp.lines.map((line, idx) => (
-                    <div key={idx} className="flex items-center justify-between gap-2">
-                      <span>
-                        {line.contractorName} · {line.projectName}
-                        {line.qbClassName && <span className="text-muted-foreground ml-1">(Class: {line.qbClassName})</span>}
-                      </span>
-                      <span className="font-medium">${line.dollars.toFixed(2)}</span>
+            {billGroupPreviews.map((bp) => {
+              // Drill-down: always include project + dates. Include contractor only if single worker.
+              const uniqueWorkerIds = [...new Set(bp.lines.map(l => l.projectId))]; // reuse projectId from first line for project filter
+              const firstProjectId = bp.lines[0]?.projectId;
+              const workerUserIds = [...new Set(bp.lines.map(l => {
+                // Find the candidateGroup that matches this line to get worker_user_id
+                const cg = candidateGroups.find(g =>
+                  g.contractorName === l.contractorName && g.project_id === l.projectId
+                );
+                return cg?.worker_user_id;
+              }).filter(Boolean))];
+              const drillDownParams = new URLSearchParams();
+              if (firstProjectId) drillDownParams.set('project', firstProjectId);
+              drillDownParams.set('from', bp.periodStart);
+              drillDownParams.set('to', bp.periodEnd);
+              if (workerUserIds.length === 1 && workerUserIds[0]) {
+                drillDownParams.set('contractor', workerUserIds[0]);
+              }
+              const drillDownUrl = `/shifts?${drillDownParams.toString()}`;
+
+              return (
+                <div key={bp.key} className="border rounded p-3 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{bp.companyName} → {bp.qb_vendor_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {bp.lines[0]?.projectName && <span>{bp.lines[0].projectName} · </span>}
+                        {bp.periodStart} → {bp.periodEnd}
+                      </p>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">${bp.totalDollars.toFixed(2)}</p>
+                      <Button size="sm" variant="ghost" className="h-6 text-xs px-2" asChild>
+                        <a href={drillDownUrl}>View Shifts</a>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-xs space-y-0.5 pl-2 border-l-2 border-muted">
+                    {bp.lines.map((line, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-2">
+                        <span>
+                          {line.contractorName} · {line.projectName}
+                          {line.qbClassName && <span className="text-muted-foreground ml-1">(Class: {line.qbClassName})</span>}
+                        </span>
+                        <span className="font-medium">${line.dollars.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Each line preserves its project/class context inside the combined bill.</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       )}
