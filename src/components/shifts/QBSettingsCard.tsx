@@ -655,7 +655,7 @@ const QBSettingsCard = () => {
                     {projects.map((proj) => {
                       const edit = getClassEdit(proj.id);
                       const hasUnsaved = !!classEdits[proj.id];
-                      const showDropdown = qbClassesLoaded && qbClasses.length > 0;
+                      const showDropdown = qbClassesLoaded && qbClasses.length > 0 && qbClassesForCompany === selectedCompanyId;
 
                       return (
                         <div key={proj.id} className="flex flex-wrap items-center gap-2 text-xs border rounded p-2">
