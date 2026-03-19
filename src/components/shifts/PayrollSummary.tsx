@@ -414,12 +414,16 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
 
     const groupsMap = new Map<string, CandidateGroup>();
     for (const row of eligible) {
+      const cid = projCompanyMap.get(row.shift.project_id) || null;
+      const co = cid ? companyMap.get(cid) : null;
       const key = `${row.shift.user_id}::${row.shift.project_id}::${fromDate}::${toDate}`;
       if (!groupsMap.has(key)) {
         groupsMap.set(key, {
           key,
           worker_user_id: row.shift.user_id,
           project_id: row.shift.project_id,
+          company_id: cid,
+          companyName: co ? (co.short_name || co.name) : 'No company',
           contractorName: row.workerName,
           projectName: row.projectName,
           periodStart: fromDate,
@@ -434,6 +438,39 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       group.totalHours += Number(row.shift.total_hours);
       group.totalDollars += row.dollars;
     }
+
+    // Build bill group previews (grouped by company + vendor + period)
+    const billPreviews = new Map<string, BillGroupPreview>();
+    for (const group of groupsMap.values()) {
+      if (!group.company_id) continue;
+      const vm = vmMap.get(group.company_id)?.get(group.worker_user_id);
+      if (!vm) continue;
+      const bKey = `${group.company_id}::${vm.qb_vendor_id}::${fromDate}::${toDate}`;
+      if (!billPreviews.has(bKey)) {
+        const co = companyMap.get(group.company_id);
+        billPreviews.set(bKey, {
+          key: bKey,
+          company_id: group.company_id,
+          companyName: co ? (co.short_name || co.name) : 'Unknown',
+          qb_vendor_id: vm.qb_vendor_id,
+          qb_vendor_name: vm.qb_vendor_name,
+          periodStart: fromDate,
+          periodEnd: toDate,
+          lines: [],
+          totalDollars: 0,
+        });
+      }
+      const preview = billPreviews.get(bKey)!;
+      preview.lines.push({
+        contractorName: group.contractorName,
+        projectName: group.projectName,
+        projectId: group.project_id,
+        qbClassName: cmMap.get(group.project_id) || null,
+        dollars: group.totalDollars,
+      });
+      preview.totalDollars += group.totalDollars;
+    }
+    setBillGroupPreviews([...billPreviews.values()].sort((a, b) => a.companyName.localeCompare(b.companyName) || a.qb_vendor_name.localeCompare(b.qb_vendor_name)));
 
     const { data: batches, error: batchesError } = await supabase
       .from('worker_payable_batches')
