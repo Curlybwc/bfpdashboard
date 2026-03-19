@@ -101,6 +101,15 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Hard-stop: project_id required for payroll bill creation
+      if (!batch.project_id) {
+        const errorMsg = "Batch has no project assigned. A project is required for payroll bill creation.";
+        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        results.push({ batch_id: batchId, success: false, error: errorMsg });
+        failedBatchIds.add(batchId);
+        continue;
+      }
+
       // Hard-stop: company_id required
       const companyId = resolveCompanyId(batch);
       if (!companyId) {
