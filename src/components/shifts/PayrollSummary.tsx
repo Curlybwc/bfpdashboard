@@ -299,7 +299,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const loadPayroll = useCallback(async () => {
     setLoading(true);
 
-    const [{ data: shifts, error: shiftsError }, { data: profiles, error: profilesError }, { data: projects, error: projectsError }] = await Promise.all([
+    const [{ data: shifts, error: shiftsError }, { data: profiles, error: profilesError }, { data: projects, error: projectsError }, { data: companiesData }, { data: vendorData }, { data: classData }] = await Promise.all([
       supabase
         .from('shifts')
         .select('*')
@@ -307,13 +307,42 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         .lte('shift_date', toDate)
         .order('shift_date', { ascending: false }),
       supabase.from('profiles').select('id, full_name, hourly_rate'),
-      supabase.from('projects').select('id, name'),
+      supabase.from('projects').select('id, name, company_id'),
+      supabase.from('companies').select('id, name, short_name').order('name'),
+      supabase.from('quickbooks_vendor_mappings').select('user_id, company_id, qb_vendor_id, qb_vendor_name'),
+      supabase.from('quickbooks_class_mappings').select('project_id, qb_class_name'),
     ]);
 
     if (shiftsError || profilesError || projectsError) {
       setLoading(false);
       throw new Error(shiftsError?.message || profilesError?.message || projectsError?.message || 'Failed to load payroll data');
     }
+
+    const comps = (companiesData || []) as { id: string; name: string; short_name: string | null }[];
+    setCompanies(comps);
+    const companyMap = new Map(comps.map(c => [c.id, c]));
+
+    const projCompanyMap = new Map<string, string>();
+    ((projects || []) as { id: string; name: string; company_id: string | null }[]).forEach(p => {
+      if (p.company_id) projCompanyMap.set(p.id, p.company_id);
+    });
+    setProjectCompanyMap(projCompanyMap);
+
+    // Build vendor mappings: company_id -> user_id -> mapping
+    const vmMap = new Map<string, Map<string, { qb_vendor_id: string; qb_vendor_name: string }>>();
+    ((vendorData || []) as { user_id: string; company_id: string | null; qb_vendor_id: string; qb_vendor_name: string | null }[]).forEach(v => {
+      if (!v.company_id) return;
+      if (!vmMap.has(v.company_id)) vmMap.set(v.company_id, new Map());
+      vmMap.get(v.company_id)!.set(v.user_id, { qb_vendor_id: v.qb_vendor_id, qb_vendor_name: v.qb_vendor_name || '' });
+    });
+    setVendorMappings(vmMap);
+
+    // Class mappings: project_id -> class_name
+    const cmMap = new Map<string, string>();
+    ((classData || []) as { project_id: string; qb_class_name: string | null }[]).forEach(c => {
+      if (c.qb_class_name) cmMap.set(c.project_id, c.qb_class_name);
+    });
+    setClassMappings(cmMap);
 
     const shiftRows = shifts || [];
     const profileMap = new Map<string, Pick<ProfileRow, 'id' | 'full_name' | 'hourly_rate'>>((profiles || []).map((row) => [row.id, row]));
