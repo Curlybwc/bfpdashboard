@@ -1363,89 +1363,276 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
         </>
       )}
 
-      {/* Historical / External Payment */}
+      {/* Match Existing QuickBooks Payment */}
       <Card className="p-3 space-y-2">
         <div className="flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-medium flex-1">Record Historical / External Payment</p>
+          <p className="text-sm font-medium flex-1">Match Existing QuickBooks Payment</p>
           <Button size="sm" variant="outline" onClick={() => setHistOpen(!histOpen)}>
             {histOpen ? 'Close' : 'Open'}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Record a contractor payment that was already paid outside the app. Creates a QuickBooks Purchase — no bill required.</p>
+        <p className="text-xs text-muted-foreground">Link an existing QuickBooks transaction to local payment records, or record a local-only payment.</p>
 
         {histOpen && (
-          <div className="space-y-3 pt-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Company *</Label>
-                <Select value={histCompanyId} onValueChange={setHistCompanyId}>
-                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                  <SelectContent>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.short_name || c.name}</SelectItem>
+          <Tabs defaultValue="search-link" className="pt-2">
+            <TabsList className="w-full">
+              <TabsTrigger value="search-link" className="flex-1 text-xs">Search & Link</TabsTrigger>
+              <TabsTrigger value="local-only" className="flex-1 text-xs">Save Local Only</TabsTrigger>
+            </TabsList>
+
+            {/* ─── Search & Link Tab ─── */}
+            <TabsContent value="search-link" className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Company *</Label>
+                  <Select value={searchCompanyId} onValueChange={setSearchCompanyId}>
+                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                    <SelectContent>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.short_name || c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">QB Vendor ID (optional)</Label>
+                  <Input className="h-8 text-xs" value={searchVendorId} onChange={(e) => setSearchVendorId(e.target.value)} placeholder="Filter by vendor" />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">From</Label>
+                  <Input type="date" className="h-8 text-xs" value={searchFromDate} onChange={(e) => setSearchFromDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">To</Label>
+                  <Input type="date" className="h-8 text-xs" value={searchToDate} onChange={(e) => setSearchToDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Min $</Label>
+                  <Input type="number" className="h-8 text-xs" value={searchMinAmount} onChange={(e) => setSearchMinAmount(e.target.value)} placeholder="0" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max $</Label>
+                  <Input type="number" className="h-8 text-xs" value={searchMaxAmount} onChange={(e) => setSearchMaxAmount(e.target.value)} placeholder="∞" />
+                </div>
+              </div>
+              <Button size="sm" onClick={handleSearchQBTransactions} disabled={searchLoading || !searchCompanyId}>
+                {searchLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Search className="h-4 w-4 mr-1" />}
+                Search QuickBooks
+              </Button>
+
+              {/* Search results */}
+              {searchResults.length > 0 && !selectedTxn && (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  <p className="text-xs text-muted-foreground">{searchResults.length} transaction(s) found</p>
+                  {searchResults.map((txn) => (
+                    <button
+                      key={`${txn.type}:${txn.id}`}
+                      className="w-full text-left border rounded p-2 text-xs hover:bg-accent transition-colors space-y-0.5"
+                      onClick={() => handleSelectTxn(txn)}
+                    >
+                      <div className="flex justify-between">
+                        <span className="font-medium">{txn.type} #{txn.doc_number || txn.id}</span>
+                        <span className="font-semibold">${txn.amount.toFixed(2)}</span>
+                      </div>
+                      <div className="text-muted-foreground">
+                        {txn.txn_date} · {txn.vendor_name || 'No vendor'}{txn.memo ? ` · ${txn.memo.slice(0, 50)}` : ''}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Selected transaction + allocation table */}
+              {selectedTxn && (
+                <div className="space-y-3 border rounded p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{selectedTxn.type} #{selectedTxn.id} — ${selectedTxn.amount.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">{selectedTxn.txn_date} · {selectedTxn.vendor_name || 'No vendor'}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => { setSelectedTxn(null); setAllocations([]); setExistingAllocations([]); }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Existing allocations */}
+                  {existingAllocations.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Already linked: ${allocExistingSum.toFixed(2)}</p>
+                      {existingAllocations.map((ea, i) => {
+                        const profile = allProfiles.find(p => p.id === ea.worker_user_id);
+                        const project = ea.project_id ? allProjects.find(p => p.id === ea.project_id) : null;
+                        return (
+                          <div key={i} className="text-xs bg-muted/50 rounded px-2 py-1 flex justify-between">
+                            <span>{profile?.full_name || 'Unknown'}{project ? ` · ${project.name}` : ''}</span>
+                            <span className="font-medium">${ea.amount.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* New allocations */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">New Allocations</p>
+                    {allocations.map((alloc, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-1 items-end">
+                        <div className="col-span-3 space-y-0.5">
+                          <Label className="text-[10px]">Worker *</Label>
+                          <Select value={alloc.worker_user_id} onValueChange={(v) => {
+                            const next = [...allocations];
+                            next[idx] = { ...next[idx], worker_user_id: v };
+                            setAllocations(next);
+                          }}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Worker" /></SelectTrigger>
+                            <SelectContent>
+                              {allProfiles.map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.full_name || 'Unnamed'}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2 space-y-0.5">
+                          <Label className="text-[10px]">Amount *</Label>
+                          <Input className="h-7 text-xs" type="number" step="0.01" value={alloc.amount} onChange={(e) => {
+                            const next = [...allocations];
+                            next[idx] = { ...next[idx], amount: e.target.value };
+                            setAllocations(next);
+                          }} />
+                        </div>
+                        <div className="col-span-3 space-y-0.5">
+                          <Label className="text-[10px]">Project</Label>
+                          <Select value={alloc.project_id} onValueChange={(v) => {
+                            const next = [...allocations];
+                            next[idx] = { ...next[idx], project_id: v };
+                            setAllocations(next);
+                          }}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Optional" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              {allProjects.map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3 space-y-0.5">
+                          <Label className="text-[10px]">Memo</Label>
+                          <Input className="h-7 text-xs" value={alloc.memo} onChange={(e) => {
+                            const next = [...allocations];
+                            next[idx] = { ...next[idx], memo: e.target.value };
+                            setAllocations(next);
+                          }} />
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          {allocations.length > 1 && (
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setAllocations(allocations.filter((_, i) => i !== idx))}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Payment Date *</Label>
-                <Input type="date" value={histDate} onChange={(e) => setHistDate(e.target.value)} />
-              </div>
-            </div>
+                    <Button size="sm" variant="outline" onClick={() => setAllocations([...allocations, { worker_user_id: '', amount: '', memo: '', project_id: '' }])}>
+                      <Plus className="h-3 w-3 mr-1" />Add Row
+                    </Button>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">QB Vendor ID *</Label>
-                <Input value={histVendorId} onChange={(e) => setHistVendorId(e.target.value)} placeholder="Vendor ID from QuickBooks" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Vendor Name</Label>
-                <Input value={histVendorName} onChange={(e) => setHistVendorName(e.target.value)} placeholder="Display name" />
-              </div>
-            </div>
+                  {/* Running total */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Existing: ${allocExistingSum.toFixed(2)} + New: ${allocNewSum.toFixed(2)} = ${(allocExistingSum + allocNewSum).toFixed(2)} / ${selectedTxn.amount.toFixed(2)}
+                    </span>
+                    {allocExistingSum + allocNewSum > selectedTxn.amount && (
+                      <Badge variant="destructive" className="text-[10px]">Over-allocated</Badge>
+                    )}
+                  </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Expense Account ID *</Label>
-                <Input value={histAccountId} onChange={(e) => setHistAccountId(e.target.value)} placeholder="Account ID from QuickBooks" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Account Name</Label>
-                <Input value={histAccountName} onChange={(e) => setHistAccountName(e.target.value)} placeholder="Display name" />
-              </div>
-            </div>
+                  {linkResult && (
+                    <div className={`text-xs rounded p-2 ${linkResult.success ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
+                      {linkResult.success ? `✓ ${linkResult.message}` : `✗ ${linkResult.message}`}
+                    </div>
+                  )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Amount *</Label>
-                <Input type="number" step="0.01" min="0.01" value={histAmount} onChange={(e) => setHistAmount(e.target.value)} placeholder="0.00" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Project (optional)</Label>
-                <Input value={histProjectId} onChange={(e) => setHistProjectId(e.target.value)} placeholder="Project ID (optional)" />
-              </div>
-            </div>
+                  <Button onClick={handleSaveLinkedAllocations} disabled={linkSaving || allocNewSum <= 0 || allocExistingSum + allocNewSum > selectedTxn.amount} className="w-full">
+                    {linkSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Link2 className="h-4 w-4 mr-1" />}
+                    Save Allocations
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
 
-            <div className="space-y-1">
-              <Label className="text-xs">Memo (optional)</Label>
-              <Textarea value={histMemo} onChange={(e) => setHistMemo(e.target.value)} rows={2} placeholder="Notes for QuickBooks" />
-            </div>
-
-            {histResult && (
-              <div className={`text-xs rounded p-2 ${histResult.success ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
-                {histResult.success
-                  ? `✓ Payment recorded — QuickBooks Purchase ID: ${histResult.purchase_id}`
-                  : `✗ ${histResult.error}`
-                }
+            {/* ─── Save Local Only Tab ─── */}
+            <TabsContent value="local-only" className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Worker *</Label>
+                  <Select value={localWorkerId} onValueChange={setLocalWorkerId}>
+                    <SelectTrigger><SelectValue placeholder="Select worker" /></SelectTrigger>
+                    <SelectContent>
+                      {allProfiles.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.full_name || 'Unnamed'}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Amount *</Label>
+                  <Input type="number" step="0.01" min="0.01" value={localAmount} onChange={(e) => setLocalAmount(e.target.value)} placeholder="0.00" />
+                </div>
               </div>
-            )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Payment Date *</Label>
+                  <Input type="date" value={localDate} onChange={(e) => setLocalDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Company (optional)</Label>
+                  <Select value={localCompanyId} onValueChange={setLocalCompanyId}>
+                    <SelectTrigger><SelectValue placeholder="No company" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.short_name || c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Project (optional)</Label>
+                  <Select value={localProjectId} onValueChange={setLocalProjectId}>
+                    <SelectTrigger><SelectValue placeholder="No project" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {allProjects.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Memo (optional)</Label>
+                  <Input value={localMemo} onChange={(e) => setLocalMemo(e.target.value)} placeholder="Notes" />
+                </div>
+              </div>
 
-            <Button onClick={handleHistoricalPayment} disabled={histSubmitting || !histCompanyId || !histVendorId || !histAccountId || !histAmount || !histDate} className="w-full">
-              {histSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <DollarSign className="h-4 w-4 mr-1" />}
-              Record Payment in QuickBooks
-            </Button>
-          </div>
+              {localResult && (
+                <div className={`text-xs rounded p-2 ${localResult.success ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
+                  {localResult.success ? `✓ ${localResult.message}` : `✗ ${localResult.message}`}
+                </div>
+              )}
+
+              <Button onClick={handleSaveLocalPayment} disabled={localSaving || !localWorkerId || !localAmount || !localDate} className="w-full">
+                {localSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <DollarSign className="h-4 w-4 mr-1" />}
+                Save Local Payment
+              </Button>
+            </TabsContent>
+          </Tabs>
         )}
       </Card>
     </div>
