@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import QBCombobox from './QBCombobox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2 } from 'lucide-react';
+import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -32,6 +32,42 @@ const QBSettingsCard = () => {
   const [newCompanyConnId, setNewCompanyConnId] = useState('');
   const [addCompanyOpen, setAddCompanyOpen] = useState(false);
   const [addingCompany, setAddingCompany] = useState(false);
+
+  // Edit company
+  const [editCompanyOpen, setEditCompanyOpen] = useState(false);
+  const [editCompanyName, setEditCompanyName] = useState('');
+  const [editCompanyShort, setEditCompanyShort] = useState('');
+  const [editCompanyConnId, setEditCompanyConnId] = useState('');
+  const [editingCompany, setEditingCompany] = useState(false);
+
+  const openEditCompany = () => {
+    if (!selectedCompany) return;
+    setEditCompanyName(selectedCompany.name);
+    setEditCompanyShort(selectedCompany.short_name || '');
+    setEditCompanyConnId(selectedCompany.qb_connection_id || '');
+    setEditCompanyOpen(true);
+  };
+
+  const handleEditCompany = async () => {
+    if (!editCompanyName.trim() || !selectedCompanyId) return;
+    setEditingCompany(true);
+    const { error } = await supabase
+      .from('companies')
+      .update({
+        name: editCompanyName.trim(),
+        short_name: editCompanyShort.trim() || null,
+        qb_connection_id: editCompanyConnId || null,
+      })
+      .eq('id', selectedCompanyId);
+    setEditingCompany(false);
+    if (error) {
+      toast({ title: 'Failed to update company', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Company updated' });
+      setEditCompanyOpen(false);
+      await loadCompanies();
+    }
+  };
 
   // Expense account state (per company)
   const [expAccountId, setExpAccountId] = useState('');
@@ -470,6 +506,43 @@ const QBSettingsCard = () => {
                   </div>
                 </DialogContent>
               </Dialog>
+              {selectedCompany && (
+                <Dialog open={editCompanyOpen} onOpenChange={setEditCompanyOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={openEditCompany}>
+                      <Pencil className="h-3 w-3 mr-1" />Edit
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Edit Company</DialogTitle></DialogHeader>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Company Name</Label>
+                        <Input className="h-8 text-sm" value={editCompanyName} onChange={(e) => setEditCompanyName(e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Short Name</Label>
+                        <Input className="h-8 text-sm" value={editCompanyShort} onChange={(e) => setEditCompanyShort(e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">QuickBooks Connection</Label>
+                        <Select value={editCompanyConnId} onValueChange={setEditCompanyConnId}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="No connection" /></SelectTrigger>
+                          <SelectContent>
+                            {qbConnections.map((conn) => (
+                              <SelectItem key={conn.id} value={conn.id}>{conn.company_name || conn.realm_id}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button disabled={editingCompany || !editCompanyName.trim()} onClick={handleEditCompany} className="w-full">
+                        {editingCompany ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                        Save Changes
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
             {companies.length === 0 ? (
               <p className="text-xs text-muted-foreground">No companies configured. Add a company to start.</p>
