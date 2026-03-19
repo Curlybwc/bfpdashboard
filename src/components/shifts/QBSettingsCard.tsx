@@ -81,11 +81,12 @@ const QBSettingsCard = () => {
   const [classEdits, setClassEdits] = useState<Record<string, { qb_class_id: string; qb_class_name: string }>>({});
   const [classSaving, setClassSaving] = useState<string | null>(null);
 
-  // QB classes from API
+  // QB classes from API — keyed to the company they were loaded for
   const [qbClasses, setQbClasses] = useState<QBClass[]>([]);
   const [qbClassesLoading, setQbClassesLoading] = useState(false);
   const [qbClassesLoaded, setQbClassesLoaded] = useState(false);
   const [qbClassesError, setQbClassesError] = useState<string | null>(null);
+  const [qbClassesForCompany, setQbClassesForCompany] = useState<string>('');
 
   // QB accounts from API (for expense account picker)
   const [qbAccounts, setQbAccounts] = useState<QBAccount[]>([]);
@@ -129,6 +130,7 @@ const QBSettingsCard = () => {
 
     // Reset QB entity caches when switching companies
     setQbClassesLoaded(false);
+    setQbClassesForCompany('');
     setQbAccountsLoaded(false);
     setQbVendorsLoaded(false);
     setQbClasses([]);
@@ -216,6 +218,7 @@ const QBSettingsCard = () => {
         const classes = (data?.classes || []) as QBClass[];
         setQbClasses(classes);
         setQbClassesLoaded(true);
+        setQbClassesForCompany(selectedCompanyId);
         toast({ title: `Loaded ${classes.length} QB classes` });
       }
     } catch {
@@ -304,6 +307,8 @@ const QBSettingsCard = () => {
   };
 
   const selectClassForProject = (projectId: string, classId: string) => {
+    // Guard: only allow selection if classes belong to the currently selected company
+    if (qbClassesForCompany !== selectedCompanyId) return;
     const qbClass = qbClasses.find((c) => c.id === classId);
     if (!qbClass) return;
     setClassEdits((prev) => ({
@@ -422,7 +427,9 @@ const QBSettingsCard = () => {
       else failures++;
     }
 
-    const classEditIds = Object.keys(classEdits);
+    // Scope class edits to only projects visible under the current company
+    const visibleProjectIds = new Set(projects.map((p) => p.id));
+    const classEditIds = Object.keys(classEdits).filter((pid) => visibleProjectIds.has(pid));
     let classSavedCount = 0;
     for (const pid of classEditIds) {
       const ok = await saveClassMapping(pid);
@@ -648,7 +655,7 @@ const QBSettingsCard = () => {
                     {projects.map((proj) => {
                       const edit = getClassEdit(proj.id);
                       const hasUnsaved = !!classEdits[proj.id];
-                      const showDropdown = qbClassesLoaded && qbClasses.length > 0;
+                      const showDropdown = qbClassesLoaded && qbClasses.length > 0 && qbClassesForCompany === selectedCompanyId;
 
                       return (
                         <div key={proj.id} className="flex flex-wrap items-center gap-2 text-xs border rounded p-2">
