@@ -130,6 +130,7 @@ const QBSettingsCard = () => {
 
     // Reset QB entity caches when switching companies
     setQbClassesLoaded(false);
+    setQbClassesForCompany('');
     setQbAccountsLoaded(false);
     setQbVendorsLoaded(false);
     setQbClasses([]);
