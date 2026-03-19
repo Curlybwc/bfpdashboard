@@ -8,10 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2, X, Trash2, DollarSign, Building2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2, X, Trash2, DollarSign, Building2, Search, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
 import QBSettingsCard from './QBSettingsCard';
+import QBCombobox from './QBCombobox';
 import type { Tables } from '@/integrations/supabase/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -168,19 +170,35 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
   const [vendorMappings, setVendorMappings] = useState<Map<string, Map<string, { qb_vendor_id: string; qb_vendor_name: string }>>>(new Map());
   const [classMappings, setClassMappings] = useState<Map<string, string>>(new Map());
 
-  // Historical payment form state
+  // Historical payment section state
   const [histOpen, setHistOpen] = useState(false);
-  const [histCompanyId, setHistCompanyId] = useState('');
-  const [histVendorId, setHistVendorId] = useState('');
-  const [histVendorName, setHistVendorName] = useState('');
-  const [histAccountId, setHistAccountId] = useState('');
-  const [histAccountName, setHistAccountName] = useState('');
-  const [histAmount, setHistAmount] = useState('');
-  const [histDate, setHistDate] = useState('');
-  const [histMemo, setHistMemo] = useState('');
-  const [histProjectId, setHistProjectId] = useState('');
-  const [histSubmitting, setHistSubmitting] = useState(false);
-  const [histResult, setHistResult] = useState<{ success: boolean; purchase_id?: string; error?: string } | null>(null);
+  // Search & Link mode
+  const [searchCompanyId, setSearchCompanyId] = useState('');
+  const [searchVendorId, setSearchVendorId] = useState('');
+  const [searchFromDate, setSearchFromDate] = useState('');
+  const [searchToDate, setSearchToDate] = useState('');
+  const [searchMinAmount, setSearchMinAmount] = useState('');
+  const [searchMaxAmount, setSearchMaxAmount] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; type: string; txn_date: string; amount: number; vendor_name: string | null; memo: string | null; doc_number: string | null }>>([]);
+  const [selectedTxn, setSelectedTxn] = useState<{ id: string; type: string; txn_date: string; amount: number; vendor_name: string | null; memo: string | null; doc_number: string | null } | null>(null);
+  const [allocations, setAllocations] = useState<Array<{ worker_user_id: string; amount: string; memo: string; project_id: string }>>([]);
+  const [existingAllocations, setExistingAllocations] = useState<Array<{ worker_user_id: string; amount: number; memo: string | null; project_id: string | null }>>([]);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkResult, setLinkResult] = useState<{ success: boolean; message: string } | null>(null);
+  // Local-only mode
+  const [localWorkerId, setLocalWorkerId] = useState('');
+  const [localCompanyId, setLocalCompanyId] = useState('');
+  const [localProjectId, setLocalProjectId] = useState('');
+  const [localAmount, setLocalAmount] = useState('');
+  const [localDate, setLocalDate] = useState('');
+  const [localMemo, setLocalMemo] = useState('');
+  const [localSaving, setLocalSaving] = useState(false);
+  const [localResult, setLocalResult] = useState<{ success: boolean; message: string } | null>(null);
+  // Profile list for worker pickers
+  const [allProfiles, setAllProfiles] = useState<Array<{ id: string; full_name: string | null }>>([]);
+  // Project list for project pickers
+  const [allProjects, setAllProjects] = useState<Array<{ id: string; name: string }>>([]);
 
   // QuickBooks connection state
   const [qbStatus, setQbStatus] = useState<QBConnectionStatus | null>(null);
@@ -743,39 +761,141 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
     await loadPayroll();
   };
 
-  const handleHistoricalPayment = async () => {
-    if (!histCompanyId || !histVendorId || !histAccountId || !histAmount || !histDate) {
-      toast({ title: 'Missing fields', description: 'Company, vendor, account, amount, and date are all required.', variant: 'destructive' });
+  // Load profiles and projects for pickers
+  useEffect(() => {
+    const loadPickers = async () => {
+      const [{ data: profiles }, { data: projects }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name'),
+        supabase.from('projects').select('id, name').eq('status', 'active').order('name'),
+      ]);
+      setAllProfiles((profiles || []) as Array<{ id: string; full_name: string | null }>);
+      setAllProjects((projects || []) as Array<{ id: string; name: string }>);
+    };
+    loadPickers();
+  }, []);
+
+  const handleSearchQBTransactions = async () => {
+    if (!searchCompanyId) {
+      toast({ title: 'Missing company', description: 'Select a company to search.', variant: 'destructive' });
       return;
     }
-    setHistSubmitting(true);
-    setHistResult(null);
+    setSearchLoading(true);
+    setSearchResults([]);
+    setSelectedTxn(null);
+    setAllocations([]);
+    setExistingAllocations([]);
+    setLinkResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke('quickbooks_record_expense', {
+      const { data, error } = await supabase.functions.invoke('quickbooks_search_transactions', {
         body: {
-          company_id: histCompanyId,
-          vendor_id: histVendorId,
-          vendor_name: histVendorName,
-          account_id: histAccountId,
-          account_name: histAccountName,
-          amount: parseFloat(histAmount),
-          payment_date: histDate,
-          memo: histMemo || undefined,
-          project_id: histProjectId || undefined,
+          company_id: searchCompanyId,
+          vendor_id: searchVendorId || undefined,
+          from_date: searchFromDate || undefined,
+          to_date: searchToDate || undefined,
+          min_amount: searchMinAmount ? parseFloat(searchMinAmount) : undefined,
+          max_amount: searchMaxAmount ? parseFloat(searchMaxAmount) : undefined,
         },
       });
       if (error) {
-        setHistResult({ success: false, error: error.message });
+        toast({ title: 'Search failed', description: error.message, variant: 'destructive' });
       } else if (data?.error) {
-        setHistResult({ success: false, error: data.message || data.error });
+        toast({ title: 'Search failed', description: data.message || data.error, variant: 'destructive' });
       } else {
-        setHistResult({ success: true, purchase_id: data?.purchase_id });
-        toast({ title: 'Historical payment recorded', description: `QuickBooks Purchase ID: ${data?.purchase_id || 'Created'}` });
+        setSearchResults(data?.transactions || []);
       }
     } catch {
-      setHistResult({ success: false, error: 'Unexpected error' });
+      toast({ title: 'Search failed', variant: 'destructive' });
     }
-    setHistSubmitting(false);
+    setSearchLoading(false);
+  };
+
+  const handleSelectTxn = async (txn: typeof searchResults[0]) => {
+    setSelectedTxn(txn);
+    setAllocations([{ worker_user_id: '', amount: '', memo: '', project_id: '' }]);
+    setLinkResult(null);
+    // Load existing allocations for this txn
+    const extRef = `${txn.type}:${txn.id}`;
+    const { data } = await supabase
+      .from('worker_payments')
+      .select('worker_user_id, amount, memo, project_id')
+      .eq('company_id', searchCompanyId)
+      .eq('external_reference', extRef)
+      .eq('payment_source', 'quickbooks_linked' as any);
+    setExistingAllocations((data || []).map(r => ({
+      worker_user_id: r.worker_user_id,
+      amount: Number(r.amount),
+      memo: r.memo,
+      project_id: r.project_id,
+    })));
+  };
+
+  const allocNewSum = useMemo(() => allocations.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0), [allocations]);
+  const allocExistingSum = useMemo(() => existingAllocations.reduce((s, a) => s + a.amount, 0), [existingAllocations]);
+
+  const handleSaveLinkedAllocations = async () => {
+    if (!user?.id || !selectedTxn) return;
+    const extRef = `${selectedTxn.type}:${selectedTxn.id}`;
+    const valid = allocations.filter(a => a.worker_user_id && parseFloat(a.amount) > 0);
+    if (valid.length === 0) {
+      toast({ title: 'No valid allocations', variant: 'destructive' });
+      return;
+    }
+    setLinkSaving(true);
+    setLinkResult(null);
+    try {
+      const { data, error } = await supabase.rpc('save_linked_historical_payments', {
+        p_caller_id: user.id,
+        p_company_id: searchCompanyId,
+        p_external_reference: extRef,
+        p_qb_txn_type: selectedTxn.type,
+        p_qb_txn_amount: selectedTxn.amount,
+        p_allocations: valid.map(a => ({
+          worker_user_id: a.worker_user_id,
+          amount: parseFloat(a.amount),
+          paid_date: selectedTxn.txn_date,
+          memo: a.memo || null,
+          project_id: a.project_id || null,
+        })),
+      });
+      if (error) {
+        setLinkResult({ success: false, message: error.message });
+      } else {
+        setLinkResult({ success: true, message: `${(data as any)?.inserted_count || valid.length} allocation(s) saved. Total allocated: $${(data as any)?.total_allocated || ''}` });
+        // Refresh existing allocations
+        handleSelectTxn(selectedTxn);
+      }
+    } catch (e) {
+      setLinkResult({ success: false, message: e instanceof Error ? e.message : 'Unknown error' });
+    }
+    setLinkSaving(false);
+  };
+
+  const handleSaveLocalPayment = async () => {
+    if (!user?.id || !localWorkerId || !localAmount || !localDate) {
+      toast({ title: 'Missing fields', description: 'Worker, amount, and date are required.', variant: 'destructive' });
+      return;
+    }
+    setLocalSaving(true);
+    setLocalResult(null);
+    try {
+      const { data, error } = await supabase.rpc('save_local_historical_payment', {
+        p_caller_id: user.id,
+        p_worker_user_id: localWorkerId,
+        p_amount: parseFloat(localAmount),
+        p_paid_date: localDate,
+        p_company_id: localCompanyId || null,
+        p_project_id: localProjectId || null,
+        p_memo: localMemo || null,
+      });
+      if (error) {
+        setLocalResult({ success: false, message: error.message });
+      } else {
+        setLocalResult({ success: true, message: `Payment recorded (ID: ${(data as any)?.payment_id || 'created'})` });
+      }
+    } catch (e) {
+      setLocalResult({ success: false, message: e instanceof Error ? e.message : 'Unknown error' });
+    }
+    setLocalSaving(false);
   };
 
   const totals = useMemo(() => {
@@ -1243,89 +1363,276 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
         </>
       )}
 
-      {/* Historical / External Payment */}
+      {/* Match Existing QuickBooks Payment */}
       <Card className="p-3 space-y-2">
         <div className="flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-medium flex-1">Record Historical / External Payment</p>
+          <p className="text-sm font-medium flex-1">Match Existing QuickBooks Payment</p>
           <Button size="sm" variant="outline" onClick={() => setHistOpen(!histOpen)}>
             {histOpen ? 'Close' : 'Open'}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Record a contractor payment that was already paid outside the app. Creates a QuickBooks Purchase — no bill required.</p>
+        <p className="text-xs text-muted-foreground">Link an existing QuickBooks transaction to local payment records, or record a local-only payment.</p>
 
         {histOpen && (
-          <div className="space-y-3 pt-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Company *</Label>
-                <Select value={histCompanyId} onValueChange={setHistCompanyId}>
-                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                  <SelectContent>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.short_name || c.name}</SelectItem>
+          <Tabs defaultValue="search-link" className="pt-2">
+            <TabsList className="w-full">
+              <TabsTrigger value="search-link" className="flex-1 text-xs">Search & Link</TabsTrigger>
+              <TabsTrigger value="local-only" className="flex-1 text-xs">Save Local Only</TabsTrigger>
+            </TabsList>
+
+            {/* ─── Search & Link Tab ─── */}
+            <TabsContent value="search-link" className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Company *</Label>
+                  <Select value={searchCompanyId} onValueChange={setSearchCompanyId}>
+                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                    <SelectContent>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.short_name || c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">QB Vendor ID (optional)</Label>
+                  <Input className="h-8 text-xs" value={searchVendorId} onChange={(e) => setSearchVendorId(e.target.value)} placeholder="Filter by vendor" />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">From</Label>
+                  <Input type="date" className="h-8 text-xs" value={searchFromDate} onChange={(e) => setSearchFromDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">To</Label>
+                  <Input type="date" className="h-8 text-xs" value={searchToDate} onChange={(e) => setSearchToDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Min $</Label>
+                  <Input type="number" className="h-8 text-xs" value={searchMinAmount} onChange={(e) => setSearchMinAmount(e.target.value)} placeholder="0" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max $</Label>
+                  <Input type="number" className="h-8 text-xs" value={searchMaxAmount} onChange={(e) => setSearchMaxAmount(e.target.value)} placeholder="∞" />
+                </div>
+              </div>
+              <Button size="sm" onClick={handleSearchQBTransactions} disabled={searchLoading || !searchCompanyId}>
+                {searchLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Search className="h-4 w-4 mr-1" />}
+                Search QuickBooks
+              </Button>
+
+              {/* Search results */}
+              {searchResults.length > 0 && !selectedTxn && (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  <p className="text-xs text-muted-foreground">{searchResults.length} transaction(s) found</p>
+                  {searchResults.map((txn) => (
+                    <button
+                      key={`${txn.type}:${txn.id}`}
+                      className="w-full text-left border rounded p-2 text-xs hover:bg-accent transition-colors space-y-0.5"
+                      onClick={() => handleSelectTxn(txn)}
+                    >
+                      <div className="flex justify-between">
+                        <span className="font-medium">{txn.type} #{txn.doc_number || txn.id}</span>
+                        <span className="font-semibold">${txn.amount.toFixed(2)}</span>
+                      </div>
+                      <div className="text-muted-foreground">
+                        {txn.txn_date} · {txn.vendor_name || 'No vendor'}{txn.memo ? ` · ${txn.memo.slice(0, 50)}` : ''}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Selected transaction + allocation table */}
+              {selectedTxn && (
+                <div className="space-y-3 border rounded p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{selectedTxn.type} #{selectedTxn.id} — ${selectedTxn.amount.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">{selectedTxn.txn_date} · {selectedTxn.vendor_name || 'No vendor'}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => { setSelectedTxn(null); setAllocations([]); setExistingAllocations([]); }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Existing allocations */}
+                  {existingAllocations.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Already linked: ${allocExistingSum.toFixed(2)}</p>
+                      {existingAllocations.map((ea, i) => {
+                        const profile = allProfiles.find(p => p.id === ea.worker_user_id);
+                        const project = ea.project_id ? allProjects.find(p => p.id === ea.project_id) : null;
+                        return (
+                          <div key={i} className="text-xs bg-muted/50 rounded px-2 py-1 flex justify-between">
+                            <span>{profile?.full_name || 'Unknown'}{project ? ` · ${project.name}` : ''}</span>
+                            <span className="font-medium">${ea.amount.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* New allocations */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">New Allocations</p>
+                    {allocations.map((alloc, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-1 items-end">
+                        <div className="col-span-3 space-y-0.5">
+                          <Label className="text-[10px]">Worker *</Label>
+                          <Select value={alloc.worker_user_id} onValueChange={(v) => {
+                            const next = [...allocations];
+                            next[idx] = { ...next[idx], worker_user_id: v };
+                            setAllocations(next);
+                          }}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Worker" /></SelectTrigger>
+                            <SelectContent>
+                              {allProfiles.map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.full_name || 'Unnamed'}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2 space-y-0.5">
+                          <Label className="text-[10px]">Amount *</Label>
+                          <Input className="h-7 text-xs" type="number" step="0.01" value={alloc.amount} onChange={(e) => {
+                            const next = [...allocations];
+                            next[idx] = { ...next[idx], amount: e.target.value };
+                            setAllocations(next);
+                          }} />
+                        </div>
+                        <div className="col-span-3 space-y-0.5">
+                          <Label className="text-[10px]">Project</Label>
+                          <Select value={alloc.project_id} onValueChange={(v) => {
+                            const next = [...allocations];
+                            next[idx] = { ...next[idx], project_id: v };
+                            setAllocations(next);
+                          }}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Optional" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              {allProjects.map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3 space-y-0.5">
+                          <Label className="text-[10px]">Memo</Label>
+                          <Input className="h-7 text-xs" value={alloc.memo} onChange={(e) => {
+                            const next = [...allocations];
+                            next[idx] = { ...next[idx], memo: e.target.value };
+                            setAllocations(next);
+                          }} />
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          {allocations.length > 1 && (
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setAllocations(allocations.filter((_, i) => i !== idx))}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Payment Date *</Label>
-                <Input type="date" value={histDate} onChange={(e) => setHistDate(e.target.value)} />
-              </div>
-            </div>
+                    <Button size="sm" variant="outline" onClick={() => setAllocations([...allocations, { worker_user_id: '', amount: '', memo: '', project_id: '' }])}>
+                      <Plus className="h-3 w-3 mr-1" />Add Row
+                    </Button>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">QB Vendor ID *</Label>
-                <Input value={histVendorId} onChange={(e) => setHistVendorId(e.target.value)} placeholder="Vendor ID from QuickBooks" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Vendor Name</Label>
-                <Input value={histVendorName} onChange={(e) => setHistVendorName(e.target.value)} placeholder="Display name" />
-              </div>
-            </div>
+                  {/* Running total */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Existing: ${allocExistingSum.toFixed(2)} + New: ${allocNewSum.toFixed(2)} = ${(allocExistingSum + allocNewSum).toFixed(2)} / ${selectedTxn.amount.toFixed(2)}
+                    </span>
+                    {allocExistingSum + allocNewSum > selectedTxn.amount && (
+                      <Badge variant="destructive" className="text-[10px]">Over-allocated</Badge>
+                    )}
+                  </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Expense Account ID *</Label>
-                <Input value={histAccountId} onChange={(e) => setHistAccountId(e.target.value)} placeholder="Account ID from QuickBooks" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Account Name</Label>
-                <Input value={histAccountName} onChange={(e) => setHistAccountName(e.target.value)} placeholder="Display name" />
-              </div>
-            </div>
+                  {linkResult && (
+                    <div className={`text-xs rounded p-2 ${linkResult.success ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
+                      {linkResult.success ? `✓ ${linkResult.message}` : `✗ ${linkResult.message}`}
+                    </div>
+                  )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Amount *</Label>
-                <Input type="number" step="0.01" min="0.01" value={histAmount} onChange={(e) => setHistAmount(e.target.value)} placeholder="0.00" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Project (optional)</Label>
-                <Input value={histProjectId} onChange={(e) => setHistProjectId(e.target.value)} placeholder="Project ID (optional)" />
-              </div>
-            </div>
+                  <Button onClick={handleSaveLinkedAllocations} disabled={linkSaving || allocNewSum <= 0 || allocExistingSum + allocNewSum > selectedTxn.amount} className="w-full">
+                    {linkSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Link2 className="h-4 w-4 mr-1" />}
+                    Save Allocations
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
 
-            <div className="space-y-1">
-              <Label className="text-xs">Memo (optional)</Label>
-              <Textarea value={histMemo} onChange={(e) => setHistMemo(e.target.value)} rows={2} placeholder="Notes for QuickBooks" />
-            </div>
-
-            {histResult && (
-              <div className={`text-xs rounded p-2 ${histResult.success ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
-                {histResult.success
-                  ? `✓ Payment recorded — QuickBooks Purchase ID: ${histResult.purchase_id}`
-                  : `✗ ${histResult.error}`
-                }
+            {/* ─── Save Local Only Tab ─── */}
+            <TabsContent value="local-only" className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Worker *</Label>
+                  <Select value={localWorkerId} onValueChange={setLocalWorkerId}>
+                    <SelectTrigger><SelectValue placeholder="Select worker" /></SelectTrigger>
+                    <SelectContent>
+                      {allProfiles.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.full_name || 'Unnamed'}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Amount *</Label>
+                  <Input type="number" step="0.01" min="0.01" value={localAmount} onChange={(e) => setLocalAmount(e.target.value)} placeholder="0.00" />
+                </div>
               </div>
-            )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Payment Date *</Label>
+                  <Input type="date" value={localDate} onChange={(e) => setLocalDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Company (optional)</Label>
+                  <Select value={localCompanyId} onValueChange={setLocalCompanyId}>
+                    <SelectTrigger><SelectValue placeholder="No company" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.short_name || c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Project (optional)</Label>
+                  <Select value={localProjectId} onValueChange={setLocalProjectId}>
+                    <SelectTrigger><SelectValue placeholder="No project" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {allProjects.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Memo (optional)</Label>
+                  <Input value={localMemo} onChange={(e) => setLocalMemo(e.target.value)} placeholder="Notes" />
+                </div>
+              </div>
 
-            <Button onClick={handleHistoricalPayment} disabled={histSubmitting || !histCompanyId || !histVendorId || !histAccountId || !histAmount || !histDate} className="w-full">
-              {histSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <DollarSign className="h-4 w-4 mr-1" />}
-              Record Payment in QuickBooks
-            </Button>
-          </div>
+              {localResult && (
+                <div className={`text-xs rounded p-2 ${localResult.success ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
+                  {localResult.success ? `✓ ${localResult.message}` : `✗ ${localResult.message}`}
+                </div>
+              )}
+
+              <Button onClick={handleSaveLocalPayment} disabled={localSaving || !localWorkerId || !localAmount || !localDate} className="w-full">
+                {localSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <DollarSign className="h-4 w-4 mr-1" />}
+                Save Local Payment
+              </Button>
+            </TabsContent>
+          </Tabs>
         )}
       </Card>
     </div>

@@ -2251,6 +2251,7 @@ export type Database = {
       worker_payments: {
         Row: {
           amount: number
+          company_id: string | null
           created_at: string
           created_by: string
           external_reference: string | null
@@ -2263,6 +2264,9 @@ export type Database = {
           pay_period_start: string | null
           payment_source: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id: string | null
+          project_id: string | null
+          qb_txn_amount: number | null
+          qb_txn_type: string | null
           status: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id: string | null
           stripe_payout_id: string | null
@@ -2271,6 +2275,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id?: string | null
           created_at?: string
           created_by: string
           external_reference?: string | null
@@ -2283,6 +2288,9 @@ export type Database = {
           pay_period_start?: string | null
           payment_source: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id?: string | null
+          project_id?: string | null
+          qb_txn_amount?: number | null
+          qb_txn_type?: string | null
           status?: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id?: string | null
           stripe_payout_id?: string | null
@@ -2291,6 +2299,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string | null
           created_at?: string
           created_by?: string
           external_reference?: string | null
@@ -2303,6 +2312,9 @@ export type Database = {
           pay_period_start?: string | null
           payment_source?: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id?: string | null
+          project_id?: string | null
+          qb_txn_amount?: number | null
+          qb_txn_type?: string | null
           status?: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id?: string | null
           stripe_payout_id?: string | null
@@ -2310,6 +2322,13 @@ export type Database = {
           worker_user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "worker_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "worker_payments_created_by_fkey"
             columns: ["created_by"]
@@ -2322,6 +2341,13 @@ export type Database = {
             columns: ["payout_run_id"]
             isOneToOne: false
             referencedRelation: "payout_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -2475,6 +2501,31 @@ export type Database = {
       }
       push_recipe_step_to_tasks: { Args: { p_step_id: string }; Returns: Json }
       push_recipe_to_tasks: { Args: { p_recipe_id: string }; Returns: Json }
+      save_linked_historical_payments: {
+        Args: {
+          p_allocations: Json
+          p_caller_id: string
+          p_company_id: string
+          p_external_reference: string
+          p_qb_txn_amount: number
+          p_qb_txn_type: string
+        }
+        Returns: Json
+      }
+      save_local_historical_payment: {
+        Args: {
+          p_amount: number
+          p_caller_id: string
+          p_company_id?: string
+          p_memo?: string
+          p_paid_date: string
+          p_pay_period_end?: string
+          p_pay_period_start?: string
+          p_project_id?: string
+          p_worker_user_id: string
+        }
+        Returns: Json
+      }
       upsert_shift_with_allocations: {
         Args: {
           p_allocations?: Json
@@ -2530,6 +2581,7 @@ export type Database = {
         | "stripe_connect"
         | "manual_quickbooks"
         | "venmo_manual"
+        | "quickbooks_linked"
       worker_payment_status:
         | "pending"
         | "processing"
@@ -2707,6 +2759,7 @@ export const Constants = {
         "stripe_connect",
         "manual_quickbooks",
         "venmo_manual",
+        "quickbooks_linked",
       ],
       worker_payment_status: [
         "pending",
