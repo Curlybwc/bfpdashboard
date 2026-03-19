@@ -13,7 +13,9 @@ import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
 import QBSettingsCard from './QBSettingsCard';
 import type { Tables } from '@/integrations/supabase/types';
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 type ShiftRow = Tables<'shifts'>;
 type ProfileRow = Tables<'profiles'>;
 type ProjectRow = Tables<'projects'>;
