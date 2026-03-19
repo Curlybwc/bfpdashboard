@@ -378,6 +378,7 @@ const ProjectDetail = () => {
   const openEditDialog = () => {
     setEditName(project?.name || '');
     setEditAddress(project?.address || '');
+    setSelectedCompanyId(project?.company_id || '');
     setEditOpen(true);
   };
 
@@ -443,7 +444,11 @@ const ProjectDetail = () => {
     e.preventDefault();
     if (!id || !editName.trim()) return;
     updateProjectMutation.mutate(
-      { name: editName.trim(), address: editAddress.trim() || null },
+      {
+        name: editName.trim(),
+        address: editAddress.trim() || null,
+        company_id: selectedCompanyId || null,
+      },
       { onSuccess: () => setEditOpen(false) },
     );
   };
@@ -800,6 +805,23 @@ const ProjectDetail = () => {
               <Label>Address (optional)</Label>
               <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="e.g. 123 Main St" />
             </div>
+            {isAdmin && companyOptions.length > 0 && (
+              <div className="space-y-2">
+                <Label>Paying Company</Label>
+                <Select value={selectedCompanyId || 'none'} onValueChange={(v) => setSelectedCompanyId(v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Not assigned —</SelectItem>
+                    {companyOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}{c.short_name ? ` (${c.short_name})` : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!selectedCompanyId && (
+                  <p className="text-xs text-destructive">⚠ Company is required for QuickBooks export.</p>
+                )}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={updateProjectMutation.isPending || !editName.trim()}>
               {updateProjectMutation.isPending ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : 'Save'}
             </Button>
@@ -876,9 +898,17 @@ const ProjectDetail = () => {
         </AlertDialogContent>
       </AlertDialog>
       <div className="p-4">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           <StatusBadge status={project.status} />
           {project.address && <span className="text-sm text-muted-foreground">{project.address}</span>}
+          {(() => {
+            const co = companyOptions.find(c => c.id === project.company_id);
+            return co ? (
+              <Badge variant="outline" className="text-xs">{co.short_name || co.name}</Badge>
+            ) : isAdmin ? (
+              <Badge variant="destructive" className="text-[10px]">No company</Badge>
+            ) : null;
+          })()}
         </div>
 
         <AlertsBanner alerts={projectAlerts} />
