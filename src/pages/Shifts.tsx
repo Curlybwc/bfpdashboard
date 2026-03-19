@@ -201,7 +201,7 @@ const Shifts = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <div className="space-y-1">
                 <Label className="text-xs">Contractor</Label>
-                <Select value={contractorFilter} onValueChange={setContractorFilter}>
+                <Select value={contractorFilter || 'all'} onValueChange={(v) => setContractorFilter(v === 'all' ? '' : v)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
@@ -215,7 +215,7 @@ const Shifts = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Project</Label>
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                <Select value={projectFilter || 'all'} onValueChange={(v) => setProjectFilter(v === 'all' ? '' : v)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
