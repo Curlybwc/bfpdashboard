@@ -805,6 +805,23 @@ const ProjectDetail = () => {
               <Label>Address (optional)</Label>
               <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="e.g. 123 Main St" />
             </div>
+            {isAdmin && companyOptions.length > 0 && (
+              <div className="space-y-2">
+                <Label>Paying Company</Label>
+                <Select value={selectedCompanyId || 'none'} onValueChange={(v) => setSelectedCompanyId(v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Not assigned —</SelectItem>
+                    {companyOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}{c.short_name ? ` (${c.short_name})` : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!selectedCompanyId && (
+                  <p className="text-xs text-destructive">⚠ Company is required for QuickBooks export.</p>
+                )}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={updateProjectMutation.isPending || !editName.trim()}>
               {updateProjectMutation.isPending ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</> : 'Save'}
             </Button>
