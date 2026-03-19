@@ -645,10 +645,10 @@ const QBSettingsCard = () => {
 
           {/* Legacy unassigned data warning */}
           {(legacyVendorCount > 0 || legacyBatchCount > 0) && (
-            <div className="p-2 rounded border border-yellow-500/30 bg-yellow-500/5 space-y-1">
+            <div className="p-2 rounded border border-accent/30 bg-accent/5 space-y-1">
               <div className="flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3 text-yellow-600 shrink-0" />
-                <p className="text-xs font-medium text-yellow-700">Legacy data needs assignment</p>
+                <AlertTriangle className="h-3 w-3 text-accent-foreground shrink-0" />
+                <p className="text-xs font-medium text-accent-foreground">Legacy data needs assignment</p>
               </div>
               {legacyVendorCount > 0 && (
                 <p className="text-xs text-muted-foreground">{legacyVendorCount} vendor mapping{legacyVendorCount > 1 ? 's' : ''} have no company assigned.</p>

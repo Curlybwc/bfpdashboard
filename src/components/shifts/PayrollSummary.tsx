@@ -812,8 +812,8 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
         )}
       </Card>
 
-      {/* QuickBooks Settings (admin-only, visible when connected) */}
-      {qbStatus?.connected && <QBSettingsCard />}
+      {/* QuickBooks Settings (always visible — connect button is inside) */}
+      <QBSettingsCard />
 
       {/* Pay period selector */}
       <div className="space-y-1">
