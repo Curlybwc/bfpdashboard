@@ -218,6 +218,7 @@ const QBSettingsCard = () => {
         const classes = (data?.classes || []) as QBClass[];
         setQbClasses(classes);
         setQbClassesLoaded(true);
+        setQbClassesForCompany(selectedCompanyId);
         toast({ title: `Loaded ${classes.length} QB classes` });
       }
     } catch {
