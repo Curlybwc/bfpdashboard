@@ -761,39 +761,141 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
     await loadPayroll();
   };
 
-  const handleHistoricalPayment = async () => {
-    if (!histCompanyId || !histVendorId || !histAccountId || !histAmount || !histDate) {
-      toast({ title: 'Missing fields', description: 'Company, vendor, account, amount, and date are all required.', variant: 'destructive' });
+  // Load profiles and projects for pickers
+  useEffect(() => {
+    const loadPickers = async () => {
+      const [{ data: profiles }, { data: projects }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name'),
+        supabase.from('projects').select('id, name').eq('status', 'active').order('name'),
+      ]);
+      setAllProfiles((profiles || []) as Array<{ id: string; full_name: string | null }>);
+      setAllProjects((projects || []) as Array<{ id: string; name: string }>);
+    };
+    loadPickers();
+  }, []);
+
+  const handleSearchQBTransactions = async () => {
+    if (!searchCompanyId) {
+      toast({ title: 'Missing company', description: 'Select a company to search.', variant: 'destructive' });
       return;
     }
-    setHistSubmitting(true);
-    setHistResult(null);
+    setSearchLoading(true);
+    setSearchResults([]);
+    setSelectedTxn(null);
+    setAllocations([]);
+    setExistingAllocations([]);
+    setLinkResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke('quickbooks_record_expense', {
+      const { data, error } = await supabase.functions.invoke('quickbooks_search_transactions', {
         body: {
-          company_id: histCompanyId,
-          vendor_id: histVendorId,
-          vendor_name: histVendorName,
-          account_id: histAccountId,
-          account_name: histAccountName,
-          amount: parseFloat(histAmount),
-          payment_date: histDate,
-          memo: histMemo || undefined,
-          project_id: histProjectId || undefined,
+          company_id: searchCompanyId,
+          vendor_id: searchVendorId || undefined,
+          from_date: searchFromDate || undefined,
+          to_date: searchToDate || undefined,
+          min_amount: searchMinAmount ? parseFloat(searchMinAmount) : undefined,
+          max_amount: searchMaxAmount ? parseFloat(searchMaxAmount) : undefined,
         },
       });
       if (error) {
-        setHistResult({ success: false, error: error.message });
+        toast({ title: 'Search failed', description: error.message, variant: 'destructive' });
       } else if (data?.error) {
-        setHistResult({ success: false, error: data.message || data.error });
+        toast({ title: 'Search failed', description: data.message || data.error, variant: 'destructive' });
       } else {
-        setHistResult({ success: true, purchase_id: data?.purchase_id });
-        toast({ title: 'Historical payment recorded', description: `QuickBooks Purchase ID: ${data?.purchase_id || 'Created'}` });
+        setSearchResults(data?.transactions || []);
       }
     } catch {
-      setHistResult({ success: false, error: 'Unexpected error' });
+      toast({ title: 'Search failed', variant: 'destructive' });
     }
-    setHistSubmitting(false);
+    setSearchLoading(false);
+  };
+
+  const handleSelectTxn = async (txn: typeof searchResults[0]) => {
+    setSelectedTxn(txn);
+    setAllocations([{ worker_user_id: '', amount: '', memo: '', project_id: '' }]);
+    setLinkResult(null);
+    // Load existing allocations for this txn
+    const extRef = `${txn.type}:${txn.id}`;
+    const { data } = await supabase
+      .from('worker_payments')
+      .select('worker_user_id, amount, memo, project_id')
+      .eq('company_id', searchCompanyId)
+      .eq('external_reference', extRef)
+      .eq('payment_source', 'quickbooks_linked' as any);
+    setExistingAllocations((data || []).map(r => ({
+      worker_user_id: r.worker_user_id,
+      amount: Number(r.amount),
+      memo: r.memo,
+      project_id: r.project_id,
+    })));
+  };
+
+  const allocNewSum = useMemo(() => allocations.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0), [allocations]);
+  const allocExistingSum = useMemo(() => existingAllocations.reduce((s, a) => s + a.amount, 0), [existingAllocations]);
+
+  const handleSaveLinkedAllocations = async () => {
+    if (!user?.id || !selectedTxn) return;
+    const extRef = `${selectedTxn.type}:${selectedTxn.id}`;
+    const valid = allocations.filter(a => a.worker_user_id && parseFloat(a.amount) > 0);
+    if (valid.length === 0) {
+      toast({ title: 'No valid allocations', variant: 'destructive' });
+      return;
+    }
+    setLinkSaving(true);
+    setLinkResult(null);
+    try {
+      const { data, error } = await supabase.rpc('save_linked_historical_payments', {
+        p_caller_id: user.id,
+        p_company_id: searchCompanyId,
+        p_external_reference: extRef,
+        p_qb_txn_type: selectedTxn.type,
+        p_qb_txn_amount: selectedTxn.amount,
+        p_allocations: valid.map(a => ({
+          worker_user_id: a.worker_user_id,
+          amount: parseFloat(a.amount),
+          paid_date: selectedTxn.txn_date,
+          memo: a.memo || null,
+          project_id: a.project_id || null,
+        })),
+      });
+      if (error) {
+        setLinkResult({ success: false, message: error.message });
+      } else {
+        setLinkResult({ success: true, message: `${(data as any)?.inserted_count || valid.length} allocation(s) saved. Total allocated: $${(data as any)?.total_allocated || ''}` });
+        // Refresh existing allocations
+        handleSelectTxn(selectedTxn);
+      }
+    } catch (e) {
+      setLinkResult({ success: false, message: e instanceof Error ? e.message : 'Unknown error' });
+    }
+    setLinkSaving(false);
+  };
+
+  const handleSaveLocalPayment = async () => {
+    if (!user?.id || !localWorkerId || !localAmount || !localDate) {
+      toast({ title: 'Missing fields', description: 'Worker, amount, and date are required.', variant: 'destructive' });
+      return;
+    }
+    setLocalSaving(true);
+    setLocalResult(null);
+    try {
+      const { data, error } = await supabase.rpc('save_local_historical_payment', {
+        p_caller_id: user.id,
+        p_worker_user_id: localWorkerId,
+        p_amount: parseFloat(localAmount),
+        p_paid_date: localDate,
+        p_company_id: localCompanyId || null,
+        p_project_id: localProjectId || null,
+        p_memo: localMemo || null,
+      });
+      if (error) {
+        setLocalResult({ success: false, message: error.message });
+      } else {
+        setLocalResult({ success: true, message: `Payment recorded (ID: ${(data as any)?.payment_id || 'created'})` });
+      }
+    } catch (e) {
+      setLocalResult({ success: false, message: e instanceof Error ? e.message : 'Unknown error' });
+    }
+    setLocalSaving(false);
   };
 
   const totals = useMemo(() => {
