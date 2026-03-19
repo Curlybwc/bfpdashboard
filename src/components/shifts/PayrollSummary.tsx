@@ -181,7 +181,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
   const [searchMaxAmount, setSearchMaxAmount] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<Array<{ id: string; type: string; txn_date: string; amount: number; vendor_name: string | null; memo: string | null; doc_number: string | null }>>([]);
-  const [selectedTxn, setSelectedTxn] = useState<{ id: string; type: string; txn_date: string; amount: number; vendor_name: string | null; memo: string | null } | null>(null);
+  const [selectedTxn, setSelectedTxn] = useState<{ id: string; type: string; txn_date: string; amount: number; vendor_name: string | null; memo: string | null; doc_number: string | null } | null>(null);
   const [allocations, setAllocations] = useState<Array<{ worker_user_id: string; amount: string; memo: string; project_id: string }>>([]);
   const [existingAllocations, setExistingAllocations] = useState<Array<{ worker_user_id: string; amount: number; memo: string | null; project_id: string | null }>>([]);
   const [linkSaving, setLinkSaving] = useState(false);
