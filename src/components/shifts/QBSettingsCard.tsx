@@ -182,9 +182,57 @@ const QBSettingsCard = () => {
     setExpLoading(false);
   }, [selectedCompanyId]);
 
+  const loadLegacyCounts = useCallback(async () => {
+    const [{ count: vendorCount }, { count: batchCount }] = await Promise.all([
+      supabase.from('quickbooks_vendor_mappings').select('id', { count: 'exact', head: true }).is('company_id', null),
+      supabase.from('worker_payable_batches').select('id', { count: 'exact', head: true }).is('company_id', null),
+    ]);
+    setLegacyVendorCount(vendorCount || 0);
+    setLegacyBatchCount(batchCount || 0);
+  }, []);
+
+  const handleClaimLegacyVendors = async () => {
+    if (!selectedCompanyId) return;
+    setClaimingLegacy(true);
+    const { error } = await supabase
+      .from('quickbooks_vendor_mappings')
+      .update({ company_id: selectedCompanyId })
+      .is('company_id', null);
+    setClaimingLegacy(false);
+    if (error) {
+      toast({ title: 'Failed to claim legacy mappings', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Legacy vendor mappings assigned to this company' });
+      setLegacyVendorCount(0);
+      await loadCompanyData();
+    }
+  };
+
+  const handleConnectQBForCompany = async () => {
+    if (!selectedCompanyId) return;
+    setQbConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_connect_begin', {
+        body: { company_id: selectedCompanyId },
+      });
+      if (error || !data?.auth_url) {
+        toast({ title: 'Failed to start QuickBooks connection', description: error?.message || 'No auth URL returned', variant: 'destructive' });
+        setQbConnecting(false);
+        return;
+      }
+      window.open(data.auth_url, '_blank', 'noopener');
+    } catch {
+      toast({ title: 'Failed to start QuickBooks connection', variant: 'destructive' });
+    }
+    setQbConnecting(false);
+  };
+
   useEffect(() => {
-    if (open) loadCompanies();
-  }, [open, loadCompanies]);
+    if (open) {
+      loadCompanies();
+      loadLegacyCounts();
+    }
+  }, [open, loadCompanies, loadLegacyCounts]);
 
   useEffect(() => {
     if (open && selectedCompanyId) loadCompanyData();
