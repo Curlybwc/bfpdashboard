@@ -2251,6 +2251,7 @@ export type Database = {
       worker_payments: {
         Row: {
           amount: number
+          company_id: string | null
           created_at: string
           created_by: string
           external_reference: string | null
@@ -2263,6 +2264,9 @@ export type Database = {
           pay_period_start: string | null
           payment_source: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id: string | null
+          project_id: string | null
+          qb_txn_amount: number | null
+          qb_txn_type: string | null
           status: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id: string | null
           stripe_payout_id: string | null
@@ -2271,6 +2275,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id?: string | null
           created_at?: string
           created_by: string
           external_reference?: string | null
@@ -2283,6 +2288,9 @@ export type Database = {
           pay_period_start?: string | null
           payment_source: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id?: string | null
+          project_id?: string | null
+          qb_txn_amount?: number | null
+          qb_txn_type?: string | null
           status?: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id?: string | null
           stripe_payout_id?: string | null
@@ -2291,6 +2299,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string | null
           created_at?: string
           created_by?: string
           external_reference?: string | null
@@ -2303,6 +2312,9 @@ export type Database = {
           pay_period_start?: string | null
           payment_source?: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id?: string | null
+          project_id?: string | null
+          qb_txn_amount?: number | null
+          qb_txn_type?: string | null
           status?: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id?: string | null
           stripe_payout_id?: string | null
@@ -2310,6 +2322,13 @@ export type Database = {
           worker_user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "worker_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "worker_payments_created_by_fkey"
             columns: ["created_by"]
@@ -2322,6 +2341,13 @@ export type Database = {
             columns: ["payout_run_id"]
             isOneToOne: false
             referencedRelation: "payout_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -2530,6 +2556,7 @@ export type Database = {
         | "stripe_connect"
         | "manual_quickbooks"
         | "venmo_manual"
+        | "quickbooks_linked"
       worker_payment_status:
         | "pending"
         | "processing"
@@ -2707,6 +2734,7 @@ export const Constants = {
         "stripe_connect",
         "manual_quickbooks",
         "venmo_manual",
+        "quickbooks_linked",
       ],
       worker_payment_status: [
         "pending",
