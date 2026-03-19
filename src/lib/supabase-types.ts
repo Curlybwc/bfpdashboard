@@ -13,7 +13,7 @@ export type PricingStatus = 'Priced' | 'Needs Pricing';
 export type PayoutOnboardingStatus = 'not_started' | 'in_progress' | 'completed' | 'restricted';
 export type PayoutRunStatus = 'draft' | 'submitted' | 'completed' | 'canceled' | 'failed' | 'partially_failed';
 export type WorkerPayableBatchStatus = 'draft' | 'exported' | 'paid' | 'voided';
-export type WorkerPaymentSource = 'stripe_connect' | 'manual_quickbooks' | 'venmo_manual';
+export type WorkerPaymentSource = 'stripe_connect' | 'manual_quickbooks' | 'venmo_manual' | 'quickbooks_linked';
 export type WorkerPaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'voided';
 export type WorkerTaxClassification = 'contractor_1099' | 'employee_w2';
 
