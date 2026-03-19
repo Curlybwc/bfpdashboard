@@ -25,6 +25,7 @@ function getOAuthBaseUrl(): string {
 /**
  * Fetch the active (non-disconnected) QuickBooks connection.
  * Automatically refreshes the token if it expires within 5 minutes.
+ * @deprecated Use getConnectionForCompany for multi-company routing.
  */
 export async function getActiveConnection(
   adminClient: SupabaseClient,
@@ -39,6 +40,81 @@ export async function getActiveConnection(
   if (error || !data) return null;
 
   const conn = data as QBConnection;
+  return ensureTokenFresh(adminClient, conn);
+}
+
+/**
+ * Fetch the QuickBooks connection for a specific company.
+ * Resolves company -> qb_connection_id -> connection row.
+ * Automatically refreshes the token if it expires within 5 minutes.
+ */
+export async function getConnectionForCompany(
+  adminClient: SupabaseClient,
+  companyId: string,
+): Promise<{ conn: QBConnection | null; error?: string }> {
+  // Look up the company
+  const { data: company, error: companyError } = await adminClient
+    .from("companies")
+    .select("id, name, short_name, qb_connection_id")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (companyError) {
+    return { conn: null, error: `Failed to look up company: ${companyError.message}` };
+  }
+  if (!company) {
+    return { conn: null, error: `Company not found (${companyId})` };
+  }
+  if (!company.qb_connection_id) {
+    return { conn: null, error: `Company "${company.name}" has no QuickBooks connection linked. Go to QuickBooks Settings and link a connection.` };
+  }
+
+  // Fetch the specific connection
+  const { data: connRow, error: connError } = await adminClient
+    .from("quickbooks_connections")
+    .select("*")
+    .eq("id", company.qb_connection_id)
+    .is("disconnected_at", null)
+    .maybeSingle();
+
+  if (connError) {
+    return { conn: null, error: `Failed to fetch QuickBooks connection: ${connError.message}` };
+  }
+  if (!connRow) {
+    return { conn: null, error: `QuickBooks connection for "${company.name}" is disconnected or missing. Reconnect QuickBooks for this company.` };
+  }
+
+  const conn = await ensureTokenFresh(adminClient, connRow as QBConnection);
+  if (!conn) {
+    return { conn: null, error: `Failed to refresh QuickBooks token for "${company.name}". Reconnect QuickBooks.` };
+  }
+
+  return { conn };
+}
+
+/**
+ * Fetch a specific connection by its ID directly.
+ * Used by list functions when caller provides a connection_id.
+ */
+export async function getConnectionById(
+  adminClient: SupabaseClient,
+  connectionId: string,
+): Promise<QBConnection | null> {
+  const { data, error } = await adminClient
+    .from("quickbooks_connections")
+    .select("*")
+    .eq("id", connectionId)
+    .is("disconnected_at", null)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return ensureTokenFresh(adminClient, data as QBConnection);
+}
+
+async function ensureTokenFresh(
+  adminClient: SupabaseClient,
+  conn: QBConnection,
+): Promise<QBConnection | null> {
   const expiresAt = new Date(conn.token_expires_at).getTime();
   const fiveMinFromNow = Date.now() + 5 * 60 * 1000;
 
@@ -46,9 +122,7 @@ export async function getActiveConnection(
     return conn;
   }
 
-  // Token is expiring soon — refresh it
-  const refreshed = await refreshToken(adminClient, conn);
-  return refreshed;
+  return refreshToken(adminClient, conn);
 }
 
 async function refreshToken(

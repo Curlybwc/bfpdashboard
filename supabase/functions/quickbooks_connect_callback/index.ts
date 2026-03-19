@@ -118,27 +118,47 @@ Deno.serve(async (req) => {
     // Non-fatal — we just won't have the display name
   }
 
-  // Disconnect any existing active connection
-  await adminClient
+  // Check if this realm is already connected (reconnecting same company)
+  const { data: existingConn } = await adminClient
     .from("quickbooks_connections")
-    .update({ disconnected_at: new Date().toISOString() })
-    .is("disconnected_at", null);
+    .select("id")
+    .eq("realm_id", realmId)
+    .is("disconnected_at", null)
+    .maybeSingle();
 
-  // Insert new connection
-  const { error: insertError } = await adminClient
-    .from("quickbooks_connections")
-    .insert({
-      realm_id: realmId,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      token_expires_at: expiresAt,
-      company_name: companyName,
-      connected_by: userId,
-    });
+  if (existingConn) {
+    // Update existing connection with new tokens
+    const { error: updateError } = await adminClient
+      .from("quickbooks_connections")
+      .update({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        token_expires_at: expiresAt,
+        company_name: companyName,
+      })
+      .eq("id", existingConn.id);
 
-  if (insertError) {
-    console.error("Failed to store QB connection:", insertError.message);
-    return redirectError("Failed to store connection");
+    if (updateError) {
+      console.error("Failed to update QB connection:", updateError.message);
+      return redirectError("Failed to update connection");
+    }
+  } else {
+    // Insert new connection (do NOT disconnect existing connections — multi-company support)
+    const { error: insertError } = await adminClient
+      .from("quickbooks_connections")
+      .insert({
+        realm_id: realmId,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        token_expires_at: expiresAt,
+        company_name: companyName,
+        connected_by: userId,
+      });
+
+    if (insertError) {
+      console.error("Failed to store QB connection:", insertError.message);
+      return redirectError("Failed to store connection");
+    }
   }
 
   return redirectSuccess();
