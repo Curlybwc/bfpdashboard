@@ -898,9 +898,17 @@ const ProjectDetail = () => {
         </AlertDialogContent>
       </AlertDialog>
       <div className="p-4">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           <StatusBadge status={project.status} />
           {project.address && <span className="text-sm text-muted-foreground">{project.address}</span>}
+          {(() => {
+            const co = companyOptions.find(c => c.id === project.company_id);
+            return co ? (
+              <Badge variant="outline" className="text-xs">{co.short_name || co.name}</Badge>
+            ) : isAdmin ? (
+              <Badge variant="destructive" className="text-[10px]">No company</Badge>
+            ) : null;
+          })()}
         </div>
 
         <AlertsBanner alerts={projectAlerts} />
