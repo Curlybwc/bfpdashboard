@@ -170,19 +170,35 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
   const [vendorMappings, setVendorMappings] = useState<Map<string, Map<string, { qb_vendor_id: string; qb_vendor_name: string }>>>(new Map());
   const [classMappings, setClassMappings] = useState<Map<string, string>>(new Map());
 
-  // Historical payment form state
+  // Historical payment section state
   const [histOpen, setHistOpen] = useState(false);
-  const [histCompanyId, setHistCompanyId] = useState('');
-  const [histVendorId, setHistVendorId] = useState('');
-  const [histVendorName, setHistVendorName] = useState('');
-  const [histAccountId, setHistAccountId] = useState('');
-  const [histAccountName, setHistAccountName] = useState('');
-  const [histAmount, setHistAmount] = useState('');
-  const [histDate, setHistDate] = useState('');
-  const [histMemo, setHistMemo] = useState('');
-  const [histProjectId, setHistProjectId] = useState('');
-  const [histSubmitting, setHistSubmitting] = useState(false);
-  const [histResult, setHistResult] = useState<{ success: boolean; purchase_id?: string; error?: string } | null>(null);
+  // Search & Link mode
+  const [searchCompanyId, setSearchCompanyId] = useState('');
+  const [searchVendorId, setSearchVendorId] = useState('');
+  const [searchFromDate, setSearchFromDate] = useState('');
+  const [searchToDate, setSearchToDate] = useState('');
+  const [searchMinAmount, setSearchMinAmount] = useState('');
+  const [searchMaxAmount, setSearchMaxAmount] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; type: string; txn_date: string; amount: number; vendor_name: string | null; memo: string | null; doc_number: string | null }>>([]);
+  const [selectedTxn, setSelectedTxn] = useState<{ id: string; type: string; txn_date: string; amount: number; vendor_name: string | null; memo: string | null } | null>(null);
+  const [allocations, setAllocations] = useState<Array<{ worker_user_id: string; amount: string; memo: string; project_id: string }>>([]);
+  const [existingAllocations, setExistingAllocations] = useState<Array<{ worker_user_id: string; amount: number; memo: string | null; project_id: string | null }>>([]);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkResult, setLinkResult] = useState<{ success: boolean; message: string } | null>(null);
+  // Local-only mode
+  const [localWorkerId, setLocalWorkerId] = useState('');
+  const [localCompanyId, setLocalCompanyId] = useState('');
+  const [localProjectId, setLocalProjectId] = useState('');
+  const [localAmount, setLocalAmount] = useState('');
+  const [localDate, setLocalDate] = useState('');
+  const [localMemo, setLocalMemo] = useState('');
+  const [localSaving, setLocalSaving] = useState(false);
+  const [localResult, setLocalResult] = useState<{ success: boolean; message: string } | null>(null);
+  // Profile list for worker pickers
+  const [allProfiles, setAllProfiles] = useState<Array<{ id: string; full_name: string | null }>>([]);
+  // Project list for project pickers
+  const [allProjects, setAllProjects] = useState<Array<{ id: string; name: string }>>([]);
 
   // QuickBooks connection state
   const [qbStatus, setQbStatus] = useState<QBConnectionStatus | null>(null);
