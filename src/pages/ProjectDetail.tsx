@@ -98,6 +98,8 @@ const ProjectDetail = () => {
   const { toast } = useToast();
   const { isAdmin } = useAdmin();
   const queryClient = useQueryClient();
+  const [companyOptions, setCompanyOptions] = useState<{ id: string; name: string; short_name: string | null }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
 
   // Server state via React Query
   const { data, isLoading } = useProjectDetail(id, user?.id);
