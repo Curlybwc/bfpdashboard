@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import QBCombobox from './QBCombobox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2, Pencil } from 'lucide-react';
+import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2, Pencil, Link2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
