@@ -37,12 +37,26 @@ type CandidateGroup = {
   key: string;
   worker_user_id: string;
   project_id: string;
+  company_id: string | null;
+  companyName: string;
   contractorName: string;
   projectName: string;
   periodStart: string;
   periodEnd: string;
   shifts: ShiftWithComputed[];
   totalHours: number;
+  totalDollars: number;
+};
+
+type BillGroupPreview = {
+  key: string;
+  company_id: string;
+  companyName: string;
+  qb_vendor_id: string;
+  qb_vendor_name: string;
+  periodStart: string;
+  periodEnd: string;
+  lines: { contractorName: string; projectName: string; projectId: string; qbClassName: string | null; dollars: number }[];
   totalDollars: number;
 };
 
