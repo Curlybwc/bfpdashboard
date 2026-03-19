@@ -81,11 +81,12 @@ const QBSettingsCard = () => {
   const [classEdits, setClassEdits] = useState<Record<string, { qb_class_id: string; qb_class_name: string }>>({});
   const [classSaving, setClassSaving] = useState<string | null>(null);
 
-  // QB classes from API
+  // QB classes from API — keyed to the company they were loaded for
   const [qbClasses, setQbClasses] = useState<QBClass[]>([]);
   const [qbClassesLoading, setQbClassesLoading] = useState(false);
   const [qbClassesLoaded, setQbClassesLoaded] = useState(false);
   const [qbClassesError, setQbClassesError] = useState<string | null>(null);
+  const [qbClassesForCompany, setQbClassesForCompany] = useState<string>('');
 
   // QB accounts from API (for expense account picker)
   const [qbAccounts, setQbAccounts] = useState<QBAccount[]>([]);
