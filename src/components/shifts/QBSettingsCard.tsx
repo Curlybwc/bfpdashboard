@@ -307,6 +307,8 @@ const QBSettingsCard = () => {
   };
 
   const selectClassForProject = (projectId: string, classId: string) => {
+    // Guard: only allow selection if classes belong to the currently selected company
+    if (qbClassesForCompany !== selectedCompanyId) return;
     const qbClass = qbClasses.find((c) => c.id === classId);
     if (!qbClass) return;
     setClassEdits((prev) => ({
