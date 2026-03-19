@@ -444,7 +444,11 @@ const ProjectDetail = () => {
     e.preventDefault();
     if (!id || !editName.trim()) return;
     updateProjectMutation.mutate(
-      { name: editName.trim(), address: editAddress.trim() || null },
+      {
+        name: editName.trim(),
+        address: editAddress.trim() || null,
+        company_id: selectedCompanyId || null,
+      },
       { onSuccess: () => setEditOpen(false) },
     );
   };
