@@ -85,6 +85,7 @@ type QBConnectionStatus = {
 
 interface PayrollSummaryProps {
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
+  billFirstMode?: boolean;
 }
 
 // Generate biweekly pay periods (Monday → second Sunday)
