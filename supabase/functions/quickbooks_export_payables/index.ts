@@ -70,11 +70,12 @@ Deno.serve(async (req) => {
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name || "Unknown"]));
 
     // Pre-validate all batches and build grouped bill keys
-    // Grouping key: company_id + qb_vendor_id + period_start + period_end
+    // Grouping key: company_id + qb_vendor_id + project_id + period_start + period_end
     type BillGroup = {
       companyId: string;
       qbVendorId: string;
       qbVendorName: string;
+      projectId: string;
       periodStart: string;
       periodEnd: string;
       lines: { batch: any; projectName: string; projectAddress: string | null; classId: string | null; className: string | null; amount: number; description: string; workerName: string }[];
