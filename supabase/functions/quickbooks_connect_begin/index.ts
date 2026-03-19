@@ -9,6 +9,16 @@ Deno.serve(async (req) => {
   try {
     const { userId } = await requireAdminAuth(req);
 
+    const body = await req.json().catch(() => ({}));
+    const companyId = body.company_id;
+
+    if (!companyId || typeof companyId !== "string") {
+      return new Response(
+        JSON.stringify({ error: "bad_request", message: "company_id is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const clientId = Deno.env.get("QB_CLIENT_ID");
     const redirectUri = Deno.env.get("QB_REDIRECT_URI");
     const scopes = Deno.env.get("QB_OAUTH_SCOPES") || "com.intuit.quickbooks.accounting";
@@ -21,8 +31,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build state: userId + timestamp, signed with HMAC
-    const statePayload = `${userId}:${Date.now()}`;
+    // Build state: companyId:userId:timestamp, signed with HMAC
+    const statePayload = `${companyId}:${userId}:${Date.now()}`;
     const stateSig = await signState(statePayload, stateSecret);
     const state = `${statePayload}:${stateSig}`;
 
