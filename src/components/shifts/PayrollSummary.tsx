@@ -777,6 +777,352 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
     return { candidateDollars, exportedDollars, paidDollars };
   }, [candidateGroups, exportedGroups, paidGroups]);
 
+  // Reusable bill preview JSX
+  const billPreviewContent = billGroupPreviews.length > 0 ? (
+    <Card className="p-3 space-y-2">
+      <div>
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-medium">QuickBooks Bill Preview</p>
+        </div>
+        <p className="text-xs text-muted-foreground">How eligible items will group into bills when exported (by company + QB vendor + project + period).</p>
+      </div>
+      <div className="space-y-2">
+        {billGroupPreviews.map((bp) => {
+          const firstProjectId = bp.lines[0]?.projectId;
+          const workerUserIds = [...new Set(bp.lines.map(l => {
+            const cg = candidateGroups.find(g =>
+              g.contractorName === l.contractorName && g.project_id === l.projectId
+            );
+            return cg?.worker_user_id;
+          }).filter(Boolean))];
+          const drillDownParams = new URLSearchParams();
+          if (firstProjectId) drillDownParams.set('project', firstProjectId);
+          drillDownParams.set('from', bp.periodStart);
+          drillDownParams.set('to', bp.periodEnd);
+          if (workerUserIds.length === 1 && workerUserIds[0]) {
+            drillDownParams.set('contractor', workerUserIds[0]);
+          }
+          const drillDownUrl = `/shifts?${drillDownParams.toString()}`;
+
+          return (
+            <div key={bp.key} className="border rounded p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{bp.companyName} → {bp.qb_vendor_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {bp.lines[0]?.projectName && <span>{bp.lines[0].projectName} · </span>}
+                    {bp.periodStart} → {bp.periodEnd}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold">${bp.totalDollars.toFixed(2)}</p>
+                  <Button size="sm" variant="ghost" className="h-6 text-xs px-2" asChild>
+                    <a href={drillDownUrl}>View Shifts</a>
+                  </Button>
+                </div>
+              </div>
+              <div className="text-xs space-y-0.5 pl-2 border-l-2 border-muted">
+                {bp.lines.map((line, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2">
+                    <span>
+                      {line.contractorName} · {line.projectName}
+                      {line.qbClassName && <span className="text-muted-foreground ml-1">(Class: {line.qbClassName})</span>}
+                    </span>
+                    <span className="font-medium">${line.dollars.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  ) : null;
+
+  // Ready to Pay content (shared between modes)
+  const readyToPayContent = (
+    <>
+      {loading ? (
+        <p className="text-xs text-muted-foreground flex items-center"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Loading…</p>
+      ) : candidateGroups.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No unpaid shifts available to prepare in this date range.</p>
+      ) : (
+        <div className="space-y-2">
+          {candidateGroups.map((group) => (
+            <Collapsible key={group.key} open={expandedCandidates.has(group.key)} onOpenChange={() => toggleCandidate(group.key)}>
+              <CollapsibleTrigger asChild>
+                <div className="rounded border border-border px-3 py-2 cursor-pointer hover:bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedCandidates.has(group.key) ? 'rotate-180' : ''}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate">
+                        <span className="text-muted-foreground">{group.companyName} →</span> {group.contractorName} · {group.projectName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{group.periodStart} → {group.periodEnd} · {group.shifts.length} shifts</p>
+                    </div>
+                    <p className="text-sm font-medium">${group.totalDollars.toFixed(2)}</p>
+                  </div>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-1 pl-4 space-y-1">
+                {group.shifts.map((row) => (
+                  <div key={row.shift.id} className="text-xs border rounded p-2 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span>{row.shift.shift_date} · {Number(row.shift.total_hours)}h @ ${row.rateUsed.toFixed(2)}</span>
+                      <span className="font-medium">${row.dollars.toFixed(2)}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 text-muted-foreground">
+                      {row.allocations.map((a, idx) => <span key={`${row.shift.id}-${idx}`}>{a.task_name}: {a.hours}h</span>)}
+                    </div>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onEditShift({ id: row.shift.id })}>
+                      <Pencil className="h-3 w-3 mr-1" />Edit Shift
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" disabled={creatingGroupKey === group.key || payingGroupKey === group.key} onClick={() => handleCreatePayable(group)}>
+                    {creatingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                    Prepare Payment
+                  </Button>
+                  <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)}>
+                    {payingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                    Record as Paid (Local Only)
+                  </Button>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  // Prepared Payments content
+  const preparedPaymentsContent = (
+    <>
+      {exportedGroups.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No prepared payments for this date range.</p>
+      ) : (
+        <div className="space-y-2">
+          {exportedGroups.map((group) => {
+            const key = `existing-${group.batch.id}`;
+            const qbBillUrl = getQBBillUrl(group.batch);
+            const isDraft = group.batch.status === 'draft';
+            const isExported = group.batch.status === 'exported';
+            const exportError = group.batch.qb_export_error;
+
+            return (
+              <Collapsible key={group.batch.id} open={expandedExisting.has(key)} onOpenChange={() => toggleExisting(key)}>
+                <CollapsibleTrigger asChild>
+                  <div className="rounded border border-border px-3 py-2 cursor-pointer hover:bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedExisting.has(key) ? 'rotate-180' : ''}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
+                          <Badge variant={isExported ? 'default' : 'secondary'} className="text-[10px] h-5">
+                            {isExported ? 'Sent to QuickBooks' : 'Prepared'}
+                          </Badge>
+                          {group.batch.qb_bill_doc_number && (
+                            <Badge variant="outline" className="text-[10px] h-5">
+                              QB #{group.batch.qb_bill_doc_number}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end}</p>
+                      </div>
+                      <p className="text-sm font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
+                      {(isDraft || isExported) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-2 h-7 text-xs gap-1"
+                          disabled={updatingBatchId === group.batch.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMarkPaid(group.batch.id);
+                          }}
+                        >
+                          {updatingBatchId === group.batch.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                           Mark Paid (Local Only)
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-1 pl-4 space-y-1">
+                  {exportError && (
+                    <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 rounded p-2">
+                      <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                      <span>{exportError}</span>
+                    </div>
+                  )}
+
+                  {group.shifts.map((row) => (
+                    <div key={row.shift.id} className="text-xs border rounded p-2 flex items-center justify-between">
+                      <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h · ${row.dollars.toFixed(2)}</span>
+                      {isDraft && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                          disabled={removingShiftId === row.shift.id}
+                          onClick={() => handleRemoveShiftFromBatch(row.shift.id, group.batch.id)}
+                          title="Remove this shift from group"
+                        >
+                          {removingShiftId === row.shift.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap gap-2">
+                    {isDraft && qbStatus?.connected && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={exportingBatchIds.has(group.batch.id)}
+                        onClick={() => handleExportToQB(group.batch.id)}
+                      >
+                        {exportingBatchIds.has(group.batch.id) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                        Export to QuickBooks
+                      </Button>
+                    )}
+                    {isExported && qbBillUrl && (
+                      <Button size="sm" variant="outline" asChild>
+                        <a href={qbBillUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Open in QuickBooks
+                        </a>
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      disabled={updatingBatchId === group.batch.id}
+                      onClick={() => handleMarkPaid(group.batch.id)}
+                    >
+                      {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                      Mark Paid (Local Only)
+                    </Button>
+                    {isDraft && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={voidingBatchId === group.batch.id}
+                        onClick={() => handleVoidBatch(group.batch.id)}
+                      >
+                        {voidingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                        Void Group
+                      </Button>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  // Already Paid content
+  const alreadyPaidContent = (
+    <>
+      {paidGroups.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No paid records for this date range.</p>
+      ) : (
+        <div className="space-y-1">
+          {paidGroups.map((group) => {
+            const qbBillUrl = getQBBillUrl(group.batch);
+            return (
+              <div key={group.batch.id} className="text-xs border rounded p-2 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p>{group.contractorName} · {group.projectName}</p>
+                    {group.batch.qb_bill_doc_number && (
+                      <Badge variant="outline" className="text-[10px] h-5">
+                        QB #{group.batch.qb_bill_doc_number}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · Paid on {group.batch.paid_at ? new Date(group.batch.paid_at).toLocaleDateString() : '—'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {qbBillUrl && (
+                    <a href={qbBillUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  <p className="font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  // Excluded shifts content
+  const excludedContent = (
+    <>
+      {excludedShifts.length === 0 ? (
+        <p className="text-xs text-muted-foreground">All shifts in this range are available.</p>
+      ) : (
+        <div className="space-y-1">
+          {excludedShifts.map((row) => (
+            <div key={row.shift.shift.id} className="text-xs border rounded p-2 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p>{row.shift.workerName} · {row.shift.projectName} · {row.shift.shift.shift_date} · {Number(row.shift.shift.total_hours)}h</p>
+                <p className="text-muted-foreground">{row.reason}</p>
+              </div>
+              {row.linkedBatchId && (
+                <div className="flex gap-1 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2"
+                    disabled={removingShiftId === row.shift.shift.id}
+                    onClick={() => handleRemoveShiftFromBatch(row.shift.shift.id, row.linkedBatchId!)}
+                    title="Remove this shift from its group"
+                  >
+                    {removingShiftId === row.shift.shift.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3 mr-1" />}
+                    Remove
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs px-2 text-destructive hover:text-destructive"
+                    disabled={voidingBatchId === row.linkedBatchId}
+                    onClick={() => handleVoidBatch(row.linkedBatchId!)}
+                    title="Void the entire payment group"
+                  >
+                    {voidingBatchId === row.linkedBatchId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                    Void Group
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  // Helper to wrap a section in a collapsible card for billFirstMode
+  const collapsibleSection = (title: string, count: number, content: React.ReactNode) => (
+    <Collapsible>
+      <Card className="p-3 space-y-2">
+        <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          <p className="text-sm font-medium">{title}</p>
+          <Badge variant="secondary" className="text-[10px] ml-auto">{count}</Badge>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-2">{content}</CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+
   return (
     <div className="space-y-4">
       {/* QuickBooks Connection Banner */}
@@ -813,7 +1159,6 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
         )}
       </Card>
 
-      {/* QuickBooks Settings (always visible — connect button is inside) */}
       <QBSettingsCard />
 
       {/* Pay period selector */}
@@ -841,377 +1186,56 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
         <p>Already paid: <span className="text-foreground font-medium">${totals.paidDollars.toFixed(2)}</span></p>
       </Card>
 
-      {/* Bill Preview — shown first in billFirstMode */}
-      {billFirstMode && billGroupPreviews.length > 0 && renderBillPreview()}
-
-      {/* Unpaid Eligible Groups */}
       {billFirstMode ? (
-        <Collapsible>
-          <Card className="p-3 space-y-2">
-            <CollapsibleTrigger className="flex items-center gap-2 w-full">
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              <p className="text-sm font-medium">Ready to Pay</p>
-              <Badge variant="secondary" className="text-[10px] ml-auto">{candidateGroups.length}</Badge>
-            </CollapsibleTrigger>
-            <CollapsibleContent>{renderReadyToPay()}</CollapsibleContent>
-          </Card>
-        </Collapsible>
+        <>
+          {/* Bill preview is primary in billFirstMode */}
+          {billPreviewContent}
+
+          {collapsibleSection('Ready to Pay', candidateGroups.length, readyToPayContent)}
+          {collapsibleSection('Prepared Payments', exportedGroups.length, preparedPaymentsContent)}
+          {collapsibleSection('Already Paid', paidGroups.length, alreadyPaidContent)}
+          {collapsibleSection('Already Included Elsewhere', excludedShifts.length, excludedContent)}
+        </>
       ) : (
-      <Card className="p-3 space-y-2">
-        <div>
-          <p className="text-sm font-medium">Ready to Pay</p>
-          <p className="text-xs text-muted-foreground">These contractor/project groups have unpaid shifts that can be prepared as a payment now.</p>
-        </div>
-
-        {loading ? (
-          <p className="text-xs text-muted-foreground flex items-center"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Loading…</p>
-        ) : candidateGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No unpaid shifts available to prepare in this date range.</p>
-        ) : (
-          <div className="space-y-2">
-            {candidateGroups.map((group) => (
-              <Collapsible key={group.key} open={expandedCandidates.has(group.key)} onOpenChange={() => toggleCandidate(group.key)}>
-                <CollapsibleTrigger asChild>
-                  <div className="rounded border border-border px-3 py-2 cursor-pointer hover:bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedCandidates.has(group.key) ? 'rotate-180' : ''}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm truncate">
-                          <span className="text-muted-foreground">{group.companyName} →</span> {group.contractorName} · {group.projectName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{group.periodStart} → {group.periodEnd} · {group.shifts.length} shifts</p>
-                      </div>
-                      <p className="text-sm font-medium">${group.totalDollars.toFixed(2)}</p>
-                    </div>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-1 pl-4 space-y-1">
-                  {group.shifts.map((row) => (
-                    <div key={row.shift.id} className="text-xs border rounded p-2 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span>{row.shift.shift_date} · {Number(row.shift.total_hours)}h @ ${row.rateUsed.toFixed(2)}</span>
-                        <span className="font-medium">${row.dollars.toFixed(2)}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 text-muted-foreground">
-                        {row.allocations.map((a, idx) => <span key={`${row.shift.id}-${idx}`}>{a.task_name}: {a.hours}h</span>)}
-                      </div>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onEditShift({ id: row.shift.id })}>
-                        <Pencil className="h-3 w-3 mr-1" />Edit Shift
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" disabled={creatingGroupKey === group.key || payingGroupKey === group.key} onClick={() => handleCreatePayable(group)}>
-                      {creatingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                      Prepare Payment
-                    </Button>
-                    <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)}>
-                      {payingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                      Record as Paid (Local Only)
-                    </Button>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Exported / Draft Payables */}
-      <Card className="p-3 space-y-2">
-        <div>
-          <p className="text-sm font-medium">Prepared Payments</p>
-          <p className="text-xs text-muted-foreground">These payments have been prepared. Their shifts won't appear in Ready to Pay.</p>
-        </div>
-        {exportedGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No prepared payments for this date range.</p>
-        ) : (
-          <div className="space-y-2">
-            {exportedGroups.map((group) => {
-              const key = `existing-${group.batch.id}`;
-              const qbBillUrl = getQBBillUrl(group.batch);
-              const isDraft = group.batch.status === 'draft';
-              const isExported = group.batch.status === 'exported';
-              const exportError = group.batch.qb_export_error;
-
-              return (
-                <Collapsible key={group.batch.id} open={expandedExisting.has(key)} onOpenChange={() => toggleExisting(key)}>
-                  <CollapsibleTrigger asChild>
-                    <div className="rounded border border-border px-3 py-2 cursor-pointer hover:bg-muted/30">
-                      <div className="flex items-center gap-2">
-                        <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expandedExisting.has(key) ? 'rotate-180' : ''}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
-                            <Badge variant={isExported ? 'default' : 'secondary'} className="text-[10px] h-5">
-                              {isExported ? 'Sent to QuickBooks' : 'Prepared'}
-                            </Badge>
-                            {group.batch.qb_bill_doc_number && (
-                              <Badge variant="outline" className="text-[10px] h-5">
-                                QB #{group.batch.qb_bill_doc_number}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end}</p>
-                        </div>
-                        <p className="text-sm font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
-                        {(isDraft || isExported) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="ml-2 h-7 text-xs gap-1"
-                            disabled={updatingBatchId === group.batch.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMarkPaid(group.batch.id);
-                            }}
-                          >
-                            {updatingBatchId === group.batch.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
-                             Mark Paid (Local Only)
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-1 pl-4 space-y-1">
-                    {/* Export error display */}
-                    {exportError && (
-                      <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 rounded p-2">
-                        <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
-                        <span>{exportError}</span>
-                      </div>
-                    )}
-
-                    {group.shifts.map((row) => (
-                      <div key={row.shift.id} className="text-xs border rounded p-2 flex items-center justify-between">
-                        <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h · ${row.dollars.toFixed(2)}</span>
-                        {isDraft && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                            disabled={removingShiftId === row.shift.id}
-                            onClick={() => handleRemoveShiftFromBatch(row.shift.id, group.batch.id)}
-                            title="Remove this shift from group"
-                          >
-                            {removingShiftId === row.shift.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    <div className="flex flex-wrap gap-2">
-                      {/* Export to QuickBooks — only for draft batches with active QB connection */}
-                      {isDraft && qbStatus?.connected && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={exportingBatchIds.has(group.batch.id)}
-                          onClick={() => handleExportToQB(group.batch.id)}
-                        >
-                          {exportingBatchIds.has(group.batch.id) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                          Export to QuickBooks
-                        </Button>
-                      )}
-
-                      {/* Open in QuickBooks — for exported batches with a QB reference */}
-                      {isExported && qbBillUrl && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          asChild
-                        >
-                          <a href={qbBillUrl} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Open in QuickBooks
-                          </a>
-                        </Button>
-                      )}
-
-                      {/* Mark Paid (Local Only) — does NOT create a QuickBooks BillPayment */}
-                      <Button
-                        size="sm"
-                        disabled={updatingBatchId === group.batch.id}
-                        onClick={() => handleMarkPaid(group.batch.id)}
-                      >
-                        {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                        Mark Paid (Local Only)
-                      </Button>
-                      {/* Void entire group */}
-                      {isDraft && (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={voidingBatchId === group.batch.id}
-                          onClick={() => handleVoidBatch(group.batch.id)}
-                        >
-                          {voidingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
-                          Void Group
-                        </Button>
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      {/* Paid Payables */}
-      <Card className="p-3 space-y-2">
-        <div>
-          <p className="text-sm font-medium">Already Paid</p>
-          <p className="text-xs text-muted-foreground">These payments were already recorded as paid.</p>
-        </div>
-        {paidGroups.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No paid records for this date range.</p>
-        ) : (
-          <div className="space-y-1">
-            {paidGroups.map((group) => {
-              const qbBillUrl = getQBBillUrl(group.batch);
-              return (
-                <div key={group.batch.id} className="text-xs border rounded p-2 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p>{group.contractorName} · {group.projectName}</p>
-                      {group.batch.qb_bill_doc_number && (
-                        <Badge variant="outline" className="text-[10px] h-5">
-                          QB #{group.batch.qb_bill_doc_number}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · Paid on {group.batch.paid_at ? new Date(group.batch.paid_at).toLocaleDateString() : '—'}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {qbBillUrl && (
-                      <a href={qbBillUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                    <p className="font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      {/* Excluded Shifts */}
-      <Card className="p-3 space-y-2">
-        <div>
-          <p className="text-sm font-medium">Already Included Elsewhere</p>
-          <p className="text-xs text-muted-foreground">These shifts are already part of another payment group, so they can't be included again.</p>
-        </div>
-        {excludedShifts.length === 0 ? (
-          <p className="text-xs text-muted-foreground">All shifts in this range are available.</p>
-        ) : (
-          <div className="space-y-1">
-            {excludedShifts.map((row) => (
-              <div key={row.shift.shift.id} className="text-xs border rounded p-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p>{row.shift.workerName} · {row.shift.projectName} · {row.shift.shift.shift_date} · {Number(row.shift.shift.total_hours)}h</p>
-                  <p className="text-muted-foreground">{row.reason}</p>
-                </div>
-                {row.linkedBatchId && (
-                  <div className="flex gap-1 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 text-xs px-2"
-                      disabled={removingShiftId === row.shift.shift.id}
-                      onClick={() => handleRemoveShiftFromBatch(row.shift.shift.id, row.linkedBatchId!)}
-                      title="Remove this shift from its group"
-                    >
-                      {removingShiftId === row.shift.shift.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3 mr-1" />}
-                      Remove
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 text-xs px-2 text-destructive hover:text-destructive"
-                      disabled={voidingBatchId === row.linkedBatchId}
-                      onClick={() => handleVoidBatch(row.linkedBatchId!)}
-                      title="Void the entire payment group"
-                    >
-                      {voidingBatchId === row.linkedBatchId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 mr-1" />}
-                      Void Group
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Bill Group Preview — shows how items will group when exported to QuickBooks */}
-      {billGroupPreviews.length > 0 && (
-        <Card className="p-3 space-y-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm font-medium">QuickBooks Bill Preview</p>
+        <>
+          {/* Standard mode: detail sections expanded, bill preview at bottom */}
+          <Card className="p-3 space-y-2">
+            <div>
+              <p className="text-sm font-medium">Ready to Pay</p>
+              <p className="text-xs text-muted-foreground">These contractor/project groups have unpaid shifts that can be prepared as a payment now.</p>
             </div>
-            <p className="text-xs text-muted-foreground">How eligible items will group into bills when exported (by company + QB vendor + project + period).</p>
-          </div>
-          <div className="space-y-2">
-            {billGroupPreviews.map((bp) => {
-              // Drill-down: always include project + dates. Include contractor only if single worker.
-              const uniqueWorkerIds = [...new Set(bp.lines.map(l => l.projectId))]; // reuse projectId from first line for project filter
-              const firstProjectId = bp.lines[0]?.projectId;
-              const workerUserIds = [...new Set(bp.lines.map(l => {
-                // Find the candidateGroup that matches this line to get worker_user_id
-                const cg = candidateGroups.find(g =>
-                  g.contractorName === l.contractorName && g.project_id === l.projectId
-                );
-                return cg?.worker_user_id;
-              }).filter(Boolean))];
-              const drillDownParams = new URLSearchParams();
-              if (firstProjectId) drillDownParams.set('project', firstProjectId);
-              drillDownParams.set('from', bp.periodStart);
-              drillDownParams.set('to', bp.periodEnd);
-              if (workerUserIds.length === 1 && workerUserIds[0]) {
-                drillDownParams.set('contractor', workerUserIds[0]);
-              }
-              const drillDownUrl = `/shifts?${drillDownParams.toString()}`;
+            {readyToPayContent}
+          </Card>
 
-              return (
-                <div key={bp.key} className="border rounded p-3 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{bp.companyName} → {bp.qb_vendor_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {bp.lines[0]?.projectName && <span>{bp.lines[0].projectName} · </span>}
-                        {bp.periodStart} → {bp.periodEnd}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold">${bp.totalDollars.toFixed(2)}</p>
-                      <Button size="sm" variant="ghost" className="h-6 text-xs px-2" asChild>
-                        <a href={drillDownUrl}>View Shifts</a>
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="text-xs space-y-0.5 pl-2 border-l-2 border-muted">
-                    {bp.lines.map((line, idx) => (
-                      <div key={idx} className="flex items-center justify-between gap-2">
-                        <span>
-                          {line.contractorName} · {line.projectName}
-                          {line.qbClassName && <span className="text-muted-foreground ml-1">(Class: {line.qbClassName})</span>}
-                        </span>
-                        <span className="font-medium">${line.dollars.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+          <Card className="p-3 space-y-2">
+            <div>
+              <p className="text-sm font-medium">Prepared Payments</p>
+              <p className="text-xs text-muted-foreground">These payments have been prepared. Their shifts won't appear in Ready to Pay.</p>
+            </div>
+            {preparedPaymentsContent}
+          </Card>
+
+          <Card className="p-3 space-y-2">
+            <div>
+              <p className="text-sm font-medium">Already Paid</p>
+              <p className="text-xs text-muted-foreground">These payments were already recorded as paid.</p>
+            </div>
+            {alreadyPaidContent}
+          </Card>
+
+          <Card className="p-3 space-y-2">
+            <div>
+              <p className="text-sm font-medium">Already Included Elsewhere</p>
+              <p className="text-xs text-muted-foreground">These shifts are already part of another payment group, so they can't be included again.</p>
+            </div>
+            {excludedContent}
+          </Card>
+
+          {billPreviewContent}
+        </>
       )}
 
-      {/* Historical / External Payment — record a paid transaction in QuickBooks without a bill */}
+      {/* Historical / External Payment */}
       <Card className="p-3 space-y-2">
         <div className="flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-muted-foreground" />

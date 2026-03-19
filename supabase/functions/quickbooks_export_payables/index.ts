@@ -191,8 +191,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Build grouping key
-      const groupKey = `${companyId}::${vendorMapping.qb_vendor_id}::${batch.period_start}::${batch.period_end}`;
+      // Build grouping key — includes project for one-bill-per-project
+      const groupKey = `${companyId}::${vendorMapping.qb_vendor_id}::${batch.project_id}::${batch.period_start}::${batch.period_end}`;
 
       const proj = batch.project_id ? projectMap.get(batch.project_id) : null;
       const projectName = proj?.name || "Project";
@@ -205,6 +205,7 @@ Deno.serve(async (req) => {
           companyId,
           qbVendorId: vendorMapping.qb_vendor_id,
           qbVendorName: vendorMapping.qb_vendor_name || "",
+          projectId: batch.project_id,
           periodStart: batch.period_start,
           periodEnd: batch.period_end,
           lines: [],
