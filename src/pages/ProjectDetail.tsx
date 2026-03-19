@@ -378,6 +378,7 @@ const ProjectDetail = () => {
   const openEditDialog = () => {
     setEditName(project?.name || '');
     setEditAddress(project?.address || '');
+    setSelectedCompanyId(project?.company_id || '');
     setEditOpen(true);
   };
 
