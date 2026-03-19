@@ -109,6 +109,14 @@ const QBSettingsCard = () => {
   // Track whether expense account was edited from its loaded value
   const [expDirty, setExpDirty] = useState(false);
 
+  // Connect flow state
+  const [qbConnecting, setQbConnecting] = useState(false);
+
+  // Legacy unassigned data counts
+  const [legacyVendorCount, setLegacyVendorCount] = useState(0);
+  const [legacyBatchCount, setLegacyBatchCount] = useState(0);
+  const [claimingLegacy, setClaimingLegacy] = useState(false);
+
   const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
 
   const loadCompanies = useCallback(async () => {
