@@ -809,7 +809,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                             }}
                           >
                             {updatingBatchId === group.batch.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
-                             Record Manual Payment
+                             Mark Paid (Local Only)
                           </Button>
                         )}
                       </div>
