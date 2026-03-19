@@ -1124,6 +1124,130 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
           </div>
         )}
       </Card>
+
+      {/* Bill Group Preview — shows how items will group when exported to QuickBooks */}
+      {billGroupPreviews.length > 0 && (
+        <Card className="p-3 space-y-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-medium">QuickBooks Bill Preview</p>
+            </div>
+            <p className="text-xs text-muted-foreground">How eligible items will group into bills when exported (by company + QB vendor + period).</p>
+          </div>
+          <div className="space-y-2">
+            {billGroupPreviews.map((bp) => (
+              <div key={bp.key} className="border rounded p-3 space-y-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{bp.companyName} → {bp.qb_vendor_name}</p>
+                    <p className="text-xs text-muted-foreground">{bp.periodStart} → {bp.periodEnd}</p>
+                  </div>
+                  <p className="text-sm font-semibold">${bp.totalDollars.toFixed(2)}</p>
+                </div>
+                <div className="text-xs space-y-0.5 pl-2 border-l-2 border-muted">
+                  {bp.lines.map((line, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2">
+                      <span>
+                        {line.contractorName} · {line.projectName}
+                        {line.qbClassName && <span className="text-muted-foreground ml-1">(Class: {line.qbClassName})</span>}
+                      </span>
+                      <span className="font-medium">${line.dollars.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">Each line preserves its project/class context inside the combined bill.</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Historical / External Payment — record a paid transaction in QuickBooks without a bill */}
+      <Card className="p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-medium flex-1">Record Historical / External Payment</p>
+          <Button size="sm" variant="outline" onClick={() => setHistOpen(!histOpen)}>
+            {histOpen ? 'Close' : 'Open'}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Record a contractor payment that was already paid outside the app. Creates a QuickBooks Purchase — no bill required.</p>
+
+        {histOpen && (
+          <div className="space-y-3 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Company *</Label>
+                <Select value={histCompanyId} onValueChange={setHistCompanyId}>
+                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                  <SelectContent>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.short_name || c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Payment Date *</Label>
+                <Input type="date" value={histDate} onChange={(e) => setHistDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">QB Vendor ID *</Label>
+                <Input value={histVendorId} onChange={(e) => setHistVendorId(e.target.value)} placeholder="Vendor ID from QuickBooks" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Vendor Name</Label>
+                <Input value={histVendorName} onChange={(e) => setHistVendorName(e.target.value)} placeholder="Display name" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Expense Account ID *</Label>
+                <Input value={histAccountId} onChange={(e) => setHistAccountId(e.target.value)} placeholder="Account ID from QuickBooks" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Account Name</Label>
+                <Input value={histAccountName} onChange={(e) => setHistAccountName(e.target.value)} placeholder="Display name" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Amount *</Label>
+                <Input type="number" step="0.01" min="0.01" value={histAmount} onChange={(e) => setHistAmount(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Project (optional)</Label>
+                <Input value={histProjectId} onChange={(e) => setHistProjectId(e.target.value)} placeholder="Project ID (optional)" />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Memo (optional)</Label>
+              <Textarea value={histMemo} onChange={(e) => setHistMemo(e.target.value)} rows={2} placeholder="Notes for QuickBooks" />
+            </div>
+
+            {histResult && (
+              <div className={`text-xs rounded p-2 ${histResult.success ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
+                {histResult.success
+                  ? `✓ Payment recorded — QuickBooks Purchase ID: ${histResult.purchase_id}`
+                  : `✗ ${histResult.error}`
+                }
+              </div>
+            )}
+
+            <Button onClick={handleHistoricalPayment} disabled={histSubmitting || !histCompanyId || !histVendorId || !histAccountId || !histAmount || !histDate} className="w-full">
+              {histSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <DollarSign className="h-4 w-4 mr-1" />}
+              Record Payment in QuickBooks
+            </Button>
+          </div>
+        )}
+      </Card>
     </div>
   );
 };
