@@ -139,7 +139,7 @@ function getCurrentPeriodKey(): string {
   return PAY_PERIODS.length > 0 ? `${PAY_PERIODS[0].from}::${PAY_PERIODS[0].to}` : '';
 }
 
-const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
+const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
