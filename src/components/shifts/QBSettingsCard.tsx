@@ -427,7 +427,9 @@ const QBSettingsCard = () => {
       else failures++;
     }
 
-    const classEditIds = Object.keys(classEdits);
+    // Scope class edits to only projects visible under the current company
+    const visibleProjectIds = new Set(projects.map((p) => p.id));
+    const classEditIds = Object.keys(classEdits).filter((pid) => visibleProjectIds.has(pid));
     let classSavedCount = 0;
     for (const pid of classEditIds) {
       const ok = await saveClassMapping(pid);
