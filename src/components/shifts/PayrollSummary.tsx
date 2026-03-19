@@ -732,6 +732,41 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
     await loadPayroll();
   };
 
+  const handleHistoricalPayment = async () => {
+    if (!histCompanyId || !histVendorId || !histAccountId || !histAmount || !histDate) {
+      toast({ title: 'Missing fields', description: 'Company, vendor, account, amount, and date are all required.', variant: 'destructive' });
+      return;
+    }
+    setHistSubmitting(true);
+    setHistResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('quickbooks_record_expense', {
+        body: {
+          company_id: histCompanyId,
+          vendor_id: histVendorId,
+          vendor_name: histVendorName,
+          account_id: histAccountId,
+          account_name: histAccountName,
+          amount: parseFloat(histAmount),
+          payment_date: histDate,
+          memo: histMemo || undefined,
+          project_id: histProjectId || undefined,
+        },
+      });
+      if (error) {
+        setHistResult({ success: false, error: error.message });
+      } else if (data?.error) {
+        setHistResult({ success: false, error: data.message || data.error });
+      } else {
+        setHistResult({ success: true, purchase_id: data?.purchase_id });
+        toast({ title: 'Historical payment recorded', description: `QuickBooks Purchase ID: ${data?.purchase_id || 'Created'}` });
+      }
+    } catch {
+      setHistResult({ success: false, error: 'Unexpected error' });
+    }
+    setHistSubmitting(false);
+  };
+
   const totals = useMemo(() => {
     const candidateDollars = candidateGroups.reduce((sum, row) => sum + row.totalDollars, 0);
     const exportedDollars = exportedGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
