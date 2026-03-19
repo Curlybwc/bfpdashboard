@@ -159,6 +159,27 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
   const [exportedGroups, setExportedGroups] = useState<ExistingPayableGroup[]>([]);
   const [paidGroups, setPaidGroups] = useState<ExistingPayableGroup[]>([]);
   const [excludedShifts, setExcludedShifts] = useState<ExcludedShift[]>([]);
+  const [billGroupPreviews, setBillGroupPreviews] = useState<BillGroupPreview[]>([]);
+
+  // Company & vendor data for grouping preview and historical payments
+  const [companies, setCompanies] = useState<{ id: string; name: string; short_name: string | null }[]>([]);
+  const [projectCompanyMap, setProjectCompanyMap] = useState<Map<string, string>>(new Map());
+  const [vendorMappings, setVendorMappings] = useState<Map<string, Map<string, { qb_vendor_id: string; qb_vendor_name: string }>>>(new Map());
+  const [classMappings, setClassMappings] = useState<Map<string, string>>(new Map());
+
+  // Historical payment form state
+  const [histOpen, setHistOpen] = useState(false);
+  const [histCompanyId, setHistCompanyId] = useState('');
+  const [histVendorId, setHistVendorId] = useState('');
+  const [histVendorName, setHistVendorName] = useState('');
+  const [histAccountId, setHistAccountId] = useState('');
+  const [histAccountName, setHistAccountName] = useState('');
+  const [histAmount, setHistAmount] = useState('');
+  const [histDate, setHistDate] = useState('');
+  const [histMemo, setHistMemo] = useState('');
+  const [histProjectId, setHistProjectId] = useState('');
+  const [histSubmitting, setHistSubmitting] = useState(false);
+  const [histResult, setHistResult] = useState<{ success: boolean; purchase_id?: string; error?: string } | null>(null);
 
   // QuickBooks connection state
   const [qbStatus, setQbStatus] = useState<QBConnectionStatus | null>(null);
