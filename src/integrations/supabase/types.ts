@@ -134,6 +134,38 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          qb_connection_id: string | null
+          short_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          qb_connection_id?: string | null
+          short_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          qb_connection_id?: string | null
+          short_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_qb_connection_id_fkey"
+            columns: ["qb_connection_id"]
+            isOneToOne: false
+            referencedRelation: "quickbooks_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cost_items: {
         Row: {
           active: boolean
@@ -521,6 +553,7 @@ export type Database = {
       projects: {
         Row: {
           address: string | null
+          company_id: string | null
           created_at: string
           has_missing_estimates: boolean
           id: string
@@ -532,6 +565,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          company_id?: string | null
           created_at?: string
           has_missing_estimates?: boolean
           id?: string
@@ -543,6 +577,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          company_id?: string | null
           created_at?: string
           has_missing_estimates?: boolean
           id?: string
@@ -553,6 +588,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_scope_id_fkey"
             columns: ["scope_id"]
@@ -640,6 +682,7 @@ export type Database = {
       }
       quickbooks_settings: {
         Row: {
+          company_id: string | null
           id: string
           labor_expense_account_id: string | null
           labor_expense_account_name: string | null
@@ -647,6 +690,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          company_id?: string | null
           id?: string
           labor_expense_account_id?: string | null
           labor_expense_account_name?: string | null
@@ -654,16 +698,26 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          company_id?: string | null
           id?: string
           labor_expense_account_id?: string | null
           labor_expense_account_name?: string | null
           singleton?: boolean
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "quickbooks_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quickbooks_vendor_mappings: {
         Row: {
+          company_id: string | null
           created_at: string
           id: string
           qb_vendor_id: string
@@ -671,6 +725,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
           id?: string
           qb_vendor_id: string
@@ -678,6 +733,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          company_id?: string | null
           created_at?: string
           id?: string
           qb_vendor_id?: string
@@ -686,9 +742,16 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "quickbooks_vendor_mappings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quickbooks_vendor_mappings_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -2038,6 +2101,7 @@ export type Database = {
       worker_payable_batches: {
         Row: {
           accounting_source: string | null
+          company_id: string | null
           created_at: string
           created_by: string
           id: string
@@ -2059,6 +2123,7 @@ export type Database = {
         }
         Insert: {
           accounting_source?: string | null
+          company_id?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -2080,6 +2145,7 @@ export type Database = {
         }
         Update: {
           accounting_source?: string | null
+          company_id?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -2100,6 +2166,13 @@ export type Database = {
           worker_user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "worker_payable_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "worker_payable_batches_created_by_fkey"
             columns: ["created_by"]

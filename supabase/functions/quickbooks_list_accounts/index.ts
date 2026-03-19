@@ -1,5 +1,5 @@
 import { corsHeaders, requireAdminAuth } from "../_shared/auth.ts";
-import { getActiveConnection, qbApiFetch } from "../_shared/quickbooks.ts";
+import { getActiveConnection, getConnectionForCompany, qbApiFetch } from "../_shared/quickbooks.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -9,12 +9,33 @@ Deno.serve(async (req) => {
   try {
     const { adminClient } = await requireAdminAuth(req);
 
-    const conn = await getActiveConnection(adminClient);
-    if (!conn) {
-      return new Response(
-        JSON.stringify({ error: "no_connection", message: "No active QuickBooks connection." }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    // Accept optional company_id to route to the correct QB connection
+    let companyId: string | null = null;
+    try {
+      const body = await req.json();
+      companyId = body?.company_id || null;
+    } catch {
+      // No body or invalid JSON — use legacy fallback
+    }
+
+    let conn;
+    if (companyId) {
+      const result = await getConnectionForCompany(adminClient, companyId);
+      if (!result.conn) {
+        return new Response(
+          JSON.stringify({ error: "no_connection", message: result.error || "No active QuickBooks connection for this company." }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      conn = result.conn;
+    } else {
+      conn = await getActiveConnection(adminClient);
+      if (!conn) {
+        return new Response(
+          JSON.stringify({ error: "no_connection", message: "No active QuickBooks connection." }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     const query = encodeURIComponent(

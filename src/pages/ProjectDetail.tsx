@@ -98,6 +98,8 @@ const ProjectDetail = () => {
   const { toast } = useToast();
   const { isAdmin } = useAdmin();
   const queryClient = useQueryClient();
+  const [companyOptions, setCompanyOptions] = useState<{ id: string; name: string; short_name: string | null }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
 
   // Server state via React Query
   const { data, isLoading } = useProjectDetail(id, user?.id);
@@ -170,7 +172,7 @@ const ProjectDetail = () => {
   const isContractor = !isAdmin && projectRole === 'contractor';
   const isManager = isAdmin || projectRole === 'manager';
 
-  // Fetch crew groups
+  // Fetch crew groups and companies
   useEffect(() => {
     const fetchCrewGroups = async () => {
       const { data: groupsData } = await supabase.from('crew_groups').select('id, name');
@@ -182,7 +184,12 @@ const ProjectDetail = () => {
         members: (membersData || []).filter((member) => member.crew_group_id === group.id).map((member) => member.user_id),
       })));
     };
+    const fetchCompanies = async () => {
+      const { data } = await supabase.from('companies').select('id, name, short_name').order('name');
+      setCompanyOptions((data || []) as { id: string; name: string; short_name: string | null }[]);
+    };
     fetchCrewGroups();
+    fetchCompanies();
   }, []);
 
   // Task filtering (contractor vs full view)

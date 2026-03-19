@@ -4,11 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import QBCombobox from './QBCombobox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Save, Settings, RefreshCw } from 'lucide-react';
+import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
+type CompanyRow = { id: string; name: string; short_name: string | null; qb_connection_id: string | null };
+type QBConnectionRow = { id: string; company_name: string | null; realm_id: string };
 type ProjectRow = { id: string; name: string; address: string | null; status: string };
 type ProfileRow = { id: string; full_name: string | null; is_active: boolean };
 type QBClass = { id: string; name: string; fully_qualified_name: string };
@@ -19,7 +23,17 @@ const QBSettingsCard = () => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
-  // Expense account state
+  // Companies
+  const [companies, setCompanies] = useState<CompanyRow[]>([]);
+  const [qbConnections, setQbConnections] = useState<QBConnectionRow[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [newCompanyShort, setNewCompanyShort] = useState('');
+  const [newCompanyConnId, setNewCompanyConnId] = useState('');
+  const [addCompanyOpen, setAddCompanyOpen] = useState(false);
+  const [addingCompany, setAddingCompany] = useState(false);
+
+  // Expense account state (per company)
   const [expAccountId, setExpAccountId] = useState('');
   const [expAccountName, setExpAccountName] = useState('');
   const [expLoading, setExpLoading] = useState(false);
@@ -49,28 +63,58 @@ const QBSettingsCard = () => {
   const [qbVendorsLoaded, setQbVendorsLoaded] = useState(false);
   const [qbVendorsError, setQbVendorsError] = useState<string | null>(null);
 
-  // Vendor mappings state
+  // Vendor mappings state (per company)
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [vendorMappings, setVendorMappings] = useState<Record<string, { qb_vendor_id: string; qb_vendor_name: string }>>({});
   const [vendorEdits, setVendorEdits] = useState<Record<string, { qb_vendor_id: string; qb_vendor_name: string }>>({});
   const [vendorSaving, setVendorSaving] = useState<string | null>(null);
 
-  const loadAll = useCallback(async () => {
+  // Track whether expense account was edited from its loaded value
+  const [expDirty, setExpDirty] = useState(false);
+
+  const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
+
+  const loadCompanies = useCallback(async () => {
+    const [{ data: companiesData }, { data: connectionsData }] = await Promise.all([
+      supabase.from('companies').select('id, name, short_name, qb_connection_id').order('name'),
+      supabase.from('quickbooks_connections').select('id, company_name, realm_id').is('disconnected_at', null),
+    ]);
+    const comps = (companiesData || []) as CompanyRow[];
+    setCompanies(comps);
+    setQbConnections((connectionsData || []) as QBConnectionRow[]);
+    if (comps.length > 0 && !selectedCompanyId) {
+      setSelectedCompanyId(comps[0].id);
+    }
+  }, [selectedCompanyId]);
+
+  const loadCompanyData = useCallback(async () => {
+    if (!selectedCompanyId) return;
     setExpLoading(true);
 
+    // Reset QB entity caches when switching companies
+    setQbClassesLoaded(false);
+    setQbAccountsLoaded(false);
+    setQbVendorsLoaded(false);
+    setQbClasses([]);
+    setQbAccounts([]);
+    setQbVendors([]);
+
     const [settingsRes, projectsRes, profilesRes, classRes, vendorRes] = await Promise.all([
-      supabase.from('quickbooks_settings').select('labor_expense_account_id, labor_expense_account_name').limit(1).maybeSingle(),
-      supabase.from('projects').select('id, name, address, status').eq('status', 'active').order('name'),
+      supabase.from('quickbooks_settings').select('labor_expense_account_id, labor_expense_account_name').eq('company_id', selectedCompanyId).maybeSingle(),
+      supabase.from('projects').select('id, name, address, status').eq('status', 'active').eq('company_id', selectedCompanyId).order('name'),
       supabase.from('profiles').select('id, full_name, is_active').eq('is_active', true).order('full_name'),
       supabase.from('quickbooks_class_mappings').select('project_id, qb_class_id, qb_class_name'),
-      supabase.from('quickbooks_vendor_mappings').select('user_id, qb_vendor_id, qb_vendor_name'),
+      supabase.from('quickbooks_vendor_mappings').select('user_id, qb_vendor_id, qb_vendor_name').eq('company_id', selectedCompanyId),
     ]);
 
     if (settingsRes.data) {
       setExpAccountId(settingsRes.data.labor_expense_account_id || '');
       setExpAccountName(settingsRes.data.labor_expense_account_name || '');
-      setExpDirty(false);
+    } else {
+      setExpAccountId('');
+      setExpAccountName('');
     }
+    setExpDirty(false);
 
     setProjects((projectsRes.data || []) as ProjectRow[]);
     setProfiles((profilesRes.data || []) as ProfileRow[]);
@@ -90,36 +134,56 @@ const QBSettingsCard = () => {
     setVendorEdits({});
 
     setExpLoading(false);
-  }, []);
+  }, [selectedCompanyId]);
 
   useEffect(() => {
-    if (open) loadAll();
-  }, [open, loadAll]);
+    if (open) loadCompanies();
+  }, [open, loadCompanies]);
+
+  useEffect(() => {
+    if (open && selectedCompanyId) loadCompanyData();
+  }, [open, selectedCompanyId, loadCompanyData]);
+
+  const handleAddCompany = async () => {
+    if (!newCompanyName.trim()) return;
+    setAddingCompany(true);
+    const { error } = await supabase.from('companies').insert({
+      name: newCompanyName.trim(),
+      short_name: newCompanyShort.trim() || null,
+      qb_connection_id: newCompanyConnId || null,
+    });
+    setAddingCompany(false);
+    if (error) {
+      toast({ title: 'Failed to add company', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Company added' });
+      setNewCompanyName('');
+      setNewCompanyShort('');
+      setNewCompanyConnId('');
+      setAddCompanyOpen(false);
+      await loadCompanies();
+    }
+  };
 
   const loadQBClasses = async () => {
     setQbClassesLoading(true);
     setQbClassesError(null);
     try {
-      const { data, error } = await supabase.functions.invoke('quickbooks_list_classes');
+      const { data, error } = await supabase.functions.invoke('quickbooks_list_classes', {
+        body: { company_id: selectedCompanyId },
+      });
       if (error) {
         setQbClassesError(error.message);
-        toast({ title: 'Failed to load QB classes', description: error.message, variant: 'destructive' });
       } else if (data?.error) {
         setQbClassesError(data.message || data.error);
-        toast({ title: 'Failed to load QB classes', description: data.message || data.error, variant: 'destructive' });
       } else {
         const classes = (data?.classes || []) as QBClass[];
         setQbClasses(classes);
         setQbClassesLoaded(true);
-        if (classes.length === 0) {
-          toast({ title: 'No classes found', description: 'No active classes in your QuickBooks account.' });
-        } else {
-          toast({ title: `Loaded ${classes.length} QB classes` });
-        }
+        toast({ title: `Loaded ${classes.length} QB classes` });
       }
     } catch {
       setQbClassesError('Unexpected error');
-      toast({ title: 'Failed to load QB classes', variant: 'destructive' });
     }
     setQbClassesLoading(false);
   };
@@ -128,26 +192,21 @@ const QBSettingsCard = () => {
     setQbAccountsLoading(true);
     setQbAccountsError(null);
     try {
-      const { data, error } = await supabase.functions.invoke('quickbooks_list_accounts');
+      const { data, error } = await supabase.functions.invoke('quickbooks_list_accounts', {
+        body: { company_id: selectedCompanyId },
+      });
       if (error) {
         setQbAccountsError(error.message);
-        toast({ title: 'Failed to load QB accounts', description: error.message, variant: 'destructive' });
       } else if (data?.error) {
         setQbAccountsError(data.message || data.error);
-        toast({ title: 'Failed to load QB accounts', description: data.message || data.error, variant: 'destructive' });
       } else {
         const accounts = (data?.accounts || []) as QBAccount[];
         setQbAccounts(accounts);
         setQbAccountsLoaded(true);
-        if (accounts.length === 0) {
-          toast({ title: 'No expense accounts found', description: 'No active expense accounts in your QuickBooks account.' });
-        } else {
-          toast({ title: `Loaded ${accounts.length} QB expense accounts` });
-        }
+        toast({ title: `Loaded ${accounts.length} QB expense accounts` });
       }
     } catch {
       setQbAccountsError('Unexpected error');
-      toast({ title: 'Failed to load QB accounts', variant: 'destructive' });
     }
     setQbAccountsLoading(false);
   };
@@ -161,16 +220,13 @@ const QBSettingsCard = () => {
   };
 
   const saveExpenseAccount = async (): Promise<boolean> => {
-    if (!expAccountId.trim()) {
-      toast({ title: 'Account ID required', variant: 'destructive' });
-      return false;
-    }
+    if (!expAccountId.trim() || !selectedCompanyId) return false;
     setExpSaving(true);
 
     const { data: existing } = await supabase
       .from('quickbooks_settings')
       .select('id')
-      .limit(1)
+      .eq('company_id', selectedCompanyId)
       .maybeSingle();
 
     let error;
@@ -189,6 +245,7 @@ const QBSettingsCard = () => {
         .insert({
           labor_expense_account_id: expAccountId.trim(),
           labor_expense_account_name: expAccountName.trim() || null,
+          company_id: selectedCompanyId,
         }));
     }
     setExpSaving(false);
@@ -221,9 +278,7 @@ const QBSettingsCard = () => {
 
   const saveClassMapping = async (projectId: string): Promise<boolean> => {
     const edit = getClassEdit(projectId);
-    if (!edit.qb_class_id.trim()) {
-      return false;
-    }
+    if (!edit.qb_class_id.trim()) return false;
     setClassSaving(projectId);
 
     const { error } = await supabase
@@ -258,26 +313,21 @@ const QBSettingsCard = () => {
     setQbVendorsLoading(true);
     setQbVendorsError(null);
     try {
-      const { data, error } = await supabase.functions.invoke('quickbooks_list_vendors');
+      const { data, error } = await supabase.functions.invoke('quickbooks_list_vendors', {
+        body: { company_id: selectedCompanyId },
+      });
       if (error) {
         setQbVendorsError(error.message);
-        toast({ title: 'Failed to load QB vendors', description: error.message, variant: 'destructive' });
       } else if (data?.error) {
         setQbVendorsError(data.message || data.error);
-        toast({ title: 'Failed to load QB vendors', description: data.message || data.error, variant: 'destructive' });
       } else {
         const vendors = (data?.vendors || []) as QBVendor[];
         setQbVendors(vendors);
         setQbVendorsLoaded(true);
-        if (vendors.length === 0) {
-          toast({ title: 'No vendors found', description: 'No active vendors in your QuickBooks account.' });
-        } else {
-          toast({ title: `Loaded ${vendors.length} QB vendors` });
-        }
+        toast({ title: `Loaded ${vendors.length} QB vendors` });
       }
     } catch {
       setQbVendorsError('Unexpected error');
-      toast({ title: 'Failed to load QB vendors', variant: 'destructive' });
     }
     setQbVendorsLoading(false);
   };
@@ -293,19 +343,24 @@ const QBSettingsCard = () => {
 
   const saveVendorMapping = async (userId: string): Promise<boolean> => {
     const edit = getVendorEdit(userId);
-    if (!edit.qb_vendor_id.trim()) {
-      return false;
-    }
+    if (!edit.qb_vendor_id.trim() || !selectedCompanyId) return false;
     setVendorSaving(userId);
 
+    // Use upsert with the new composite unique key
     const { error } = await supabase
       .from('quickbooks_vendor_mappings')
       .upsert(
-        { user_id: userId, qb_vendor_id: edit.qb_vendor_id.trim(), qb_vendor_name: edit.qb_vendor_name.trim() || null },
-        { onConflict: 'user_id' }
+        {
+          user_id: userId,
+          qb_vendor_id: edit.qb_vendor_id.trim(),
+          qb_vendor_name: edit.qb_vendor_name.trim() || null,
+          company_id: selectedCompanyId,
+        },
+        { onConflict: 'user_id,company_id' }
       );
 
     if (error) {
+      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
       setVendorSaving(null);
       return false;
     }
@@ -315,8 +370,6 @@ const QBSettingsCard = () => {
     return true;
   };
 
-  // Track whether expense account was edited from its loaded value
-  const [expDirty, setExpDirty] = useState(false);
   const setExpAccountIdTracked = (v: string) => { setExpAccountId(v); setExpDirty(true); };
   const setExpAccountNameTracked = (v: string) => { setExpAccountName(v); setExpDirty(true); };
 
@@ -327,41 +380,38 @@ const QBSettingsCard = () => {
     const saved: string[] = [];
     let failures = 0;
 
-    // 1. Expense account — only if dirty
     if (expDirty) {
       const ok = await saveExpenseAccount();
       if (ok) { saved.push('labor account'); setExpDirty(false); }
       else failures++;
     }
 
-    // 2. Class mappings — only rows with edits
     const classEditIds = Object.keys(classEdits);
-    let classSaved = 0;
+    let classSavedCount = 0;
     for (const pid of classEditIds) {
       const ok = await saveClassMapping(pid);
-      if (ok) classSaved++;
+      if (ok) classSavedCount++;
       else failures++;
     }
-    if (classSaved > 0) saved.push(`${classSaved} class mapping${classSaved > 1 ? 's' : ''}`);
+    if (classSavedCount > 0) saved.push(`${classSavedCount} class mapping${classSavedCount > 1 ? 's' : ''}`);
 
-    // 3. Vendor mappings — only rows with edits
     const vendorEditIds = Object.keys(vendorEdits);
-    let vendorSaved = 0;
+    let vendorSavedCount = 0;
     for (const uid of vendorEditIds) {
       const ok = await saveVendorMapping(uid);
-      if (ok) vendorSaved++;
+      if (ok) vendorSavedCount++;
       else failures++;
     }
-    if (vendorSaved > 0) saved.push(`${vendorSaved} vendor mapping${vendorSaved > 1 ? 's' : ''}`);
+    if (vendorSavedCount > 0) saved.push(`${vendorSavedCount} vendor mapping${vendorSavedCount > 1 ? 's' : ''}`);
 
     setSaveAllLoading(false);
 
     if (saved.length === 0 && failures === 0) {
       toast({ title: 'Nothing to save', description: 'No changes detected.' });
     } else if (failures > 0 && saved.length > 0) {
-      toast({ title: 'Some QuickBooks settings could not be saved', description: `Saved ${saved.join(' and ')}.`, variant: 'destructive' });
+      toast({ title: 'Some settings could not be saved', description: `Saved ${saved.join(' and ')}.`, variant: 'destructive' });
     } else if (failures > 0) {
-      toast({ title: 'Some QuickBooks settings could not be saved', variant: 'destructive' });
+      toast({ title: 'Some settings could not be saved', variant: 'destructive' });
     } else {
       toast({ title: 'QuickBooks settings saved', description: `Saved ${saved.join(' and ')}.` });
     }
@@ -380,7 +430,69 @@ const QBSettingsCard = () => {
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-3 space-y-4">
-          {expLoading ? (
+          {/* Company Selector */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-3 w-3 text-muted-foreground" />
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex-1">Company</p>
+              <Dialog open={addCompanyOpen} onOpenChange={setAddCompanyOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-7 text-xs px-2">
+                    <Plus className="h-3 w-3 mr-1" />Add Company
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Add Company</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Company Name</Label>
+                      <Input className="h-8 text-sm" value={newCompanyName} onChange={(e) => setNewCompanyName(e.target.value)} placeholder="e.g. Bahr Family Properties, LLC" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Short Name</Label>
+                      <Input className="h-8 text-sm" value={newCompanyShort} onChange={(e) => setNewCompanyShort(e.target.value)} placeholder="e.g. BFP" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">QuickBooks Connection</Label>
+                      <Select value={newCompanyConnId} onValueChange={setNewCompanyConnId}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select connection…" /></SelectTrigger>
+                        <SelectContent>
+                          {qbConnections.map((conn) => (
+                            <SelectItem key={conn.id} value={conn.id}>{conn.company_name || conn.realm_id}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button disabled={addingCompany || !newCompanyName.trim()} onClick={handleAddCompany} className="w-full">
+                      {addingCompany ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                      Add Company
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            {companies.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No companies configured. Add a company to start.</p>
+            ) : (
+              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select company…" /></SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}{c.short_name ? ` (${c.short_name})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {selectedCompany && !selectedCompany.qb_connection_id && (
+              <p className="text-xs text-destructive">⚠ This company has no QuickBooks connection linked.</p>
+            )}
+          </div>
+
+          {!selectedCompanyId ? (
+            <p className="text-xs text-muted-foreground">Select a company above to configure QuickBooks settings.</p>
+          ) : expLoading ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" /> Loading…
             </div>
@@ -457,7 +569,7 @@ const QBSettingsCard = () => {
                   <p className="text-xs text-destructive">{qbClassesError} — use manual entry below.</p>
                 )}
                 {projects.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No active projects.</p>
+                  <p className="text-xs text-muted-foreground">No active projects assigned to this company.</p>
                 ) : (
                   <div className="space-y-1">
                     {projects.map((proj) => {

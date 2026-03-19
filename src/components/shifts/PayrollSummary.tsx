@@ -749,7 +749,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                     </Button>
                     <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)}>
                       {payingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                      Mark Paid Now
+                      Record as Paid (Local Only)
                     </Button>
                   </div>
                 </CollapsibleContent>
@@ -809,7 +809,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                             }}
                           >
                             {updatingBatchId === group.batch.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
-                             Record Manual Payment
+                             Mark Paid (Local Only)
                           </Button>
                         )}
                       </div>
@@ -869,14 +869,14 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                         </Button>
                       )}
 
-                      {/* Record Manual Payment — manual fallback for draft and exported */}
+                      {/* Mark Paid (Local Only) — does NOT create a QuickBooks BillPayment */}
                       <Button
                         size="sm"
                         disabled={updatingBatchId === group.batch.id}
                         onClick={() => handleMarkPaid(group.batch.id)}
                       >
                         {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                        Record Manual Payment
+                        Mark Paid (Local Only)
                       </Button>
                       {/* Void entire group */}
                       {isDraft && (
