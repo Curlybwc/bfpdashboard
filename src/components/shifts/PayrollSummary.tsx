@@ -869,14 +869,14 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
                         </Button>
                       )}
 
-                      {/* Record Manual Payment — manual fallback for draft and exported */}
+                      {/* Mark Paid (Local Only) — does NOT create a QuickBooks BillPayment */}
                       <Button
                         size="sm"
                         disabled={updatingBatchId === group.batch.id}
                         onClick={() => handleMarkPaid(group.batch.id)}
                       >
                         {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                        Record Manual Payment
+                        Mark Paid (Local Only)
                       </Button>
                       {/* Void entire group */}
                       {isDraft && (
