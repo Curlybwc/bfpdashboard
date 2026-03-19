@@ -2501,6 +2501,31 @@ export type Database = {
       }
       push_recipe_step_to_tasks: { Args: { p_step_id: string }; Returns: Json }
       push_recipe_to_tasks: { Args: { p_recipe_id: string }; Returns: Json }
+      save_linked_historical_payments: {
+        Args: {
+          p_allocations: Json
+          p_caller_id: string
+          p_company_id: string
+          p_external_reference: string
+          p_qb_txn_amount: number
+          p_qb_txn_type: string
+        }
+        Returns: Json
+      }
+      save_local_historical_payment: {
+        Args: {
+          p_amount: number
+          p_caller_id: string
+          p_company_id?: string
+          p_memo?: string
+          p_paid_date: string
+          p_pay_period_end?: string
+          p_pay_period_start?: string
+          p_project_id?: string
+          p_worker_user_id: string
+        }
+        Returns: Json
+      }
       upsert_shift_with_allocations: {
         Args: {
           p_allocations?: Json
