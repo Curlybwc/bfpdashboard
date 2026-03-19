@@ -554,6 +554,7 @@ const PayrollSummary = ({ onEditShift }: PayrollSummaryProps) => {
       .insert({
         worker_user_id: group.worker_user_id,
         project_id: group.project_id,
+        company_id: group.company_id,
         period_start: group.periodStart,
         period_end: group.periodEnd,
         total_amount: Number(group.totalDollars.toFixed(2)),
