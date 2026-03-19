@@ -33,6 +33,42 @@ const QBSettingsCard = () => {
   const [addCompanyOpen, setAddCompanyOpen] = useState(false);
   const [addingCompany, setAddingCompany] = useState(false);
 
+  // Edit company
+  const [editCompanyOpen, setEditCompanyOpen] = useState(false);
+  const [editCompanyName, setEditCompanyName] = useState('');
+  const [editCompanyShort, setEditCompanyShort] = useState('');
+  const [editCompanyConnId, setEditCompanyConnId] = useState('');
+  const [editingCompany, setEditingCompany] = useState(false);
+
+  const openEditCompany = () => {
+    if (!selectedCompany) return;
+    setEditCompanyName(selectedCompany.name);
+    setEditCompanyShort(selectedCompany.short_name || '');
+    setEditCompanyConnId(selectedCompany.qb_connection_id || '');
+    setEditCompanyOpen(true);
+  };
+
+  const handleEditCompany = async () => {
+    if (!editCompanyName.trim() || !selectedCompanyId) return;
+    setEditingCompany(true);
+    const { error } = await supabase
+      .from('companies')
+      .update({
+        name: editCompanyName.trim(),
+        short_name: editCompanyShort.trim() || null,
+        qb_connection_id: editCompanyConnId || null,
+      })
+      .eq('id', selectedCompanyId);
+    setEditingCompany(false);
+    if (error) {
+      toast({ title: 'Failed to update company', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Company updated' });
+      setEditCompanyOpen(false);
+      await loadCompanies();
+    }
+  };
+
   // Expense account state (per company)
   const [expAccountId, setExpAccountId] = useState('');
   const [expAccountName, setExpAccountName] = useState('');
