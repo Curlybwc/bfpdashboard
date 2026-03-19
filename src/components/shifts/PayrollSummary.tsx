@@ -229,11 +229,19 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
   }, [fetchQBStatus]);
 
   const handleConnectQB = async () => {
+    // Use the first available company for OAuth flow
+    const companyId = companies.length > 0 ? companies[0].id : null;
+    if (!companyId) {
+      toast({ title: 'No company available', description: 'Add a company before connecting QuickBooks.', variant: 'destructive' });
+      return;
+    }
     setQbConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('quickbooks_connect_begin');
+      const { data, error } = await supabase.functions.invoke('quickbooks_connect_begin', {
+        body: { company_id: companyId },
+      });
       if (error || !data?.auth_url) {
-        toast({ title: 'Failed to start QuickBooks connection', description: error?.message || 'No auth URL returned', variant: 'destructive' });
+        toast({ title: 'Failed to start QuickBooks connection', description: error?.message || data?.message || 'No auth URL returned', variant: 'destructive' });
         setQbConnecting(false);
         return;
       }
