@@ -143,6 +143,7 @@ const AdminPanel = () => {
       description: 'Shifts, availability & crew management',
       items: [
         { label: 'Shifts', action: () => navigate('/shifts') },
+        { label: 'Payroll', action: () => navigate('/payroll') },
         { label: 'Availability', action: () => setActiveView('availability') },
         { label: 'Crew Groups', action: () => setActiveView('crew-groups') },
       ],

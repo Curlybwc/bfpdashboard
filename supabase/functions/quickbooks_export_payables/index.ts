@@ -70,11 +70,12 @@ Deno.serve(async (req) => {
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name || "Unknown"]));
 
     // Pre-validate all batches and build grouped bill keys
-    // Grouping key: company_id + qb_vendor_id + period_start + period_end
+    // Grouping key: company_id + qb_vendor_id + project_id + period_start + period_end
     type BillGroup = {
       companyId: string;
       qbVendorId: string;
       qbVendorName: string;
+      projectId: string;
       periodStart: string;
       periodEnd: string;
       lines: { batch: any; projectName: string; projectAddress: string | null; classId: string | null; className: string | null; amount: number; description: string; workerName: string }[];
@@ -96,6 +97,15 @@ Deno.serve(async (req) => {
 
       if (batch.status !== "draft") {
         results.push({ batch_id: batchId, success: false, error: `Batch is '${batch.status}', expected 'draft'` });
+        failedBatchIds.add(batchId);
+        continue;
+      }
+
+      // Hard-stop: project_id required for payroll bill creation
+      if (!batch.project_id) {
+        const errorMsg = "Batch has no project assigned. A project is required for payroll bill creation.";
+        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
       }
@@ -181,8 +191,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Build grouping key
-      const groupKey = `${companyId}::${vendorMapping.qb_vendor_id}::${batch.period_start}::${batch.period_end}`;
+      // Build grouping key — includes project for one-bill-per-project
+      const groupKey = `${companyId}::${vendorMapping.qb_vendor_id}::${batch.project_id}::${batch.period_start}::${batch.period_end}`;
 
       const proj = batch.project_id ? projectMap.get(batch.project_id) : null;
       const projectName = proj?.name || "Project";
@@ -195,6 +205,7 @@ Deno.serve(async (req) => {
           companyId,
           qbVendorId: vendorMapping.qb_vendor_id,
           qbVendorName: vendorMapping.qb_vendor_name || "",
+          projectId: batch.project_id,
           periodStart: batch.period_start,
           periodEnd: batch.period_end,
           lines: [],

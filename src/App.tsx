@@ -28,6 +28,7 @@ import MaterialInventory from "./pages/MaterialInventory";
 import Today from "./pages/Today";
 import Shopping from "./pages/Shopping";
 import Shifts from "./pages/Shifts";
+import Payroll from "./pages/Payroll";
 import Availability from "./pages/Availability";
 import FieldModeCapture from "./pages/FieldModeCapture";
 import FieldModePreview from "./pages/FieldModePreview";
@@ -104,6 +105,7 @@ const AppRoutes = () => {
         <Route path="/scopes/:id/walkthrough" element={<ManagerGuard><ScopeWalkthrough /></ManagerGuard>} />
         <Route path="/shopping" element={<Shopping />} />
         <Route path="/shifts" element={<Shifts />} />
+        <Route path="/payroll" element={<AdminGuard><Payroll /></AdminGuard>} />
         <Route path="/availability" element={<Availability />} />
         <Route path="/admin" element={<AdminGuard><AdminPanel /></AdminGuard>} />
         <Route path="/admin/recipes" element={<AdminGuard><AdminRecipes /></AdminGuard>} />
