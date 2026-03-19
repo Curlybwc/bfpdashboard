@@ -440,13 +440,13 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
       group.totalDollars += row.dollars;
     }
 
-    // Build bill group previews (grouped by company + vendor + period)
+    // Build bill group previews (grouped by company + vendor + PROJECT + period)
     const billPreviews = new Map<string, BillGroupPreview>();
     for (const group of groupsMap.values()) {
       if (!group.company_id) continue;
       const vm = vmMap.get(group.company_id)?.get(group.worker_user_id);
       if (!vm) continue;
-      const bKey = `${group.company_id}::${vm.qb_vendor_id}::${fromDate}::${toDate}`;
+      const bKey = `${group.company_id}::${vm.qb_vendor_id}::${group.project_id}::${fromDate}::${toDate}`;
       if (!billPreviews.has(bKey)) {
         const co = companyMap.get(group.company_id);
         billPreviews.set(bKey, {
