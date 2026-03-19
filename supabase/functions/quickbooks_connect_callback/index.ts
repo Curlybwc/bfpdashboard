@@ -32,13 +32,14 @@ Deno.serve(async (req) => {
   }
 
   // Validate state HMAC
+  // State format: companyId:userId:timestamp:signature
   const stateSecret = Deno.env.get("QB_STATE_SECRET");
   if (!stateSecret) {
     return redirectError("Server misconfigured");
   }
 
   const parts = stateParam.split(":");
-  if (parts.length < 3) {
+  if (parts.length < 4) {
     return redirectError("Invalid state parameter");
   }
   const sig = parts.pop()!;
@@ -49,12 +50,13 @@ Deno.serve(async (req) => {
   }
 
   // Check state isn't too old (10 min)
-  const timestamp = parseInt(parts[1], 10);
+  const timestamp = parseInt(parts[2], 10);
   if (isNaN(timestamp) || Date.now() - timestamp > 10 * 60 * 1000) {
     return redirectError("State expired");
   }
 
-  const userId = parts[0];
+  const companyId = parts[0];
+  const userId = parts[1];
 
   // Exchange code for tokens
   const clientId = Deno.env.get("QB_CLIENT_ID");
@@ -126,6 +128,8 @@ Deno.serve(async (req) => {
     .is("disconnected_at", null)
     .maybeSingle();
 
+  let resolvedConnectionId: string;
+
   if (existingConn) {
     // Update existing connection with new tokens
     const { error: updateError } = await adminClient
@@ -142,9 +146,10 @@ Deno.serve(async (req) => {
       console.error("Failed to update QB connection:", updateError.message);
       return redirectError("Failed to update connection");
     }
+    resolvedConnectionId = existingConn.id;
   } else {
-    // Insert new connection (do NOT disconnect existing connections — multi-company support)
-    const { error: insertError } = await adminClient
+    // Insert new connection
+    const { data: newConn, error: insertError } = await adminClient
       .from("quickbooks_connections")
       .insert({
         realm_id: realmId,
@@ -153,12 +158,47 @@ Deno.serve(async (req) => {
         token_expires_at: expiresAt,
         company_name: companyName,
         connected_by: userId,
-      });
+      })
+      .select("id")
+      .single();
 
-    if (insertError) {
-      console.error("Failed to store QB connection:", insertError.message);
+    if (insertError || !newConn) {
+      console.error("Failed to store QB connection:", insertError?.message);
       return redirectError("Failed to store connection");
     }
+    resolvedConnectionId = newConn.id;
+  }
+
+  // Auto-link: set companies.qb_connection_id for the requesting company
+  // But first, check if another company already uses this connection
+  const { data: otherCompany } = await adminClient
+    .from("companies")
+    .select("id, name")
+    .eq("qb_connection_id", resolvedConnectionId)
+    .neq("id", companyId)
+    .maybeSingle();
+
+  if (otherCompany) {
+    // Another company is already linked to this QB connection.
+    // Still link the requesting company (admin chose this deliberately),
+    // but log a warning. Both companies will share the same QB connection.
+    console.warn(
+      `QB connection ${resolvedConnectionId} (realm ${realmId}) is also linked to company "${otherCompany.name}" (${otherCompany.id}). ` +
+      `Now also linking to company ${companyId}.`
+    );
+  }
+
+  // Update the requesting company's qb_connection_id
+  const { error: linkError } = await adminClient
+    .from("companies")
+    .update({ qb_connection_id: resolvedConnectionId })
+    .eq("id", companyId);
+
+  if (linkError) {
+    console.error("Failed to link QB connection to company:", linkError.message);
+    // Connection was created/updated successfully, but linking failed.
+    // Don't fail the whole flow — the admin can manually link via Edit Company.
+    return redirectSuccess();
   }
 
   return redirectSuccess();
