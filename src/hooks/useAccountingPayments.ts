@@ -52,6 +52,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
       const { data, error } = await q;
+      console.log('[Accounting] wp query result:', { data, error, filters });
       if (error) throw error;
       return (data ?? []).map((r) => ({
         id: r.id,
