@@ -39,6 +39,7 @@ import Eula from "./pages/Eula";
 import QBDisconnected from "./pages/QBDisconnected";
 import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
+import Accounting from "./pages/Accounting";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
