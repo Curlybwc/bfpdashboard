@@ -162,6 +162,7 @@ const AdminPanel = () => {
       icon: BarChart3,
       description: 'Analytics, calendar & scope accuracy',
       items: [
+        { label: 'Accounting', action: () => navigate('/admin/accounting') },
         { label: 'Analytics', action: () => navigate('/admin/analytics') },
         { label: 'Calendar', action: () => navigate('/admin/calendar') },
         { label: 'Scope Accuracy', action: () => navigate('/admin/scope-accuracy') },

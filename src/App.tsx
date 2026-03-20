@@ -39,6 +39,7 @@ import Eula from "./pages/Eula";
 import QBDisconnected from "./pages/QBDisconnected";
 import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
+import Accounting from "./pages/Accounting";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
@@ -118,6 +119,7 @@ const AppRoutes = () => {
         <Route path="/admin/inventory/materials" element={<AdminGuard><MaterialInventory /></AdminGuard>} />
         <Route path="/admin/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
         <Route path="/admin/calendar" element={<AdminGuard><CalendarView /></AdminGuard>} />
+        <Route path="/admin/accounting" element={<AdminGuard><Accounting /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}
