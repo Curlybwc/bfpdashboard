@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useMemo } from 'react';
-
+import { format } from 'date-fns';
 
 export interface AccountingFilters {
   workerId?: string;
@@ -34,8 +34,29 @@ export interface ContractorTotal {
   count: number;
 }
 
+function toLocalDateString(value: string) {
+  return format(new Date(value), 'yyyy-MM-dd');
+}
+
+function paddedTimestampBounds(fromDate: string, toDate: string) {
+  const from = new Date(`${fromDate}T00:00:00`);
+  const to = new Date(`${toDate}T23:59:59`);
+
+  from.setDate(from.getDate() - 1);
+  to.setDate(to.getDate() + 1);
+
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+  };
+}
+
 export function useAccountingPayments(filters: AccountingFilters) {
-  // Source 1: worker_payments with status = 'paid'
+  const batchBounds = useMemo(
+    () => paddedTimestampBounds(filters.fromDate, filters.toDate),
+    [filters.fromDate, filters.toDate],
+  );
+
   const wpQuery = useQuery({
     queryKey: ['accounting-wp', filters],
     queryFn: async () => {
@@ -52,8 +73,8 @@ export function useAccountingPayments(filters: AccountingFilters) {
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
       const { data, error } = await q;
-      console.log('[Accounting] wp query result:', { data, error, filters });
       if (error) throw error;
+
       return (data ?? []).map((r) => ({
         id: r.id,
         worker_user_id: r.worker_user_id,
@@ -73,18 +94,16 @@ export function useAccountingPayments(filters: AccountingFilters) {
     },
   });
 
-  // Source 2: worker_payable_batches with status = 'paid'
-  // paid_at is a timestamptz, so we filter by casting to date range
   const batchQuery = useQuery({
-    queryKey: ['accounting-batches', filters],
+    queryKey: ['accounting-batches', filters, batchBounds],
     queryFn: async () => {
       let q = supabase
         .from('worker_payable_batches')
         .select('id, worker_user_id, total_amount, paid_at, period_start, period_end, status, company_id, project_id, settlement_method, accounting_source, qb_bill_doc_number')
         .eq('status', 'paid')
         .not('paid_at', 'is', null)
-        .gte('paid_at', filters.fromDate + 'T00:00:00Z')
-        .lte('paid_at', filters.toDate + 'T23:59:59Z')
+        .gte('paid_at', batchBounds.from)
+        .lte('paid_at', batchBounds.to)
         .order('paid_at', { ascending: false });
 
       if (filters.workerId) q = q.eq('worker_user_id', filters.workerId);
@@ -92,24 +111,26 @@ export function useAccountingPayments(filters: AccountingFilters) {
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
       const { data, error } = await q;
-      console.log('[Accounting] batch query result:', { data, error, filters });
       if (error) throw error;
-      return (data ?? []).map((r) => ({
-        id: r.id,
-        worker_user_id: r.worker_user_id,
-        paid_date: r.paid_at ? r.paid_at.split('T')[0] : r.period_end,
-        amount: Number(r.total_amount),
-        payment_source: r.settlement_method ?? r.accounting_source ?? 'batch',
-        status: 'paid',
-        company_id: r.company_id,
-        project_id: r.project_id,
-        external_reference: r.qb_bill_doc_number ?? null,
-        memo: null,
-        pay_period_start: r.period_start,
-        pay_period_end: r.period_end,
-        qb_txn_type: null,
-        source_table: 'worker_payable_batches' as const,
-      }));
+
+      return (data ?? [])
+        .map((r) => ({
+          id: r.id,
+          worker_user_id: r.worker_user_id,
+          paid_date: r.paid_at ? toLocalDateString(r.paid_at) : r.period_end,
+          amount: Number(r.total_amount),
+          payment_source: r.settlement_method ?? r.accounting_source ?? 'batch',
+          status: 'paid',
+          company_id: r.company_id,
+          project_id: r.project_id,
+          external_reference: r.qb_bill_doc_number ?? null,
+          memo: null,
+          pay_period_start: r.period_start,
+          pay_period_end: r.period_end,
+          qb_txn_type: null,
+          source_table: 'worker_payable_batches' as const,
+        }))
+        .filter((r) => r.paid_date >= filters.fromDate && r.paid_date <= filters.toDate);
     },
   });
 
@@ -133,27 +154,21 @@ export function useAccountingPayments(filters: AccountingFilters) {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Deduplicate: if a worker_payments row and a batch row share the same worker + similar amount + date, prefer worker_payments
   const payments = useMemo<AccountingPayment[]>(() => {
     const wpRows = wpQuery.data ?? [];
     const batchRows = batchQuery.data ?? [];
 
-    // Build a set of worker_payments IDs for dedup
-    // Also track (worker_user_id, paid_date, amount) tuples from worker_payments
     const wpKeys = new Set<string>();
     for (const r of wpRows) {
       wpKeys.add(`${r.worker_user_id}|${r.paid_date}|${r.amount.toFixed(2)}`);
     }
 
-    // Only include batch rows that don't already appear in worker_payments
     const dedupedBatches = batchRows.filter((b) => {
       const key = `${b.worker_user_id}|${b.paid_date}|${b.amount.toFixed(2)}`;
       return !wpKeys.has(key);
     });
 
-    const all = [...wpRows, ...dedupedBatches];
-    all.sort((a, b) => b.paid_date.localeCompare(a.paid_date));
-    return all;
+    return [...wpRows, ...dedupedBatches].sort((a, b) => b.paid_date.localeCompare(a.paid_date));
   }, [wpQuery.data, batchQuery.data]);
 
   const profileMap = useMemo(() => {
