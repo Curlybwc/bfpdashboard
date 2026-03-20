@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react'; // force HMR reset
 import { format, startOfYear, startOfMonth } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
