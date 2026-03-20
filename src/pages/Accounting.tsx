@@ -37,6 +37,8 @@ const SOURCE_LABELS: Record<string, string> = {
   manual_quickbooks: 'QB Manual',
   venmo_manual: 'Venmo',
   quickbooks_linked: 'QB Linked',
+  off_platform_manual: 'Manual',
+  batch: 'Batch',
 };
 
 const Accounting = () => {
