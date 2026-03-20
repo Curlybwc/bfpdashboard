@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useMemo } from 'react';
 
+
 export interface AccountingFilters {
   workerId?: string;
   companyId?: string; // uuid, "legacy" for null-company rows, or undefined for all
