@@ -36,6 +36,7 @@ const Shifts = () => {
   const [editAllocations, setEditAllocations] = useState<ShiftAllocation[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [adminView, setAdminView] = useState<'list' | 'calendar'>('list');
+  const [newShiftDefaults, setNewShiftDefaults] = useState<{ date?: string; userId?: string }>({});
 
   // Filter state — initialized from query params for drill-down support
   const [contractorFilter, setContractorFilter] = useState(searchParams.get('contractor') || '');
