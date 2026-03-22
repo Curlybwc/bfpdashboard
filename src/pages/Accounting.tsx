@@ -79,6 +79,15 @@ const Accounting = () => {
     <div className="pb-20">
       <PageHeader title="Accounting" backTo="/admin" />
       <div className="p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-muted-foreground">Payment Ledger</h2>
+          <AddHistoricalPaymentDialog
+            profiles={profilesList}
+            companies={companies}
+            projects={projects}
+            onSaved={refetch}
+          />
+        </div>
         {/* Filters */}
         <Card>
           <CardContent className="p-4 space-y-3">
