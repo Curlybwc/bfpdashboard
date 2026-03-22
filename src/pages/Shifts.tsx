@@ -90,9 +90,10 @@ const Shifts = () => {
     );
   }
 
-  const handleNewShift = () => {
+  const handleNewShift = (defaults?: { date?: string; userId?: string }) => {
     setEditShift(null);
     setEditAllocations([]);
+    setNewShiftDefaults(defaults || {});
     setShowForm(true);
   };
 
