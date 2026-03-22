@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload } from 'lucide-react';
+import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
