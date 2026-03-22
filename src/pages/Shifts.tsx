@@ -343,7 +343,7 @@ const Shifts = () => {
       <PageHeader
         title="Shifts"
         actions={
-          <Button size="sm" onClick={handleNewShift}>
+          <Button size="sm" onClick={() => handleNewShift()}>
             <Plus className="h-4 w-4 mr-1" />Log Shift
           </Button>
         }
