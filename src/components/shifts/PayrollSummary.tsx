@@ -997,7 +997,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
                       <p className="text-sm truncate">
                         <span className="text-muted-foreground">{group.companyName} →</span> {group.contractorName} · {group.projectName}
                       </p>
-                      <p className="text-xs text-muted-foreground">{group.periodStart} → {group.periodEnd} · {group.shifts.length} shifts</p>
+                      <p className="text-xs text-muted-foreground">{group.periodStart} → {group.periodEnd} · {group.shifts.length} shifts · {group.totalHours.toFixed(1)}h</p>
                     </div>
                     <p className="text-sm font-medium">${group.totalDollars.toFixed(2)}</p>
                   </div>
