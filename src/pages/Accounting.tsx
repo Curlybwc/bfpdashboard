@@ -58,8 +58,8 @@ const Accounting = () => {
   }), [fromDate, toDate, companyFilter, contractorFilter]);
 
   const {
-    payments, loading, profileMap, companyMap, companies,
-    ledgerContractors, totalPaid, contractorTotals,
+    payments, loading, profileMap, companyMap, companies, projects,
+    profilesList, ledgerContractors, totalPaid, contractorTotals, refetch,
   } = useAccountingPayments(filters);
 
   const handlePreset = (p: DatePreset) => {
