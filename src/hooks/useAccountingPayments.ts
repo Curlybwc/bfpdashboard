@@ -139,6 +139,16 @@ export function useAccountingPayments(filters: AccountingFilters) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const projectsQuery = useQuery({
+    queryKey: ['accounting-projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('projects').select('id, name').order('name');
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const payments = useMemo<AccountingPayment[]>(() => {
     const wpRows = wpQuery.data ?? [];
     const batchRows = batchQuery.data ?? [];
