@@ -91,6 +91,8 @@ const NoEligibleTasksCard = () => {
 interface ShiftFormProps {
   editShift?: Shift | null;
   editAllocations?: ShiftAllocation[];
+  defaultDate?: string;
+  defaultUserId?: string;
   onSaved: () => void;
   onCancel?: () => void;
 }
