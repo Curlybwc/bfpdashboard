@@ -1054,11 +1054,11 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
   // Prepared Payments content
   const preparedPaymentsContent = (
     <>
-      {exportedGroups.length === 0 ? (
+      {filteredExportedGroups.length === 0 ? (
         <p className="text-xs text-muted-foreground">No prepared payments for this date range.</p>
       ) : (
         <div className="space-y-2">
-          {exportedGroups.map((group) => {
+          {filteredExportedGroups.map((group) => {
             const key = `existing-${group.batch.id}`;
             const qbBillUrl = getQBBillUrl(group.batch);
             const isDraft = group.batch.status === 'draft';
