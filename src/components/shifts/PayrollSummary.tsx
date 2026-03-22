@@ -1181,11 +1181,11 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
   // Already Paid content
   const alreadyPaidContent = (
     <>
-      {paidGroups.length === 0 ? (
+      {filteredPaidGroups.length === 0 ? (
         <p className="text-xs text-muted-foreground">No paid records for this date range.</p>
       ) : (
         <div className="space-y-1">
-          {paidGroups.map((group) => {
+          {filteredPaidGroups.map((group) => {
             const qbBillUrl = getQBBillUrl(group.batch);
             return (
               <div key={group.batch.id} className="text-xs border rounded p-2 flex items-center justify-between">
