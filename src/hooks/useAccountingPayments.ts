@@ -91,7 +91,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
   });
 
   const batchQuery = useQuery({
-    queryKey: ['accounting-batches', filters, batchBounds],
+    queryKey: ['accounting-batches', filters],
     queryFn: async () => {
       let q = supabase
         .from('worker_payable_batches')
