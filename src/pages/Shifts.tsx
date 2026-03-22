@@ -112,6 +112,7 @@ const Shifts = () => {
     setShowForm(false);
     setEditShift(null);
     setEditAllocations([]);
+    setNewShiftDefaults({});
     if (isAdmin) adminRefetch(); else refetch();
   };
 
