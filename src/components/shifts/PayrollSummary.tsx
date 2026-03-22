@@ -158,8 +158,11 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriodKey);
-  const fromDate = selectedPeriod.split('::')[0] || '';
-  const toDate = selectedPeriod.split('::')[1] || '';
+  const [isCustomPeriod, setIsCustomPeriod] = useState(false);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const fromDate = isCustomPeriod ? customFrom : (selectedPeriod.split('::')[0] || '');
+  const toDate = isCustomPeriod ? customTo : (selectedPeriod.split('::')[1] || '');
   const [loading, setLoading] = useState(false);
   const [creatingGroupKey, setCreatingGroupKey] = useState<string | null>(null);
   const [payingGroupKey, setPayingGroupKey] = useState<string | null>(null);
