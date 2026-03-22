@@ -213,7 +213,7 @@ const QBSettingsCard = () => {
     setQbConnecting(true);
     try {
       const { data, error } = await supabase.functions.invoke('quickbooks_connect_begin', {
-        body: { company_id: selectedCompanyId },
+        body: { company_id: selectedCompanyId, return_to: window.location.pathname },
       });
       if (error || !data?.auth_url) {
         toast({ title: 'Failed to start QuickBooks connection', description: error?.message || 'No auth URL returned', variant: 'destructive' });

@@ -10,15 +10,15 @@ Deno.serve(async (req) => {
   const errorParam = url.searchParams.get("error");
   const appBaseUrl = Deno.env.get("APP_BASE_URL") || "http://localhost:5173";
 
-  function redirectError(msg: string) {
-    const target = new URL("/shifts", appBaseUrl);
+  function redirectError(msg: string, returnTo = "/shifts") {
+    const target = new URL(returnTo, appBaseUrl);
     target.searchParams.set("qb", "error");
     target.searchParams.set("msg", msg);
     return Response.redirect(target.toString(), 302);
   }
 
-  function redirectSuccess() {
-    const target = new URL("/shifts", appBaseUrl);
+  function redirectSuccess(returnTo = "/shifts") {
+    const target = new URL(returnTo, appBaseUrl);
     target.searchParams.set("qb", "connected");
     return Response.redirect(target.toString(), 302);
   }
@@ -49,14 +49,16 @@ Deno.serve(async (req) => {
     return redirectError("Invalid state signature");
   }
 
-  // Check state isn't too old (10 min)
-  const timestamp = parseInt(parts[2], 10);
-  if (isNaN(timestamp) || Date.now() - timestamp > 10 * 60 * 1000) {
-    return redirectError("State expired");
-  }
-
+  // Parts: companyId:userId:timestamp or companyId:userId:timestamp:returnTo
   const companyId = parts[0];
   const userId = parts[1];
+  const timestamp = parseInt(parts[2], 10);
+  const returnTo = parts.length >= 4 ? parts[3] : "/shifts";
+
+  // Check state isn't too old (10 min)
+  if (isNaN(timestamp) || Date.now() - timestamp > 10 * 60 * 1000) {
+    return redirectError("State expired", returnTo);
+  }
 
   // Exchange code for tokens
   const clientId = Deno.env.get("QB_CLIENT_ID");
@@ -64,7 +66,7 @@ Deno.serve(async (req) => {
   const redirectUri = Deno.env.get("QB_REDIRECT_URI");
 
   if (!clientId || !clientSecret || !redirectUri) {
-    return redirectError("Server misconfigured");
+    return redirectError("Server misconfigured", returnTo);
   }
 
   const basicAuth = btoa(`${clientId}:${clientSecret}`);
@@ -86,7 +88,7 @@ Deno.serve(async (req) => {
   if (!tokenResp.ok) {
     const errText = await tokenResp.text();
     console.error("QB token exchange failed:", tokenResp.status, errText);
-    return redirectError("Token exchange failed");
+    return redirectError("Token exchange failed", returnTo);
   }
 
   const tokens = await tokenResp.json();
@@ -144,7 +146,7 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error("Failed to update QB connection:", updateError.message);
-      return redirectError("Failed to update connection");
+      return redirectError("Failed to update connection", returnTo);
     }
     resolvedConnectionId = existingConn.id;
   } else {
@@ -164,7 +166,7 @@ Deno.serve(async (req) => {
 
     if (insertError || !newConn) {
       console.error("Failed to store QB connection:", insertError?.message);
-      return redirectError("Failed to store connection");
+      return redirectError("Failed to store connection", returnTo);
     }
     resolvedConnectionId = newConn.id;
   }
@@ -198,8 +200,8 @@ Deno.serve(async (req) => {
     console.error("Failed to link QB connection to company:", linkError.message);
     // Connection was created/updated successfully, but linking failed.
     // Don't fail the whole flow — the admin can manually link via Edit Company.
-    return redirectSuccess();
+    return redirectSuccess(returnTo);
   }
 
-  return redirectSuccess();
+  return redirectSuccess(returnTo);
 });

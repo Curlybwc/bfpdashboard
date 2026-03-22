@@ -11,6 +11,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const companyId = body.company_id;
+    const returnTo = body.return_to || "/shifts";
 
     if (!companyId || typeof companyId !== "string") {
       return new Response(
@@ -31,8 +32,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build state: companyId:userId:timestamp, signed with HMAC
-    const statePayload = `${companyId}:${userId}:${Date.now()}`;
+    // Build state: companyId:userId:timestamp:returnTo, signed with HMAC
+    const statePayload = `${companyId}:${userId}:${Date.now()}:${returnTo}`;
     const stateSig = await signState(statePayload, stateSecret);
     const state = `${statePayload}:${stateSig}`;
 
