@@ -158,7 +158,17 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       if (hasDuplicate) return;
 
       const isManual = b.settlement_method === 'off_platform_manual';
+      const wasQbExport = !!b.qb_bill_id || b.accounting_source === 'quickbooks' || b.qb_exported_at;
       const draftCat: DraftCategory = isManual ? 'manual' : 'qb_export';
+
+      const resolvePaymentMethod = (): string => {
+        if (b.status === 'draft') return isManual ? 'Off-Platform' : 'QB Export';
+        if (b.status === 'exported') return 'QB Bill';
+        // status === 'paid': check if it originated from a QB export
+        if (wasQbExport) return 'QB Bill';
+        if (isManual) return 'Off-Platform';
+        return b.settlement_method || 'Manual';
+      };
 
       unified.push({
         id: b.id,
@@ -169,9 +179,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         workerName: profMap[b.worker_user_id] || 'Unknown',
         amount: Number(b.total_amount),
         paidDate: b.paid_at ? b.paid_at.slice(0, 10) : b.period_end,
-        paymentMethod: b.status === 'draft'
-          ? (isManual ? 'Off-Platform' : 'QB Export')
-          : b.status === 'exported' ? 'QB Bill' : (b.settlement_method || 'Manual'),
+        paymentMethod: resolvePaymentMethod(),
         projectId: b.project_id,
         projectName: b.project_id ? (projMap[b.project_id] || 'Unknown Project') : null,
         companyId: b.company_id,
