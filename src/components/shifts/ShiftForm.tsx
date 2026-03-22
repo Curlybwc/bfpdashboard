@@ -91,6 +91,8 @@ const NoEligibleTasksCard = () => {
 interface ShiftFormProps {
   editShift?: Shift | null;
   editAllocations?: ShiftAllocation[];
+  defaultDate?: string;
+  defaultUserId?: string;
   onSaved: () => void;
   onCancel?: () => void;
 }
@@ -102,14 +104,14 @@ interface TaskRow {
   assignment_mode: string;
 }
 
-const ShiftForm = ({ editShift, editAllocations, onSaved, onCancel }: ShiftFormProps) => {
+const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onSaved, onCancel }: ShiftFormProps) => {
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
   const { toast } = useToast();
 
   const [projects, setProjects] = useState<{ id: string; name: string; address: string | null }[]>([]);
   const [projectId, setProjectId] = useState(editShift?.project_id || '');
-  const [shiftDate, setShiftDate] = useState(editShift?.shift_date || new Date().toISOString().slice(0, 10));
+  const [shiftDate, setShiftDate] = useState(editShift?.shift_date || defaultDate || new Date().toISOString().slice(0, 10));
   const [useStartEnd, setUseStartEnd] = useState(!!(editShift?.start_time));
   const [startTime, setStartTime] = useState(editShift?.start_time?.slice(0, 5) || '08:00');
   const [endTime, setEndTime] = useState(editShift?.end_time?.slice(0, 5) || '16:00');
@@ -121,7 +123,7 @@ const ShiftForm = ({ editShift, editAllocations, onSaved, onCancel }: ShiftFormP
 
   // For admin editing other users
   const [allUsers, setAllUsers] = useState<{ id: string; full_name: string | null }[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState(editShift?.user_id || user?.id || '');
+  const [selectedUserId, setSelectedUserId] = useState(editShift?.user_id || defaultUserId || user?.id || '');
 
   // Fetch projects user is a member of
   useEffect(() => {

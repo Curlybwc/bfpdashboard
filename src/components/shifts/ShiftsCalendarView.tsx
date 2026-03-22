@@ -11,6 +11,7 @@ interface ShiftsCalendarViewProps {
   profileMap: Record<string, string>;
   projectMap: Record<string, string>;
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
+  onDateClick?: (dateStr: string) => void;
   onMonthChange?: (from: string, to: string) => void;
 }
 
@@ -21,6 +22,7 @@ export default function ShiftsCalendarView({
   profileMap,
   projectMap,
   onEditShift,
+  onDateClick,
   onMonthChange,
 }: ShiftsCalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
@@ -97,9 +99,10 @@ export default function ShiftsCalendarView({
           return (
             <div
               key={dateStr}
-              className={`bg-background min-h-[80px] p-1 space-y-0.5 ${
+              className={`bg-background min-h-[80px] p-1 space-y-0.5 cursor-pointer hover:bg-muted/30 transition-colors ${
                 isToday ? 'ring-1 ring-inset ring-primary/50' : ''
               }`}
+              onClick={() => onDateClick?.(dateStr)}
             >
               <div className="flex items-center justify-between">
                 <span
@@ -121,7 +124,7 @@ export default function ShiftsCalendarView({
               {dayShifts.slice(0, 3).map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => onEditShift(s)}
+                  onClick={(e) => { e.stopPropagation(); onEditShift(s); }}
                   className="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                 >
                   {profileMap[s.user_id]?.split(' ')[0] || '?'} · {s.total_hours}h

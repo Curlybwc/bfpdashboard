@@ -36,6 +36,7 @@ const Shifts = () => {
   const [editAllocations, setEditAllocations] = useState<ShiftAllocation[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [adminView, setAdminView] = useState<'list' | 'calendar'>('list');
+  const [newShiftDefaults, setNewShiftDefaults] = useState<{ date?: string; userId?: string }>({});
 
   // Filter state — initialized from query params for drill-down support
   const [contractorFilter, setContractorFilter] = useState(searchParams.get('contractor') || '');
@@ -89,9 +90,10 @@ const Shifts = () => {
     );
   }
 
-  const handleNewShift = () => {
+  const handleNewShift = (defaults?: { date?: string; userId?: string }) => {
     setEditShift(null);
     setEditAllocations([]);
+    setNewShiftDefaults(defaults || {});
     setShowForm(true);
   };
 
@@ -110,6 +112,7 @@ const Shifts = () => {
     setShowForm(false);
     setEditShift(null);
     setEditAllocations([]);
+    setNewShiftDefaults({});
     if (isAdmin) adminRefetch(); else refetch();
   };
 
@@ -148,8 +151,10 @@ const Shifts = () => {
           <ShiftForm
             editShift={editShift}
             editAllocations={editAllocations}
+            defaultDate={newShiftDefaults.date}
+            defaultUserId={newShiftDefaults.userId}
             onSaved={handleSaved}
-            onCancel={() => { setShowForm(false); setEditShift(null); }}
+            onCancel={() => { setShowForm(false); setEditShift(null); setNewShiftDefaults({}); }}
           />
         </div>
       </div>
@@ -179,7 +184,7 @@ const Shifts = () => {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Button size="sm" onClick={handleNewShift}>
+              <Button size="sm" onClick={() => handleNewShift()}>
                 <Plus className="h-4 w-4 mr-1" />Log Shift
               </Button>
             </div>
@@ -269,6 +274,9 @@ const Shifts = () => {
               profileMap={profileMap}
               projectMap={projectMap}
               onEditShift={handleEditShift}
+              onDateClick={(dateStr) => {
+                handleNewShift({ date: dateStr, userId: contractorFilter || undefined });
+              }}
               onMonthChange={(from, to) => {
                 setFromDate(from);
                 setToDate(to);
@@ -341,7 +349,7 @@ const Shifts = () => {
       <PageHeader
         title="Shifts"
         actions={
-          <Button size="sm" onClick={handleNewShift}>
+          <Button size="sm" onClick={() => handleNewShift()}>
             <Plus className="h-4 w-4 mr-1" />Log Shift
           </Button>
         }
