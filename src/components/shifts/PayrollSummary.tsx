@@ -909,12 +909,26 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     setLocalSaving(false);
   };
 
+  // Apply worker filter if provided
+  const filteredCandidateGroups = useMemo(() =>
+    workerFilter ? candidateGroups.filter(g => g.worker_user_id === workerFilter) : candidateGroups,
+    [candidateGroups, workerFilter]
+  );
+  const filteredExportedGroups = useMemo(() =>
+    workerFilter ? exportedGroups.filter(g => g.batch.worker_user_id === workerFilter) : exportedGroups,
+    [exportedGroups, workerFilter]
+  );
+  const filteredPaidGroups = useMemo(() =>
+    workerFilter ? paidGroups.filter(g => g.batch.worker_user_id === workerFilter) : paidGroups,
+    [paidGroups, workerFilter]
+  );
+
   const totals = useMemo(() => {
-    const candidateDollars = candidateGroups.reduce((sum, row) => sum + row.totalDollars, 0);
-    const exportedDollars = exportedGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
-    const paidDollars = paidGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
+    const candidateDollars = filteredCandidateGroups.reduce((sum, row) => sum + row.totalDollars, 0);
+    const exportedDollars = filteredExportedGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
+    const paidDollars = filteredPaidGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
     return { candidateDollars, exportedDollars, paidDollars };
-  }, [candidateGroups, exportedGroups, paidGroups]);
+  }, [filteredCandidateGroups, filteredExportedGroups, filteredPaidGroups]);
 
   // Reusable bill preview JSX
   const billPreviewContent = billGroupPreviews.length > 0 ? (
