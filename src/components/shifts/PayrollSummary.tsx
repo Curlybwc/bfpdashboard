@@ -1183,7 +1183,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
                       </Badge>
                     )}
                   </div>
-                  <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · Paid on {group.batch.paid_at ? new Date(group.batch.paid_at).toLocaleDateString() : '—'}</p>
+                  <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · {group.totalHours.toFixed(1)}h · Paid on {group.batch.paid_at ? new Date(group.batch.paid_at).toLocaleDateString() : '—'}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {qbBillUrl && (
