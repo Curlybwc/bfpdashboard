@@ -1366,6 +1366,8 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
         )}
       </div>
 
+      <p className="text-xs text-muted-foreground">Shifts already paid (via any period) are automatically excluded, so you won't pay the same shift twice.</p>
+
       <Card className="p-3 text-xs text-muted-foreground">
         <p>Ready to prepare: <span className="text-foreground font-medium">${totals.candidateDollars.toFixed(2)}</span></p>
         <p>Prepared (not yet paid): <span className="text-foreground font-medium">${totals.exportedDollars.toFixed(2)}</span></p>
