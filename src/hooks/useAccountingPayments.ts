@@ -52,10 +52,6 @@ function paddedTimestampBounds(fromDate: string, toDate: string) {
 }
 
 export function useAccountingPayments(filters: AccountingFilters) {
-  const batchBounds = useMemo(
-    () => paddedTimestampBounds(filters.fromDate, filters.toDate),
-    [filters.fromDate, filters.toDate],
-  );
 
   const wpQuery = useQuery({
     queryKey: ['accounting-wp', filters],
