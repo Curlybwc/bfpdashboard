@@ -77,12 +77,22 @@ type ExcludedShift = {
   linkedBatchId?: string;
 };
 
+type QBConnectionDetail = {
+  id: string;
+  company_name?: string;
+  realm_id?: string;
+  connected_at?: string;
+  token_healthy?: boolean;
+  company_id?: string | null;
+};
+
 type QBConnectionStatus = {
   connected: boolean;
   company_name?: string;
   realm_id?: string;
   connected_at?: string;
   token_healthy?: boolean;
+  connections?: QBConnectionDetail[];
 };
 
 interface PayrollSummaryProps {
@@ -246,9 +256,9 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
     fetchQBStatus();
   }, [fetchQBStatus]);
 
-  const handleConnectQB = async () => {
-    // Use the first available company for OAuth flow
-    const companyId = companies.length > 0 ? companies[0].id : null;
+  const handleConnectQB = async (targetCompanyId?: string) => {
+    // Use provided company ID, or fall back to first available
+    const companyId = targetCompanyId || (companies.length > 0 ? companies[0].id : null);
     if (!companyId) {
       toast({ title: 'No company available', description: 'Add a company before connecting QuickBooks.', variant: 'destructive' });
       return;
@@ -1260,26 +1270,32 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
             <Loader2 className="h-3 w-3 animate-spin" />
             Checking QuickBooks connection…
           </div>
-        ) : qbStatus?.connected ? (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">QuickBooks: {qbStatus.company_name || 'Connected'}</p>
-                {!qbStatus.token_healthy && (
-                  <p className="text-xs text-destructive">Token expired — reconnect required</p>
-                )}
-              </div>
-            </div>
-            <Button size="sm" variant="outline" onClick={handleConnectQB} disabled={qbConnecting}>
-              {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
-              Reconnect
-            </Button>
+        ) : qbStatus?.connected && qbStatus.connections?.length ? (
+          <div className="space-y-2">
+            {qbStatus.connections.map((conn) => (
+                <div key={conn.id} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CheckCircle className={`h-4 w-4 shrink-0 ${conn.token_healthy ? 'text-green-600' : 'text-destructive'}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">QB: {conn.company_name || 'Connected'}</p>
+                      {!conn.token_healthy && (
+                        <p className="text-xs text-destructive">Token expired — reconnect required</p>
+                      )}
+                    </div>
+                  </div>
+                  {!conn.token_healthy && conn.company_id && (
+                    <Button size="sm" variant="outline" onClick={() => handleConnectQB(conn.company_id!)} disabled={qbConnecting}>
+                      {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
+                      Reconnect
+                    </Button>
+                  )}
+                </div>
+              ))}
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">QuickBooks not connected</p>
-            <Button size="sm" onClick={handleConnectQB} disabled={qbConnecting}>
+            <Button size="sm" onClick={() => handleConnectQB()} disabled={qbConnecting}>
               {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
               Connect QuickBooks
             </Button>
