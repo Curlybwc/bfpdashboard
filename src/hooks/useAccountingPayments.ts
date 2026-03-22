@@ -107,27 +107,32 @@ export function useAccountingPayments(filters: AccountingFilters) {
       if (filters.companyId === 'legacy') q = q.is('company_id', null);
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
+      // Filter by period overlap with date range
+      q = q.lte('period_start', filters.toDate).gte('period_end', filters.fromDate);
+
       const { data, error } = await q;
       if (error) throw error;
 
       return (data ?? [])
-        .map((r) => ({
-          id: r.id,
-          worker_user_id: r.worker_user_id,
-          paid_date: r.paid_at ? toLocalDateString(r.paid_at) : r.period_end,
-          amount: Number(r.total_amount),
-          payment_source: r.settlement_method ?? r.accounting_source ?? 'batch',
-          status: 'paid',
-          company_id: r.company_id,
-          project_id: r.project_id,
-          external_reference: r.qb_bill_doc_number ?? null,
-          memo: null,
-          pay_period_start: r.period_start,
-          pay_period_end: r.period_end,
-          qb_txn_type: null,
-          source_table: 'worker_payable_batches' as const,
-        }))
-        .filter((r) => r.paid_date >= filters.fromDate && r.paid_date <= filters.toDate);
+        .map((r) => {
+          const paidDate = r.paid_at ? toLocalDateString(r.paid_at) : r.period_end;
+          return {
+            id: r.id,
+            worker_user_id: r.worker_user_id,
+            paid_date: paidDate,
+            amount: Number(r.total_amount),
+            payment_source: r.status === 'exported' ? 'quickbooks_exported' : (r.settlement_method ?? r.accounting_source ?? 'batch'),
+            status: r.status,
+            company_id: r.company_id,
+            project_id: r.project_id,
+            external_reference: r.qb_bill_doc_number ?? null,
+            memo: null,
+            pay_period_start: r.period_start,
+            pay_period_end: r.period_end,
+            qb_txn_type: null,
+            source_table: 'worker_payable_batches' as const,
+          };
+        });
     },
   });
 
