@@ -1323,24 +1323,48 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
 
       <QBSettingsCard />
 
-      {/* Pay period selector */}
-      <div className="space-y-1">
-        <Label className="text-xs">Pay Period</Label>
-        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a pay period" />
-          </SelectTrigger>
-          <SelectContent>
-            {PAY_PERIODS.map((p) => (
-              <SelectItem key={`${p.from}::${p.to}`} value={`${p.from}::${p.to}`}>
-                {p.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Pay Period</Label>
+          <Select
+            value={isCustomPeriod ? 'custom' : selectedPeriod}
+            onValueChange={(v) => {
+              if (v === 'custom') {
+                setIsCustomPeriod(true);
+                if (!customFrom) setCustomFrom(new Date().toISOString().slice(0, 10));
+                if (!customTo) setCustomTo(new Date().toISOString().slice(0, 10));
+              } else {
+                setIsCustomPeriod(false);
+                setSelectedPeriod(v);
+              }
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a pay period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="custom">Custom date range…</SelectItem>
+              {PAY_PERIODS.map((p) => (
+                <SelectItem key={`${p.from}::${p.to}`} value={`${p.from}::${p.to}`}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {isCustomPeriod && (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" className="h-8 text-xs" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" className="h-8 text-xs" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+            </div>
+          </div>
+        )}
       </div>
-
-      <p className="text-xs text-muted-foreground">This page groups unpaid shifts by contractor and project so you can prepare payments without paying the same shift twice.</p>
 
       <Card className="p-3 text-xs text-muted-foreground">
         <p>Ready to prepare: <span className="text-foreground font-medium">${totals.candidateDollars.toFixed(2)}</span></p>
