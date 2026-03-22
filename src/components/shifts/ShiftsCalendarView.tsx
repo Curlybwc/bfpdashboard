@@ -11,6 +11,7 @@ interface ShiftsCalendarViewProps {
   profileMap: Record<string, string>;
   projectMap: Record<string, string>;
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
+  onDateClick?: (dateStr: string) => void;
   onMonthChange?: (from: string, to: string) => void;
 }
 
