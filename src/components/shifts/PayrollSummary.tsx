@@ -600,7 +600,6 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
         period_end: group.periodEnd,
         total_amount: Number(group.totalDollars.toFixed(2)),
         status: 'draft',
-        settlement_method: 'off_platform_manual',
         created_by: user.id,
       })
       .select('*')
