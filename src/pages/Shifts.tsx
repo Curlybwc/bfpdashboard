@@ -281,6 +281,19 @@ const Shifts = () => {
                   </>
                 )}
               </div>
+              {contractorFilter && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1"
+                  asChild
+                >
+                  <a href={`/payroll?worker=${contractorFilter}&workerName=${encodeURIComponent(profileMap[contractorFilter] || '')}`}>
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Pay Worker
+                  </a>
+                </Button>
+              )}
             </Card>
           )}
 
