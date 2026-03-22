@@ -1068,7 +1068,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end}</p>
+                        <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · {group.totalHours.toFixed(1)}h</p>
                       </div>
                       <p className="text-sm font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
                       {(isDraft || isExported) && (
