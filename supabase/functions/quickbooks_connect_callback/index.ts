@@ -49,14 +49,16 @@ Deno.serve(async (req) => {
     return redirectError("Invalid state signature");
   }
 
-  // Check state isn't too old (10 min)
-  const timestamp = parseInt(parts[2], 10);
-  if (isNaN(timestamp) || Date.now() - timestamp > 10 * 60 * 1000) {
-    return redirectError("State expired");
-  }
-
+  // Parts: companyId:userId:timestamp or companyId:userId:timestamp:returnTo
   const companyId = parts[0];
   const userId = parts[1];
+  const timestamp = parseInt(parts[2], 10);
+  const returnTo = parts.length >= 4 ? parts[3] : "/shifts";
+
+  // Check state isn't too old (10 min)
+  if (isNaN(timestamp) || Date.now() - timestamp > 10 * 60 * 1000) {
+    return redirectError("State expired", returnTo);
+  }
 
   // Exchange code for tokens
   const clientId = Deno.env.get("QB_CLIENT_ID");
