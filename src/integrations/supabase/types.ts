@@ -709,7 +709,7 @@ export type Database = {
           {
             foreignKeyName: "quickbooks_settings_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
