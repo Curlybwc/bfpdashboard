@@ -263,6 +263,17 @@ const Shifts = () => {
                 </Card>
               ))}
             </div>
+          ) : adminView === 'calendar' ? (
+            <ShiftsCalendarView
+              shifts={shifts}
+              profileMap={profileMap}
+              projectMap={projectMap}
+              onEditShift={handleEditShift}
+              onMonthChange={(from, to) => {
+                setFromDate(from);
+                setToDate(to);
+              }}
+            />
           ) : shifts.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No shifts found for this date range.</p>
           ) : (
