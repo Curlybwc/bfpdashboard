@@ -1,14 +1,17 @@
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/PageHeader';
 import PayrollSummary from '@/components/shifts/PayrollSummary';
+import PaymentHistory from '@/components/shifts/PaymentHistory';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { X } from 'lucide-react';
 
 const Payroll = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const workerFilter = searchParams.get('worker') || undefined;
   const workerName = searchParams.get('workerName') || undefined;
+  const defaultTab = searchParams.get('tab') || 'prepare';
 
   const clearFilter = () => {
     searchParams.delete('worker');
@@ -30,13 +33,24 @@ const Payroll = () => {
             </Button>
           </div>
         )}
-        <PayrollSummary
-          billFirstMode
-          workerFilter={workerFilter}
-          onEditShift={(shift) => {
-            window.location.href = `/shifts?edit=${shift.id}`;
-          }}
-        />
+        <Tabs defaultValue={defaultTab}>
+          <TabsList className="w-full">
+            <TabsTrigger value="prepare" className="flex-1 text-xs">Prepare Payroll</TabsTrigger>
+            <TabsTrigger value="history" className="flex-1 text-xs">Payment History</TabsTrigger>
+          </TabsList>
+          <TabsContent value="prepare" className="mt-4">
+            <PayrollSummary
+              billFirstMode
+              workerFilter={workerFilter}
+              onEditShift={(shift) => {
+                window.location.href = `/shifts?edit=${shift.id}`;
+              }}
+            />
+          </TabsContent>
+          <TabsContent value="history" className="mt-4">
+            <PaymentHistory workerFilter={workerFilter} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
