@@ -100,10 +100,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
       let q = supabase
         .from('worker_payable_batches')
         .select('id, worker_user_id, total_amount, paid_at, period_start, period_end, status, company_id, project_id, settlement_method, accounting_source, qb_bill_doc_number')
-        .eq('status', 'paid')
-        .not('paid_at', 'is', null)
-        .gte('paid_at', batchBounds.from)
-        .lte('paid_at', batchBounds.to)
+        .in('status', ['paid', 'exported'])
         .order('paid_at', { ascending: false });
 
       if (filters.workerId) q = q.eq('worker_user_id', filters.workerId);
