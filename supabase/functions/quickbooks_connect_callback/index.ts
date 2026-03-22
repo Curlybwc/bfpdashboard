@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
   if (!tokenResp.ok) {
     const errText = await tokenResp.text();
     console.error("QB token exchange failed:", tokenResp.status, errText);
-    return redirectError("Token exchange failed");
+    return redirectError("Token exchange failed", returnTo);
   }
 
   const tokens = await tokenResp.json();
