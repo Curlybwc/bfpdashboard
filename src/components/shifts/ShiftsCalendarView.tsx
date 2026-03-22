@@ -99,9 +99,10 @@ export default function ShiftsCalendarView({
           return (
             <div
               key={dateStr}
-              className={`bg-background min-h-[80px] p-1 space-y-0.5 ${
+              className={`bg-background min-h-[80px] p-1 space-y-0.5 cursor-pointer hover:bg-muted/30 transition-colors ${
                 isToday ? 'ring-1 ring-inset ring-primary/50' : ''
               }`}
+              onClick={() => onDateClick?.(dateStr)}
             >
               <div className="flex items-center justify-between">
                 <span
