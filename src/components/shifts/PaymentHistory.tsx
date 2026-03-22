@@ -244,11 +244,11 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     }
   };
 
-  const handleExportAllDrafts = async () => {
-    if (draftBatches.length === 0) return;
+  const handleExportQBDrafts = async () => {
+    if (qbDrafts.length === 0) return;
     setExporting(true);
     try {
-      const batchIds = draftBatches.map((d) => d.id);
+      const batchIds = qbDrafts.map((d) => d.id);
       const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
         body: { batch_ids: batchIds },
       });
@@ -263,6 +263,34 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       toast({
         title: 'Export failed',
         description: err.message || 'Could not export drafts to QuickBooks.',
+        variant: 'destructive',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleMarkManualPaid = async () => {
+    if (manualDrafts.length === 0) return;
+    setExporting(true);
+    try {
+      const batchIds = manualDrafts.map((d) => d.id);
+      for (const id of batchIds) {
+        const { error } = await supabase
+          .from('worker_payable_batches')
+          .update({ status: 'paid', paid_at: new Date().toISOString(), settlement_method: 'off_platform_manual' })
+          .eq('id', id);
+        if (error) throw error;
+      }
+      toast({
+        title: 'Marked as paid',
+        description: `${batchIds.length} off-platform payment(s) marked as paid.`,
+      });
+      loadData();
+    } catch (err: any) {
+      toast({
+        title: 'Update failed',
+        description: err.message || 'Could not mark payments as paid.',
         variant: 'destructive',
       });
     } finally {
