@@ -44,10 +44,13 @@ type BatchRow = {
   created_at: string;
 };
 
+type DraftCategory = 'qb_export' | 'manual';
+
 type UnifiedPayment = {
   id: string;
   source: 'payment' | 'batch';
   batchStatus?: string;
+  draftCategory?: DraftCategory;
   workerUserId: string;
   workerName: string;
   amount: number;
