@@ -22,6 +22,7 @@ export default function ShiftsCalendarView({
   profileMap,
   projectMap,
   onEditShift,
+  onDateClick,
   onMonthChange,
 }: ShiftsCalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
