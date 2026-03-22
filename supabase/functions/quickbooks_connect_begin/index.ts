@@ -11,6 +11,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const companyId = body.company_id;
+    const returnTo = body.return_to || "/shifts";
 
     if (!companyId || typeof companyId !== "string") {
       return new Response(
