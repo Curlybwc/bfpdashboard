@@ -32,8 +32,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build state: companyId:userId:timestamp, signed with HMAC
-    const statePayload = `${companyId}:${userId}:${Date.now()}`;
+    // Build state: companyId:userId:timestamp:returnTo, signed with HMAC
+    const statePayload = `${companyId}:${userId}:${Date.now()}:${returnTo}`;
     const stateSig = await signState(statePayload, stateSecret);
     const state = `${statePayload}:${stateSig}`;
 
