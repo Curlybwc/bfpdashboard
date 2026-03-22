@@ -168,9 +168,21 @@ const Shifts = () => {
         <PageHeader
           title="Shifts"
           actions={
-            <Button size="sm" onClick={handleNewShift}>
-              <Plus className="h-4 w-4 mr-1" />Log Shift
-            </Button>
+            <div className="flex items-center gap-2">
+              <Tabs value={adminView} onValueChange={(v) => setAdminView(v as 'list' | 'calendar')}>
+                <TabsList className="h-8">
+                  <TabsTrigger value="list" className="h-6 px-2 text-xs gap-1">
+                    <List className="h-3.5 w-3.5" />List
+                  </TabsTrigger>
+                  <TabsTrigger value="calendar" className="h-6 px-2 text-xs gap-1">
+                    <CalendarDays className="h-3.5 w-3.5" />Calendar
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Button size="sm" onClick={handleNewShift}>
+                <Plus className="h-4 w-4 mr-1" />Log Shift
+              </Button>
+            </div>
           }
         />
         <div className="p-4 space-y-4">
