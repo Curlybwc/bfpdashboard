@@ -203,5 +203,5 @@ Deno.serve(async (req) => {
     return redirectSuccess(returnTo);
   }
 
-  return redirectSuccess();
+  return redirectSuccess(returnTo);
 });

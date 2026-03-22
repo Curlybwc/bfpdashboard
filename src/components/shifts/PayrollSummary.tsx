@@ -256,7 +256,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
     setQbConnecting(true);
     try {
       const { data, error } = await supabase.functions.invoke('quickbooks_connect_begin', {
-        body: { company_id: companyId },
+        body: { company_id: companyId, return_to: '/payroll' },
       });
       if (error || !data?.auth_url) {
         toast({ title: 'Failed to start QuickBooks connection', description: error?.message || data?.message || 'No auth URL returned', variant: 'destructive' });
