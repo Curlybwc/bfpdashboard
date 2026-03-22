@@ -77,12 +77,21 @@ type ExcludedShift = {
   linkedBatchId?: string;
 };
 
+type QBConnectionDetail = {
+  id: string;
+  company_name?: string;
+  realm_id?: string;
+  connected_at?: string;
+  token_healthy?: boolean;
+};
+
 type QBConnectionStatus = {
   connected: boolean;
   company_name?: string;
   realm_id?: string;
   connected_at?: string;
   token_healthy?: boolean;
+  connections?: QBConnectionDetail[];
 };
 
 interface PayrollSummaryProps {
