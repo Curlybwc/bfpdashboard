@@ -9,25 +9,37 @@ Deno.serve(async (req) => {
     const { adminClient } = await requireAdminAuth(req);
 
     // Return ALL active connections (multi-company support)
-    const { data, error } = await adminClient
-      .from("quickbooks_connections")
-      .select("id, realm_id, company_name, connected_by, connected_at, disconnected_at, token_expires_at")
-      .is("disconnected_at", null)
-      .order("connected_at", { ascending: true });
+    const [connsResult, companiesResult] = await Promise.all([
+      adminClient
+        .from("quickbooks_connections")
+        .select("id, realm_id, company_name, connected_by, connected_at, disconnected_at, token_expires_at")
+        .is("disconnected_at", null)
+        .order("connected_at", { ascending: true }),
+      adminClient
+        .from("companies")
+        .select("id, name, qb_connection_id"),
+    ]);
 
-    if (error) {
+    if (connsResult.error) {
       return new Response(
-        JSON.stringify({ error: "query_failed", message: error.message }),
+        JSON.stringify({ error: "query_failed", message: connsResult.error.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const connections = (data || []).map((row: any) => ({
+    // Build connection_id → company_id map
+    const connToCompany: Record<string, string> = {};
+    for (const c of companiesResult.data || []) {
+      if (c.qb_connection_id) connToCompany[c.qb_connection_id] = c.id;
+    }
+
+    const connections = (connsResult.data || []).map((row: any) => ({
       id: row.id,
       company_name: row.company_name,
       realm_id: row.realm_id,
       connected_at: row.connected_at,
       token_healthy: new Date(row.token_expires_at).getTime() > Date.now(),
+      company_id: connToCompany[row.id] || null,
     }));
 
     // Backward compat: also return top-level connected flag
