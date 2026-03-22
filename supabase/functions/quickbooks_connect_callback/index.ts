@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
 
     if (insertError || !newConn) {
       console.error("Failed to store QB connection:", insertError?.message);
-      return redirectError("Failed to store connection");
+      return redirectError("Failed to store connection", returnTo);
     }
     resolvedConnectionId = newConn.id;
   }
