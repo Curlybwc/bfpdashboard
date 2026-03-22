@@ -38,19 +38,6 @@ function toLocalDateString(value: string) {
   return format(new Date(value), 'yyyy-MM-dd');
 }
 
-function paddedTimestampBounds(fromDate: string, toDate: string) {
-  const from = new Date(`${fromDate}T00:00:00`);
-  const to = new Date(`${toDate}T23:59:59`);
-
-  from.setDate(from.getDate() - 1);
-  to.setDate(to.getDate() + 1);
-
-  return {
-    from: from.toISOString(),
-    to: to.toISOString(),
-  };
-}
-
 export function useAccountingPayments(filters: AccountingFilters) {
 
   const wpQuery = useQuery({
