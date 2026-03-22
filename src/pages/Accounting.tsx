@@ -11,6 +11,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useAccountingPayments } from '@/hooks/useAccountingPayments';
+import AddHistoricalPaymentDialog from '@/components/accounting/AddHistoricalPaymentDialog';
 
 type DatePreset = 'ytd' | 'month' | 'custom';
 
