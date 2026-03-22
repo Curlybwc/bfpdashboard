@@ -274,6 +274,9 @@ const Shifts = () => {
               profileMap={profileMap}
               projectMap={projectMap}
               onEditShift={handleEditShift}
+              onDateClick={(dateStr) => {
+                handleNewShift({ date: dateStr, userId: contractorFilter || undefined });
+              }}
               onMonthChange={(from, to) => {
                 setFromDate(from);
                 setToDate(to);
