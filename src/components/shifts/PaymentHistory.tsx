@@ -157,15 +157,21 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       );
       if (hasDuplicate) return;
 
+      const isManual = b.settlement_method === 'off_platform_manual';
+      const draftCat: DraftCategory = isManual ? 'manual' : 'qb_export';
+
       unified.push({
         id: b.id,
         source: 'batch',
         batchStatus: b.status,
+        draftCategory: b.status === 'draft' ? draftCat : undefined,
         workerUserId: b.worker_user_id,
         workerName: profMap[b.worker_user_id] || 'Unknown',
         amount: Number(b.total_amount),
         paidDate: b.paid_at ? b.paid_at.slice(0, 10) : b.period_end,
-        paymentMethod: b.status === 'draft' ? 'Pending' : b.status === 'exported' ? 'QB Bill' : (b.settlement_method || 'Manual'),
+        paymentMethod: b.status === 'draft'
+          ? (isManual ? 'Off-Platform' : 'QB Export')
+          : b.status === 'exported' ? 'QB Bill' : (b.settlement_method || 'Manual'),
         projectId: b.project_id,
         projectName: b.project_id ? (projMap[b.project_id] || 'Unknown Project') : null,
         companyId: b.company_id,
