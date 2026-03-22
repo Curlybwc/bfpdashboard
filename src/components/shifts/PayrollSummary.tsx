@@ -98,6 +98,7 @@ type QBConnectionStatus = {
 interface PayrollSummaryProps {
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
   billFirstMode?: boolean;
+  workerFilter?: string;
 }
 
 // Generate biweekly pay periods (Monday → second Sunday)
@@ -151,7 +152,7 @@ function getCurrentPeriodKey(): string {
   return PAY_PERIODS.length > 0 ? `${PAY_PERIODS[0].from}::${PAY_PERIODS[0].to}` : '';
 }
 
-const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryProps) => {
+const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: PayrollSummaryProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -908,12 +909,26 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
     setLocalSaving(false);
   };
 
+  // Apply worker filter if provided
+  const filteredCandidateGroups = useMemo(() =>
+    workerFilter ? candidateGroups.filter(g => g.worker_user_id === workerFilter) : candidateGroups,
+    [candidateGroups, workerFilter]
+  );
+  const filteredExportedGroups = useMemo(() =>
+    workerFilter ? exportedGroups.filter(g => g.batch.worker_user_id === workerFilter) : exportedGroups,
+    [exportedGroups, workerFilter]
+  );
+  const filteredPaidGroups = useMemo(() =>
+    workerFilter ? paidGroups.filter(g => g.batch.worker_user_id === workerFilter) : paidGroups,
+    [paidGroups, workerFilter]
+  );
+
   const totals = useMemo(() => {
-    const candidateDollars = candidateGroups.reduce((sum, row) => sum + row.totalDollars, 0);
-    const exportedDollars = exportedGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
-    const paidDollars = paidGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
+    const candidateDollars = filteredCandidateGroups.reduce((sum, row) => sum + row.totalDollars, 0);
+    const exportedDollars = filteredExportedGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
+    const paidDollars = filteredPaidGroups.reduce((sum, row) => sum + Number(row.batch.total_amount || row.totalDollars), 0);
     return { candidateDollars, exportedDollars, paidDollars };
-  }, [candidateGroups, exportedGroups, paidGroups]);
+  }, [filteredCandidateGroups, filteredExportedGroups, filteredPaidGroups]);
 
   // Reusable bill preview JSX
   const billPreviewContent = billGroupPreviews.length > 0 ? (
@@ -983,11 +998,11 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
     <>
       {loading ? (
         <p className="text-xs text-muted-foreground flex items-center"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Loading…</p>
-      ) : candidateGroups.length === 0 ? (
+      ) : filteredCandidateGroups.length === 0 ? (
         <p className="text-xs text-muted-foreground">No unpaid shifts available to prepare in this date range.</p>
       ) : (
         <div className="space-y-2">
-          {candidateGroups.map((group) => (
+          {filteredCandidateGroups.map((group) => (
             <Collapsible key={group.key} open={expandedCandidates.has(group.key)} onOpenChange={() => toggleCandidate(group.key)}>
               <CollapsibleTrigger asChild>
                 <div className="rounded border border-border px-3 py-2 cursor-pointer hover:bg-muted/30">
@@ -1039,11 +1054,11 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
   // Prepared Payments content
   const preparedPaymentsContent = (
     <>
-      {exportedGroups.length === 0 ? (
+      {filteredExportedGroups.length === 0 ? (
         <p className="text-xs text-muted-foreground">No prepared payments for this date range.</p>
       ) : (
         <div className="space-y-2">
-          {exportedGroups.map((group) => {
+          {filteredExportedGroups.map((group) => {
             const key = `existing-${group.batch.id}`;
             const qbBillUrl = getQBBillUrl(group.batch);
             const isDraft = group.batch.status === 'draft';
@@ -1166,11 +1181,11 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
   // Already Paid content
   const alreadyPaidContent = (
     <>
-      {paidGroups.length === 0 ? (
+      {filteredPaidGroups.length === 0 ? (
         <p className="text-xs text-muted-foreground">No paid records for this date range.</p>
       ) : (
         <div className="space-y-1">
-          {paidGroups.map((group) => {
+          {filteredPaidGroups.map((group) => {
             const qbBillUrl = getQBBillUrl(group.batch);
             return (
               <div key={group.batch.id} className="text-xs border rounded p-2 flex items-center justify-between">
@@ -1335,9 +1350,9 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
           {/* Bill preview is primary in billFirstMode */}
           {billPreviewContent}
 
-          {collapsibleSection('Ready to Pay', candidateGroups.length, readyToPayContent)}
-          {collapsibleSection('Prepared Payments', exportedGroups.length, preparedPaymentsContent)}
-          {collapsibleSection('Already Paid', paidGroups.length, alreadyPaidContent)}
+          {collapsibleSection('Ready to Pay', filteredCandidateGroups.length, readyToPayContent)}
+          {collapsibleSection('Prepared Payments', filteredExportedGroups.length, preparedPaymentsContent)}
+          {collapsibleSection('Already Paid', filteredPaidGroups.length, alreadyPaidContent)}
           {collapsibleSection('Already Included Elsewhere', excludedShifts.length, excludedContent)}
         </>
       ) : (

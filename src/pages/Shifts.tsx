@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Clock, Trash2, X, List, CalendarDays } from 'lucide-react';
+import { Plus, Clock, Trash2, X, List, CalendarDays, DollarSign } from 'lucide-react';
 import { fetchShiftAllocations, fetchShiftById, useMyShifts, type Shift, type ShiftAllocation } from '@/hooks/useShifts';
 import { useAdminShifts, useContractorList, useProjectList } from '@/hooks/useAdminShifts';
 import { supabase } from '@/integrations/supabase/client';
@@ -281,6 +281,19 @@ const Shifts = () => {
                   </>
                 )}
               </div>
+              {contractorFilter && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1"
+                  asChild
+                >
+                  <a href={`/payroll?worker=${contractorFilter}&workerName=${encodeURIComponent(profileMap[contractorFilter] || '')}`}>
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Pay Worker
+                  </a>
+                </Button>
+              )}
             </Card>
           )}
 
