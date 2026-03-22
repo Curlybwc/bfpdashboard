@@ -83,6 +83,7 @@ type QBConnectionDetail = {
   realm_id?: string;
   connected_at?: string;
   token_healthy?: boolean;
+  company_id?: string | null;
 };
 
 type QBConnectionStatus = {
