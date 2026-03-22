@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload } from 'lucide-react';
+import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -44,10 +44,13 @@ type BatchRow = {
   created_at: string;
 };
 
+type DraftCategory = 'qb_export' | 'manual';
+
 type UnifiedPayment = {
   id: string;
   source: 'payment' | 'batch';
   batchStatus?: string;
+  draftCategory?: DraftCategory;
   workerUserId: string;
   workerName: string;
   amount: number;
@@ -154,15 +157,21 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       );
       if (hasDuplicate) return;
 
+      const isManual = b.settlement_method === 'off_platform_manual';
+      const draftCat: DraftCategory = isManual ? 'manual' : 'qb_export';
+
       unified.push({
         id: b.id,
         source: 'batch',
         batchStatus: b.status,
+        draftCategory: b.status === 'draft' ? draftCat : undefined,
         workerUserId: b.worker_user_id,
         workerName: profMap[b.worker_user_id] || 'Unknown',
         amount: Number(b.total_amount),
         paidDate: b.paid_at ? b.paid_at.slice(0, 10) : b.period_end,
-        paymentMethod: b.status === 'draft' ? 'Pending' : b.status === 'exported' ? 'QB Bill' : (b.settlement_method || 'Manual'),
+        paymentMethod: b.status === 'draft'
+          ? (isManual ? 'Off-Platform' : 'QB Export')
+          : b.status === 'exported' ? 'QB Bill' : (b.settlement_method || 'Manual'),
         projectId: b.project_id,
         projectName: b.project_id ? (projMap[b.project_id] || 'Unknown Project') : null,
         companyId: b.company_id,
@@ -198,8 +207,10 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   }, [payments, contractorFilter, projectFilter, workerFilter]);
 
   const totalAmount = useMemo(() => filtered.reduce((s, p) => s + p.amount, 0), [filtered]);
-  const draftBatches = useMemo(() => filtered.filter((p) => p.source === 'batch' && p.batchStatus === 'draft'), [filtered]);
-  const draftTotal = useMemo(() => draftBatches.reduce((s, p) => s + p.amount, 0), [draftBatches]);
+  const qbDrafts = useMemo(() => filtered.filter((p) => p.batchStatus === 'draft' && p.draftCategory === 'qb_export'), [filtered]);
+  const manualDrafts = useMemo(() => filtered.filter((p) => p.batchStatus === 'draft' && p.draftCategory === 'manual'), [filtered]);
+  const qbDraftTotal = useMemo(() => qbDrafts.reduce((s, p) => s + p.amount, 0), [qbDrafts]);
+  const manualDraftTotal = useMemo(() => manualDrafts.reduce((s, p) => s + p.amount, 0), [manualDrafts]);
 
   // Get unique contractors and projects for filter dropdowns
   const contractorOptions = useMemo(() => {
@@ -233,11 +244,11 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     }
   };
 
-  const handleExportAllDrafts = async () => {
-    if (draftBatches.length === 0) return;
+  const handleExportQBDrafts = async () => {
+    if (qbDrafts.length === 0) return;
     setExporting(true);
     try {
-      const batchIds = draftBatches.map((d) => d.id);
+      const batchIds = qbDrafts.map((d) => d.id);
       const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
         body: { batch_ids: batchIds },
       });
@@ -252,6 +263,34 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       toast({
         title: 'Export failed',
         description: err.message || 'Could not export drafts to QuickBooks.',
+        variant: 'destructive',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleMarkManualPaid = async () => {
+    if (manualDrafts.length === 0) return;
+    setExporting(true);
+    try {
+      const batchIds = manualDrafts.map((d) => d.id);
+      for (const id of batchIds) {
+        const { error } = await supabase
+          .from('worker_payable_batches')
+          .update({ status: 'paid', paid_at: new Date().toISOString(), settlement_method: 'off_platform_manual' })
+          .eq('id', id);
+        if (error) throw error;
+      }
+      toast({
+        title: 'Marked as paid',
+        description: `${batchIds.length} off-platform payment(s) marked as paid.`,
+      });
+      loadData();
+    } catch (err: any) {
+      toast({
+        title: 'Update failed',
+        description: err.message || 'Could not mark payments as paid.',
         variant: 'destructive',
       });
     } finally {
@@ -329,25 +368,49 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         </div>
       </Card>
 
-      {/* Draft export bar */}
-      {draftBatches.length > 0 && (
-        <Card className="p-3 flex items-center justify-between bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+      {/* QB Export drafts bar */}
+      {qbDrafts.length > 0 && (
+        <Card className="p-3 flex items-center justify-between border-primary/20 bg-primary/5">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300 text-xs">
-              {draftBatches.length} Draft{draftBatches.length !== 1 ? 's' : ''}
+            <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+              {qbDrafts.length} QB Draft{qbDrafts.length !== 1 ? 's' : ''}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              ${draftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
+              ${qbDraftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
             </span>
           </div>
           <Button
             size="sm"
             className="h-7 text-xs gap-1"
-            onClick={handleExportAllDrafts}
+            onClick={handleExportQBDrafts}
             disabled={exporting}
           >
             {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-            Export All to QB
+            Export to QB
+          </Button>
+        </Card>
+      )}
+
+      {/* Manual / off-platform drafts bar */}
+      {manualDrafts.length > 0 && (
+        <Card className="p-3 flex items-center justify-between border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs border-amber-300 text-amber-800 dark:text-amber-200">
+              {manualDrafts.length} Off-Platform
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              ${manualDraftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1"
+            onClick={handleMarkManualPaid}
+            disabled={exporting}
+          >
+            {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+            Mark All Paid
           </Button>
         </Card>
       )}
