@@ -255,9 +255,9 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
     fetchQBStatus();
   }, [fetchQBStatus]);
 
-  const handleConnectQB = async () => {
-    // Use the first available company for OAuth flow
-    const companyId = companies.length > 0 ? companies[0].id : null;
+  const handleConnectQB = async (targetCompanyId?: string) => {
+    // Use provided company ID, or fall back to first available
+    const companyId = targetCompanyId || (companies.length > 0 ? companies[0].id : null);
     if (!companyId) {
       toast({ title: 'No company available', description: 'Add a company before connecting QuickBooks.', variant: 'destructive' });
       return;
