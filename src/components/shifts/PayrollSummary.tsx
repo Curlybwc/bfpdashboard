@@ -1266,17 +1266,24 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
   );
 
   // Helper to wrap a section in a collapsible card for billFirstMode
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const toggleSection = (title: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title); else next.add(title);
+      return next;
+    });
+  };
+
   const collapsibleSection = (title: string, count: number, content: React.ReactNode) => (
-    <Collapsible>
-      <Card className="p-3 space-y-2">
-        <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-          <p className="text-sm font-medium">{title}</p>
-          <Badge variant="secondary" className="text-[10px] ml-auto">{count}</Badge>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-2">{content}</CollapsibleContent>
-      </Card>
-    </Collapsible>
+    <Card className="p-3 space-y-2">
+      <button className="flex items-center gap-2 w-full text-left" onClick={() => toggleSection(title)}>
+        <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${openSections.has(title) ? 'rotate-180' : ''}`} />
+        <p className="text-sm font-medium">{title}</p>
+        <Badge variant="secondary" className="text-[10px] ml-auto">{count}</Badge>
+      </button>
+      {openSections.has(title) && <div className="pt-2">{content}</div>}
+    </Card>
   );
 
   return (
