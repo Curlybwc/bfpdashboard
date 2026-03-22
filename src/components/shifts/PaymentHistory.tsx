@@ -368,25 +368,49 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         </div>
       </Card>
 
-      {/* Draft export bar */}
-      {draftBatches.length > 0 && (
-        <Card className="p-3 flex items-center justify-between bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+      {/* QB Export drafts bar */}
+      {qbDrafts.length > 0 && (
+        <Card className="p-3 flex items-center justify-between border-primary/20 bg-primary/5">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300 text-xs">
-              {draftBatches.length} Draft{draftBatches.length !== 1 ? 's' : ''}
+            <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+              {qbDrafts.length} QB Draft{qbDrafts.length !== 1 ? 's' : ''}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              ${draftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
+              ${qbDraftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
             </span>
           </div>
           <Button
             size="sm"
             className="h-7 text-xs gap-1"
-            onClick={handleExportAllDrafts}
+            onClick={handleExportQBDrafts}
             disabled={exporting}
           >
             {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-            Export All to QB
+            Export to QB
+          </Button>
+        </Card>
+      )}
+
+      {/* Manual / off-platform drafts bar */}
+      {manualDrafts.length > 0 && (
+        <Card className="p-3 flex items-center justify-between border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs border-amber-300 text-amber-800 dark:text-amber-200">
+              {manualDrafts.length} Off-Platform
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              ${manualDraftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1"
+            onClick={handleMarkManualPaid}
+            disabled={exporting}
+          >
+            {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+            Mark All Paid
           </Button>
         </Card>
       )}
