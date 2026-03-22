@@ -35,6 +35,7 @@ const Shifts = () => {
   const [editShift, setEditShift] = useState<Shift | null>(null);
   const [editAllocations, setEditAllocations] = useState<ShiftAllocation[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [adminView, setAdminView] = useState<'list' | 'calendar'>('list');
 
   // Filter state — initialized from query params for drill-down support
   const [contractorFilter, setContractorFilter] = useState(searchParams.get('contractor') || '');
