@@ -1350,9 +1350,9 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
           {/* Bill preview is primary in billFirstMode */}
           {billPreviewContent}
 
-          {collapsibleSection('Ready to Pay', candidateGroups.length, readyToPayContent)}
-          {collapsibleSection('Prepared Payments', exportedGroups.length, preparedPaymentsContent)}
-          {collapsibleSection('Already Paid', paidGroups.length, alreadyPaidContent)}
+          {collapsibleSection('Ready to Pay', filteredCandidateGroups.length, readyToPayContent)}
+          {collapsibleSection('Prepared Payments', filteredExportedGroups.length, preparedPaymentsContent)}
+          {collapsibleSection('Already Paid', filteredPaidGroups.length, alreadyPaidContent)}
           {collapsibleSection('Already Included Elsewhere', excludedShifts.length, excludedContent)}
         </>
       ) : (
