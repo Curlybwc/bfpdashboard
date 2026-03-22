@@ -4,10 +4,10 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X } from 'lucide-react';
+import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 type PaymentRow = {
   id: string;
@@ -47,6 +47,7 @@ type BatchRow = {
 type UnifiedPayment = {
   id: string;
   source: 'payment' | 'batch';
+  batchStatus?: string;
   workerUserId: string;
   workerName: string;
   amount: number;
@@ -69,6 +70,8 @@ interface PaymentHistoryProps {
 const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState<UnifiedPayment[]>([]);
+  const [exporting, setExporting] = useState(false);
+  const { toast } = useToast();
 
   // Filters
   const [dateFrom, setDateFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -84,7 +87,6 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    // Load lookups in parallel with payment data
     const [profilesRes, projectsRes, companiesRes, paymentsRes, batchesRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name').eq('is_active', true),
       supabase.from('projects').select('id, name'),
@@ -99,7 +101,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       supabase
         .from('worker_payable_batches')
         .select('id, worker_user_id, total_amount, paid_at, status, company_id, project_id, period_start, period_end, qb_bill_id, qb_bill_doc_number, qb_exported_at, settlement_method, accounting_source, created_at')
-        .in('status', ['paid', 'exported'])
+        .in('status', ['draft', 'paid', 'exported'])
         .gte('period_start', dateFrom)
         .lte('period_end', dateTo)
         .order('created_at', { ascending: false }),
@@ -117,8 +119,6 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     (companiesRes.data || []).forEach((c: any) => { compMap[c.id] = c.short_name || c.name; });
     setCompanies(compMap);
 
-    // Track batch IDs that have corresponding worker_payment records to deduplicate
-    const batchPaymentIds = new Set<string>();
     const unified: UnifiedPayment[] = [];
 
     // Worker payments
@@ -142,11 +142,8 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       });
     });
 
-    // Paid batches (only if not already represented in worker_payments)
-    // Batches with status 'exported' represent QB bills created; 'paid' means marked paid locally
+    // Batches (draft, paid, exported) — deduplicate against worker_payments
     (batchesRes.data || []).forEach((b: BatchRow) => {
-      // Skip if there's already a worker_payment covering this batch
-      // We detect overlap by matching worker + project + period
       const hasDuplicate = unified.some(
         (u) =>
           u.workerUserId === b.worker_user_id &&
@@ -160,11 +157,12 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       unified.push({
         id: b.id,
         source: 'batch',
+        batchStatus: b.status,
         workerUserId: b.worker_user_id,
         workerName: profMap[b.worker_user_id] || 'Unknown',
         amount: Number(b.total_amount),
         paidDate: b.paid_at ? b.paid_at.slice(0, 10) : b.period_end,
-        paymentMethod: b.status === 'exported' ? 'QB Bill' : (b.settlement_method || 'Manual'),
+        paymentMethod: b.status === 'draft' ? 'Pending' : b.status === 'exported' ? 'QB Bill' : (b.settlement_method || 'Manual'),
         projectId: b.project_id,
         projectName: b.project_id ? (projMap[b.project_id] || 'Unknown Project') : null,
         companyId: b.company_id,
@@ -176,8 +174,13 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       });
     });
 
-    // Sort by paid date descending
-    unified.sort((a, b) => b.paidDate.localeCompare(a.paidDate));
+    // Sort: drafts first, then by date descending
+    unified.sort((a, b) => {
+      const aDraft = a.batchStatus === 'draft' ? 0 : 1;
+      const bDraft = b.batchStatus === 'draft' ? 0 : 1;
+      if (aDraft !== bDraft) return aDraft - bDraft;
+      return b.paidDate.localeCompare(a.paidDate);
+    });
 
     setPayments(unified);
     setLoading(false);
@@ -195,6 +198,8 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   }, [payments, contractorFilter, projectFilter, workerFilter]);
 
   const totalAmount = useMemo(() => filtered.reduce((s, p) => s + p.amount, 0), [filtered]);
+  const draftBatches = useMemo(() => filtered.filter((p) => p.source === 'batch' && p.batchStatus === 'draft'), [filtered]);
+  const draftTotal = useMemo(() => draftBatches.reduce((s, p) => s + p.amount, 0), [draftBatches]);
 
   // Get unique contractors and projects for filter dropdowns
   const contractorOptions = useMemo(() => {
@@ -225,6 +230,32 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     } else if (preset === 'ytd') {
       setDateFrom(`${now.getFullYear()}-01-01`);
       setDateTo(format(now, 'yyyy-MM-dd'));
+    }
+  };
+
+  const handleExportAllDrafts = async () => {
+    if (draftBatches.length === 0) return;
+    setExporting(true);
+    try {
+      const batchIds = draftBatches.map((d) => d.id);
+      const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
+        body: { batch_ids: batchIds },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: 'Export successful',
+        description: `${data?.bills_created || batchIds.length} bill(s) exported to QuickBooks.`,
+      });
+      loadData();
+    } catch (err: any) {
+      toast({
+        title: 'Export failed',
+        description: err.message || 'Could not export drafts to QuickBooks.',
+        variant: 'destructive',
+      });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -298,6 +329,29 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         </div>
       </Card>
 
+      {/* Draft export bar */}
+      {draftBatches.length > 0 && (
+        <Card className="p-3 flex items-center justify-between bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300 text-xs">
+              {draftBatches.length} Draft{draftBatches.length !== 1 ? 's' : ''}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              ${draftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
+            </span>
+          </div>
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={handleExportAllDrafts}
+            disabled={exporting}
+          >
+            {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+            Export All to QB
+          </Button>
+        </Card>
+      )}
+
       {/* Summary */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
@@ -327,6 +381,11 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium">{p.workerName}</p>
                     <Badge variant="secondary" className="text-[10px]">{p.paymentMethod}</Badge>
+                    {p.batchStatus === 'draft' && (
+                      <Badge className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300">
+                        Draft
+                      </Badge>
+                    )}
                     {p.companyName && (
                       <Badge variant="outline" className="text-[10px] gap-0.5">
                         <Building2 className="h-2.5 w-2.5" />{p.companyName}
