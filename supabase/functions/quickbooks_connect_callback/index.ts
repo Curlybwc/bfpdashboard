@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
     console.error("Failed to link QB connection to company:", linkError.message);
     // Connection was created/updated successfully, but linking failed.
     // Don't fail the whole flow — the admin can manually link via Edit Company.
-    return redirectSuccess();
+    return redirectSuccess(returnTo);
   }
 
   return redirectSuccess();
