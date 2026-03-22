@@ -1269,26 +1269,40 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
             <Loader2 className="h-3 w-3 animate-spin" />
             Checking QuickBooks connection…
           </div>
-        ) : qbStatus?.connected ? (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">QuickBooks: {qbStatus.company_name || 'Connected'}</p>
-                {!qbStatus.token_healthy && (
-                  <p className="text-xs text-destructive">Token expired — reconnect required</p>
-                )}
-              </div>
-            </div>
-            <Button size="sm" variant="outline" onClick={handleConnectQB} disabled={qbConnecting}>
-              {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
-              Reconnect
-            </Button>
+        ) : qbStatus?.connected && qbStatus.connections?.length ? (
+          <div className="space-y-2">
+            {qbStatus.connections.map((conn) => {
+              // Find the company linked to this connection
+              const linkedCompany = companies.find(c => {
+                // Match by connection ID — we need to check which company uses this QB connection
+                // Since we don't have qb_connection_id on the client, match by company_name
+                return c.name === conn.company_name || c.name?.includes(conn.company_name?.split(' ')[0] || '___');
+              });
+              return (
+                <div key={conn.id} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CheckCircle className={`h-4 w-4 shrink-0 ${conn.token_healthy ? 'text-green-600' : 'text-destructive'}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">QB: {conn.company_name || 'Connected'}</p>
+                      {!conn.token_healthy && (
+                        <p className="text-xs text-destructive">Token expired — reconnect required</p>
+                      )}
+                    </div>
+                  </div>
+                  {!conn.token_healthy && (
+                    <Button size="sm" variant="outline" onClick={() => handleConnectQB(linkedCompany?.id)} disabled={qbConnecting}>
+                      {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
+                      Reconnect
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">QuickBooks not connected</p>
-            <Button size="sm" onClick={handleConnectQB} disabled={qbConnecting}>
+            <Button size="sm" onClick={() => handleConnectQB()} disabled={qbConnecting}>
               {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
               Connect QuickBooks
             </Button>
