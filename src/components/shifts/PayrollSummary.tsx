@@ -997,7 +997,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
                       <p className="text-sm truncate">
                         <span className="text-muted-foreground">{group.companyName} →</span> {group.contractorName} · {group.projectName}
                       </p>
-                      <p className="text-xs text-muted-foreground">{group.periodStart} → {group.periodEnd} · {group.shifts.length} shifts</p>
+                      <p className="text-xs text-muted-foreground">{group.periodStart} → {group.periodEnd} · {group.shifts.length} shifts · {group.totalHours.toFixed(1)}h</p>
                     </div>
                     <p className="text-sm font-medium">${group.totalDollars.toFixed(2)}</p>
                   </div>
@@ -1068,7 +1068,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end}</p>
+                        <p className="text-xs text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · {group.totalHours.toFixed(1)}h</p>
                       </div>
                       <p className="text-sm font-medium">${Number(group.batch.total_amount || group.totalDollars).toFixed(2)}</p>
                       {(isDraft || isExported) && (
@@ -1183,7 +1183,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
                       </Badge>
                     )}
                   </div>
-                  <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · Paid on {group.batch.paid_at ? new Date(group.batch.paid_at).toLocaleDateString() : '—'}</p>
+                  <p className="text-muted-foreground">{group.batch.period_start} → {group.batch.period_end} · {group.totalHours.toFixed(1)}h · Paid on {group.batch.paid_at ? new Date(group.batch.paid_at).toLocaleDateString() : '—'}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {qbBillUrl && (
