@@ -1272,14 +1272,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
           </div>
         ) : qbStatus?.connected && qbStatus.connections?.length ? (
           <div className="space-y-2">
-            {qbStatus.connections.map((conn) => {
-              // Find the company linked to this connection
-              const linkedCompany = companies.find(c => {
-                // Match by connection ID — we need to check which company uses this QB connection
-                // Since we don't have qb_connection_id on the client, match by company_name
-                return c.name === conn.company_name || c.name?.includes(conn.company_name?.split(' ')[0] || '___');
-              });
-              return (
+            {qbStatus.connections.map((conn) => (
                 <div key={conn.id} className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <CheckCircle className={`h-4 w-4 shrink-0 ${conn.token_healthy ? 'text-green-600' : 'text-destructive'}`} />
@@ -1290,15 +1283,14 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false }: PayrollSummaryPr
                       )}
                     </div>
                   </div>
-                  {!conn.token_healthy && (
-                    <Button size="sm" variant="outline" onClick={() => handleConnectQB(linkedCompany?.id)} disabled={qbConnecting}>
+                  {!conn.token_healthy && conn.company_id && (
+                    <Button size="sm" variant="outline" onClick={() => handleConnectQB(conn.company_id!)} disabled={qbConnecting}>
                       {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
                       Reconnect
                     </Button>
                   )}
                 </div>
-              );
-            })}
+              ))}
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
