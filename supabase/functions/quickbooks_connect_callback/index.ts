@@ -10,15 +10,15 @@ Deno.serve(async (req) => {
   const errorParam = url.searchParams.get("error");
   const appBaseUrl = Deno.env.get("APP_BASE_URL") || "http://localhost:5173";
 
-  function redirectError(msg: string) {
-    const target = new URL("/shifts", appBaseUrl);
+  function redirectError(msg: string, returnTo = "/shifts") {
+    const target = new URL(returnTo, appBaseUrl);
     target.searchParams.set("qb", "error");
     target.searchParams.set("msg", msg);
     return Response.redirect(target.toString(), 302);
   }
 
-  function redirectSuccess() {
-    const target = new URL("/shifts", appBaseUrl);
+  function redirectSuccess(returnTo = "/shifts") {
+    const target = new URL(returnTo, appBaseUrl);
     target.searchParams.set("qb", "connected");
     return Response.redirect(target.toString(), 302);
   }
