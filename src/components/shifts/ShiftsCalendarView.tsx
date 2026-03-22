@@ -124,7 +124,7 @@ export default function ShiftsCalendarView({
               {dayShifts.slice(0, 3).map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => onEditShift(s)}
+                  onClick={(e) => { e.stopPropagation(); onEditShift(s); }}
                   className="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                 >
                   {profileMap[s.user_id]?.split(' ')[0] || '?'} · {s.total_hours}h
