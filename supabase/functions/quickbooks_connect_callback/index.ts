@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error("Failed to update QB connection:", updateError.message);
-      return redirectError("Failed to update connection");
+      return redirectError("Failed to update connection", returnTo);
     }
     resolvedConnectionId = existingConn.id;
   } else {
