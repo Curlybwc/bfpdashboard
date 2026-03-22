@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import PageHeader from '@/components/PageHeader';
 import ShiftForm from '@/components/shifts/ShiftForm';
+import ShiftsCalendarView from '@/components/shifts/ShiftsCalendarView';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Clock, Trash2, X } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Clock, Trash2, X, List, CalendarDays } from 'lucide-react';
 import { fetchShiftAllocations, fetchShiftById, useMyShifts, type Shift, type ShiftAllocation } from '@/hooks/useShifts';
 import { useAdminShifts, useContractorList, useProjectList } from '@/hooks/useAdminShifts';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +35,7 @@ const Shifts = () => {
   const [editShift, setEditShift] = useState<Shift | null>(null);
   const [editAllocations, setEditAllocations] = useState<ShiftAllocation[]>([]);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [adminView, setAdminView] = useState<'list' | 'calendar'>('list');
 
   // Filter state — initialized from query params for drill-down support
   const [contractorFilter, setContractorFilter] = useState(searchParams.get('contractor') || '');
@@ -165,9 +168,21 @@ const Shifts = () => {
         <PageHeader
           title="Shifts"
           actions={
-            <Button size="sm" onClick={handleNewShift}>
-              <Plus className="h-4 w-4 mr-1" />Log Shift
-            </Button>
+            <div className="flex items-center gap-2">
+              <Tabs value={adminView} onValueChange={(v) => setAdminView(v as 'list' | 'calendar')}>
+                <TabsList className="h-8">
+                  <TabsTrigger value="list" className="h-6 px-2 text-xs gap-1">
+                    <List className="h-3.5 w-3.5" />List
+                  </TabsTrigger>
+                  <TabsTrigger value="calendar" className="h-6 px-2 text-xs gap-1">
+                    <CalendarDays className="h-3.5 w-3.5" />Calendar
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Button size="sm" onClick={handleNewShift}>
+                <Plus className="h-4 w-4 mr-1" />Log Shift
+              </Button>
+            </div>
           }
         />
         <div className="p-4 space-y-4">
@@ -248,6 +263,17 @@ const Shifts = () => {
                 </Card>
               ))}
             </div>
+          ) : adminView === 'calendar' ? (
+            <ShiftsCalendarView
+              shifts={shifts}
+              profileMap={profileMap}
+              projectMap={projectMap}
+              onEditShift={handleEditShift}
+              onMonthChange={(from, to) => {
+                setFromDate(from);
+                setToDate(to);
+              }}
+            />
           ) : shifts.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No shifts found for this date range.</p>
           ) : (
