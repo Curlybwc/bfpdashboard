@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
   const redirectUri = Deno.env.get("QB_REDIRECT_URI");
 
   if (!clientId || !clientSecret || !redirectUri) {
-    return redirectError("Server misconfigured");
+    return redirectError("Server misconfigured", returnTo);
   }
 
   const basicAuth = btoa(`${clientId}:${clientSecret}`);
