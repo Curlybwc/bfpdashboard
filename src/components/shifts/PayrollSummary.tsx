@@ -998,11 +998,11 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     <>
       {loading ? (
         <p className="text-xs text-muted-foreground flex items-center"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Loading…</p>
-      ) : candidateGroups.length === 0 ? (
+      ) : filteredCandidateGroups.length === 0 ? (
         <p className="text-xs text-muted-foreground">No unpaid shifts available to prepare in this date range.</p>
       ) : (
         <div className="space-y-2">
-          {candidateGroups.map((group) => (
+          {filteredCandidateGroups.map((group) => (
             <Collapsible key={group.key} open={expandedCandidates.has(group.key)} onOpenChange={() => toggleCandidate(group.key)}>
               <CollapsibleTrigger asChild>
                 <div className="rounded border border-border px-3 py-2 cursor-pointer hover:bg-muted/30">
