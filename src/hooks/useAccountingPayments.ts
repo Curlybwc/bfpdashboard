@@ -216,6 +216,18 @@ export function useAccountingPayments(filters: AccountingFilters) {
       .sort((a, b) => b.total - a.total);
   }, [payments, profileMap]);
 
+  const refetch = () => {
+    wpQuery.refetch();
+    batchQuery.refetch();
+  };
+
+  const profilesList = useMemo(() => {
+    return (profilesQuery.data ?? [])
+      .filter((p) => p.full_name)
+      .map((p) => ({ id: p.id, name: p.full_name! }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [profilesQuery.data]);
+
   return {
     payments,
     loading: wpQuery.isLoading || batchQuery.isLoading || profilesQuery.isLoading || companiesQuery.isLoading,
@@ -223,8 +235,11 @@ export function useAccountingPayments(filters: AccountingFilters) {
     profileMap,
     companyMap,
     companies: companiesQuery.data ?? [],
+    projects: projectsQuery.data ?? [],
+    profilesList,
     ledgerContractors,
     totalPaid,
     contractorTotals,
+    refetch,
   };
 }
