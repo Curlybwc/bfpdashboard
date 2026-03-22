@@ -151,8 +151,10 @@ const Shifts = () => {
           <ShiftForm
             editShift={editShift}
             editAllocations={editAllocations}
+            defaultDate={newShiftDefaults.date}
+            defaultUserId={newShiftDefaults.userId}
             onSaved={handleSaved}
-            onCancel={() => { setShowForm(false); setEditShift(null); }}
+            onCancel={() => { setShowForm(false); setEditShift(null); setNewShiftDefaults({}); }}
           />
         </div>
       </div>
