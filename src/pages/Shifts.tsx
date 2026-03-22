@@ -258,6 +258,32 @@ const Shifts = () => {
             </div>
           </Card>
 
+          {/* Summary banner */}
+          {!adminLoading2 && shifts.length > 0 && (
+            <Card className="p-3 flex items-center justify-between bg-primary/5 border-primary/20">
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-primary">{shifts.reduce((sum, s) => sum + s.total_hours, 0).toFixed(1)}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Hours</p>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div className="text-center">
+                  <p className="text-2xl font-bold">{shifts.length}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Shifts</p>
+                </div>
+                {contractorFilter && profileMap[contractorFilter] && (
+                  <>
+                    <div className="h-8 w-px bg-border" />
+                    <div>
+                      <p className="text-sm font-medium">{profileMap[contractorFilter]}</p>
+                      <p className="text-[10px] text-muted-foreground">{fromDate} → {toDate}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </Card>
+          )}
+
           {/* Results */}
           {adminLoading2 ? (
             <div className="space-y-2">
