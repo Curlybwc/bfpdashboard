@@ -11,6 +11,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { useAccountingPayments } from '@/hooks/useAccountingPayments';
+import AddHistoricalPaymentDialog from '@/components/accounting/AddHistoricalPaymentDialog';
 
 type DatePreset = 'ytd' | 'month' | 'custom';
 
@@ -37,6 +38,7 @@ const SOURCE_LABELS: Record<string, string> = {
   manual_quickbooks: 'QB Manual',
   venmo_manual: 'Venmo',
   quickbooks_linked: 'QB Linked',
+  quickbooks_exported: 'QB Exported',
   off_platform_manual: 'Manual',
   batch: 'Batch',
 };
@@ -56,8 +58,8 @@ const Accounting = () => {
   }), [fromDate, toDate, companyFilter, contractorFilter]);
 
   const {
-    payments, loading, profileMap, companyMap, companies,
-    ledgerContractors, totalPaid, contractorTotals,
+    payments, loading, profileMap, companyMap, companies, projects,
+    profilesList, ledgerContractors, totalPaid, contractorTotals, refetch,
   } = useAccountingPayments(filters);
 
   const handlePreset = (p: DatePreset) => {
@@ -77,6 +79,15 @@ const Accounting = () => {
     <div className="pb-20">
       <PageHeader title="Accounting" backTo="/admin" />
       <div className="p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-muted-foreground">Payment Ledger</h2>
+          <AddHistoricalPaymentDialog
+            profiles={profilesList}
+            companies={companies}
+            projects={projects}
+            onSaved={refetch}
+          />
+        </div>
         {/* Filters */}
         <Card>
           <CardContent className="p-4 space-y-3">

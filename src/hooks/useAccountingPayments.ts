@@ -38,24 +38,7 @@ function toLocalDateString(value: string) {
   return format(new Date(value), 'yyyy-MM-dd');
 }
 
-function paddedTimestampBounds(fromDate: string, toDate: string) {
-  const from = new Date(`${fromDate}T00:00:00`);
-  const to = new Date(`${toDate}T23:59:59`);
-
-  from.setDate(from.getDate() - 1);
-  to.setDate(to.getDate() + 1);
-
-  return {
-    from: from.toISOString(),
-    to: to.toISOString(),
-  };
-}
-
 export function useAccountingPayments(filters: AccountingFilters) {
-  const batchBounds = useMemo(
-    () => paddedTimestampBounds(filters.fromDate, filters.toDate),
-    [filters.fromDate, filters.toDate],
-  );
 
   const wpQuery = useQuery({
     queryKey: ['accounting-wp', filters],
@@ -95,42 +78,44 @@ export function useAccountingPayments(filters: AccountingFilters) {
   });
 
   const batchQuery = useQuery({
-    queryKey: ['accounting-batches', filters, batchBounds],
+    queryKey: ['accounting-batches', filters],
     queryFn: async () => {
       let q = supabase
         .from('worker_payable_batches')
         .select('id, worker_user_id, total_amount, paid_at, period_start, period_end, status, company_id, project_id, settlement_method, accounting_source, qb_bill_doc_number')
-        .eq('status', 'paid')
-        .not('paid_at', 'is', null)
-        .gte('paid_at', batchBounds.from)
-        .lte('paid_at', batchBounds.to)
+        .in('status', ['paid', 'exported'])
         .order('paid_at', { ascending: false });
 
       if (filters.workerId) q = q.eq('worker_user_id', filters.workerId);
       if (filters.companyId === 'legacy') q = q.is('company_id', null);
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
+      // Filter by period overlap with date range
+      q = q.lte('period_start', filters.toDate).gte('period_end', filters.fromDate);
+
       const { data, error } = await q;
       if (error) throw error;
 
       return (data ?? [])
-        .map((r) => ({
-          id: r.id,
-          worker_user_id: r.worker_user_id,
-          paid_date: r.paid_at ? toLocalDateString(r.paid_at) : r.period_end,
-          amount: Number(r.total_amount),
-          payment_source: r.settlement_method ?? r.accounting_source ?? 'batch',
-          status: 'paid',
-          company_id: r.company_id,
-          project_id: r.project_id,
-          external_reference: r.qb_bill_doc_number ?? null,
-          memo: null,
-          pay_period_start: r.period_start,
-          pay_period_end: r.period_end,
-          qb_txn_type: null,
-          source_table: 'worker_payable_batches' as const,
-        }))
-        .filter((r) => r.paid_date >= filters.fromDate && r.paid_date <= filters.toDate);
+        .map((r) => {
+          const paidDate = r.paid_at ? toLocalDateString(r.paid_at) : r.period_end;
+          return {
+            id: r.id,
+            worker_user_id: r.worker_user_id,
+            paid_date: paidDate,
+            amount: Number(r.total_amount),
+            payment_source: r.status === 'exported' ? 'quickbooks_exported' : (r.settlement_method ?? r.accounting_source ?? 'batch'),
+            status: r.status,
+            company_id: r.company_id,
+            project_id: r.project_id,
+            external_reference: r.qb_bill_doc_number ?? null,
+            memo: null,
+            pay_period_start: r.period_start,
+            pay_period_end: r.period_end,
+            qb_txn_type: null,
+            source_table: 'worker_payable_batches' as const,
+          };
+        });
     },
   });
 
@@ -148,6 +133,16 @@ export function useAccountingPayments(filters: AccountingFilters) {
     queryKey: ['accounting-companies'],
     queryFn: async () => {
       const { data, error } = await supabase.from('companies').select('id, name, short_name');
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const projectsQuery = useQuery({
+    queryKey: ['accounting-projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('projects').select('id, name').order('name');
       if (error) throw error;
       return data ?? [];
     },
@@ -221,6 +216,18 @@ export function useAccountingPayments(filters: AccountingFilters) {
       .sort((a, b) => b.total - a.total);
   }, [payments, profileMap]);
 
+  const refetch = () => {
+    wpQuery.refetch();
+    batchQuery.refetch();
+  };
+
+  const profilesList = useMemo(() => {
+    return (profilesQuery.data ?? [])
+      .filter((p) => p.full_name)
+      .map((p) => ({ id: p.id, name: p.full_name! }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [profilesQuery.data]);
+
   return {
     payments,
     loading: wpQuery.isLoading || batchQuery.isLoading || profilesQuery.isLoading || companiesQuery.isLoading,
@@ -228,8 +235,11 @@ export function useAccountingPayments(filters: AccountingFilters) {
     profileMap,
     companyMap,
     companies: companiesQuery.data ?? [],
+    projects: projectsQuery.data ?? [],
+    profilesList,
     ledgerContractors,
     totalPaid,
     contractorTotals,
+    refetch,
   };
 }
