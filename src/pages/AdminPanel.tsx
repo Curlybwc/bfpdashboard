@@ -79,6 +79,20 @@ const AdminPanel = () => {
     }
   };
 
+  const updateRate = async (profileId: string, rateStr: string) => {
+    const rate = rateStr === '' ? null : Number(rateStr);
+    if (rateStr !== '' && isNaN(rate!)) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ hourly_rate: rate } as any)
+      .eq('id', profileId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    fetchProfiles();
+  };
+
   const handleDeleteUser = async (targetUserId: string, name: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('admin_delete_user', {
