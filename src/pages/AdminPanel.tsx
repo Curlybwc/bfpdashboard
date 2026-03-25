@@ -220,6 +220,20 @@ const AdminPanel = () => {
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-end">
                   <div className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3 text-muted-foreground" />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Rate"
+                      className="h-6 w-[70px] text-xs px-1.5"
+                      defaultValue={profile.hourly_rate ?? ''}
+                      onBlur={(e) => updateRate(profile.id, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                    />
+                    <span className="text-[10px] text-muted-foreground">/hr</span>
+                  </div>
+                  <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">Active</span>
                     <Switch
                       checked={profile.is_active !== false}
