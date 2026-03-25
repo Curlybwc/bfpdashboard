@@ -161,7 +161,9 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
 
       const isManual = b.settlement_method === 'off_platform_manual';
       const wasQbExport = !!b.qb_bill_id || b.accounting_source === 'quickbooks' || b.qb_exported_at;
-      const draftCat: DraftCategory = isManual ? 'manual' : 'qb_export';
+      // Any batch without a QB bill is eligible for QB export
+      const needsQbExport = !b.qb_bill_id && !b.qb_exported_at;
+      const draftCat: DraftCategory = needsQbExport ? 'qb_export' : (isManual ? 'manual' : 'qb_export');
 
       const resolvePaymentMethod = (): string => {
         if (b.status === 'draft') return isManual ? 'Off-Platform' : 'QB Export';
