@@ -13,7 +13,8 @@ import AdminAvailability from '@/components/admin/AdminAvailability';
 import AdminCrewGroups from '@/components/admin/AdminCrewGroups';
 import AdminTenants from '@/components/admin/AdminTenants';
 import AdminMaterialLibrary from '@/components/admin/AdminMaterialLibrary';
-import { LogIn, BookOpen, Settings, Package, BarChart3, Users, Trash2, Ban } from 'lucide-react';
+import { LogIn, BookOpen, Settings, Package, BarChart3, Users, Trash2, Ban, DollarSign } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -76,6 +77,20 @@ const AdminPanel = () => {
     if (field === 'is_active') {
       toast({ title: currentValue ? 'User deactivated' : 'User reactivated' });
     }
+  };
+
+  const updateRate = async (profileId: string, rateStr: string) => {
+    const rate = rateStr === '' ? null : Number(rateStr);
+    if (rateStr !== '' && isNaN(rate!)) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ hourly_rate: rate } as any)
+      .eq('id', profileId);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
+    fetchProfiles();
   };
 
   const handleDeleteUser = async (targetUserId: string, name: string) => {
@@ -204,6 +219,20 @@ const AdminPanel = () => {
                   <p className="text-xs text-muted-foreground truncate">{profile.id}</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-end">
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3 text-muted-foreground" />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Rate"
+                      className="h-6 w-[70px] text-xs px-1.5"
+                      defaultValue={profile.hourly_rate ?? ''}
+                      onBlur={(e) => updateRate(profile.id, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                    />
+                    <span className="text-[10px] text-muted-foreground">/hr</span>
+                  </div>
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">Active</span>
                     <Switch
