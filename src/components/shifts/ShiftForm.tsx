@@ -422,7 +422,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       )}
 
       {/* Task allocation */}
-      {projectId && totalHours > 0 && (
+      {!isFlatRate && projectId && totalHours > 0 && (
         <div className="space-y-2">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Allocate Hours to Tasks
