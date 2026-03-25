@@ -346,7 +346,12 @@ const Shifts = () => {
                       {s.admin_edited_at && (
                         <Badge variant="outline" className="text-xs">Admin edited</Badge>
                       )}
-                      <span className="text-sm font-medium">{s.total_hours}h</span>
+                      {s.is_flat_rate ? (
+                        <span className="text-sm font-medium">${Number(s.flat_rate_amount || 0).toFixed(2)}</span>
+                      ) : (
+                        <span className="text-sm font-medium">{s.total_hours}h</span>
+                      )}
+                      {s.is_flat_rate && <Badge variant="secondary" className="text-[10px]">Flat</Badge>}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" disabled={deleting === s.id}>
