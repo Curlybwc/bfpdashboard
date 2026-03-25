@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     // Fetch all requested batches
     const { data: batches, error: batchErr } = await adminClient
       .from("worker_payable_batches")
-      .select("id, worker_user_id, project_id, period_start, period_end, total_amount, status, company_id")
+      .select("id, worker_user_id, project_id, period_start, period_end, total_amount, status, company_id, qb_bill_id")
       .in("id", batch_ids);
 
     if (batchErr) {
