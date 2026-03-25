@@ -261,25 +261,25 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     }
   };
 
-  const handleExportQBDrafts = async () => {
-    if (qbExportable.length === 0) return;
+  const handleExportQBDrafts = async (batchIds?: string[]) => {
+    const ids = batchIds || qbExportable.map((d) => d.id);
+    if (ids.length === 0) return;
     setExporting(true);
     try {
-      const batchIds = qbExportable.map((d) => d.id);
       const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
-        body: { batch_ids: batchIds },
+        body: { batch_ids: ids },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast({
         title: 'Export successful',
-        description: `${data?.bills_created || batchIds.length} bill(s) exported to QuickBooks.`,
+        description: `${data?.bills_created || ids.length} bill(s) exported to QuickBooks.`,
       });
       loadData();
     } catch (err: any) {
       toast({
         title: 'Export failed',
-        description: err.message || 'Could not export drafts to QuickBooks.',
+        description: err.message || 'Could not export to QuickBooks.',
         variant: 'destructive',
       });
     } finally {
@@ -399,7 +399,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
           <Button
             size="sm"
             className="h-7 text-xs gap-1"
-            onClick={handleExportQBDrafts}
+            onClick={() => handleExportQBDrafts()}
             disabled={exporting}
           >
             {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
@@ -481,9 +481,23 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   </div>
                   {p.memo && <p className="text-xs text-muted-foreground truncate">{p.memo}</p>}
                 </div>
-                <p className="text-sm font-mono font-medium whitespace-nowrap">
-                  ${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
+                <div className="flex flex-col items-end gap-1">
+                  <p className="text-sm font-mono font-medium whitespace-nowrap">
+                    ${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  {p.source === 'batch' && p.draftCategory === 'qb_export' && !p.qbBillId && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-[10px] gap-1"
+                      onClick={() => handleExportQBDrafts([p.id])}
+                      disabled={exporting}
+                    >
+                      {exporting ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Upload className="h-2.5 w-2.5" />}
+                      Export to QB
+                    </Button>
+                  )}
+                </div>
               </div>
             </Card>
           ))}
