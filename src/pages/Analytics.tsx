@@ -61,7 +61,7 @@ const Analytics = () => {
       const [projRes, taskRes, shiftRes, matRes] = await Promise.all([
         supabase.from('projects').select('id, name').order('name'),
         supabase.from('tasks').select('id, project_id, stage, is_blocked, completed_at, created_at'),
-        supabase.from('shifts').select('id, project_id, total_hours, hourly_rate_snapshot, shift_date'),
+        supabase.from('shifts').select('id, project_id, total_hours, hourly_rate_snapshot, shift_date, is_flat_rate, flat_rate_amount'),
         supabase.from('task_materials').select('id, task_id, name, quantity, purchased, delivered, confirmed_on_site, is_active'),
       ]);
       setProjects(projRes.data || []);
