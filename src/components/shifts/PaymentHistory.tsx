@@ -498,6 +498,8 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                     </Button>
                   )}
                 </div>
+              </div>
+            </Card>
           ))}
         </div>
       )}
