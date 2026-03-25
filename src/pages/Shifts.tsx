@@ -263,7 +263,7 @@ const Shifts = () => {
             <Card className="p-3 flex items-center justify-between bg-primary/5 border-primary/20">
               <div className="flex items-center gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-primary">{shifts.reduce((sum, s) => sum + s.total_hours, 0).toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-primary">{shifts.filter(s => !s.is_flat_rate).reduce((sum, s) => sum + s.total_hours, 0).toFixed(1)}</p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Hours</p>
                 </div>
                 <div className="h-8 w-px bg-border" />
