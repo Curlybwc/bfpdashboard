@@ -132,8 +132,8 @@ const Analytics = () => {
     filteredShifts.forEach(s => {
       const name = projectMap[s.project_id] || 'Unknown';
       if (!map[s.project_id]) map[s.project_id] = { projectName: name, totalHours: 0, totalCost: 0 };
-      map[s.project_id].totalHours += Number(s.total_hours) || 0;
-      map[s.project_id].totalCost += (Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0);
+      map[s.project_id].totalHours += (s as any).is_flat_rate ? 0 : (Number(s.total_hours) || 0);
+      map[s.project_id].totalCost += (s as any).is_flat_rate ? Number((s as any).flat_rate_amount || 0) : (Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0);
     });
     return Object.values(map).sort((a, b) => b.totalHours - a.totalHours);
   }, [filteredShifts, projectMap]);
