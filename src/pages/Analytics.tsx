@@ -160,9 +160,9 @@ const Analytics = () => {
   const totalTasks = filteredTasks.length;
   const completedTasks = filteredTasks.filter(t => t.stage === 'Done').length;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const totalLaborHours = filteredShifts.reduce((sum, s) => sum + (Number(s.total_hours) || 0), 0);
+  const totalLaborHours = filteredShifts.filter((s: any) => !s.is_flat_rate).reduce((sum, s) => sum + (Number(s.total_hours) || 0), 0);
   const totalLaborCost = filteredShifts.reduce((sum, s) =>
-    sum + ((Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0)), 0);
+    sum + ((s as any).is_flat_rate ? Number((s as any).flat_rate_amount || 0) : (Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0)), 0);
   const blockedCount = filteredTasks.filter(t => t.is_blocked).length;
 
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;
