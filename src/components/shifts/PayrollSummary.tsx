@@ -932,67 +932,72 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     return { candidateDollars, exportedDollars, paidDollars };
   }, [filteredCandidateGroups, filteredExportedGroups, filteredPaidGroups]);
 
-  // Reusable bill preview JSX
+  // Reusable bill preview JSX – collapsible, compact
   const billPreviewContent = billGroupPreviews.length > 0 ? (
-    <Card className="p-3 space-y-2">
-      <div>
-        <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-medium">QuickBooks Bill Preview</p>
-        </div>
-        <p className="text-xs text-muted-foreground">How eligible items will group into bills when exported (by company + QB vendor + project + period).</p>
-      </div>
-      <div className="space-y-2">
-        {billGroupPreviews.map((bp) => {
-          const firstProjectId = bp.lines[0]?.projectId;
-          const workerUserIds = [...new Set(bp.lines.map(l => {
-            const cg = candidateGroups.find(g =>
-              g.contractorName === l.contractorName && g.project_id === l.projectId
-            );
-            return cg?.worker_user_id;
-          }).filter(Boolean))];
-          const drillDownParams = new URLSearchParams();
-          if (firstProjectId) drillDownParams.set('project', firstProjectId);
-          drillDownParams.set('from', bp.periodStart);
-          drillDownParams.set('to', bp.periodEnd);
-          if (workerUserIds.length === 1 && workerUserIds[0]) {
-            drillDownParams.set('contractor', workerUserIds[0]);
-          }
-          const drillDownUrl = `/shifts?${drillDownParams.toString()}`;
+    <Collapsible>
+      <Card className="p-2">
+        <CollapsibleTrigger className="flex items-center justify-between w-full text-left">
+          <div className="flex items-center gap-1.5">
+            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">QB Bill Preview</span>
+            <span className="text-[10px] text-muted-foreground">({billGroupPreviews.length} bill{billGroupPreviews.length !== 1 ? 's' : ''})</span>
+          </div>
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-1.5 mt-2">
+            {billGroupPreviews.map((bp) => {
+              const firstProjectId = bp.lines[0]?.projectId;
+              const workerUserIds = [...new Set(bp.lines.map(l => {
+                const cg = candidateGroups.find(g =>
+                  g.contractorName === l.contractorName && g.project_id === l.projectId
+                );
+                return cg?.worker_user_id;
+              }).filter(Boolean))];
+              const drillDownParams = new URLSearchParams();
+              if (firstProjectId) drillDownParams.set('project', firstProjectId);
+              drillDownParams.set('from', bp.periodStart);
+              drillDownParams.set('to', bp.periodEnd);
+              if (workerUserIds.length === 1 && workerUserIds[0]) {
+                drillDownParams.set('contractor', workerUserIds[0]);
+              }
+              const drillDownUrl = `/shifts?${drillDownParams.toString()}`;
 
-          return (
-            <div key={bp.key} className="border rounded p-3 space-y-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">{bp.companyName} → {bp.qb_vendor_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {bp.lines[0]?.projectName && <span>{bp.lines[0].projectName} · </span>}
-                    {bp.periodStart} → {bp.periodEnd}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold">${bp.totalDollars.toFixed(2)}</p>
-                  <Button size="sm" variant="ghost" className="h-6 text-xs px-2" asChild>
-                    <a href={drillDownUrl}>View Shifts</a>
-                  </Button>
-                </div>
-              </div>
-              <div className="text-xs space-y-0.5 pl-2 border-l-2 border-muted">
-                {bp.lines.map((line, idx) => (
-                  <div key={idx} className="flex items-center justify-between gap-2">
-                    <span>
-                      {line.contractorName} · {line.projectName}
-                      {line.qbClassName && <span className="text-muted-foreground ml-1">(Class: {line.qbClassName})</span>}
-                    </span>
-                    <span className="font-medium">${line.dollars.toFixed(2)}</span>
+              return (
+                <div key={bp.key} className="border rounded p-2 space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium">{bp.companyName} → {bp.qb_vendor_name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {bp.lines[0]?.projectName && <span>{bp.lines[0].projectName} · </span>}
+                        {bp.periodStart} → {bp.periodEnd}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-semibold">${bp.totalDollars.toFixed(2)}</p>
+                      <Button size="sm" variant="ghost" className="h-5 text-[10px] px-1.5" asChild>
+                        <a href={drillDownUrl}>View</a>
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
+                  <div className="text-[10px] space-y-0 pl-2 border-l border-muted">
+                    {bp.lines.map((line, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-2">
+                        <span>
+                          {line.contractorName} · {line.projectName}
+                          {line.qbClassName && <span className="text-muted-foreground ml-1">(Class: {line.qbClassName})</span>}
+                        </span>
+                        <span className="font-medium">${line.dollars.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   ) : null;
 
   // Ready to Pay content (shared between modes)
