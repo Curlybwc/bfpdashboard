@@ -259,10 +259,10 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   };
 
   const handleExportQBDrafts = async () => {
-    if (qbDrafts.length === 0) return;
+    if (qbExportable.length === 0) return;
     setExporting(true);
     try {
-      const batchIds = qbDrafts.map((d) => d.id);
+      const batchIds = qbExportable.map((d) => d.id);
       const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
         body: { batch_ids: batchIds },
       });
