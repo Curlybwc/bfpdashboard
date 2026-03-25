@@ -277,7 +277,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
     if (!user || !canSave) return;
     setSaving(true);
 
-    const allocArray = Object.entries(allocations)
+    const allocArray = isFlatRate ? [] : Object.entries(allocations)
       .filter(([, v]) => parseFloat(v) > 0)
       .map(([task_id, hours]) => ({ task_id, hours: parseFloat(hours) }));
 
@@ -288,11 +288,13 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       p_user_id: selectedUserId,
       p_project_id: projectId,
       p_shift_date: shiftDate,
-      p_start_time: useStartEnd ? startTime + ':00' : null,
-      p_end_time: useStartEnd ? endTime + ':00' : null,
-      p_total_hours: useStartEnd ? null : totalHours,
+      p_start_time: isFlatRate ? null : (useStartEnd ? startTime + ':00' : null),
+      p_end_time: isFlatRate ? null : (useStartEnd ? endTime + ':00' : null),
+      p_total_hours: isFlatRate ? null : (useStartEnd ? null : totalHours),
       p_allocations: allocArray,
       p_is_admin_edit: isAdminEdit,
+      p_is_flat_rate: isFlatRate,
+      p_flat_rate_amount: isFlatRate ? parseFloat(flatRateAmount) : null,
     });
 
     setSaving(false);
@@ -300,7 +302,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       toast({ title: 'Error saving shift', description: error.message, variant: 'destructive' });
       return;
     }
-    toast({ title: editShift ? 'Shift updated' : 'Shift logged' });
+    toast({ title: editShift ? 'Shift updated' : (isFlatRate ? 'Flat rate payment logged' : 'Shift logged') });
     onSaved();
   };
 
