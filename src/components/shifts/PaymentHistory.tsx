@@ -481,11 +481,23 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   </div>
                   {p.memo && <p className="text-xs text-muted-foreground truncate">{p.memo}</p>}
                 </div>
-                <p className="text-sm font-mono font-medium whitespace-nowrap">
-                  ${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-            </Card>
+                <div className="flex flex-col items-end gap-1">
+                  <p className="text-sm font-mono font-medium whitespace-nowrap">
+                    ${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  {p.source === 'batch' && p.draftCategory === 'qb_export' && !p.qbBillId && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-[10px] gap-1"
+                      onClick={() => handleExportQBDrafts([p.id])}
+                      disabled={exporting}
+                    >
+                      {exporting ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Upload className="h-2.5 w-2.5" />}
+                      Export to QB
+                    </Button>
+                  )}
+                </div>
           ))}
         </div>
       )}
