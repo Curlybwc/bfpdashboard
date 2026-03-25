@@ -1110,8 +1110,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           end_time: string | null
+          flat_rate_amount: number | null
           hourly_rate_snapshot: number | null
           id: string
+          is_flat_rate: boolean
           project_id: string
           shift_date: string
           start_time: string | null
@@ -1126,8 +1128,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           end_time?: string | null
+          flat_rate_amount?: number | null
           hourly_rate_snapshot?: number | null
           id?: string
+          is_flat_rate?: boolean
           project_id: string
           shift_date: string
           start_time?: string | null
@@ -1142,8 +1146,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           end_time?: string | null
+          flat_rate_amount?: number | null
           hourly_rate_snapshot?: number | null
           id?: string
+          is_flat_rate?: boolean
           project_id?: string
           shift_date?: string
           start_time?: string | null
