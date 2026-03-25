@@ -62,6 +62,7 @@ type UnifiedPayment = {
   companyName: string | null;
   memo: string | null;
   qbRef: string | null;
+  qbBillId: string | null;
   periodStart: string | null;
   periodEnd: string | null;
 };
@@ -140,6 +141,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         companyName: p.company_id ? (compMap[p.company_id] || 'Unknown') : null,
         memo: p.memo,
         qbRef: p.external_reference || null,
+        qbBillId: null,
         periodStart: p.pay_period_start,
         periodEnd: p.pay_period_end,
       });
@@ -174,7 +176,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         id: b.id,
         source: 'batch',
         batchStatus: b.status,
-        draftCategory: b.status === 'draft' ? draftCat : undefined,
+        draftCategory: (b.status === 'draft' || (b.status === 'paid' && !b.qb_bill_id)) ? draftCat : undefined,
         workerUserId: b.worker_user_id,
         workerName: profMap[b.worker_user_id] || 'Unknown',
         amount: Number(b.total_amount),
@@ -186,6 +188,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         companyName: b.company_id ? (compMap[b.company_id] || 'Unknown') : null,
         memo: b.qb_bill_doc_number ? `Bill #${b.qb_bill_doc_number}` : null,
         qbRef: b.qb_bill_id || null,
+        qbBillId: b.qb_bill_id || null,
         periodStart: b.period_start,
         periodEnd: b.period_end,
       });
@@ -215,9 +218,13 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   }, [payments, contractorFilter, projectFilter, workerFilter]);
 
   const totalAmount = useMemo(() => filtered.reduce((s, p) => s + p.amount, 0), [filtered]);
-  const qbDrafts = useMemo(() => filtered.filter((p) => p.batchStatus === 'draft' && p.draftCategory === 'qb_export'), [filtered]);
+  const qbExportable = useMemo(() => filtered.filter((p) => {
+    if (p.draftCategory !== 'qb_export') return false;
+    // Draft batches or paid batches that haven't been exported to QB yet
+    return p.batchStatus === 'draft' || (p.batchStatus === 'paid' && !p.qbBillId);
+  }), [filtered]);
   const manualDrafts = useMemo(() => filtered.filter((p) => p.batchStatus === 'draft' && p.draftCategory === 'manual'), [filtered]);
-  const qbDraftTotal = useMemo(() => qbDrafts.reduce((s, p) => s + p.amount, 0), [qbDrafts]);
+  const qbExportableTotal = useMemo(() => qbExportable.reduce((s, p) => s + p.amount, 0), [qbExportable]);
   const manualDraftTotal = useMemo(() => manualDrafts.reduce((s, p) => s + p.amount, 0), [manualDrafts]);
 
   // Get unique contractors and projects for filter dropdowns
@@ -253,10 +260,10 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   };
 
   const handleExportQBDrafts = async () => {
-    if (qbDrafts.length === 0) return;
+    if (qbExportable.length === 0) return;
     setExporting(true);
     try {
-      const batchIds = qbDrafts.map((d) => d.id);
+      const batchIds = qbExportable.map((d) => d.id);
       const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
         body: { batch_ids: batchIds },
       });
@@ -377,14 +384,14 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       </Card>
 
       {/* QB Export drafts bar */}
-      {qbDrafts.length > 0 && (
+      {qbExportable.length > 0 && (
         <Card className="p-3 flex items-center justify-between border-primary/20 bg-primary/5">
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs border-primary/30 text-primary">
-              {qbDrafts.length} QB Draft{qbDrafts.length !== 1 ? 's' : ''}
+              {qbExportable.length} pending QB export{qbExportable.length !== 1 ? 's' : ''}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              ${qbDraftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
+              ${qbExportableTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
             </span>
           </div>
           <Button

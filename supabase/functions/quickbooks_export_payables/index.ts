@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     // Fetch all requested batches
     const { data: batches, error: batchErr } = await adminClient
       .from("worker_payable_batches")
-      .select("id, worker_user_id, project_id, period_start, period_end, total_amount, status, company_id")
+      .select("id, worker_user_id, project_id, period_start, period_end, total_amount, status, company_id, qb_bill_id")
       .in("id", batch_ids);
 
     if (batchErr) {
@@ -95,8 +95,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      if (batch.status !== "draft") {
-        results.push({ batch_id: batchId, success: false, error: `Batch is '${batch.status}', expected 'draft'` });
+      // Allow draft and paid (not yet exported) batches; reject exported/voided
+      if (batch.status !== "draft" && batch.status !== "paid") {
+        results.push({ batch_id: batchId, success: false, error: `Batch is '${batch.status}', cannot export` });
+        failedBatchIds.add(batchId);
+        continue;
+      }
+      if (batch.qb_bill_id) {
+        results.push({ batch_id: batchId, success: false, error: `Batch already has QB bill ${batch.qb_bill_id}` });
         failedBatchIds.add(batchId);
         continue;
       }
@@ -290,10 +296,13 @@ Deno.serve(async (req) => {
 
       // Update all batches in this group
       for (const batchId of validBatchIds) {
+        const batch = batchMap.get(batchId);
+        // Preserve 'paid' status if already marked paid; otherwise set to 'exported'
+        const newStatus = batch?.status === "paid" ? "paid" : "exported";
         const { error: updateErr } = await adminClient
           .from("worker_payable_batches")
           .update({
-            status: "exported",
+            status: newStatus,
             accounting_source: "quickbooks",
             qb_bill_id: qbBillId,
             qb_bill_doc_number: qbDocNumber,
