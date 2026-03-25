@@ -261,25 +261,25 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     }
   };
 
-  const handleExportQBDrafts = async () => {
-    if (qbExportable.length === 0) return;
+  const handleExportQBDrafts = async (batchIds?: string[]) => {
+    const ids = batchIds || qbExportable.map((d) => d.id);
+    if (ids.length === 0) return;
     setExporting(true);
     try {
-      const batchIds = qbExportable.map((d) => d.id);
       const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
-        body: { batch_ids: batchIds },
+        body: { batch_ids: ids },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast({
         title: 'Export successful',
-        description: `${data?.bills_created || batchIds.length} bill(s) exported to QuickBooks.`,
+        description: `${data?.bills_created || ids.length} bill(s) exported to QuickBooks.`,
       });
       loadData();
     } catch (err: any) {
       toast({
         title: 'Export failed',
-        description: err.message || 'Could not export drafts to QuickBooks.',
+        description: err.message || 'Could not export to QuickBooks.',
         variant: 'destructive',
       });
     } finally {
