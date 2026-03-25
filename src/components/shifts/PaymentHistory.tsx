@@ -215,9 +215,13 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   }, [payments, contractorFilter, projectFilter, workerFilter]);
 
   const totalAmount = useMemo(() => filtered.reduce((s, p) => s + p.amount, 0), [filtered]);
-  const qbDrafts = useMemo(() => filtered.filter((p) => p.batchStatus === 'draft' && p.draftCategory === 'qb_export'), [filtered]);
+  const qbExportable = useMemo(() => filtered.filter((p) => {
+    if (p.draftCategory !== 'qb_export') return false;
+    // Draft batches or paid batches that haven't been exported to QB yet
+    return p.batchStatus === 'draft' || (p.batchStatus === 'paid' && !p.qbBillId);
+  }), [filtered]);
   const manualDrafts = useMemo(() => filtered.filter((p) => p.batchStatus === 'draft' && p.draftCategory === 'manual'), [filtered]);
-  const qbDraftTotal = useMemo(() => qbDrafts.reduce((s, p) => s + p.amount, 0), [qbDrafts]);
+  const qbExportableTotal = useMemo(() => qbExportable.reduce((s, p) => s + p.amount, 0), [qbExportable]);
   const manualDraftTotal = useMemo(() => manualDrafts.reduce((s, p) => s + p.amount, 0), [manualDrafts]);
 
   // Get unique contractors and projects for filter dropdowns
