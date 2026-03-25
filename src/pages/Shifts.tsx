@@ -454,7 +454,12 @@ const ShiftHistory = ({
               {s.admin_edited_at && (
                 <Badge variant="outline" className="text-xs">Admin edited</Badge>
               )}
-              <span className="text-sm font-medium">{s.total_hours}h</span>
+              {s.is_flat_rate ? (
+                <span className="text-sm font-medium">${Number(s.flat_rate_amount || 0).toFixed(2)}</span>
+              ) : (
+                <span className="text-sm font-medium">{s.total_hours}h</span>
+              )}
+              {s.is_flat_rate && <Badge variant="secondary" className="text-[10px]">Flat</Badge>}
             </div>
           </div>
         </Card>
