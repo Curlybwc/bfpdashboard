@@ -399,7 +399,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
           <Button
             size="sm"
             className="h-7 text-xs gap-1"
-            onClick={handleExportQBDrafts}
+            onClick={() => handleExportQBDrafts()}
             disabled={exporting}
           >
             {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
