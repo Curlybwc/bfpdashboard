@@ -296,10 +296,13 @@ Deno.serve(async (req) => {
 
       // Update all batches in this group
       for (const batchId of validBatchIds) {
+        const batch = batchMap.get(batchId);
+        // Preserve 'paid' status if already marked paid; otherwise set to 'exported'
+        const newStatus = batch?.status === "paid" ? "paid" : "exported";
         const { error: updateErr } = await adminClient
           .from("worker_payable_batches")
           .update({
-            status: "exported",
+            status: newStatus,
             accounting_source: "quickbooks",
             qb_bill_id: qbBillId,
             qb_bill_doc_number: qbDocNumber,
