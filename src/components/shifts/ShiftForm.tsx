@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
-import { Loader2, Clock, Hash, AlertCircle, ArrowRight } from 'lucide-react';
+import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign } from 'lucide-react';
 import type { Shift, ShiftAllocation } from '@/hooks/useShifts';
 
 const NoEligibleTasksCard = () => {
