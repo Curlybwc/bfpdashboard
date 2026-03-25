@@ -383,14 +383,14 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       </Card>
 
       {/* QB Export drafts bar */}
-      {qbDrafts.length > 0 && (
+      {qbExportable.length > 0 && (
         <Card className="p-3 flex items-center justify-between border-primary/20 bg-primary/5">
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-xs border-primary/30 text-primary">
-              {qbDrafts.length} QB Draft{qbDrafts.length !== 1 ? 's' : ''}
+              {qbExportable.length} pending QB export{qbExportable.length !== 1 ? 's' : ''}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              ${qbDraftTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
+              ${qbExportableTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pending export
             </span>
           </div>
           <Button
