@@ -62,6 +62,7 @@ type UnifiedPayment = {
   companyName: string | null;
   memo: string | null;
   qbRef: string | null;
+  qbBillId: string | null;
   periodStart: string | null;
   periodEnd: string | null;
 };
