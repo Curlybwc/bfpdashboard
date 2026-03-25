@@ -268,8 +268,10 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
     return Object.values(allocations).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   }, [allocations]);
 
-  const remaining = Math.round((totalHours - allocatedHours) * 100) / 100;
-  const canSave = totalHours > 0 && Math.abs(remaining) < 0.01 && projectId;
+  const remaining = isFlatRate ? 0 : Math.round((totalHours - allocatedHours) * 100) / 100;
+  const canSave = isFlatRate
+    ? projectId && parseFloat(flatRateAmount) > 0
+    : totalHours > 0 && Math.abs(remaining) < 0.01 && projectId;
 
   const handleSave = async () => {
     if (!user || !canSave) return;
