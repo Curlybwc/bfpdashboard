@@ -175,7 +175,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         id: b.id,
         source: 'batch',
         batchStatus: b.status,
-        draftCategory: b.status === 'draft' ? draftCat : undefined,
+        draftCategory: (b.status === 'draft' || (b.status === 'paid' && !b.qb_bill_id)) ? draftCat : undefined,
         workerUserId: b.worker_user_id,
         workerName: profMap[b.worker_user_id] || 'Unknown',
         amount: Number(b.total_amount),
