@@ -15,6 +15,8 @@ export interface Shift {
   updated_at: string;
   admin_edited_at: string | null;
   admin_edited_by: string | null;
+  is_flat_rate?: boolean;
+  flat_rate_amount?: number | null;
 }
 
 export interface ShiftAllocation {
