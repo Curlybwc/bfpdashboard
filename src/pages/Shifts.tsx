@@ -263,7 +263,7 @@ const Shifts = () => {
             <Card className="p-3 flex items-center justify-between bg-primary/5 border-primary/20">
               <div className="flex items-center gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-primary">{shifts.reduce((sum, s) => sum + s.total_hours, 0).toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-primary">{shifts.filter(s => !s.is_flat_rate).reduce((sum, s) => sum + s.total_hours, 0).toFixed(1)}</p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Hours</p>
                 </div>
                 <div className="h-8 w-px bg-border" />
@@ -346,7 +346,12 @@ const Shifts = () => {
                       {s.admin_edited_at && (
                         <Badge variant="outline" className="text-xs">Admin edited</Badge>
                       )}
-                      <span className="text-sm font-medium">{s.total_hours}h</span>
+                      {s.is_flat_rate ? (
+                        <span className="text-sm font-medium">${Number(s.flat_rate_amount || 0).toFixed(2)}</span>
+                      ) : (
+                        <span className="text-sm font-medium">{s.total_hours}h</span>
+                      )}
+                      {s.is_flat_rate && <Badge variant="secondary" className="text-[10px]">Flat</Badge>}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" disabled={deleting === s.id}>
@@ -449,7 +454,12 @@ const ShiftHistory = ({
               {s.admin_edited_at && (
                 <Badge variant="outline" className="text-xs">Admin edited</Badge>
               )}
-              <span className="text-sm font-medium">{s.total_hours}h</span>
+              {s.is_flat_rate ? (
+                <span className="text-sm font-medium">${Number(s.flat_rate_amount || 0).toFixed(2)}</span>
+              ) : (
+                <span className="text-sm font-medium">{s.total_hours}h</span>
+              )}
+              {s.is_flat_rate && <Badge variant="secondary" className="text-[10px]">Flat</Badge>}
             </div>
           </div>
         </Card>

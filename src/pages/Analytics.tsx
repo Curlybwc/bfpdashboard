@@ -61,7 +61,7 @@ const Analytics = () => {
       const [projRes, taskRes, shiftRes, matRes] = await Promise.all([
         supabase.from('projects').select('id, name').order('name'),
         supabase.from('tasks').select('id, project_id, stage, is_blocked, completed_at, created_at'),
-        supabase.from('shifts').select('id, project_id, total_hours, hourly_rate_snapshot, shift_date'),
+        supabase.from('shifts').select('id, project_id, total_hours, hourly_rate_snapshot, shift_date, is_flat_rate, flat_rate_amount'),
         supabase.from('task_materials').select('id, task_id, name, quantity, purchased, delivered, confirmed_on_site, is_active'),
       ]);
       setProjects(projRes.data || []);
@@ -132,8 +132,8 @@ const Analytics = () => {
     filteredShifts.forEach(s => {
       const name = projectMap[s.project_id] || 'Unknown';
       if (!map[s.project_id]) map[s.project_id] = { projectName: name, totalHours: 0, totalCost: 0 };
-      map[s.project_id].totalHours += Number(s.total_hours) || 0;
-      map[s.project_id].totalCost += (Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0);
+      map[s.project_id].totalHours += (s as any).is_flat_rate ? 0 : (Number(s.total_hours) || 0);
+      map[s.project_id].totalCost += (s as any).is_flat_rate ? Number((s as any).flat_rate_amount || 0) : (Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0);
     });
     return Object.values(map).sort((a, b) => b.totalHours - a.totalHours);
   }, [filteredShifts, projectMap]);
@@ -160,9 +160,9 @@ const Analytics = () => {
   const totalTasks = filteredTasks.length;
   const completedTasks = filteredTasks.filter(t => t.stage === 'Done').length;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const totalLaborHours = filteredShifts.reduce((sum, s) => sum + (Number(s.total_hours) || 0), 0);
+  const totalLaborHours = filteredShifts.filter((s: any) => !s.is_flat_rate).reduce((sum, s) => sum + (Number(s.total_hours) || 0), 0);
   const totalLaborCost = filteredShifts.reduce((sum, s) =>
-    sum + ((Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0)), 0);
+    sum + ((s as any).is_flat_rate ? Number((s as any).flat_rate_amount || 0) : (Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0)), 0);
   const blockedCount = filteredTasks.filter(t => t.is_blocked).length;
 
   if (loading) return <div className="p-4 text-center text-muted-foreground">Loading...</div>;

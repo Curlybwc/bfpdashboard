@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
-import { Loader2, Clock, Hash, AlertCircle, ArrowRight } from 'lucide-react';
+import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign } from 'lucide-react';
 import type { Shift, ShiftAllocation } from '@/hooks/useShifts';
 
 const NoEligibleTasksCard = () => {
@@ -112,6 +112,8 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
   const [projects, setProjects] = useState<{ id: string; name: string; address: string | null }[]>([]);
   const [projectId, setProjectId] = useState(editShift?.project_id || '');
   const [shiftDate, setShiftDate] = useState(editShift?.shift_date || defaultDate || new Date().toISOString().slice(0, 10));
+  const [isFlatRate, setIsFlatRate] = useState(!!(editShift as any)?.is_flat_rate);
+  const [flatRateAmount, setFlatRateAmount] = useState((editShift as any)?.flat_rate_amount ? String((editShift as any).flat_rate_amount) : '');
   const [useStartEnd, setUseStartEnd] = useState(!!(editShift?.start_time));
   const [startTime, setStartTime] = useState(editShift?.start_time?.slice(0, 5) || '08:00');
   const [endTime, setEndTime] = useState(editShift?.end_time?.slice(0, 5) || '16:00');
@@ -266,14 +268,16 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
     return Object.values(allocations).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
   }, [allocations]);
 
-  const remaining = Math.round((totalHours - allocatedHours) * 100) / 100;
-  const canSave = totalHours > 0 && Math.abs(remaining) < 0.01 && projectId;
+  const remaining = isFlatRate ? 0 : Math.round((totalHours - allocatedHours) * 100) / 100;
+  const canSave = isFlatRate
+    ? projectId && parseFloat(flatRateAmount) > 0
+    : totalHours > 0 && Math.abs(remaining) < 0.01 && projectId;
 
   const handleSave = async () => {
     if (!user || !canSave) return;
     setSaving(true);
 
-    const allocArray = Object.entries(allocations)
+    const allocArray = isFlatRate ? [] : Object.entries(allocations)
       .filter(([, v]) => parseFloat(v) > 0)
       .map(([task_id, hours]) => ({ task_id, hours: parseFloat(hours) }));
 
@@ -284,11 +288,13 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       p_user_id: selectedUserId,
       p_project_id: projectId,
       p_shift_date: shiftDate,
-      p_start_time: useStartEnd ? startTime + ':00' : null,
-      p_end_time: useStartEnd ? endTime + ':00' : null,
-      p_total_hours: useStartEnd ? null : totalHours,
+      p_start_time: isFlatRate ? null : (useStartEnd ? startTime + ':00' : null),
+      p_end_time: isFlatRate ? null : (useStartEnd ? endTime + ':00' : null),
+      p_total_hours: isFlatRate ? null : (useStartEnd ? null : totalHours),
       p_allocations: allocArray,
       p_is_admin_edit: isAdminEdit,
+      p_is_flat_rate: isFlatRate,
+      p_flat_rate_amount: isFlatRate ? parseFloat(flatRateAmount) : null,
     });
 
     setSaving(false);
@@ -296,7 +302,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       toast({ title: 'Error saving shift', description: error.message, variant: 'destructive' });
       return;
     }
-    toast({ title: editShift ? 'Shift updated' : 'Shift logged' });
+    toast({ title: editShift ? 'Shift updated' : (isFlatRate ? 'Flat rate payment logged' : 'Shift logged') });
     onSaved();
   };
 
@@ -347,51 +353,76 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
         <Input type="date" value={shiftDate} onChange={e => setShiftDate(e.target.value)} />
       </div>
 
-      {/* Hour mode toggle */}
-      <div className="flex items-center gap-3">
-        <Clock className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-xs flex-1">Use Start / End Time</Label>
-        <Switch checked={useStartEnd} onCheckedChange={setUseStartEnd} />
-      </div>
-
-      {useStartEnd ? (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Start</Label>
-            <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">End</Label>
-            <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-1">
-          <Label className="text-xs">Total Hours</Label>
-          <Input
-            type="number"
-            step="0.25"
-            min="0.25"
-            value={manualHours}
-            onChange={e => setManualHours(e.target.value)}
-            placeholder="e.g. 8"
-          />
+      {/* Flat Rate toggle */}
+      {isAdmin && (
+        <div className="flex items-center gap-3">
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <Label className="text-xs flex-1">Flat Rate Payment</Label>
+          <Switch checked={isFlatRate} onCheckedChange={setIsFlatRate} />
         </div>
       )}
 
-      {/* Summary bar */}
-      <Card className="p-3">
-        <div className="flex justify-between text-sm">
-          <span>Total: <strong>{totalHours}h</strong></span>
-          <span>Allocated: <strong>{allocatedHours}h</strong></span>
-          <span className={remaining !== 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
-            Remaining: {remaining}h
-          </span>
+      {isFlatRate ? (
+        <div className="space-y-1">
+          <Label className="text-xs">Amount ($)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={flatRateAmount}
+            onChange={e => setFlatRateAmount(e.target.value)}
+            placeholder="e.g. 500.00"
+          />
         </div>
-      </Card>
+      ) : (
+        <>
+          {/* Hour mode toggle */}
+          <div className="flex items-center gap-3">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-xs flex-1">Use Start / End Time</Label>
+            <Switch checked={useStartEnd} onCheckedChange={setUseStartEnd} />
+          </div>
+
+          {useStartEnd ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Start</Label>
+                <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">End</Label>
+                <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label className="text-xs">Total Hours</Label>
+              <Input
+                type="number"
+                step="0.25"
+                min="0.25"
+                value={manualHours}
+                onChange={e => setManualHours(e.target.value)}
+                placeholder="e.g. 8"
+              />
+            </div>
+          )}
+
+          {/* Summary bar */}
+          <Card className="p-3">
+            <div className="flex justify-between text-sm">
+              <span>Total: <strong>{totalHours}h</strong></span>
+              <span>Allocated: <strong>{allocatedHours}h</strong></span>
+              <span className={remaining !== 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
+                Remaining: {remaining}h
+              </span>
+            </div>
+          </Card>
+        </>
+      )}
 
       {/* Task allocation */}
-      {projectId && totalHours > 0 && (
+      {!isFlatRate && projectId && totalHours > 0 && (
         <div className="space-y-2">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Allocate Hours to Tasks
