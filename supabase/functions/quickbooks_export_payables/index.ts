@@ -95,8 +95,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      if (batch.status !== "draft") {
-        results.push({ batch_id: batchId, success: false, error: `Batch is '${batch.status}', expected 'draft'` });
+      // Allow draft and paid (not yet exported) batches; reject exported/voided
+      if (batch.status !== "draft" && batch.status !== "paid") {
+        results.push({ batch_id: batchId, success: false, error: `Batch is '${batch.status}', cannot export` });
+        failedBatchIds.add(batchId);
+        continue;
+      }
+      if (batch.qb_bill_id) {
+        results.push({ batch_id: batchId, success: false, error: `Batch already has QB bill ${batch.qb_bill_id}` });
         failedBatchIds.add(batchId);
         continue;
       }
