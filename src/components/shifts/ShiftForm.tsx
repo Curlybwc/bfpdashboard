@@ -353,48 +353,73 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
         <Input type="date" value={shiftDate} onChange={e => setShiftDate(e.target.value)} />
       </div>
 
-      {/* Hour mode toggle */}
-      <div className="flex items-center gap-3">
-        <Clock className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-xs flex-1">Use Start / End Time</Label>
-        <Switch checked={useStartEnd} onCheckedChange={setUseStartEnd} />
-      </div>
-
-      {useStartEnd ? (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Start</Label>
-            <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">End</Label>
-            <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-1">
-          <Label className="text-xs">Total Hours</Label>
-          <Input
-            type="number"
-            step="0.25"
-            min="0.25"
-            value={manualHours}
-            onChange={e => setManualHours(e.target.value)}
-            placeholder="e.g. 8"
-          />
+      {/* Flat Rate toggle */}
+      {isAdmin && (
+        <div className="flex items-center gap-3">
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <Label className="text-xs flex-1">Flat Rate Payment</Label>
+          <Switch checked={isFlatRate} onCheckedChange={setIsFlatRate} />
         </div>
       )}
 
-      {/* Summary bar */}
-      <Card className="p-3">
-        <div className="flex justify-between text-sm">
-          <span>Total: <strong>{totalHours}h</strong></span>
-          <span>Allocated: <strong>{allocatedHours}h</strong></span>
-          <span className={remaining !== 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
-            Remaining: {remaining}h
-          </span>
+      {isFlatRate ? (
+        <div className="space-y-1">
+          <Label className="text-xs">Amount ($)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={flatRateAmount}
+            onChange={e => setFlatRateAmount(e.target.value)}
+            placeholder="e.g. 500.00"
+          />
         </div>
-      </Card>
+      ) : (
+        <>
+          {/* Hour mode toggle */}
+          <div className="flex items-center gap-3">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-xs flex-1">Use Start / End Time</Label>
+            <Switch checked={useStartEnd} onCheckedChange={setUseStartEnd} />
+          </div>
+
+          {useStartEnd ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Start</Label>
+                <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">End</Label>
+                <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <Label className="text-xs">Total Hours</Label>
+              <Input
+                type="number"
+                step="0.25"
+                min="0.25"
+                value={manualHours}
+                onChange={e => setManualHours(e.target.value)}
+                placeholder="e.g. 8"
+              />
+            </div>
+          )}
+
+          {/* Summary bar */}
+          <Card className="p-3">
+            <div className="flex justify-between text-sm">
+              <span>Total: <strong>{totalHours}h</strong></span>
+              <span>Allocated: <strong>{allocatedHours}h</strong></span>
+              <span className={remaining !== 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
+                Remaining: {remaining}h
+              </span>
+            </div>
+          </Card>
+        </>
+      )}
 
       {/* Task allocation */}
       {projectId && totalHours > 0 && (
