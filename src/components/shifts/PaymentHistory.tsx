@@ -187,6 +187,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         companyName: b.company_id ? (compMap[b.company_id] || 'Unknown') : null,
         memo: b.qb_bill_doc_number ? `Bill #${b.qb_bill_doc_number}` : null,
         qbRef: b.qb_bill_id || null,
+        qbBillId: b.qb_bill_id || null,
         periodStart: b.period_start,
         periodEnd: b.period_end,
       });
