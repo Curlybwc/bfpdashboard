@@ -417,8 +417,10 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
 
     const computedShifts: ShiftWithComputed[] = shiftRows.map((row) => {
       const profile = profileMap.get(row.user_id);
+      const isFlatRate = (row as any).is_flat_rate;
+      const flatAmount = Number((row as any).flat_rate_amount || 0);
       const rate = Number(row.hourly_rate_snapshot ?? profile?.hourly_rate ?? 0);
-      const dollars = Number((Number(row.total_hours) * rate).toFixed(2));
+      const dollars = isFlatRate ? flatAmount : Number((Number(row.total_hours) * rate).toFixed(2));
       return {
         shift: row,
         projectName: projectMap.get(row.project_id) || 'Unknown project',
