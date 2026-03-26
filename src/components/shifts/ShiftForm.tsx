@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
-import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign, Trash2 } from 'lucide-react';
 import type { Shift, ShiftAllocation } from '@/hooks/useShifts';
 
 const NoEligibleTasksCard = () => {
@@ -462,6 +463,41 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       <div className="flex gap-2 pt-2">
         {onCancel && (
           <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
+        )}
+        {editShift && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="icon" className="shrink-0">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this shift?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete this shift ({editShift.shift_date}, {editShift.total_hours}h). This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    await supabase.from('shift_task_allocations').delete().eq('shift_id', editShift.id);
+                    const { error } = await supabase.from('shifts').delete().eq('id', editShift.id);
+                    if (error) {
+                      toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
+                    } else {
+                      toast({ title: 'Shift deleted' });
+                      onSaved();
+                    }
+                  }}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
         <Button
           className="flex-1"
