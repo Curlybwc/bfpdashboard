@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN dd_on_file boolean NOT NULL DEFAULT false;

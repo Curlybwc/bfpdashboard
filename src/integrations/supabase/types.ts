@@ -485,6 +485,7 @@ export type Database = {
         Row: {
           can_manage_projects: boolean
           created_at: string
+          dd_on_file: boolean
           full_name: string | null
           hourly_rate: number | null
           id: string
@@ -495,6 +496,7 @@ export type Database = {
         Insert: {
           can_manage_projects?: boolean
           created_at?: string
+          dd_on_file?: boolean
           full_name?: string | null
           hourly_rate?: number | null
           id: string
@@ -505,6 +507,7 @@ export type Database = {
         Update: {
           can_manage_projects?: boolean
           created_at?: string
+          dd_on_file?: boolean
           full_name?: string | null
           hourly_rate?: number | null
           id?: string
