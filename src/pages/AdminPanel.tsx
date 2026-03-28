@@ -64,7 +64,7 @@ const AdminPanel = () => {
     fetchProfiles();
   };
 
-  const toggleField = async (profileId: string, field: 'can_manage_projects' | 'is_active', currentValue: boolean) => {
+  const toggleField = async (profileId: string, field: 'can_manage_projects' | 'is_active' | 'tax_info_filed', currentValue: boolean) => {
     const { error } = await supabase
       .from('profiles')
       .update({ [field]: !currentValue } as any)
