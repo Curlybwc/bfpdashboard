@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN tax_info_filed boolean NOT NULL DEFAULT false;
