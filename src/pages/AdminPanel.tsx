@@ -230,6 +230,16 @@ const AdminPanel = () => {
                     <span className="text-xs text-muted-foreground">1099</span>
                   </div>
                   <div className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={!!profile.dd_on_file}
+                      onChange={() => toggleField(profile.id, 'dd_on_file' as any, !!profile.dd_on_file)}
+                      className="h-3.5 w-3.5 rounded border-muted-foreground/40 accent-primary cursor-pointer"
+                      title="Direct deposit info on file"
+                    />
+                    <span className="text-xs text-muted-foreground">DD</span>
+                  </div>
+                  <div className="flex items-center gap-1">
                     <DollarSign className="h-3 w-3 text-muted-foreground" />
                     <Input
                       type="number"
