@@ -220,6 +220,16 @@ const AdminPanel = () => {
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-end">
                   <div className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={!!profile.tax_info_filed}
+                      onChange={() => toggleField(profile.id, 'tax_info_filed' as any, !!profile.tax_info_filed)}
+                      className="h-3.5 w-3.5 rounded border-muted-foreground/40 accent-primary cursor-pointer"
+                      title="1099 info entered on 1099online.com"
+                    />
+                    <span className="text-xs text-muted-foreground">1099</span>
+                  </div>
+                  <div className="flex items-center gap-1">
                     <DollarSign className="h-3 w-3 text-muted-foreground" />
                     <Input
                       type="number"
