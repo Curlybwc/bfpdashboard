@@ -51,7 +51,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
         .lte('paid_date', filters.toDate)
         .order('paid_date', { ascending: false });
 
-      if (filters.workerId) q = q.eq('worker_user_id', filters.workerId);
+      if (filters.workerIds?.length) q = q.in('worker_user_id', filters.workerIds);
       if (filters.companyId === 'legacy') q = q.is('company_id', null);
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
