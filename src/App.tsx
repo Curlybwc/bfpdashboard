@@ -41,6 +41,7 @@ import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
 import Accounting from "./pages/Accounting";
 import AdminVendorMappings from "./pages/AdminVendorMappings";
+import AdminVendors from "./pages/AdminVendors";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
@@ -122,6 +123,7 @@ const AppRoutes = () => {
         <Route path="/admin/calendar" element={<AdminGuard><CalendarView /></AdminGuard>} />
         <Route path="/admin/accounting" element={<AdminGuard><Accounting /></AdminGuard>} />
         <Route path="/admin/vendor-mappings" element={<AdminGuard><AdminVendorMappings /></AdminGuard>} />
+        <Route path="/admin/vendors" element={<AdminGuard><AdminVendors /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}

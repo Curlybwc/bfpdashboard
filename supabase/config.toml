@@ -50,3 +50,12 @@ verify_jwt = false
 
 [functions.quickbooks_record_expense]
 verify_jwt = false
+
+[functions.quickbooks_vendor_search]
+verify_jwt = false
+
+[functions.quickbooks_vendor_pull]
+verify_jwt = false
+
+[functions.quickbooks_vendor_push]
+verify_jwt = false

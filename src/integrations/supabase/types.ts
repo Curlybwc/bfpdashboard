@@ -2033,6 +2033,80 @@ export type Database = {
         }
         Relationships: []
       }
+      vendors: {
+        Row: {
+          address_line_1: string | null
+          address_line_2: string | null
+          city: string | null
+          company_id: string
+          country: string | null
+          created_at: string
+          created_by: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          postal_code: string | null
+          quickbooks_display_name: string | null
+          quickbooks_last_error: string | null
+          quickbooks_last_synced_at: string | null
+          quickbooks_sync_status: string
+          quickbooks_vendor_id: string | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          company_id: string
+          country?: string | null
+          created_at?: string
+          created_by: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          postal_code?: string | null
+          quickbooks_display_name?: string | null
+          quickbooks_last_error?: string | null
+          quickbooks_last_synced_at?: string | null
+          quickbooks_sync_status?: string
+          quickbooks_vendor_id?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          city?: string | null
+          company_id?: string
+          country?: string | null
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          postal_code?: string | null
+          quickbooks_display_name?: string | null
+          quickbooks_last_error?: string | null
+          quickbooks_last_synced_at?: string | null
+          quickbooks_sync_status?: string
+          quickbooks_vendor_id?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendors_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       worker_availability: {
         Row: {
           available_date: string
