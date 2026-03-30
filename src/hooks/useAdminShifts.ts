@@ -31,17 +31,24 @@ export function useAdminShifts(filters: AdminShiftsFilters, enabled: boolean) {
       if (error) throw error;
       const shifts = (data ?? []) as Shift[];
 
-      // Fetch profile names & project names in parallel
+      // Fetch profile names, project names, and paid shift IDs in parallel
       const userIds = [...new Set(shifts.map((s) => s.user_id))];
       const projectIds = [...new Set(shifts.map((s) => s.project_id))];
+      const shiftIds = shifts.map((s) => s.id);
 
-      const [profilesRes, projectsRes] = await Promise.all([
+      const [profilesRes, projectsRes, paidBatchRes, paidPaymentRes] = await Promise.all([
         userIds.length > 0
           ? supabase.from('profiles').select('id, full_name').in('id', userIds)
           : Promise.resolve({ data: [] as { id: string; full_name: string | null }[], error: null }),
         projectIds.length > 0
           ? supabase.from('projects').select('id, name').in('id', projectIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[], error: null }),
+        shiftIds.length > 0
+          ? supabase.from('worker_payable_batch_shifts').select('shift_id, payable_batch_id').in('shift_id', shiftIds).is('voided_at', null)
+          : Promise.resolve({ data: [] as { shift_id: string; payable_batch_id: string }[], error: null }),
+        shiftIds.length > 0
+          ? supabase.from('worker_payment_shifts').select('shift_id').in('shift_id', shiftIds)
+          : Promise.resolve({ data: [] as { shift_id: string }[], error: null }),
       ]);
 
       const profileMap: Record<string, string> = {};
@@ -50,7 +57,11 @@ export function useAdminShifts(filters: AdminShiftsFilters, enabled: boolean) {
       const projectMap: Record<string, string> = {};
       (projectsRes.data ?? []).forEach((p) => { projectMap[p.id] = p.name; });
 
-      return { shifts, profileMap, projectMap };
+      const paidShiftIds = new Set<string>();
+      (paidBatchRes.data ?? []).forEach((r) => paidShiftIds.add(r.shift_id));
+      (paidPaymentRes.data ?? []).forEach((r) => paidShiftIds.add(r.shift_id));
+
+      return { shifts, profileMap, projectMap, paidShiftIds };
     },
     enabled,
   });
