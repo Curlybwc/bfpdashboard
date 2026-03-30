@@ -47,15 +47,22 @@ const Shifts = () => {
   // Track whether filters came from query params (drill-down)
   const isDrillDown = !!(searchParams.get('contractor') || searchParams.get('project') || searchParams.get('from'));
 
-  // Handle edit query param
+  // Handle edit query param — defined inline to avoid TDZ with handleEditShift
+  const editIdParam = searchParams.get('edit');
   useEffect(() => {
-    const editId = searchParams.get('edit');
-    if (editId) {
-      handleEditShift({ id: editId });
+    if (!editIdParam) return;
+    (async () => {
+      const full = await fetchShiftById(editIdParam);
+      if (full) {
+        const allocs = await fetchShiftAllocations(editIdParam);
+        setEditShift(full);
+        setEditAllocations(allocs);
+        setShowForm(true);
+      }
       searchParams.delete('edit');
       setSearchParams(searchParams, { replace: true });
-    }
-  }, []);
+    })();
+  }, [editIdParam]);
 
   // Non-admin data
   const { data, isLoading, refetch } = useMyShifts(user?.id);
