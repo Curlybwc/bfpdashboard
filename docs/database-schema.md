@@ -52,6 +52,8 @@ erDiagram
     profiles ||--o{ profile_aliases : has
     profiles ||--o{ project_members : "member of"
     profiles ||--o{ scope_members : "member of"
+
+    companies ||--o{ vendors : has
 ```
 
 ---
