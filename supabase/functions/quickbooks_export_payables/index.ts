@@ -65,9 +65,10 @@ Deno.serve(async (req) => {
     const workerIds = [...new Set((batches || []).map((b: any) => b.worker_user_id))];
     const { data: profiles } = await adminClient
       .from("profiles")
-      .select("id, full_name")
+      .select("id, full_name, skip_qb_export")
       .in("id", workerIds);
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name || "Unknown"]));
+    const skipQbSet = new Set((profiles || []).filter((p: any) => p.skip_qb_export).map((p: any) => p.id));
 
     // Pre-validate all batches and build grouped bill keys
     // Grouping key: company_id + qb_vendor_id + project_id + period_start + period_end
