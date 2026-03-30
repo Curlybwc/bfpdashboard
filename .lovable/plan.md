@@ -1,97 +1,132 @@
 
 
-## Plan: Crew Tasks (Multi-Person, Multi-Day)
+# Vendor Management + QuickBooks Sync — Revised Plan
 
-### 1. Database Migration
+## Adjustments from feedback
 
-Single migration adding columns, tables, indexes, RLS, and a helper function.
+1. **`company_id` NOT NULL** — Every vendor belongs to a company. No cross-company use case exists.
+2. **`updated_at` trigger** — Use the repo's standard `update_updated_at_column()` trigger.
+3. **RLS scoped to admin-only** — No global authenticated read. Matches `quickbooks_vendor_mappings` and `quickbooks_settings` patterns (admin-managed, company-scoped data). If read access for non-admins is needed later, a company-scoped policy can be added.
+4. **`quickbooks_vendor_push` guards** — Refuse push when `quickbooks_vendor_id` is already set (return error). On QB API failure, persist `quickbooks_sync_status = 'error'` and `quickbooks_last_error` before returning.
+5. **`quickbooks_vendor_search` input escaping** — Escape single quotes and special chars in search term before interpolating into QB query string.
+6. **Type regeneration** — After migration, Supabase TS types will auto-regenerate. Also update `docs/database-schema.md`.
 
-**New columns on `tasks`:**
-- `assignment_mode text NOT NULL DEFAULT 'solo'` (values: `'solo'`, `'crew'`)
-- `lead_user_id uuid NULL`
+---
 
-**New table `task_candidates` (eligibility pool):**
+## Step 1 — Migration
+
 ```sql
-CREATE TABLE public.task_candidates (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  PRIMARY KEY (task_id, user_id)
+CREATE TABLE public.vendors (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL REFERENCES public.companies(id),
+  name text NOT NULL,
+  email text,
+  phone text,
+  address_line_1 text,
+  address_line_2 text,
+  city text,
+  state text,
+  postal_code text,
+  country text DEFAULT 'US',
+  quickbooks_vendor_id text,
+  quickbooks_display_name text,
+  quickbooks_sync_status text NOT NULL DEFAULT 'not_synced',
+  quickbooks_last_synced_at timestamptz,
+  quickbooks_last_error text,
+  created_by uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_task_candidates_user ON public.task_candidates(user_id);
+
+CREATE UNIQUE INDEX uq_vendor_qb_id_company
+  ON public.vendors (company_id, quickbooks_vendor_id)
+  WHERE quickbooks_vendor_id IS NOT NULL;
+
+ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins full access on vendors"
+  ON public.vendors FOR ALL TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+CREATE TRIGGER update_vendors_updated_at
+  BEFORE UPDATE ON public.vendors
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-**New table `task_workers` (active crew):**
-```sql
-CREATE TABLE public.task_workers (
-  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  active boolean NOT NULL DEFAULT true,
-  joined_at timestamptz NOT NULL DEFAULT now(),
-  left_at timestamptz NULL,
-  PRIMARY KEY (task_id, user_id)
-);
-CREATE INDEX idx_task_workers_user ON public.task_workers(user_id);
-CREATE INDEX idx_task_workers_task_active ON public.task_workers(task_id, active);
-```
+**File**: new migration in `supabase/migrations/`
 
-**RLS on `task_candidates`:**
-- SELECT: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND is_project_member(auth.uid(), t.project_id))`
-- INSERT/DELETE: `is_admin(auth.uid()) OR EXISTS(SELECT 1 FROM tasks t WHERE t.id = task_id AND get_project_role(auth.uid(), t.project_id) = 'manager')`
+## Step 2 — Edge function: `quickbooks_vendor_search`
 
-**RLS on `task_workers`:**
-- SELECT: same as task_candidates SELECT
-- INSERT: `(user_id = auth.uid() AND EXISTS(SELECT 1 FROM task_candidates tc WHERE tc.task_id = task_workers.task_id AND tc.user_id = auth.uid())) OR is_admin(auth.uid())`
-- UPDATE: `user_id = auth.uid() OR is_admin(auth.uid())`
-- DELETE: `user_id = auth.uid() OR is_admin(auth.uid())`
+- Accepts `{ company_id, search_term }`.
+- Auth: `requireAdminAuth`.
+- **Escapes `search_term`**: replaces `'` → `\'`, strips control chars, limits length to 100 chars before interpolating into QB query: `SELECT * FROM Vendor WHERE DisplayName LIKE '%escaped_term%'`.
+- Returns `{ vendors: [{ id, display_name, email, phone, city, state }] }`.
 
-### 2. Today Tab (`src/pages/Today.tsx`)
+**File**: `supabase/functions/quickbooks_vendor_search/index.ts`
 
-Add two additional queries in `fetchTasks` after existing solo queries:
+## Step 3 — Edge function: `quickbooks_vendor_pull`
 
-**Crew In Progress:** Query `task_workers` where `user_id = me, active = true`, get task_ids, then fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `inProgress` array, dedupe by id.
+- Accepts `{ vendor_id }`.
+- Auth: `requireAdminAuth`.
+- Reads local vendor, fetches QB vendor by ID, updates local contact fields + sets `sync_status = 'synced'`, `last_synced_at = now()`.
+- On failure: sets `sync_status = 'error'`, `last_error = message`.
 
-**Crew Available:** Query `task_candidates` where `user_id = me`, get task_ids. Query `task_workers` where `user_id = me, active = true`, get active_ids. Available crew = candidate_ids minus active_ids. Fetch those tasks where `assignment_mode = 'crew'` and `stage != 'Done'`. Merge into `available`, dedupe by id.
+**File**: `supabase/functions/quickbooks_vendor_pull/index.ts`
 
-Existing solo queries already filter by `assigned_to_user_id` which is null for crew tasks, so no cross-contamination.
+## Step 4 — Edge function: `quickbooks_vendor_push`
 
-### 3. TaskCard (`src/components/TaskCard.tsx`)
+- Accepts `{ vendor_id }`.
+- Auth: `requireAdminAuth`.
+- **Guard**: if `quickbooks_vendor_id` is already set, return `400` with `"Vendor already mapped to QuickBooks"` — do not push.
+- Creates vendor in QB via POST, saves returned ID back to local record, sets `sync_status = 'synced'`.
+- **On QB API failure**: updates local vendor with `sync_status = 'error'`, `last_error = <QB error message>`, then returns the error to the caller.
 
-Add optional props: `isCrewTask?: boolean`, `isActiveWorker?: boolean`, `isCandidate?: boolean`, `activeWorkerCount?: number`.
+**File**: `supabase/functions/quickbooks_vendor_push/index.ts`
 
-When `isCrewTask`:
-- Show a small crew icon + "N active" badge next to status
-- Replace Dibs with "Join" button (if candidate and not active) — upserts `task_workers` row
-- Show "Leave" button (if active worker) — updates `active=false, left_at=now()`
-- Hide solo Start/Complete buttons; crew tasks use Join/Leave only
-- After Join, optionally set task stage to 'In Progress' if currently 'Ready'
+## Step 5 — Config
 
-### 4. TaskDetail (`src/pages/TaskDetail.tsx`)
+Add `verify_jwt = false` for the 3 new functions in `supabase/config.toml`.
 
-**Crew toggle** (visible to admin/manager only, below Assigned To):
-- Switch labeled "Crew Task"
-- Solo→Crew: update `assignment_mode='crew'`, `lead_user_id = assigned_to_user_id`, `assigned_to_user_id = null`. Insert prior assignee into `task_candidates` + upsert into `task_workers(active=true)`.
-- Crew→Solo: fetch active workers. If exactly 1, assign to them; else if `lead_user_id`, assign to lead; else null. Update `assignment_mode='solo'`. Delete all `task_candidates` and `task_workers` for task.
+## Step 6 — Hook: `src/hooks/useVendors.ts`
 
-**Crew panel** (when `assignment_mode='crew'`, replaces Assigned To dropdown):
-- "Active Crew" list showing names from `task_workers` joined to `profiles`
-- Join/Leave button for current user
-- Manager/admin: candidate pool editor — searchable select from `projectMembers` to add/remove candidates
+React Query CRUD on `vendors` table + edge function invocations for search/pull/push. Scoped by selected `company_id`.
 
-**Solo mode**: keep existing Assigned To UI unchanged.
+## Step 7 — Page: `src/pages/AdminVendors.tsx`
 
-### 5. Files to Modify
+Admin page at `/admin/vendors` with:
+- Company selector
+- Vendor list with search, sync status badges
+- Add/edit dialog (name, email, phone, address only)
+- Per-vendor actions: Link to QB, Pull from QB, Push to QB
+- Error display from `quickbooks_last_error`
 
-1. **Migration SQL** — new columns, tables, indexes, RLS
-2. `src/pages/Today.tsx` — crew task queries merged into sections
-3. `src/components/TaskCard.tsx` — crew badge, Join/Leave actions
-4. `src/pages/TaskDetail.tsx` — crew toggle, crew panel, candidate management
-5. `src/lib/supabase-types.ts` — add `AssignmentMode` type
+## Step 8 — Wiring
 
-### 6. Key Edge Cases
+- `src/App.tsx`: add `/admin/vendors` route with `AdminGuard`
+- `src/pages/AdminPanel.tsx`: add "Vendors" hub entry
 
-- Solo queries use `assigned_to_user_id` (null for crew) — no overlap
-- Crew Available shows even when task is 'In Progress' (multiple people can join)
-- Upsert PK on `task_workers` prevents duplicate joins
-- Done tasks filtered out everywhere by existing stage checks
-- Crew→Solo cleanup deletes both tables to prevent orphan rows
+## Step 9 — Docs + Types
+
+- Update `docs/database-schema.md` with vendors table
+- Supabase TS types auto-regenerate after migration
+
+## Files changed
+
+| File | Action |
+|---|---|
+| `supabase/migrations/[new].sql` | Create vendors table, RLS, trigger, index |
+| `supabase/functions/quickbooks_vendor_search/index.ts` | New |
+| `supabase/functions/quickbooks_vendor_pull/index.ts` | New |
+| `supabase/functions/quickbooks_vendor_push/index.ts` | New |
+| `supabase/config.toml` | Add 3 function blocks |
+| `src/hooks/useVendors.ts` | New |
+| `src/pages/AdminVendors.tsx` | New |
+| `src/App.tsx` | Add route |
+| `src/pages/AdminPanel.tsx` | Add hub entry |
+| `docs/database-schema.md` | Add vendors table |
+
+## Not changed
+
+Scope, project, task, material, cost library, existing QB vendor mappings (payroll), `vendor_url` fields — all untouched.
 
