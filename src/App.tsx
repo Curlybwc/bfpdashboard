@@ -40,6 +40,7 @@ import QBDisconnected from "./pages/QBDisconnected";
 import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
 import Accounting from "./pages/Accounting";
+import AdminVendorMappings from "./pages/AdminVendorMappings";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
