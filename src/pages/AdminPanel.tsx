@@ -180,6 +180,7 @@ const AdminPanel = () => {
         { label: 'Accounting', action: () => navigate('/admin/accounting') },
         { label: 'Analytics', action: () => navigate('/admin/analytics') },
         { label: 'Calendar', action: () => navigate('/admin/calendar') },
+        { label: 'QB Vendor Mappings', action: () => navigate('/admin/vendor-mappings') },
         { label: 'Scope Accuracy', action: () => navigate('/admin/scope-accuracy') },
       ],
     },

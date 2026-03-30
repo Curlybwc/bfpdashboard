@@ -40,6 +40,7 @@ import QBDisconnected from "./pages/QBDisconnected";
 import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
 import Accounting from "./pages/Accounting";
+import AdminVendorMappings from "./pages/AdminVendorMappings";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
@@ -120,6 +121,7 @@ const AppRoutes = () => {
         <Route path="/admin/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
         <Route path="/admin/calendar" element={<AdminGuard><CalendarView /></AdminGuard>} />
         <Route path="/admin/accounting" element={<AdminGuard><Accounting /></AdminGuard>} />
+        <Route path="/admin/vendor-mappings" element={<AdminGuard><AdminVendorMappings /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}
