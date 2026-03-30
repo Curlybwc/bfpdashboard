@@ -123,6 +123,7 @@ const AppRoutes = () => {
         <Route path="/admin/calendar" element={<AdminGuard><CalendarView /></AdminGuard>} />
         <Route path="/admin/accounting" element={<AdminGuard><Accounting /></AdminGuard>} />
         <Route path="/admin/vendor-mappings" element={<AdminGuard><AdminVendorMappings /></AdminGuard>} />
+        <Route path="/admin/vendors" element={<AdminGuard><AdminVendors /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}
