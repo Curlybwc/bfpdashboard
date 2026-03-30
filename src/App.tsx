@@ -41,6 +41,7 @@ import Analytics from "./pages/Analytics";
 import CalendarView from "./pages/CalendarView";
 import Accounting from "./pages/Accounting";
 import AdminVendorMappings from "./pages/AdminVendorMappings";
+import AdminVendors from "./pages/AdminVendors";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
