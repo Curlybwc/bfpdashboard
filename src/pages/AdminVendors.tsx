@@ -126,7 +126,7 @@ const AdminVendors = () => {
 
   const syncStatusBadge = (v: Vendor) => {
     if (v.quickbooks_sync_status === 'synced') {
-      return <Badge variant="outline" className="text-green-700 border-green-300 gap-1"><CheckCircle2 className="h-3 w-3" /> Synced</Badge>;
+      return <Badge variant="outline" className="text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700 gap-1"><CheckCircle2 className="h-3 w-3" /> Synced</Badge>;
     }
     if (v.quickbooks_sync_status === 'error') {
       return <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" /> Error</Badge>;
