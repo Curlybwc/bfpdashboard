@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { format } from 'date-fns';
 
 export interface AccountingFilters {
-  workerId?: string;
+  workerIds?: string[]; // array of user IDs, or undefined/empty for all
   companyId?: string; // uuid, "legacy" for null-company rows, or undefined for all
   fromDate: string; // YYYY-MM-DD
   toDate: string;   // YYYY-MM-DD
