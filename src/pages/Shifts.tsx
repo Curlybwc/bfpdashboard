@@ -312,7 +312,8 @@ const Shifts = () => {
                 </Button>
               )}
             </Card>
-          )}
+            );
+          })()}
 
           {/* Results */}
           {adminLoading2 ? (
