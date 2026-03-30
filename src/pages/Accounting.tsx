@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'; // force HMR reset
 import { format, startOfYear, startOfMonth } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Check, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useAccountingPayments } from '@/hooks/useAccountingPayments';
 import AddHistoricalPaymentDialog from '@/components/accounting/AddHistoricalPaymentDialog';
@@ -48,14 +50,20 @@ const Accounting = () => {
   const [fromDate, setFromDate] = useState<Date>(ytdRange().from);
   const [toDate, setToDate] = useState<Date>(ytdRange().to);
   const [companyFilter, setCompanyFilter] = useState<string>('all');
-  const [contractorFilter, setContractorFilter] = useState<string>('all');
+  const [contractorFilters, setContractorFilters] = useState<string[]>([]);
+
+  const toggleContractor = (id: string) => {
+    setContractorFilters(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const filters = useMemo(() => ({
     fromDate: fmtDate(fromDate),
     toDate: fmtDate(toDate),
     companyId: companyFilter === 'all' ? undefined : companyFilter,
-    workerId: contractorFilter === 'all' ? undefined : contractorFilter,
-  }), [fromDate, toDate, companyFilter, contractorFilter]);
+    workerIds: contractorFilters.length > 0 ? contractorFilters : undefined,
+  }), [fromDate, toDate, companyFilter, contractorFilters]);
 
   const {
     payments, loading, profileMap, companyMap, companies, projects,
@@ -161,17 +169,42 @@ const Accounting = () => {
                 </SelectContent>
               </Select>
 
-              <Select value={contractorFilter} onValueChange={setContractorFilter}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
-                  <SelectValue placeholder="All Contractors" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Contractors</SelectItem>
-                  {ledgerContractors.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs w-[220px] justify-start">
+                    {contractorFilters.length === 0
+                      ? 'All Contractors'
+                      : `${contractorFilters.length} contractor${contractorFilters.length > 1 ? 's' : ''} selected`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <div className="p-2 border-b flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Contractors</span>
+                    {contractorFilters.length > 0 && (
+                      <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1" onClick={() => setContractorFilters([])}>
+                        <X className="h-3 w-3 mr-0.5" /> Clear
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="max-h-[200px]">
+                    <div className="p-1">
+                      {ledgerContractors.map((c) => (
+                        <label
+                          key={c.id}
+                          className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={contractorFilters.includes(c.id)}
+                            onCheckedChange={() => toggleContractor(c.id)}
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className="truncate">{c.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
           </CardContent>
         </Card>

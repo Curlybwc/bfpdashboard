@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { format } from 'date-fns';
 
 export interface AccountingFilters {
-  workerId?: string;
+  workerIds?: string[]; // array of user IDs, or undefined/empty for all
   companyId?: string; // uuid, "legacy" for null-company rows, or undefined for all
   fromDate: string; // YYYY-MM-DD
   toDate: string;   // YYYY-MM-DD
@@ -51,7 +51,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
         .lte('paid_date', filters.toDate)
         .order('paid_date', { ascending: false });
 
-      if (filters.workerId) q = q.eq('worker_user_id', filters.workerId);
+      if (filters.workerIds?.length) q = q.in('worker_user_id', filters.workerIds);
       if (filters.companyId === 'legacy') q = q.is('company_id', null);
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
@@ -86,7 +86,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
         .in('status', ['paid', 'exported'])
         .order('paid_at', { ascending: false });
 
-      if (filters.workerId) q = q.eq('worker_user_id', filters.workerId);
+      if (filters.workerIds?.length) q = q.in('worker_user_id', filters.workerIds);
       if (filters.companyId === 'legacy') q = q.is('company_id', null);
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
