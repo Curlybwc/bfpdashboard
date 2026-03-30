@@ -173,6 +173,7 @@ const Shifts = () => {
     const shifts = adminData?.shifts ?? [];
     const profileMap = adminData?.profileMap ?? {};
     const projectMap = adminData?.projectMap ?? {};
+    const paidShiftIds = adminData?.paidShiftIds ?? new Set<string>();
     const hasActiveFilters = contractorFilter || projectFilter || fromDate !== defaultFromDate() || toDate !== new Date().toISOString().slice(0, 10);
 
     return (
