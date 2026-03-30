@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN skip_qb_export boolean NOT NULL DEFAULT false;

@@ -491,6 +491,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_admin: boolean
+          skip_qb_export: boolean
           tax_info_filed: boolean
         }
         Insert: {
@@ -502,6 +503,7 @@ export type Database = {
           id: string
           is_active?: boolean
           is_admin?: boolean
+          skip_qb_export?: boolean
           tax_info_filed?: boolean
         }
         Update: {
@@ -513,6 +515,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_admin?: boolean
+          skip_qb_export?: boolean
           tax_info_filed?: boolean
         }
         Relationships: []
