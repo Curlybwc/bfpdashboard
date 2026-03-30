@@ -624,3 +624,35 @@ Bulk material stock.
 | `protect_admin_flag()` | Prevent non-admin from changing admin/manager flags |
 | `protect_actual_cost()` | Only admins can update actual_total_cost |
 | `update_updated_at_column()` | Auto-set updated_at on row changes |
+
+---
+
+## vendors
+
+Vendor master data table for supplier/subcontractor contact info with QuickBooks mapping.
+
+| Column | Type | Nullable | Default | Notes |
+|---|---|---|---|---|
+| id | uuid | no | gen_random_uuid() | PK |
+| company_id | uuid | no | — | FK → companies.id |
+| name | text | no | — | Vendor name |
+| email | text | yes | — | Contact email |
+| phone | text | yes | — | Contact phone |
+| address_line_1 | text | yes | — | |
+| address_line_2 | text | yes | — | |
+| city | text | yes | — | |
+| state | text | yes | — | |
+| postal_code | text | yes | — | |
+| country | text | yes | 'US' | |
+| quickbooks_vendor_id | text | yes | — | QB Vendor ID when mapped |
+| quickbooks_display_name | text | yes | — | QB DisplayName |
+| quickbooks_sync_status | text | no | 'not_synced' | not_synced, synced, error |
+| quickbooks_last_synced_at | timestamptz | yes | — | |
+| quickbooks_last_error | text | yes | — | |
+| created_by | uuid | no | — | Who created the record |
+| created_at | timestamptz | no | now() | |
+| updated_at | timestamptz | no | now() | Auto-updated by trigger |
+
+**RLS**: Admin-only (all operations).
+**Indexes**: Unique partial index on `(company_id, quickbooks_vendor_id)` WHERE `quickbooks_vendor_id IS NOT NULL`.
+**Trigger**: `update_vendors_updated_at` → `update_updated_at_column()`.
