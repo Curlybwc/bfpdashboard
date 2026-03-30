@@ -266,7 +266,12 @@ const Shifts = () => {
           </Card>
 
           {/* Summary banner */}
-          {!adminLoading2 && shifts.length > 0 && (
+          {!adminLoading2 && shifts.length > 0 && (() => {
+            const totalOwed = shifts.reduce((sum, s) => {
+              if (s.is_flat_rate) return sum + Number(s.flat_rate_amount || 0);
+              return sum + s.total_hours * Number(s.hourly_rate_snapshot ?? 0);
+            }, 0);
+            return (
             <Card className="p-3 flex items-center justify-between bg-primary/5 border-primary/20">
               <div className="flex items-center gap-4">
                 <div className="text-center">
@@ -277,6 +282,11 @@ const Shifts = () => {
                 <div className="text-center">
                   <p className="text-2xl font-bold">{shifts.length}</p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Shifts</p>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-primary">${totalOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Owed</p>
                 </div>
                 {contractorFilter && profileMap[contractorFilter] && (
                   <>
