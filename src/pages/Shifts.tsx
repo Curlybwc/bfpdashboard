@@ -365,12 +365,26 @@ const Shifts = () => {
                       {s.admin_edited_at && (
                         <Badge variant="outline" className="text-xs">Admin edited</Badge>
                       )}
-                      {s.is_flat_rate ? (
-                        <span className="text-sm font-medium">${Number(s.flat_rate_amount || 0).toFixed(2)}</span>
+                      {paidShiftIds.has(s.id) ? (
+                        <Badge className="text-[10px] bg-green-600 hover:bg-green-600 text-white">Paid</Badge>
                       ) : (
-                        <span className="text-sm font-medium">{s.total_hours}h</span>
+                        <Badge variant="secondary" className="text-[10px]">Unpaid</Badge>
                       )}
-                      {s.is_flat_rate && <Badge variant="secondary" className="text-[10px]">Flat</Badge>}
+                      <div className="text-right">
+                        {s.is_flat_rate ? (
+                          <>
+                            <span className="text-sm font-medium">${Number(s.flat_rate_amount || 0).toFixed(2)}</span>
+                            <Badge variant="secondary" className="text-[10px] ml-1">Flat</Badge>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-sm font-medium">{s.total_hours}h</span>
+                            <span className="text-xs text-muted-foreground ml-1">
+                              · ${(s.total_hours * Number(s.hourly_rate_snapshot ?? 0)).toFixed(2)}
+                            </span>
+                          </>
+                        )}
+                      </div>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" disabled={deleting === s.id}>
