@@ -169,17 +169,42 @@ const Accounting = () => {
                 </SelectContent>
               </Select>
 
-              <Select value={contractorFilter} onValueChange={setContractorFilter}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
-                  <SelectValue placeholder="All Contractors" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Contractors</SelectItem>
-                  {ledgerContractors.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs w-[220px] justify-start">
+                    {contractorFilters.length === 0
+                      ? 'All Contractors'
+                      : `${contractorFilters.length} contractor${contractorFilters.length > 1 ? 's' : ''} selected`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <div className="p-2 border-b flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Contractors</span>
+                    {contractorFilters.length > 0 && (
+                      <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1" onClick={() => setContractorFilters([])}>
+                        <X className="h-3 w-3 mr-0.5" /> Clear
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="max-h-[200px]">
+                    <div className="p-1">
+                      {ledgerContractors.map((c) => (
+                        <label
+                          key={c.id}
+                          className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={contractorFilters.includes(c.id)}
+                            onCheckedChange={() => toggleContractor(c.id)}
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className="truncate">{c.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
           </CardContent>
         </Card>
