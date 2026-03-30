@@ -65,9 +65,10 @@ Deno.serve(async (req) => {
     const workerIds = [...new Set((batches || []).map((b: any) => b.worker_user_id))];
     const { data: profiles } = await adminClient
       .from("profiles")
-      .select("id, full_name")
+      .select("id, full_name, skip_qb_export")
       .in("id", workerIds);
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name || "Unknown"]));
+    const skipQbSet = new Set((profiles || []).filter((p: any) => p.skip_qb_export).map((p: any) => p.id));
 
     // Pre-validate all batches and build grouped bill keys
     // Grouping key: company_id + qb_vendor_id + project_id + period_start + period_end
@@ -91,6 +92,14 @@ Deno.serve(async (req) => {
 
       if (!batch) {
         results.push({ batch_id: batchId, success: false, error: "Batch not found" });
+        failedBatchIds.add(batchId);
+        continue;
+      }
+
+      // Skip workers flagged for non-QB export (e.g. paid via Gusto)
+      if (skipQbSet.has(batch.worker_user_id)) {
+        const workerName = profileMap.get(batch.worker_user_id) || batch.worker_user_id;
+        results.push({ batch_id: batchId, success: false, error: `"${workerName}" is marked as Skip QB Export (e.g. paid via Gusto). Uncheck this flag in Admin → Users to enable export.` });
         failedBatchIds.add(batchId);
         continue;
       }

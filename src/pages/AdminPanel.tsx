@@ -64,7 +64,7 @@ const AdminPanel = () => {
     fetchProfiles();
   };
 
-  const toggleField = async (profileId: string, field: 'can_manage_projects' | 'is_active' | 'tax_info_filed' | 'dd_on_file', currentValue: boolean) => {
+  const toggleField = async (profileId: string, field: 'can_manage_projects' | 'is_active' | 'tax_info_filed' | 'dd_on_file' | 'skip_qb_export', currentValue: boolean) => {
     const { error } = await supabase
       .from('profiles')
       .update({ [field]: !currentValue } as any)
@@ -229,7 +229,7 @@ const AdminPanel = () => {
                     />
                     <span className="text-xs text-muted-foreground">1099</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                   <div className="flex items-center gap-1">
                     <input
                       type="checkbox"
                       checked={!!profile.dd_on_file}
@@ -238,6 +238,16 @@ const AdminPanel = () => {
                       title="Direct deposit info on file"
                     />
                     <span className="text-xs text-muted-foreground">DD</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={!!profile.skip_qb_export}
+                      onChange={() => toggleField(profile.id, 'skip_qb_export', !!profile.skip_qb_export)}
+                      className="h-3.5 w-3.5 rounded border-muted-foreground/40 accent-primary cursor-pointer"
+                      title="Skip QuickBooks export (e.g. paid via Gusto)"
+                    />
+                    <span className="text-xs text-muted-foreground">Skip QB</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <DollarSign className="h-3 w-3 text-muted-foreground" />
