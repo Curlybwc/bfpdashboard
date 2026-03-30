@@ -50,14 +50,20 @@ const Accounting = () => {
   const [fromDate, setFromDate] = useState<Date>(ytdRange().from);
   const [toDate, setToDate] = useState<Date>(ytdRange().to);
   const [companyFilter, setCompanyFilter] = useState<string>('all');
-  const [contractorFilter, setContractorFilter] = useState<string>('all');
+  const [contractorFilters, setContractorFilters] = useState<string[]>([]);
+
+  const toggleContractor = (id: string) => {
+    setContractorFilters(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const filters = useMemo(() => ({
     fromDate: fmtDate(fromDate),
     toDate: fmtDate(toDate),
     companyId: companyFilter === 'all' ? undefined : companyFilter,
-    workerId: contractorFilter === 'all' ? undefined : contractorFilter,
-  }), [fromDate, toDate, companyFilter, contractorFilter]);
+    workerIds: contractorFilters.length > 0 ? contractorFilters : undefined,
+  }), [fromDate, toDate, companyFilter, contractorFilters]);
 
   const {
     payments, loading, profileMap, companyMap, companies, projects,
