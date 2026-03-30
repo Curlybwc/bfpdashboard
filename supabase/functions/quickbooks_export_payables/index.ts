@@ -96,6 +96,14 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Skip workers flagged for non-QB export (e.g. paid via Gusto)
+      if (skipQbSet.has(batch.worker_user_id)) {
+        const workerName = profileMap.get(batch.worker_user_id) || batch.worker_user_id;
+        results.push({ batch_id: batchId, success: false, error: `"${workerName}" is marked as Skip QB Export (e.g. paid via Gusto). Uncheck this flag in Admin → Users to enable export.` });
+        failedBatchIds.add(batchId);
+        continue;
+      }
+
       // Allow draft and paid (not yet exported) batches; reject exported/voided
       if (batch.status !== "draft" && batch.status !== "paid") {
         results.push({ batch_id: batchId, success: false, error: `Batch is '${batch.status}', cannot export` });
