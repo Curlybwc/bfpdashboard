@@ -188,7 +188,7 @@ const Accounting = () => {
                   </div>
                   <ScrollArea className="max-h-[200px]">
                     <div className="p-1">
-                      {ledgerContractors.map((c) => (
+                      {profilesList.map((c) => (
                         <label
                           key={c.id}
                           className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer"
