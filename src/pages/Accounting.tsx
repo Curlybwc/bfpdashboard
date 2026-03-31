@@ -14,6 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { useAccountingPayments } from '@/hooks/useAccountingPayments';
 import AddHistoricalPaymentDialog from '@/components/accounting/AddHistoricalPaymentDialog';
+import EditHistoricalPaymentDialog from '@/components/accounting/EditHistoricalPaymentDialog';
+import type { AccountingPayment } from '@/hooks/useAccountingPayments';
 
 type DatePreset = 'ytd' | 'month' | 'custom';
 
