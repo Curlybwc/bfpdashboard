@@ -8,9 +8,12 @@ import { X, Loader2 } from 'lucide-react';
 
 interface BulkTaskBarProps {
   selectedIds: Set<string>;
+  allVisibleIds: string[];
   members: { user_id: string; profiles?: { full_name: string | null } | null }[];
   onClear: () => void;
   onDone: () => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
 }
 
 const BulkTaskBar = ({ selectedIds, members, onClear, onDone }: BulkTaskBarProps) => {
