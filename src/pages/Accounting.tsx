@@ -324,6 +324,7 @@ const Accounting = () => {
                         {p.project_id ? projectMap.get(p.project_id) ?? '—' : '—'}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground truncate max-w-[120px]">{p.external_reference ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {p.pay_period_start && p.pay_period_end
                           ? `${format(new Date(p.pay_period_start + 'T00:00:00'), 'M/d')}–${format(new Date(p.pay_period_end + 'T00:00:00'), 'M/d')}`
                           : '—'}
