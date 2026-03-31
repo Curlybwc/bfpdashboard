@@ -245,6 +245,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
     error: wpQuery.error || batchQuery.error || profilesQuery.error || companiesQuery.error,
     profileMap,
     companyMap,
+    projectMap,
     companies: companiesQuery.data ?? [],
     projects: projectsQuery.data ?? [],
     profilesList,
