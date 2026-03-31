@@ -70,7 +70,8 @@ const Accounting = () => {
     toDate: fmtDate(toDate),
     companyId: companyFilter === 'all' ? undefined : companyFilter,
     workerIds: contractorFilters.length > 0 ? contractorFilters : undefined,
-  }), [fromDate, toDate, companyFilter, contractorFilters]);
+    projectIds: projectFilters.length > 0 ? projectFilters : undefined,
+  }), [fromDate, toDate, companyFilter, contractorFilters, projectFilters]);
 
   const {
     payments, loading, profileMap, companyMap, companies, projects,
