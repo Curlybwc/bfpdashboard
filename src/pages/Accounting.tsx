@@ -362,6 +362,7 @@ const Accounting = () => {
                     <TableHead className="text-xs">Project</TableHead>
                     <TableHead className="text-xs">Reference</TableHead>
                     <TableHead className="text-xs">Period</TableHead>
+                    <TableHead className="text-xs w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
