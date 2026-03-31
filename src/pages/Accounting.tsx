@@ -51,6 +51,13 @@ const Accounting = () => {
   const [toDate, setToDate] = useState<Date>(ytdRange().to);
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [contractorFilters, setContractorFilters] = useState<string[]>([]);
+  const [projectFilters, setProjectFilters] = useState<string[]>([]);
+
+  const toggleProject = (id: string) => {
+    setProjectFilters(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const toggleContractor = (id: string) => {
     setContractorFilters(prev =>
@@ -63,10 +70,11 @@ const Accounting = () => {
     toDate: fmtDate(toDate),
     companyId: companyFilter === 'all' ? undefined : companyFilter,
     workerIds: contractorFilters.length > 0 ? contractorFilters : undefined,
-  }), [fromDate, toDate, companyFilter, contractorFilters]);
+    projectIds: projectFilters.length > 0 ? projectFilters : undefined,
+  }), [fromDate, toDate, companyFilter, contractorFilters, projectFilters]);
 
   const {
-    payments, loading, profileMap, companyMap, companies, projects,
+    payments, loading, profileMap, companyMap, projectMap, companies, projects,
     profilesList, ledgerContractors, totalPaid, contractorTotals, refetch,
   } = useAccountingPayments(filters);
 
@@ -205,6 +213,43 @@ const Accounting = () => {
                   </ScrollArea>
                 </PopoverContent>
               </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs w-[220px] justify-start">
+                    {projectFilters.length === 0
+                      ? 'All Projects'
+                      : `${projectFilters.length} project${projectFilters.length > 1 ? 's' : ''} selected`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[260px] p-0" align="start">
+                  <div className="p-2 border-b flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Projects</span>
+                    {projectFilters.length > 0 && (
+                      <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1" onClick={() => setProjectFilters([])}>
+                        <X className="h-3 w-3 mr-0.5" /> Clear
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="max-h-[200px]">
+                    <div className="p-1">
+                      {projects.map((p) => (
+                        <label
+                          key={p.id}
+                          className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={projectFilters.includes(p.id)}
+                            onCheckedChange={() => toggleProject(p.id)}
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className="truncate">{p.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
           </CardContent>
         </Card>
@@ -254,8 +299,8 @@ const Accounting = () => {
                     <TableHead className="text-xs text-right">Amount</TableHead>
                     <TableHead className="text-xs">Source</TableHead>
                     <TableHead className="text-xs">Company</TableHead>
+                    <TableHead className="text-xs">Project</TableHead>
                     <TableHead className="text-xs">Reference</TableHead>
-                    <TableHead className="text-xs">Memo</TableHead>
                     <TableHead className="text-xs">Period</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -275,8 +320,10 @@ const Accounting = () => {
                           <Badge variant="outline" className="text-[10px]">Legacy</Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-xs truncate max-w-[140px]">
+                        {p.project_id ? projectMap.get(p.project_id) ?? '—' : '—'}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground truncate max-w-[120px]">{p.external_reference ?? '—'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground truncate max-w-[120px]">{p.memo ?? '—'}</TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {p.pay_period_start && p.pay_period_end
                           ? `${format(new Date(p.pay_period_start + 'T00:00:00'), 'M/d')}–${format(new Date(p.pay_period_end + 'T00:00:00'), 'M/d')}`

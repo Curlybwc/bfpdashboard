@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 export interface AccountingFilters {
   workerIds?: string[]; // array of user IDs, or undefined/empty for all
   companyId?: string; // uuid, "legacy" for null-company rows, or undefined for all
+  projectIds?: string[]; // array of project UUIDs, or undefined/empty for all
   fromDate: string; // YYYY-MM-DD
   toDate: string;   // YYYY-MM-DD
 }
@@ -52,6 +53,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
         .order('paid_date', { ascending: false });
 
       if (filters.workerIds?.length) q = q.in('worker_user_id', filters.workerIds);
+      if (filters.projectIds?.length) q = q.in('project_id', filters.projectIds);
       if (filters.companyId === 'legacy') q = q.is('company_id', null);
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
@@ -87,6 +89,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
         .order('paid_at', { ascending: false });
 
       if (filters.workerIds?.length) q = q.in('worker_user_id', filters.workerIds);
+      if (filters.projectIds?.length) q = q.in('project_id', filters.projectIds);
       if (filters.companyId === 'legacy') q = q.is('company_id', null);
       else if (filters.companyId) q = q.eq('company_id', filters.companyId);
 
@@ -182,6 +185,14 @@ export function useAccountingPayments(filters: AccountingFilters) {
     return map;
   }, [companiesQuery.data]);
 
+  const projectMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of projectsQuery.data ?? []) {
+      map.set(p.id, p.name);
+    }
+    return map;
+  }, [projectsQuery.data]);
+
   const ledgerContractors = useMemo(() => {
     const seen = new Map<string, string>();
     for (const p of payments) {
@@ -234,6 +245,7 @@ export function useAccountingPayments(filters: AccountingFilters) {
     error: wpQuery.error || batchQuery.error || profilesQuery.error || companiesQuery.error,
     profileMap,
     companyMap,
+    projectMap,
     companies: companiesQuery.data ?? [],
     projects: projectsQuery.data ?? [],
     profilesList,
