@@ -44,6 +44,15 @@ const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onS
     <div className="sticky top-0 z-30 bg-card border-b shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
       <span className="text-sm font-medium text-foreground">{count} selected</span>
 
+      <Button
+        size="sm"
+        variant="outline"
+        className="text-xs"
+        onClick={count === allVisibleIds.length ? onDeselectAll : onSelectAll}
+      >
+        {count === allVisibleIds.length ? 'Deselect All' : 'Select All'}
+      </Button>
+
       <Select onValueChange={(v) => applyUpdate({ stage: v }, 'Stage')} disabled={loading}>
         <SelectTrigger className="w-[140px] h-8 text-xs">
           <SelectValue placeholder="Set Stage" />
