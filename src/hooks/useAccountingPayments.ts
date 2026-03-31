@@ -185,6 +185,14 @@ export function useAccountingPayments(filters: AccountingFilters) {
     return map;
   }, [companiesQuery.data]);
 
+  const projectMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of projectsQuery.data ?? []) {
+      map.set(p.id, p.name);
+    }
+    return map;
+  }, [projectsQuery.data]);
+
   const ledgerContractors = useMemo(() => {
     const seen = new Map<string, string>();
     for (const p of payments) {
