@@ -51,6 +51,13 @@ const Accounting = () => {
   const [toDate, setToDate] = useState<Date>(ytdRange().to);
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [contractorFilters, setContractorFilters] = useState<string[]>([]);
+  const [projectFilters, setProjectFilters] = useState<string[]>([]);
+
+  const toggleProject = (id: string) => {
+    setProjectFilters(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const toggleContractor = (id: string) => {
     setContractorFilters(prev =>

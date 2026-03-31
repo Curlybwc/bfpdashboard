@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 export interface AccountingFilters {
   workerIds?: string[]; // array of user IDs, or undefined/empty for all
   companyId?: string; // uuid, "legacy" for null-company rows, or undefined for all
+  projectIds?: string[]; // array of project UUIDs, or undefined/empty for all
   fromDate: string; // YYYY-MM-DD
   toDate: string;   // YYYY-MM-DD
 }
