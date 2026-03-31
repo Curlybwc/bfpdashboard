@@ -1029,6 +1029,18 @@ const ProjectDetail = () => {
                 <CheckSquare className="h-3.5 w-3.5" />
                 {hideDone ? `${doneTaskCount} done hidden` : 'Hide done'}
               </Button>
+              {isManager && (
+                <Button
+                  type="button"
+                  variant={bulkMode ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs gap-1.5"
+                  onClick={() => { if (bulkMode) exitBulkMode(); else setBulkMode(true); }}
+                >
+                  <CheckSquare className="h-3.5 w-3.5" />
+                  {bulkMode ? 'Cancel Select' : 'Select'}
+                </Button>
+              )}
             </div>
             {/* Show active filter badges */}
             {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
