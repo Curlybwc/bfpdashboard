@@ -390,6 +390,18 @@ const Accounting = () => {
                           ? `${format(new Date(p.pay_period_start + 'T00:00:00'), 'M/d')}–${format(new Date(p.pay_period_end + 'T00:00:00'), 'M/d')}`
                           : '—'}
                       </TableCell>
+                      <TableCell className="text-xs">
+                        {p.source_table === 'worker_payments' && ['off_platform_manual', 'venmo_manual', 'manual_quickbooks'].includes(p.payment_source) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => setEditingPayment(p)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
