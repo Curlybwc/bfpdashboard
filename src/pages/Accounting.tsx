@@ -410,6 +410,15 @@ const Accounting = () => {
           </Card>
         )}
       </div>
+
+      <EditHistoricalPaymentDialog
+        payment={editingPayment}
+        profiles={profilesList}
+        companies={companies}
+        projects={projects}
+        onClose={() => setEditingPayment(null)}
+        onSaved={refetch}
+      />
     </div>
   );
 };
