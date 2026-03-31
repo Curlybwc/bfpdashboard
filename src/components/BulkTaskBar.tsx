@@ -49,43 +49,47 @@ const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onS
         className="text-xs"
         onClick={count === allVisibleIds.length ? onDeselectAll : onSelectAll}
       >
-        {count === allVisibleIds.length ? 'Deselect All' : 'Select All'}
+        {count === allVisibleIds.length ? 'Deselect All' : `Select All (${allVisibleIds.length})`}
       </Button>
 
-      <Select onValueChange={(v) => applyUpdate({ stage: v }, 'Stage')} disabled={loading}>
-        <SelectTrigger className="w-[140px] h-8 text-xs">
-          <SelectValue placeholder="Set Stage" />
-        </SelectTrigger>
-        <SelectContent>
-          {TASK_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-        </SelectContent>
-      </Select>
+      {count > 0 && (
+        <>
+          <Select onValueChange={(v) => applyUpdate({ stage: v }, 'Stage')} disabled={loading}>
+            <SelectTrigger className="w-[140px] h-8 text-xs">
+              <SelectValue placeholder="Set Stage" />
+            </SelectTrigger>
+            <SelectContent>
+              {TASK_STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
 
-      <Select onValueChange={(v) => applyUpdate({ priority: v }, 'Priority')} disabled={loading}>
-        <SelectTrigger className="w-[160px] h-8 text-xs">
-          <SelectValue placeholder="Set Priority" />
-        </SelectTrigger>
-        <SelectContent>
-          {TASK_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-        </SelectContent>
-      </Select>
+          <Select onValueChange={(v) => applyUpdate({ priority: v }, 'Priority')} disabled={loading}>
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Set Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              {TASK_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+          </Select>
 
-      <Select onValueChange={(v) => {
-        const assignee = v === '__unassign' ? null : v;
-        applyUpdate({ assigned_to_user_id: assignee }, 'Assignee');
-      }} disabled={loading}>
-        <SelectTrigger className="w-[160px] h-8 text-xs">
-          <SelectValue placeholder="Set Assignee" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__unassign">Unassign</SelectItem>
-          {members.map(m => (
-            <SelectItem key={m.user_id} value={m.user_id}>
-              {m.profiles?.full_name || 'Unnamed'}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <Select onValueChange={(v) => {
+            const assignee = v === '__unassign' ? null : v;
+            applyUpdate({ assigned_to_user_id: assignee }, 'Assignee');
+          }} disabled={loading}>
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Set Assignee" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__unassign">Unassign</SelectItem>
+              {members.map(m => (
+                <SelectItem key={m.user_id} value={m.user_id}>
+                  {m.profiles?.full_name || 'Unnamed'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </>
+      )}
 
       {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
 
