@@ -231,6 +231,14 @@ const Accounting = () => {
                       </Button>
                     )}
                   </div>
+                  <div className="p-2 border-b">
+                    <Input
+                      placeholder="Search contractors…"
+                      value={contractorSearch}
+                      onChange={(e) => setContractorSearch(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
                   <ScrollArea className="max-h-[200px]">
                     <div className="p-1">
                       {profilesList.map((c) => (
