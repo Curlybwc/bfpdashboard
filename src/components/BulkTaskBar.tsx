@@ -73,14 +73,23 @@ const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onS
           </Select>
 
           <Select onValueChange={(v) => {
-            const assignee = v === '__unassign' ? null : v;
-            applyUpdate({ assigned_to_user_id: assignee }, 'Assignee');
+            if (v === '__crew') {
+              applyUpdate({ assignment_mode: 'crew', assigned_to_user_id: null, is_outside_vendor: false }, 'Crew mode');
+            } else if (v === '__outside_vendor') {
+              applyUpdate({ is_outside_vendor: true, assigned_to_user_id: null }, 'Outside Vendor');
+            } else if (v === '__unassign') {
+              applyUpdate({ assigned_to_user_id: null, is_outside_vendor: false, assignment_mode: 'solo' }, 'Assignee');
+            } else {
+              applyUpdate({ assigned_to_user_id: v, is_outside_vendor: false, assignment_mode: 'solo' }, 'Assignee');
+            }
           }} disabled={loading}>
             <SelectTrigger className="w-[160px] h-8 text-xs">
               <SelectValue placeholder="Set Assignee" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__unassign">Unassign</SelectItem>
+              <SelectItem value="__crew">Crew Task</SelectItem>
+              <SelectItem value="__outside_vendor">Outside Vendor</SelectItem>
               {members.map(m => (
                 <SelectItem key={m.user_id} value={m.user_id}>
                   {m.profiles?.full_name || 'Unnamed'}
