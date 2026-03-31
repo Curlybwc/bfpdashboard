@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react'; // force HMR reset
+import { useState, useMemo } from 'react';
 import { format, startOfYear, startOfMonth } from 'date-fns';
-import { CalendarIcon, Check, X } from 'lucide-react';
+import { CalendarIcon, Search, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -52,6 +52,9 @@ const Accounting = () => {
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [contractorFilters, setContractorFilters] = useState<string[]>([]);
   const [projectFilters, setProjectFilters] = useState<string[]>([]);
+  const [contractorSearch, setContractorSearch] = useState('');
+  const [projectSearch, setProjectSearch] = useState('');
+  const [companySearch, setCompanySearch] = useState('');
 
   const toggleProject = (id: string) => {
     setProjectFilters(prev =>
@@ -164,18 +167,52 @@ const Accounting = () => {
 
             {/* Company & Contractor */}
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
-                  <SelectValue placeholder="All Companies" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Companies</SelectItem>
-                  {companies.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.short_name ?? c.name}</SelectItem>
-                  ))}
-                  <SelectItem value="legacy">Legacy / Unassigned</SelectItem>
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs w-[180px] justify-start">
+                    {companyFilter === 'all' ? 'All Companies' : companyFilter === 'legacy' ? 'Legacy / Unassigned' : (companies.find(c => c.id === companyFilter)?.short_name ?? companies.find(c => c.id === companyFilter)?.name ?? 'Company')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <div className="p-2 border-b">
+                    <Input
+                      placeholder="Search companies…"
+                      value={companySearch}
+                      onChange={(e) => setCompanySearch(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <ScrollArea className="max-h-[200px]">
+                    <div className="p-1">
+                      <label
+                        className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer", companyFilter === 'all' && 'bg-accent')}
+                        onClick={() => { setCompanyFilter('all'); setCompanySearch(''); }}
+                      >
+                        All Companies
+                      </label>
+                      {companies
+                        .filter(c => (c.short_name ?? c.name).toLowerCase().includes(companySearch.toLowerCase()))
+                        .map((c) => (
+                        <label
+                          key={c.id}
+                          className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer", companyFilter === c.id && 'bg-accent')}
+                          onClick={() => { setCompanyFilter(c.id); setCompanySearch(''); }}
+                        >
+                          {c.short_name ?? c.name}
+                        </label>
+                      ))}
+                      {'legacy'.includes(companySearch.toLowerCase()) && (
+                        <label
+                          className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer", companyFilter === 'legacy' && 'bg-accent')}
+                          onClick={() => { setCompanyFilter('legacy'); setCompanySearch(''); }}
+                        >
+                          Legacy / Unassigned
+                        </label>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
 
               <Popover>
                 <PopoverTrigger asChild>
@@ -194,9 +231,19 @@ const Accounting = () => {
                       </Button>
                     )}
                   </div>
+                  <div className="p-2 border-b">
+                    <Input
+                      placeholder="Search contractors…"
+                      value={contractorSearch}
+                      onChange={(e) => setContractorSearch(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
                   <ScrollArea className="max-h-[200px]">
                     <div className="p-1">
-                      {profilesList.map((c) => (
+                      {profilesList
+                        .filter(c => c.name.toLowerCase().includes(contractorSearch.toLowerCase()))
+                        .map((c) => (
                         <label
                           key={c.id}
                           className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer"
@@ -231,9 +278,19 @@ const Accounting = () => {
                       </Button>
                     )}
                   </div>
+                  <div className="p-2 border-b">
+                    <Input
+                      placeholder="Search projects…"
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
                   <ScrollArea className="max-h-[200px]">
                     <div className="p-1">
-                      {projects.map((p) => (
+                      {projects
+                        .filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
+                        .map((p) => (
                         <label
                           key={p.id}
                           className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer"
