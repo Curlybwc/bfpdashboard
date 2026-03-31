@@ -299,8 +299,8 @@ const Accounting = () => {
                     <TableHead className="text-xs text-right">Amount</TableHead>
                     <TableHead className="text-xs">Source</TableHead>
                     <TableHead className="text-xs">Company</TableHead>
+                    <TableHead className="text-xs">Project</TableHead>
                     <TableHead className="text-xs">Reference</TableHead>
-                    <TableHead className="text-xs">Memo</TableHead>
                     <TableHead className="text-xs">Period</TableHead>
                   </TableRow>
                 </TableHeader>
