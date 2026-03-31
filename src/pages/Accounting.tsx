@@ -182,7 +182,7 @@ const Accounting = () => {
                       className="h-7 text-xs"
                     />
                   </div>
-                  <ScrollArea className="max-h-[300px]">
+                  <div className="max-h-[300px] overflow-y-auto">
                     <div className="p-1">
                       <label
                         className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer", companyFilter === 'all' && 'bg-accent')}
@@ -210,7 +210,7 @@ const Accounting = () => {
                         </label>
                       )}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </PopoverContent>
               </Popover>
 
@@ -239,7 +239,7 @@ const Accounting = () => {
                       className="h-7 text-xs"
                     />
                   </div>
-                  <ScrollArea className="max-h-[300px]">
+                  <div className="max-h-[300px] overflow-y-auto">
                     <div className="p-1">
                       {profilesList
                         .filter(c => c.name.toLowerCase().includes(contractorSearch.toLowerCase()))
@@ -257,7 +257,7 @@ const Accounting = () => {
                         </label>
                       ))}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </PopoverContent>
               </Popover>
 
@@ -286,7 +286,7 @@ const Accounting = () => {
                       className="h-7 text-xs"
                     />
                   </div>
-                  <ScrollArea className="max-h-[300px]">
+                  <div className="max-h-[300px] overflow-y-auto">
                     <div className="p-1">
                       {projects
                         .filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
@@ -304,7 +304,7 @@ const Accounting = () => {
                         </label>
                       ))}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
