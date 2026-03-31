@@ -57,6 +57,7 @@ const Accounting = () => {
   const [contractorSearch, setContractorSearch] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
   const [companySearch, setCompanySearch] = useState('');
+  const [editingPayment, setEditingPayment] = useState<AccountingPayment | null>(null);
 
   const toggleProject = (id: string) => {
     setProjectFilters(prev =>
