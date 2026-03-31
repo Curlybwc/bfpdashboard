@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { format, startOfYear, startOfMonth } from 'date-fns';
-import { CalendarIcon, Search, X } from 'lucide-react';
+import { CalendarIcon, Search, X, Pencil } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
