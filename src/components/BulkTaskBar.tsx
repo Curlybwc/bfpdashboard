@@ -8,12 +8,15 @@ import { X, Loader2 } from 'lucide-react';
 
 interface BulkTaskBarProps {
   selectedIds: Set<string>;
+  allVisibleIds: string[];
   members: { user_id: string; profiles?: { full_name: string | null } | null }[];
   onClear: () => void;
   onDone: () => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
 }
 
-const BulkTaskBar = ({ selectedIds, members, onClear, onDone }: BulkTaskBarProps) => {
+const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onSelectAll, onDeselectAll }: BulkTaskBarProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
@@ -40,6 +43,15 @@ const BulkTaskBar = ({ selectedIds, members, onClear, onDone }: BulkTaskBarProps
   return (
     <div className="sticky top-0 z-30 bg-card border-b shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
       <span className="text-sm font-medium text-foreground">{count} selected</span>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className="text-xs"
+        onClick={count === allVisibleIds.length ? onDeselectAll : onSelectAll}
+      >
+        {count === allVisibleIds.length ? 'Deselect All' : 'Select All'}
+      </Button>
 
       <Select onValueChange={(v) => applyUpdate({ stage: v }, 'Stage')} disabled={loading}>
         <SelectTrigger className="w-[140px] h-8 text-xs">
