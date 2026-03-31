@@ -246,6 +246,8 @@ const Accounting = () => {
                         .map((c) => (
                         <label
                           key={c.id}
+                          className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer"
+                        >
                           <Checkbox
                             checked={contractorFilters.includes(c.id)}
                             onCheckedChange={() => toggleContractor(c.id)}
