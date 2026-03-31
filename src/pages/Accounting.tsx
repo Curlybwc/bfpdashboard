@@ -167,18 +167,52 @@ const Accounting = () => {
 
             {/* Company & Contractor */}
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                <SelectTrigger className="w-[180px] h-8 text-xs">
-                  <SelectValue placeholder="All Companies" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Companies</SelectItem>
-                  {companies.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.short_name ?? c.name}</SelectItem>
-                  ))}
-                  <SelectItem value="legacy">Legacy / Unassigned</SelectItem>
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs w-[180px] justify-start">
+                    {companyFilter === 'all' ? 'All Companies' : companyFilter === 'legacy' ? 'Legacy / Unassigned' : (companies.find(c => c.id === companyFilter)?.short_name ?? companies.find(c => c.id === companyFilter)?.name ?? 'Company')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <div className="p-2 border-b">
+                    <Input
+                      placeholder="Search companies…"
+                      value={companySearch}
+                      onChange={(e) => setCompanySearch(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <ScrollArea className="max-h-[200px]">
+                    <div className="p-1">
+                      <label
+                        className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer", companyFilter === 'all' && 'bg-accent')}
+                        onClick={() => { setCompanyFilter('all'); setCompanySearch(''); }}
+                      >
+                        All Companies
+                      </label>
+                      {companies
+                        .filter(c => (c.short_name ?? c.name).toLowerCase().includes(companySearch.toLowerCase()))
+                        .map((c) => (
+                        <label
+                          key={c.id}
+                          className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer", companyFilter === c.id && 'bg-accent')}
+                          onClick={() => { setCompanyFilter(c.id); setCompanySearch(''); }}
+                        >
+                          {c.short_name ?? c.name}
+                        </label>
+                      ))}
+                      {'legacy'.includes(companySearch.toLowerCase()) && (
+                        <label
+                          className={cn("flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer", companyFilter === 'legacy' && 'bg-accent')}
+                          onClick={() => { setCompanyFilter('legacy'); setCompanySearch(''); }}
+                        >
+                          Legacy / Unassigned
+                        </label>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
 
               <Popover>
                 <PopoverTrigger asChild>
