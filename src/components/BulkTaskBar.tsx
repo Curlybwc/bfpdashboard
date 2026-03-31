@@ -16,7 +16,7 @@ interface BulkTaskBarProps {
   onDeselectAll: () => void;
 }
 
-const BulkTaskBar = ({ selectedIds, members, onClear, onDone }: BulkTaskBarProps) => {
+const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onSelectAll, onDeselectAll }: BulkTaskBarProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
