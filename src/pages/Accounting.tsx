@@ -74,7 +74,7 @@ const Accounting = () => {
   }), [fromDate, toDate, companyFilter, contractorFilters, projectFilters]);
 
   const {
-    payments, loading, profileMap, companyMap, companies, projects,
+    payments, loading, profileMap, companyMap, projectMap, companies, projects,
     profilesList, ledgerContractors, totalPaid, contractorTotals, refetch,
   } = useAccountingPayments(filters);
 
