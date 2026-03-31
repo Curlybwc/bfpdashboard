@@ -250,6 +250,7 @@ const Accounting = () => {
                   </ScrollArea>
                 </PopoverContent>
               </Popover>
+            </div>
           </CardContent>
         </Card>
 
