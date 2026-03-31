@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { format, startOfYear, startOfMonth } from 'date-fns';
-import { CalendarIcon, Search, X } from 'lucide-react';
+import { CalendarIcon, Search, X, Pencil } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { useAccountingPayments } from '@/hooks/useAccountingPayments';
 import AddHistoricalPaymentDialog from '@/components/accounting/AddHistoricalPaymentDialog';
+import EditHistoricalPaymentDialog from '@/components/accounting/EditHistoricalPaymentDialog';
+import type { AccountingPayment } from '@/hooks/useAccountingPayments';
 
 type DatePreset = 'ytd' | 'month' | 'custom';
 
@@ -55,6 +57,7 @@ const Accounting = () => {
   const [contractorSearch, setContractorSearch] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
   const [companySearch, setCompanySearch] = useState('');
+  const [editingPayment, setEditingPayment] = useState<AccountingPayment | null>(null);
 
   const toggleProject = (id: string) => {
     setProjectFilters(prev =>
@@ -359,6 +362,7 @@ const Accounting = () => {
                     <TableHead className="text-xs">Project</TableHead>
                     <TableHead className="text-xs">Reference</TableHead>
                     <TableHead className="text-xs">Period</TableHead>
+                    <TableHead className="text-xs w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -386,6 +390,18 @@ const Accounting = () => {
                           ? `${format(new Date(p.pay_period_start + 'T00:00:00'), 'M/d')}–${format(new Date(p.pay_period_end + 'T00:00:00'), 'M/d')}`
                           : '—'}
                       </TableCell>
+                      <TableCell className="text-xs">
+                        {p.source_table === 'worker_payments' && ['off_platform_manual', 'venmo_manual', 'manual_quickbooks'].includes(p.payment_source) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => setEditingPayment(p)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -394,6 +410,15 @@ const Accounting = () => {
           </Card>
         )}
       </div>
+
+      <EditHistoricalPaymentDialog
+        payment={editingPayment}
+        profiles={profilesList}
+        companies={companies}
+        projects={projects}
+        onClose={() => setEditingPayment(null)}
+        onSaved={refetch}
+      />
     </div>
   );
 };
