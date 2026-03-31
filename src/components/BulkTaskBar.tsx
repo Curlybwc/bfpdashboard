@@ -21,7 +21,6 @@ const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onS
   const [loading, setLoading] = useState(false);
 
   const count = selectedIds.size;
-  if (count === 0) return null;
 
   const ids = [...selectedIds];
 
