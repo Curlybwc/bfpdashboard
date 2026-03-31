@@ -278,9 +278,19 @@ const Accounting = () => {
                       </Button>
                     )}
                   </div>
+                  <div className="p-2 border-b">
+                    <Input
+                      placeholder="Search projects…"
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
                   <ScrollArea className="max-h-[200px]">
                     <div className="p-1">
-                      {projects.map((p) => (
+                      {projects
+                        .filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
+                        .map((p) => (
                         <label
                           key={p.id}
                           className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-accent cursor-pointer"
