@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.upsert_shift_with_allocations(uuid, uuid, uuid, date, time, time, numeric, jsonb, boolean);
