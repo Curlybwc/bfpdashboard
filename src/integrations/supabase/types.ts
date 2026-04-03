@@ -2615,37 +2615,22 @@ export type Database = {
         }
         Returns: Json
       }
-      upsert_shift_with_allocations:
-        | {
-            Args: {
-              p_allocations?: Json
-              p_end_time?: string
-              p_is_admin_edit?: boolean
-              p_project_id?: string
-              p_shift_date?: string
-              p_shift_id?: string
-              p_start_time?: string
-              p_total_hours?: number
-              p_user_id?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_allocations?: Json
-              p_end_time?: string
-              p_flat_rate_amount?: number
-              p_is_admin_edit?: boolean
-              p_is_flat_rate?: boolean
-              p_project_id?: string
-              p_shift_date?: string
-              p_shift_id?: string
-              p_start_time?: string
-              p_total_hours?: number
-              p_user_id?: string
-            }
-            Returns: Json
-          }
+      upsert_shift_with_allocations: {
+        Args: {
+          p_allocations?: Json
+          p_end_time?: string
+          p_flat_rate_amount?: number
+          p_is_admin_edit?: boolean
+          p_is_flat_rate?: boolean
+          p_project_id?: string
+          p_shift_date?: string
+          p_shift_id?: string
+          p_start_time?: string
+          p_total_hours?: number
+          p_user_id?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       blocker_reason:
