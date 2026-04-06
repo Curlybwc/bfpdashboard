@@ -1397,6 +1397,7 @@ const TaskDetail = () => {
             {canEditTaskMetadata && (
               <div className="flex gap-2 pt-1">
                 <Input
+                  id="subtask-input"
                   placeholder="Add subtask…"
                   value={newSubtaskTitle}
                   onChange={(e) => setNewSubtaskTitle(e.target.value)}

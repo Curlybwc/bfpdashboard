@@ -87,6 +87,12 @@ const RecipeBuilderSheet = ({
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-6 px-6 py-2 border-b flex items-center justify-between">
         <span className="text-sm font-medium truncate">{name || 'Recipe'}</span>
         <div className="flex gap-2 shrink-0">
+          <Button size="sm" variant="outline" onClick={() => {
+            const el = document.getElementById('recipe-step-input');
+            if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => el.focus(), 400); }
+          }}>
+            <Plus className="h-3.5 w-3.5 mr-1" />Step
+          </Button>
           <Button size="sm" onClick={handleSave}>Save Recipe</Button>
           <Button variant="destructive" size="sm" onClick={handleDelete}>
             <Trash2 className="h-3.5 w-3.5" />
