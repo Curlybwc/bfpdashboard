@@ -1230,10 +1230,8 @@ const ProjectDetail = () => {
                 </div>
               )
             )
-                  const packageKey = `pkg:${group.packageTask.id}`;
-                  const open = isGeneral || expandedIds.has(packageKey);
 
-                  if (isGeneral) {
+
                     // Render general tasks flat — no collapsible wrapper
                     return (
                       <div key="general-package" className="space-y-2">
