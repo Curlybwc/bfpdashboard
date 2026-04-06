@@ -158,16 +158,36 @@ const TaskCard = ({
             )}
           </Link>
 
-          {canDelete && (
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirmOpen(true); }}
-              className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              aria-label="Delete task"
-              disabled={loading}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
+          <div className="flex items-center gap-0.5 shrink-0">
+            {onToggleCollapse && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleCollapse(); }}
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label={isCollapsed ? 'Expand card' : 'Minimize card'}
+              >
+                {isCollapsed ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            {onMute && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMute(); }}
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label="Mute task"
+              >
+                <VolumeX className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirmOpen(true); }}
+                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                aria-label="Delete task"
+                disabled={loading}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Info badges row */}
