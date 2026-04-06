@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw } from 'lucide-react';
+import { Trash2, RefreshCw, Plus } from 'lucide-react';
 import RecipeMetaEditor from './RecipeMetaEditor';
 import RecipeStepsEditor from './RecipeStepsEditor';
 import SyncToLibraryDialog from '@/components/SyncToLibraryDialog';
