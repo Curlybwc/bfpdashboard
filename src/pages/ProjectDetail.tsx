@@ -1276,7 +1276,7 @@ const ProjectDetail = () => {
               </div>
             )}
           </>
-                        {bulkMode ? (
+        )
                           group.childTasks.map((task) => (
                             <div key={task.id} className="flex items-start gap-2">
                               <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
