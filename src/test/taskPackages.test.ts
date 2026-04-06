@@ -19,7 +19,7 @@ describe('buildTaskPackageGroups', () => {
     const kitchen = groups.find((g) => g.packageTask.id === 'pkg-1');
     expect(kitchen?.isStandalone).toBe(false);
     expect(kitchen?.summary.total).toBe(2);
-    expect(kitchen?.summary.byStatus.in_progress).toBe(1);
+    expect(kitchen?.summary.byStatus.blocked).toBe(1); // task-2 has materials needed but not on site
     expect(kitchen?.summary.materialsNeeded).toBe(1);
   });
 });
