@@ -39,6 +39,9 @@ interface TaskCardProps {
   canReportIssue?: boolean;
   canDelete?: boolean;
   allProfiles?: { id: string; full_name: string | null }[];
+  onMute?: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const TaskCard = ({
