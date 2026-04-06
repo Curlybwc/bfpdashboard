@@ -1386,6 +1386,7 @@ const TaskDetail = () => {
                       isChild
                       parentTitle={task.task}
                       assigneeName={assigneeName}
+                      isCrewTask={c.assignment_mode === 'crew'}
                       canReportIssue={projectRole === 'contractor'}
                       canDelete={canDelete}
                       allProfiles={projectMembers.map(m => ({ id: m.user_id, full_name: m.profiles?.full_name || null }))}
