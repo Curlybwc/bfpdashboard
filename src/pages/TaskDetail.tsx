@@ -34,6 +34,7 @@ import TaskLifecycleActions from '@/components/task-detail/TaskLifecycleActions'
 import SubtaskRow from '@/components/task-detail/SubtaskRow';
 import TaskCard from '@/components/TaskCard';
 import VariantManager from '@/components/recipe/VariantManager';
+import { SortableTaskList, SortableTaskItem, persistTaskOrder } from '@/components/SortableTaskList';
 import { useRecipeVariants } from '@/hooks/useRecipeVariants';
 
 const TaskDetail = () => {
