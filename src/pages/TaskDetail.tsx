@@ -853,7 +853,7 @@ const TaskDetail = () => {
 
       {/* Sticky save bar */}
       {canEditTaskMetadata && (
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b px-4 py-2 flex items-center justify-between">
+        <div className="sticky top-[53px] z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b px-4 py-2 flex items-center justify-between">
           <span className="text-sm text-muted-foreground truncate">{taskText || 'Task Detail'}</span>
           <Button size="sm" onClick={() => handleSave()} disabled={saving} className="shrink-0">
             <Save className="h-3.5 w-3.5 mr-1" />
