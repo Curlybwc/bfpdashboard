@@ -76,6 +76,44 @@ const Today = () => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const prefs = useTodayPreferences();
 
+  const restoreScrollPosition = useCallback((scrollY: number) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollY });
+      });
+    });
+  }, []);
+
+  const preserveScroll = useCallback(async (action: () => void | Promise<void>) => {
+    const scrollY = window.scrollY;
+    await action();
+    restoreScrollPosition(scrollY);
+  }, [restoreScrollPosition]);
+
+  const handleTaskUpdate = useCallback(() => {
+    void preserveScroll(refresh);
+  }, [preserveScroll, refresh]);
+
+  const handleMuteTask = useCallback((taskId: string) => {
+    void preserveScroll(() => prefs.muteTask(taskId));
+  }, [preserveScroll, prefs]);
+
+  const handleUnmuteTask = useCallback((taskId: string) => {
+    void preserveScroll(() => prefs.unmuteTask(taskId));
+  }, [preserveScroll, prefs]);
+
+  const handleToggleSection = useCallback((sectionKey: string) => {
+    void preserveScroll(() => prefs.toggleSection(sectionKey));
+  }, [preserveScroll, prefs]);
+
+  const handleToggleCard = useCallback((taskId: string) => {
+    void preserveScroll(() => prefs.toggleCard(taskId));
+  }, [preserveScroll, prefs]);
+
+  const handleUnmuteAll = useCallback(() => {
+    void preserveScroll(() => prefs.unmuteAll());
+  }, [preserveScroll, prefs]);
+
   const {
     inProgress, assigned, available, needsReview, blocked,
     projectMap, parentTitles, assigneeMap, blockerMap,
@@ -173,7 +211,7 @@ const Today = () => {
           assigneeName={t.assigned_to_user_id && t.assigned_to_user_id !== user!.id ? assigneeMap[t.assigned_to_user_id] : undefined}
           userId={user!.id}
           isAdmin={isAdmin}
-          onUpdate={refresh}
+          onUpdate={handleTaskUpdate}
           parentTitle={t.parent_task_id ? parentTitles[t.parent_task_id] : undefined}
           context="today"
           childCount={children.length}
@@ -190,9 +228,9 @@ const Today = () => {
           canReportIssue={isContractor}
           canDelete={isAdmin || isManager}
           allProfiles={allProfiles}
-          onMute={() => prefs.muteTask(t.id)}
+          onMute={() => handleMuteTask(t.id)}
           isCollapsed={prefs.collapsedCards.has(t.id)}
-          onToggleCollapse={() => prefs.toggleCard(t.id)}
+          onToggleCollapse={() => handleToggleCard(t.id)}
         />
 
         {isExpanded && children.map((child: any) => (
@@ -204,7 +242,7 @@ const Today = () => {
             assigneeName={child.assigned_to_user_id && child.assigned_to_user_id !== user!.id ? assigneeMap[child.assigned_to_user_id] : undefined}
             userId={user!.id}
             isAdmin={isAdmin}
-            onUpdate={refresh}
+            onUpdate={handleTaskUpdate}
             parentTitle={t.task}
             context="today"
             isChild
@@ -218,9 +256,9 @@ const Today = () => {
             canReportIssue={isContractor}
             canDelete={isAdmin || isManager}
             allProfiles={allProfiles}
-            onMute={() => prefs.muteTask(child.id)}
+            onMute={() => handleMuteTask(child.id)}
             isCollapsed={prefs.collapsedCards.has(child.id)}
-            onToggleCollapse={() => prefs.toggleCard(child.id)}
+            onToggleCollapse={() => handleToggleCard(child.id)}
           />
         ))}
       </div>
@@ -238,7 +276,7 @@ const Today = () => {
     return (
       <div className="mb-6">
         <button
-          onClick={() => prefs.toggleSection(sectionKey)}
+          onClick={() => handleToggleSection(sectionKey)}
           className={cn(
             "flex items-center gap-1 text-sm font-semibold uppercase tracking-wide mb-2 hover:opacity-80 transition-opacity",
             isBlockedSection ? "text-destructive" : "text-muted-foreground"
@@ -277,13 +315,13 @@ const Today = () => {
       <div className="mb-6 mt-8 border-t pt-4">
         <div className="flex items-center justify-between mb-2">
           <button
-            onClick={() => prefs.toggleSection('muted')}
+            onClick={() => handleToggleSection('muted')}
             className="flex items-center gap-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:opacity-80 transition-opacity"
           >
             {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             Muted ({allMutedTasks.length})
           </button>
-          <Button size="sm" variant="ghost" onClick={prefs.unmuteAll} className="text-xs h-7">
+          <Button size="sm" variant="ghost" onClick={handleUnmuteAll} className="text-xs h-7">
             <Volume2 className="h-3 w-3 mr-1" /> Unmute All
           </Button>
         </div>
@@ -300,7 +338,7 @@ const Today = () => {
                     assigneeName={t.assigned_to_user_id && t.assigned_to_user_id !== user!.id ? assigneeMap[t.assigned_to_user_id] : undefined}
                     userId={user!.id}
                     isAdmin={isAdmin}
-                    onUpdate={refresh}
+                    onUpdate={handleTaskUpdate}
                     context="today"
                     isCrewTask={t.assignment_mode === 'crew'}
                     isActiveWorker={crewActiveTaskIds.has(t.id)}
@@ -313,7 +351,7 @@ const Today = () => {
                     canDelete={isAdmin || isManager}
                     allProfiles={allProfiles}
                     isCollapsed={true}
-                    onToggleCollapse={() => prefs.unmuteTask(t.id)}
+                    onToggleCollapse={() => handleUnmuteTask(t.id)}
                   />
                 </div>
               </div>
