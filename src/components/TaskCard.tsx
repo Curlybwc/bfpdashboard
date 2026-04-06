@@ -170,7 +170,13 @@ const TaskCard = ({
             )}
             {onMute && (
               <button
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMute(); }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const scrollY = window.scrollY;
+                  onMute();
+                  requestAnimationFrame(() => { window.scrollTo(0, scrollY); });
+                }}
                 className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 aria-label="Mute task"
               >
