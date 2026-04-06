@@ -852,14 +852,22 @@ const TaskDetail = () => {
     <div className="pb-20">
       <PageHeader title="Task Detail" backTo={`/projects/${projectId}`} />
 
-      {/* Sticky save bar */}
+       {/* Sticky save bar */}
       {canEditTaskMetadata && (
         <div className="sticky top-[53px] z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b px-4 py-2 flex items-center justify-between">
           <span className="text-sm text-muted-foreground truncate">{taskText || 'Task Detail'}</span>
-          <Button size="sm" onClick={() => handleSave()} disabled={saving} className="shrink-0">
-            <Save className="h-3.5 w-3.5 mr-1" />
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={() => {
+              const el = document.getElementById('subtask-input');
+              if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => el.focus(), 400); }
+            }}>
+              <Plus className="h-3.5 w-3.5 mr-1" />Task
+            </Button>
+            <Button size="sm" onClick={() => handleSave()} disabled={saving}>
+              <Save className="h-3.5 w-3.5 mr-1" />
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
         </div>
       )}
 
