@@ -34,6 +34,7 @@ import TaskLifecycleActions from '@/components/task-detail/TaskLifecycleActions'
 import SubtaskRow from '@/components/task-detail/SubtaskRow';
 import TaskCard from '@/components/TaskCard';
 import VariantManager from '@/components/recipe/VariantManager';
+import { SortableTaskList, SortableTaskItem, persistTaskOrder } from '@/components/SortableTaskList';
 import { useRecipeVariants } from '@/hooks/useRecipeVariants';
 
 const TaskDetail = () => {
@@ -1350,28 +1351,41 @@ const TaskDetail = () => {
             {!hasChildren && (
               <p className="text-xs text-muted-foreground">No subtasks yet. Saving now creates a 1-step reusable task template from this task + materials.</p>
             )}
-            {children.map(c => {
-              const assigneeName = c.assigned_to_user_id
-                ? projectMembers.find(m => m.user_id === c.assigned_to_user_id)?.profiles?.full_name || undefined
-                : undefined;
-              return (
-                <TaskCard
-                  key={c.id}
-                  task={c}
-                  projectName=""
-                  userId={user?.id ?? ''}
-                  isAdmin={isAdmin}
-                  onUpdate={() => { fetchChildren(); fetchTask(); }}
-                  showProjectName={false}
-                  isChild
-                  parentTitle={task.task}
-                  assigneeName={assigneeName}
-                  canReportIssue={projectRole === 'contractor'}
-                  canDelete={canDelete}
-                  allProfiles={projectMembers.map(m => ({ id: m.user_id, full_name: m.profiles?.full_name || null }))}
-                />
-              );
-            })}
+            <SortableTaskList
+              items={children}
+              onReorder={async (reorderedIds) => {
+                const result = await persistTaskOrder(reorderedIds);
+                if (result.error) {
+                  toast({ title: 'Reorder failed', description: result.error, variant: 'destructive' });
+                } else {
+                  fetchChildren();
+                }
+              }}
+            >
+              {(c) => {
+                const assigneeName = c.assigned_to_user_id
+                  ? projectMembers.find(m => m.user_id === c.assigned_to_user_id)?.profiles?.full_name || undefined
+                  : undefined;
+                return (
+                  <SortableTaskItem key={c.id} id={c.id}>
+                    <TaskCard
+                      task={c}
+                      projectName=""
+                      userId={user?.id ?? ''}
+                      isAdmin={isAdmin}
+                      onUpdate={() => { fetchChildren(); fetchTask(); }}
+                      showProjectName={false}
+                      isChild
+                      parentTitle={task.task}
+                      assigneeName={assigneeName}
+                      canReportIssue={projectRole === 'contractor'}
+                      canDelete={canDelete}
+                      allProfiles={projectMembers.map(m => ({ id: m.user_id, full_name: m.profiles?.full_name || null }))}
+                    />
+                  </SortableTaskItem>
+                );
+              }}
+            </SortableTaskList>
             {canEditTaskMetadata && (
               <div className="flex gap-2 pt-1">
                 <Input
