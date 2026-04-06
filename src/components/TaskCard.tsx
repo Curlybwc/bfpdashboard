@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, ChevronDown, Users, Repeat, AlertTriangle, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Users, Repeat, AlertTriangle, Trash2, VolumeX, Minimize2, Maximize2 } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import TaskQuickActions from '@/components/task-card/TaskQuickActions';
 import { BLOCKER_REASONS } from '@/lib/supabase-types';
@@ -39,6 +39,9 @@ interface TaskCardProps {
   canReportIssue?: boolean;
   canDelete?: boolean;
   allProfiles?: { id: string; full_name: string | null }[];
+  onMute?: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const TaskCard = ({
@@ -50,6 +53,9 @@ const TaskCard = ({
   blockerInfo, photoCount = 0, materialCount = 0, canReportIssue = false,
   canDelete = false,
   allProfiles,
+  onMute,
+  isCollapsed = false,
+  onToggleCollapse,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -152,76 +158,100 @@ const TaskCard = ({
             )}
           </Link>
 
-          {canDelete && (
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirmOpen(true); }}
-              className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              aria-label="Delete task"
-              disabled={loading}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Info badges row */}
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {isCrewTask && (
-            <Badge variant="secondary" className="text-xs flex items-center gap-1">
-              <Users className="h-3 w-3" />
-              {activeWorkerCount} active
-            </Badge>
-          )}
-          {task.is_recurring && task.recurrence_frequency && (
-            <Badge variant="secondary" className="text-xs flex items-center gap-1">
-              <Repeat className="h-3 w-3" />
-              {task.recurrence_frequency === 'weekly' ? 'Weekly' : task.recurrence_frequency === 'monthly' ? 'Monthly' : 'Yearly'}
-            </Badge>
-          )}
-          {showNeedsMaterials && (
-            <Badge variant="outline" className="text-xs border-warning text-warning">
-              Needs Materials
-            </Badge>
-          )}
-          {task.stage !== 'Done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10) && (
-            <Badge variant="destructive" className="text-xs">Overdue</Badge>
-          )}
-        </div>
-
-        {/* Blocker info */}
-        {task.is_blocked && blockerInfo && (
-          <div className="mt-1 px-2 py-1 bg-destructive/5 rounded text-xs text-destructive">
-            <span className="font-medium">{BLOCKER_REASONS.find(r => r.value === blockerInfo.reason)?.label || blockerInfo.reason}</span>
-            {blockerInfo.needs_from_manager && (
-              <span className="text-muted-foreground ml-1">— {blockerInfo.needs_from_manager.slice(0, 60)}{blockerInfo.needs_from_manager.length > 60 ? '…' : ''}</span>
+          <div className="flex items-center gap-0.5 shrink-0">
+            {onToggleCollapse && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleCollapse(); }}
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label={isCollapsed ? 'Expand card' : 'Minimize card'}
+              >
+                {isCollapsed ? <Maximize2 className="h-3.5 w-3.5" /> : <Minimize2 className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            {onMute && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMute(); }}
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                aria-label="Mute task"
+              >
+                <VolumeX className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirmOpen(true); }}
+                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                aria-label="Delete task"
+                disabled={loading}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             )}
           </div>
-        )}
-
-        {/* Unified action pill row */}
-        <div className="mt-2" onClick={(e) => { e.stopPropagation(); }} onPointerDown={(e) => { e.stopPropagation(); }}>
-          <TaskQuickActions
-            task={task}
-            userId={userId}
-            isAdmin={isAdmin}
-            onUpdate={onUpdate}
-            allProfiles={allProfiles}
-            assigneeName={assigneeName}
-            photoCount={photoCount}
-            materialCount={materialCount}
-            operationalStatus={operationalStatus}
-            isCrewTask={isCrewTask}
-            isActiveWorker={isActiveWorker}
-            isCandidate={isCandidate}
-            hasChildren={hasChildren}
-            allChildrenDone={allChildrenDone}
-            materialsReady={materialsReady}
-            onMaterialsOpen={() => setMaterialsOpen(true)}
-            onPhotoConfirm={() => setPhotoConfirmOpen(true)}
-            canReportIssue={canReportIssue}
-            canReassign={isAdmin || canDelete}
-          />
         </div>
+
+        {!isCollapsed && (
+          <>
+            {/* Info badges row */}
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {isCrewTask && (
+                <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  {activeWorkerCount} active
+                </Badge>
+              )}
+              {task.is_recurring && task.recurrence_frequency && (
+                <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                  <Repeat className="h-3 w-3" />
+                  {task.recurrence_frequency === 'weekly' ? 'Weekly' : task.recurrence_frequency === 'monthly' ? 'Monthly' : 'Yearly'}
+                </Badge>
+              )}
+              {showNeedsMaterials && (
+                <Badge variant="outline" className="text-xs border-warning text-warning">
+                  Needs Materials
+                </Badge>
+              )}
+              {task.stage !== 'Done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10) && (
+                <Badge variant="destructive" className="text-xs">Overdue</Badge>
+              )}
+            </div>
+
+            {/* Blocker info */}
+            {task.is_blocked && blockerInfo && (
+              <div className="mt-1 px-2 py-1 bg-destructive/5 rounded text-xs text-destructive">
+                <span className="font-medium">{BLOCKER_REASONS.find(r => r.value === blockerInfo.reason)?.label || blockerInfo.reason}</span>
+                {blockerInfo.needs_from_manager && (
+                  <span className="text-muted-foreground ml-1">— {blockerInfo.needs_from_manager.slice(0, 60)}{blockerInfo.needs_from_manager.length > 60 ? '…' : ''}</span>
+                )}
+              </div>
+            )}
+
+            {/* Unified action pill row */}
+            <div className="mt-2" onClick={(e) => { e.stopPropagation(); }} onPointerDown={(e) => { e.stopPropagation(); }}>
+              <TaskQuickActions
+                task={task}
+                userId={userId}
+                isAdmin={isAdmin}
+                onUpdate={onUpdate}
+                allProfiles={allProfiles}
+                assigneeName={assigneeName}
+                photoCount={photoCount}
+                materialCount={materialCount}
+                operationalStatus={operationalStatus}
+                isCrewTask={isCrewTask}
+                isActiveWorker={isActiveWorker}
+                isCandidate={isCandidate}
+                hasChildren={hasChildren}
+                allChildrenDone={allChildrenDone}
+                materialsReady={materialsReady}
+                onMaterialsOpen={() => setMaterialsOpen(true)}
+                onPhotoConfirm={() => setPhotoConfirmOpen(true)}
+                canReportIssue={canReportIssue}
+                canReassign={isAdmin || canDelete}
+              />
+            </div>
+          </>
+        )}
       </Card>
 
       <TaskMaterialsSheet
