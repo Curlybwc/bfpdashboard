@@ -261,11 +261,14 @@ const ProjectDetail = () => {
 
   const packageGroups = useMemo(() => buildTaskPackageGroups(filteredTasksWithParents, materialCountMap), [filteredTasksWithParents, materialCountMap]);
 
+  const isGroupDone = (group: typeof packageGroups[0]) =>
+    group.summary.total > 0 && group.summary.byStatus.done === group.summary.total;
+
   const activePackageGroups = useMemo(
     () => {
-      const groups = packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total));
+      const groups = packageGroups.filter((group) => !isGroupDone(group));
       if (!hideDone) return groups;
-      return groups.map((group) => ({
+      return groups.map((group) => group.isStandalone ? group : ({
         ...group,
         childTasks: group.childTasks.filter((t) => getTaskOperationalStatus(t) !== 'done'),
       }));
@@ -274,16 +277,15 @@ const ProjectDetail = () => {
   );
 
   const completedPackageGroups = useMemo(
-    () => packageGroups.filter((group) => group.summary.total > 0 && group.summary.byStatus.done === group.summary.total),
+    () => packageGroups.filter((group) => isGroupDone(group)),
     [packageGroups],
   );
 
   const doneTaskCount = useMemo(() => {
     let count = completedPackageGroups.reduce((sum, group) => sum + group.summary.total, 0);
     if (hideDone) {
-      // Also count done tasks hidden from active groups
-      const activeGroups = packageGroups.filter((group) => !(group.summary.total > 0 && group.summary.byStatus.done === group.summary.total));
-      count += activeGroups.reduce((sum, group) => sum + group.childTasks.filter((t) => getTaskOperationalStatus(t) === 'done').length, 0);
+      const activeGroups = packageGroups.filter((group) => !isGroupDone(group));
+      count += activeGroups.reduce((sum, group) => group.isStandalone ? sum : sum + group.childTasks.filter((t) => getTaskOperationalStatus(t) === 'done').length, 0);
     }
     return count;
   }, [completedPackageGroups, packageGroups, hideDone]);
@@ -1088,116 +1090,145 @@ const ProjectDetail = () => {
         ) : (
           <>
             {activePackageGroups.length > 0 && (
-              <div className="space-y-4">
-                {activePackageGroups.map((group) => {
-                  const isGeneral = group.packageTask.id === 'general-package';
-                  const packageKey = `pkg:${group.packageTask.id}`;
-                  const open = isGeneral || expandedIds.has(packageKey);
-
-                  if (isGeneral) {
-                    // Render general tasks flat — no collapsible wrapper
-                    return (
-                      <div key="general-package" className="space-y-2">
-                        {bulkMode ? (
-                          group.childTasks.map((task) => (
-                            <div key={task.id} className="flex items-start gap-2">
+              isManager ? (
+                <SortableTaskList
+                  items={activePackageGroups.map(g => ({ ...g.packageTask, _group: g }))}
+                  onReorder={async (orderedIds) => {
+                    const { error } = await persistTaskOrder(orderedIds);
+                    if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
+                    else invalidateProject();
+                  }}
+                >
+                  {(item) => {
+                    const group = item._group as typeof activePackageGroups[0];
+                    if (group.isStandalone) {
+                      const task = group.packageTask;
+                      return (
+                        <SortableTaskItem key={task.id} id={task.id}>
+                          {bulkMode ? (
+                            <div className="flex items-start gap-2">
                               <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                               </div>
                             </div>
-                          ))
-                        ) : isManager ? (
-                          <SortableTaskList
-                            items={group.childTasks}
-                            onReorder={async (orderedIds) => {
-                              const { error } = await persistTaskOrder(orderedIds);
-                              if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
-                              else invalidateProject();
-                            }}
-                          >
-                            {(task) => (
-                              <SortableTaskItem key={task.id} id={task.id}>
-                                <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
-                              </SortableTaskItem>
+                          ) : (
+                            <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                          )}
+                        </SortableTaskItem>
+                      );
+                    }
+
+                    const packageKey = `pkg:${group.packageTask.id}`;
+                    const open = expandedIds.has(packageKey);
+                    return (
+                      <SortableTaskItem key={group.packageTask.id} id={group.packageTask.id}>
+                        <div className="rounded-lg border">
+                          <div className="flex items-center">
+                            <button className="shrink-0 p-3 pr-0" onClick={() => toggleExpanded(packageKey)}>
+                              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                            <Link to={`/projects/${project.id}/tasks/${group.packageTask.id}`} className="flex-1 min-w-0 p-3 pl-2">
+                              <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                              {(group.packageTask.room_area || group.packageTask.trade) && (
+                                <p className="text-xs text-muted-foreground">
+                                  {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
+                                </p>
+                              )}
+                            </Link>
+                            <button className="shrink-0 p-3 pl-0 flex flex-wrap justify-end gap-1" onClick={() => toggleExpanded(packageKey)}>
+                              <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
+                              <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
+                              <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
+                              {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
+                              {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
+                              {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
+                            </button>
+                            <PackageDeleteButton
+                              packageTask={group.packageTask}
+                              childCount={group.childTasks.length}
+                              onDelete={invalidateProject}
+                            />
+                          </div>
+                          {open && (
+                            <div className="border-t p-2 space-y-2">
+                              <SortableTaskList
+                                items={group.childTasks}
+                                onReorder={async (orderedIds) => {
+                                  const { error } = await persistTaskOrder(orderedIds);
+                                  if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
+                                  else invalidateProject();
+                                }}
+                              >
+                                {(task) => (
+                                  <SortableTaskItem key={task.id} id={task.id}>
+                                    {bulkMode ? (
+                                      <div className="flex items-start gap-2">
+                                        <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                                    )}
+                                  </SortableTaskItem>
+                                )}
+                              </SortableTaskList>
+                            </div>
+                          )}
+                        </div>
+                      </SortableTaskItem>
+                    );
+                  }}
+                </SortableTaskList>
+              ) : (
+                <div className="space-y-4">
+                  {activePackageGroups.map((group) => {
+                    if (group.isStandalone) {
+                      const task = group.packageTask;
+                      return (
+                        <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                      );
+                    }
+
+                    const packageKey = `pkg:${group.packageTask.id}`;
+                    const open = expandedIds.has(packageKey);
+                    return (
+                      <div key={group.packageTask.id} className="rounded-lg border">
+                        <div className="flex items-center">
+                          <button className="shrink-0 p-3 pr-0" onClick={() => toggleExpanded(packageKey)}>
+                            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </button>
+                          <Link to={`/projects/${project.id}/tasks/${group.packageTask.id}`} className="flex-1 min-w-0 p-3 pl-2">
+                            <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                            {(group.packageTask.room_area || group.packageTask.trade) && (
+                              <p className="text-xs text-muted-foreground">
+                                {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
+                              </p>
                             )}
-                          </SortableTaskList>
-                        ) : (
-                          group.childTasks.map((task) => (
-                            <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
-                          ))
+                          </Link>
+                          <button className="shrink-0 p-3 pl-0 flex flex-wrap justify-end gap-1" onClick={() => toggleExpanded(packageKey)}>
+                            <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
+                            <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
+                            <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
+                            {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
+                            {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
+                            {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
+                          </button>
+                        </div>
+                        {open && (
+                          <div className="border-t p-2 space-y-2">
+                            {group.childTasks.map((task) => (
+                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                            ))}
+                          </div>
                         )}
                       </div>
                     );
-                  }
-
-                  return (
-                    <div key={group.packageTask.id} className="rounded-lg border">
-                      <div className="flex items-center">
-                        <button className="shrink-0 p-3 pr-0" onClick={() => toggleExpanded(packageKey)}>
-                          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </button>
-                        <Link to={`/projects/${project.id}/tasks/${group.packageTask.id}`} className="flex-1 min-w-0 p-3 pl-2">
-                          <p className="font-semibold text-sm">{group.packageTask.task}</p>
-                          {(group.packageTask.room_area || group.packageTask.trade) && (
-                            <p className="text-xs text-muted-foreground">
-                              {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
-                            </p>
-                          )}
-                        </Link>
-                        <button className="shrink-0 p-3 pl-0 flex flex-wrap justify-end gap-1" onClick={() => toggleExpanded(packageKey)}>
-                          <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
-                          <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
-                          <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
-                          {group.summary.byStatus.blocked > 0 && <Badge variant="destructive" className="text-xs">Blocked {group.summary.byStatus.blocked}</Badge>}
-                          {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
-                          {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
-                        </button>
-                        {isManager && (
-                          <PackageDeleteButton
-                            packageTask={group.packageTask}
-                            childCount={group.childTasks.length}
-                            onDelete={invalidateProject}
-                          />
-                        )}
-                      </div>
-                      {open && (
-                        <div className="border-t p-2 space-y-2">
-                          {bulkMode ? (
-                            group.childTasks.map((task) => (
-                              <div key={task.id} className="flex items-start gap-2">
-                                <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
-                                </div>
-                              </div>
-                            ))
-                          ) : isManager ? (
-                            <SortableTaskList
-                              items={group.childTasks}
-                              onReorder={async (orderedIds) => {
-                                const { error } = await persistTaskOrder(orderedIds);
-                                if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
-                                else invalidateProject();
-                              }}
-                            >
-                              {(task) => (
-                                <SortableTaskItem key={task.id} id={task.id}>
-                                  <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
-                                </SortableTaskItem>
-                              )}
-                            </SortableTaskList>
-                          ) : (
-                            group.childTasks.map((task) => (
-                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                  })}
+                </div>
+              )
             )}
 
             {doneTaskCount > 0 && (
@@ -1213,6 +1244,12 @@ const ProjectDetail = () => {
                 {showCompletedSection && (
                   <div className="mt-3 space-y-4">
                     {completedPackageGroups.map((group) => {
+                      if (group.isStandalone) {
+                        const task = group.packageTask;
+                        return (
+                          <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                        );
+                      }
                       const packageKey = `pkg:${group.packageTask.id}`;
                       const open = expandedIds.has(packageKey);
                       return (
