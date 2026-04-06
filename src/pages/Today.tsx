@@ -1,19 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useTodayData } from '@/hooks/useTodayData';
+import { useTodayPreferences } from '@/hooks/useTodayPreferences';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
+import { SortableTaskList, SortableTaskItem, persistTaskOrder } from '@/components/SortableTaskList';
 
 import DailyReminders from '@/components/DailyReminders';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Zap, Clock, CalendarDays, AlertTriangle } from 'lucide-react';
+import { Zap, Clock, CalendarDays, AlertTriangle, ChevronDown, ChevronRight, Volume2 } from 'lucide-react';
 import { generateAlerts } from '@/lib/alerts';
 import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 import AlertsBanner from '@/components/AlertsBanner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import {
   Sheet,
   SheetContent,
@@ -57,7 +60,6 @@ function rankTasks(a: any, b: any): number {
   const da = a.due_date ?? '9999-12-31';
   const db = b.due_date ?? '9999-12-31';
   if (da !== db) return da < db ? -1 : 1;
-  // created_at ascending
   const ca = a.created_at || '';
   const cb = b.created_at || '';
   if (ca === cb) return 0;
@@ -68,9 +70,11 @@ const Today = () => {
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const { data, loading, error, refresh } = useTodayData(user?.id, isAdmin);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const prefs = useTodayPreferences();
 
   const {
     inProgress, assigned, available, needsReview, blocked,
@@ -80,12 +84,8 @@ const Today = () => {
     allProfiles,
   } = data;
 
-  /* ── Derived state ── */
   const isContractor = !isAdmin && !isManager;
-
-
   const showShiftReminder = isContractor && !hasShiftToday && new Date().getHours() >= 10;
-
 
   const toggleExpanded = (taskId: string) => {
     setExpandedIds((prev) => {
@@ -95,7 +95,6 @@ const Today = () => {
       return next;
     });
   };
-
 
   const alerts = useMemo(() => {
     if (!user) return [];
@@ -107,6 +106,16 @@ const Today = () => {
       crewActiveTaskIds,
     });
   }, [inProgress, assigned, blocked, needsReview, available, isAdmin, isManager, isContractor, hasShiftToday, photoCountMap, projectMap, user, crewActiveTaskIds]);
+
+  /* ── Drag reorder handler ── */
+  const handleReorder = useCallback(async (reorderedIds: string[]) => {
+    const result = await persistTaskOrder(reorderedIds);
+    if (result.error) {
+      toast({ title: 'Reorder failed', description: result.error, variant: 'destructive' });
+    } else {
+      refresh();
+    }
+  }, [refresh, toast]);
 
   /* ── Error state ── */
   if (error) {
@@ -143,87 +152,177 @@ const Today = () => {
     </div>
   );
 
-  /* ── Shared section renderer ── */
-  const Section = ({ title, tasks, emptyText, isBlockedSection = false }: { title: string; tasks: any[]; emptyText: string; isBlockedSection?: boolean }) => {
-    const sectionTaskIds = new Set(tasks.map((task) => task.id));
-    const topLevelTasks = tasks.filter((task) => !task.parent_task_id || !sectionTaskIds.has(task.parent_task_id));
+  /* ── Filter muted tasks ── */
+  const filterMuted = (tasks: any[]) => tasks.filter(t => !prefs.mutedTaskIds.has(t.id));
+  const allMutedTasks = [
+    ...inProgress, ...assigned, ...available, ...needsReview, ...blocked,
+  ].filter(t => prefs.mutedTaskIds.has(t.id));
+
+  /* ── Render a single task card ── */
+  const renderTaskCard = (t: any, opts?: { isDraggable?: boolean }) => {
+    const children = childTasksByParent[t.id] || [];
+    const isExpanded = expandedIds.has(t.id);
+    const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
 
     return (
-    <div className="mb-6">
-      <h2 className={cn(
-        "text-sm font-semibold uppercase tracking-wide mb-2",
-        isBlockedSection ? "text-destructive" : "text-muted-foreground"
-      )}>{title}</h2>
-      {topLevelTasks.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4 text-center">{emptyText}</p>
-      ) : (
-        <div className="space-y-2">
-          {topLevelTasks.map((t) => {
-            const children = childTasksByParent[t.id] || [];
-            const isExpanded = expandedIds.has(t.id);
-            const allChildrenDone = children.length === 0 || children.every((c: any) => c.stage === 'Done');
+      <div key={t.id} className="space-y-2">
+        <TaskCard
+          task={t}
+          projectName={projectMap[t.project_id]?.name || ''}
+          projectAddress={projectMap[t.project_id]?.address}
+          assigneeName={t.assigned_to_user_id && t.assigned_to_user_id !== user!.id ? assigneeMap[t.assigned_to_user_id] : undefined}
+          userId={user!.id}
+          isAdmin={isAdmin}
+          onUpdate={refresh}
+          parentTitle={t.parent_task_id ? parentTitles[t.parent_task_id] : undefined}
+          context="today"
+          childCount={children.length}
+          expanded={isExpanded}
+          onToggle={() => toggleExpanded(t.id)}
+          allChildrenDone={allChildrenDone}
+          isCrewTask={t.assignment_mode === 'crew'}
+          isActiveWorker={crewActiveTaskIds.has(t.id)}
+          isCandidate={crewCandidateTaskIds.has(t.id)}
+          activeWorkerCount={crewWorkerCounts[t.id] || 0}
+          blockerInfo={blockerMap[t.id] || null}
+          photoCount={photoCountMap[t.id] || 0}
+          materialCount={materialCountMap[t.id] || 0}
+          canReportIssue={isContractor}
+          canDelete={isAdmin || isManager}
+          allProfiles={allProfiles}
+          onMute={() => prefs.muteTask(t.id)}
+          isCollapsed={prefs.collapsedCards.has(t.id)}
+          onToggleCollapse={() => prefs.toggleCard(t.id)}
+        />
 
-            return (
-              <div key={t.id} className="space-y-2">
-                <TaskCard
-                  task={t}
-                  projectName={projectMap[t.project_id]?.name || ''}
-                  projectAddress={projectMap[t.project_id]?.address}
-                  assigneeName={t.assigned_to_user_id && t.assigned_to_user_id !== user!.id ? assigneeMap[t.assigned_to_user_id] : undefined}
-                  userId={user!.id}
-                  isAdmin={isAdmin}
-                  onUpdate={refresh}
-                  parentTitle={t.parent_task_id ? parentTitles[t.parent_task_id] : undefined}
-                  context="today"
-                  childCount={children.length}
-                  expanded={isExpanded}
-                  onToggle={() => toggleExpanded(t.id)}
-                  allChildrenDone={allChildrenDone}
-                  isCrewTask={t.assignment_mode === 'crew'}
-                  isActiveWorker={crewActiveTaskIds.has(t.id)}
-                  isCandidate={crewCandidateTaskIds.has(t.id)}
-                  activeWorkerCount={crewWorkerCounts[t.id] || 0}
-                  blockerInfo={blockerMap[t.id] || null}
-                  photoCount={photoCountMap[t.id] || 0}
-                  materialCount={materialCountMap[t.id] || 0}
-                  canReportIssue={isContractor}
-                  canDelete={isAdmin || isManager}
-                  allProfiles={allProfiles}
-                />
+        {isExpanded && children.map((child: any) => (
+          <TaskCard
+            key={child.id}
+            task={child}
+            projectName={projectMap[child.project_id]?.name || ''}
+            projectAddress={projectMap[child.project_id]?.address}
+            assigneeName={child.assigned_to_user_id && child.assigned_to_user_id !== user!.id ? assigneeMap[child.assigned_to_user_id] : undefined}
+            userId={user!.id}
+            isAdmin={isAdmin}
+            onUpdate={refresh}
+            parentTitle={t.task}
+            context="today"
+            isChild
+            isCrewTask={child.assignment_mode === 'crew'}
+            isActiveWorker={crewActiveTaskIds.has(child.id)}
+            isCandidate={crewCandidateTaskIds.has(child.id)}
+            activeWorkerCount={crewWorkerCounts[child.id] || 0}
+            blockerInfo={blockerMap[child.id] || null}
+            photoCount={photoCountMap[child.id] || 0}
+            materialCount={materialCountMap[child.id] || 0}
+            canReportIssue={isContractor}
+            canDelete={isAdmin || isManager}
+            allProfiles={allProfiles}
+            onMute={() => prefs.muteTask(child.id)}
+            isCollapsed={prefs.collapsedCards.has(child.id)}
+            onToggleCollapse={() => prefs.toggleCard(child.id)}
+          />
+        ))}
+      </div>
+    );
+  };
 
-                {isExpanded && children.map((child: any) => (
+  /* ── Section renderer with collapse + drag reorder ── */
+  const Section = ({ sectionKey, title, tasks, emptyText, isBlockedSection = false }: {
+    sectionKey: string; title: string; tasks: any[]; emptyText: string; isBlockedSection?: boolean;
+  }) => {
+    const sectionTaskIds = new Set(tasks.map((task) => task.id));
+    const topLevelTasks = tasks.filter((task) => !task.parent_task_id || !sectionTaskIds.has(task.parent_task_id));
+    const isCollapsed = prefs.collapsedSections.has(sectionKey);
+
+    return (
+      <div className="mb-6">
+        <button
+          onClick={() => prefs.toggleSection(sectionKey)}
+          className={cn(
+            "flex items-center gap-1 text-sm font-semibold uppercase tracking-wide mb-2 hover:opacity-80 transition-opacity",
+            isBlockedSection ? "text-destructive" : "text-muted-foreground"
+          )}
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {title} ({topLevelTasks.length})
+        </button>
+
+        {!isCollapsed && (
+          topLevelTasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">{emptyText}</p>
+          ) : (
+            <SortableTaskList
+              items={topLevelTasks}
+              onReorder={handleReorder}
+            >
+              {(item) => (
+                <SortableTaskItem key={item.id} id={item.id}>
+                  {renderTaskCard(item)}
+                </SortableTaskItem>
+              )}
+            </SortableTaskList>
+          )
+        )}
+      </div>
+    );
+  };
+
+  /* ── Muted section ── */
+  const MutedSection = () => {
+    if (allMutedTasks.length === 0) return null;
+    const isCollapsed = prefs.collapsedSections.has('muted');
+
+    return (
+      <div className="mb-6 mt-8 border-t pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <button
+            onClick={() => prefs.toggleSection('muted')}
+            className="flex items-center gap-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:opacity-80 transition-opacity"
+          >
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            Muted ({allMutedTasks.length})
+          </button>
+          <Button size="sm" variant="ghost" onClick={prefs.unmuteAll} className="text-xs h-7">
+            <Volume2 className="h-3 w-3 mr-1" /> Unmute All
+          </Button>
+        </div>
+
+        {!isCollapsed && (
+          <div className="space-y-2 opacity-60">
+            {allMutedTasks.map(t => (
+              <div key={t.id} className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
                   <TaskCard
-                    key={child.id}
-                    task={child}
-                    projectName={projectMap[child.project_id]?.name || ''}
-                    projectAddress={projectMap[child.project_id]?.address}
-                    assigneeName={child.assigned_to_user_id && child.assigned_to_user_id !== user!.id ? assigneeMap[child.assigned_to_user_id] : undefined}
+                    task={t}
+                    projectName={projectMap[t.project_id]?.name || ''}
+                    projectAddress={projectMap[t.project_id]?.address}
+                    assigneeName={t.assigned_to_user_id && t.assigned_to_user_id !== user!.id ? assigneeMap[t.assigned_to_user_id] : undefined}
                     userId={user!.id}
                     isAdmin={isAdmin}
                     onUpdate={refresh}
-                    parentTitle={t.task}
                     context="today"
-                    isChild
-                    isCrewTask={child.assignment_mode === 'crew'}
-                    isActiveWorker={crewActiveTaskIds.has(child.id)}
-                    isCandidate={crewCandidateTaskIds.has(child.id)}
-                    activeWorkerCount={crewWorkerCounts[child.id] || 0}
-                    blockerInfo={blockerMap[child.id] || null}
-                    photoCount={photoCountMap[child.id] || 0}
-                    materialCount={materialCountMap[child.id] || 0}
+                    isCrewTask={t.assignment_mode === 'crew'}
+                    isActiveWorker={crewActiveTaskIds.has(t.id)}
+                    isCandidate={crewCandidateTaskIds.has(t.id)}
+                    activeWorkerCount={crewWorkerCounts[t.id] || 0}
+                    blockerInfo={blockerMap[t.id] || null}
+                    photoCount={photoCountMap[t.id] || 0}
+                    materialCount={materialCountMap[t.id] || 0}
                     canReportIssue={isContractor}
                     canDelete={isAdmin || isManager}
                     allProfiles={allProfiles}
+                    isCollapsed={true}
+                    onToggleCollapse={() => prefs.unmuteTask(t.id)}
                   />
-                ))}
+                </div>
               </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   /* ── Contractor layout ── */
   const ContractorView = () => (
@@ -237,12 +336,12 @@ const Today = () => {
         </div>
       )}
 
-      <Section title="Working Now" tasks={inProgress} emptyText="No tasks in progress." />
-      <Section title="Up Next" tasks={assigned} emptyText="No assigned tasks." />
-      <Section title="Available to Take" tasks={available} emptyText="No tasks available for dibs." />
+      <Section sectionKey="working-now" title="Working Now" tasks={filterMuted(inProgress)} emptyText="No tasks in progress." />
+      <Section sectionKey="up-next" title="Up Next" tasks={filterMuted(assigned)} emptyText="No assigned tasks." />
+      <Section sectionKey="available" title="Available to Take" tasks={filterMuted(available)} emptyText="No tasks available for dibs." />
 
       {blocked.length > 0 && (
-        <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="" isBlockedSection />
+        <Section sectionKey="blocked" title={`Blocked`} tasks={filterMuted(blocked)} emptyText="" isBlockedSection />
       )}
     </>
   );
@@ -250,10 +349,10 @@ const Today = () => {
   /* ── Manager / Admin layout ── */
   const ManagerView = () => (
     <>
-      <Section title="Needs Review (Contractor / Field Reports)" tasks={needsReview} emptyText="No tasks pending review." />
-      <Section title="My In Progress" tasks={inProgress} emptyText="No tasks you're working on." />
-      <Section title="My Assigned" tasks={assigned} emptyText="No tasks assigned to you." />
-      <Section title={`Blocked (${blocked.length})`} tasks={blocked} emptyText="No blocked tasks — all clear." isBlockedSection />
+      <Section sectionKey="needs-review" title="Needs Review (Contractor / Field Reports)" tasks={filterMuted(needsReview)} emptyText="No tasks pending review." />
+      <Section sectionKey="my-in-progress" title="My In Progress" tasks={filterMuted(inProgress)} emptyText="No tasks you're working on." />
+      <Section sectionKey="my-assigned" title="My Assigned" tasks={filterMuted(assigned)} emptyText="No tasks assigned to you." />
+      <Section sectionKey="blocked" title={`Blocked`} tasks={filterMuted(blocked)} emptyText="No blocked tasks — all clear." isBlockedSection />
     </>
   );
 
@@ -292,6 +391,7 @@ const Today = () => {
       <div className="p-4">
         <AlertsBanner alerts={alerts} />
         {isContractor ? <ContractorView /> : <ManagerView />}
+        <MutedSection />
       </div>
     </div>
   );
