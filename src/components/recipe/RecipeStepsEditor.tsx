@@ -211,7 +211,7 @@ const RecipeStepsEditor = ({ recipeId, onStepsChanged, variants = [] }: RecipeSt
         </SortableContext>
       </DndContext>
       <div className="flex gap-2">
-        <Input placeholder="Step title" value={newStepTitle} onChange={(e) => setNewStepTitle(e.target.value)} className="flex-1" />
+        <Input id="recipe-step-input" placeholder="Step title" value={newStepTitle} onChange={(e) => setNewStepTitle(e.target.value)} className="flex-1" />
         <Input placeholder="Trade" value={newStepTrade} onChange={(e) => setNewStepTrade(e.target.value)} className="w-24" />
         <Button size="sm" onClick={handleAddStep} disabled={!newStepTitle.trim()}>
           <Plus className="h-4 w-4" />
