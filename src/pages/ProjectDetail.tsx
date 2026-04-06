@@ -566,7 +566,7 @@ const ProjectDetail = () => {
 
       {/* Toolbar */}
       {userCanCreateTask && (
-        <div className="flex flex-wrap gap-2 px-4 py-2 border-b bg-card">
+        <div className="sticky top-[53px] z-30 flex flex-wrap gap-2 px-4 py-2 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" />Task</Button>
