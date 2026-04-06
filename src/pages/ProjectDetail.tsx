@@ -1109,11 +1109,11 @@ const ProjectDetail = () => {
                             <div className="flex items-start gap-2">
                               <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                                <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} isCrewTask={task.assignment_mode === 'crew'} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                               </div>
                             </div>
                           ) : (
-                            <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                            <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} isCrewTask={task.assignment_mode === 'crew'} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                           )}
                         </SortableTaskItem>
                       );
@@ -1166,11 +1166,11 @@ const ProjectDetail = () => {
                                       <div className="flex items-start gap-2">
                                         <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTaskSelection(task.id)} className="mt-4 shrink-0" />
                                         <div className="flex-1 min-w-0">
-                                          <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                                          <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} isCrewTask={task.assignment_mode === 'crew'} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                                         </div>
                                       </div>
                                     ) : (
-                                      <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                                      <TaskCard task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} isCrewTask={task.assignment_mode === 'crew'} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                                     )}
                                   </SortableTaskItem>
                                 )}
@@ -1188,7 +1188,7 @@ const ProjectDetail = () => {
                     if (group.isStandalone) {
                       const task = group.packageTask;
                       return (
-                        <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                        <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} isCrewTask={task.assignment_mode === 'crew'} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                       );
                     }
 
@@ -1220,7 +1220,7 @@ const ProjectDetail = () => {
                         {open && (
                           <div className="border-t p-2 space-y-2">
                             {group.childTasks.map((task) => (
-                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                              <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} isCrewTask={task.assignment_mode === 'crew'} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                             ))}
                           </div>
                         )}
@@ -1247,7 +1247,7 @@ const ProjectDetail = () => {
                       if (group.isStandalone) {
                         const task = group.packageTask;
                         return (
-                          <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                          <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} isCrewTask={task.assignment_mode === 'crew'} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                         );
                       }
                       const packageKey = `pkg:${group.packageTask.id}`;
@@ -1264,7 +1264,7 @@ const ProjectDetail = () => {
                           {open && (
                             <div className="border-t p-2 space-y-2">
                               {group.childTasks.map((task) => (
-                                <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                                <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} isCrewTask={task.assignment_mode === 'crew'} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
                               ))}
                             </div>
                           )}
