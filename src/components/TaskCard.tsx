@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, ChevronDown, Users, Repeat, AlertTriangle, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Users, Repeat, AlertTriangle, Trash2, VolumeX, Minimize2, Maximize2 } from 'lucide-react';
 import TaskMaterialsSheet from '@/components/TaskMaterialsSheet';
 import TaskQuickActions from '@/components/task-card/TaskQuickActions';
 import { BLOCKER_REASONS } from '@/lib/supabase-types';
