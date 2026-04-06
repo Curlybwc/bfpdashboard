@@ -83,6 +83,17 @@ const RecipeBuilderSheet = ({
 
   return (
     <div className="space-y-4">
+      {/* Sticky save bar at top */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-6 px-6 py-2 border-b flex items-center justify-between">
+        <span className="text-sm font-medium truncate">{name || 'Recipe'}</span>
+        <div className="flex gap-2 shrink-0">
+          <Button size="sm" onClick={handleSave}>Save Recipe</Button>
+          <Button variant="destructive" size="sm" onClick={handleDelete}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
       <RecipeMetaEditor
         name={name} onNameChange={setName}
         trade={trade} onTradeChange={setTrade}
@@ -91,13 +102,6 @@ const RecipeBuilderSheet = ({
         lastActualAvg={lastActualAvg}
         lastActualCount={lastActualCount}
       />
-
-      <div className="flex gap-2">
-        <Button onClick={handleSave} className="flex-1">Save Recipe</Button>
-        <Button variant="destructive" size="icon" onClick={handleDelete}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
 
       <VariantManager recipeId={recipeId} variants={variants} onChanged={fetchVariants} />
 

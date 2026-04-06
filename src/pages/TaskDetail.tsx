@@ -850,6 +850,18 @@ const TaskDetail = () => {
   return (
     <div className="pb-20">
       <PageHeader title="Task Detail" backTo={`/projects/${projectId}`} />
+
+      {/* Sticky save bar */}
+      {canEditTaskMetadata && (
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b px-4 py-2 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground truncate">{taskText || 'Task Detail'}</span>
+          <Button size="sm" onClick={() => handleSave()} disabled={saving} className="shrink-0">
+            <Save className="h-3.5 w-3.5 mr-1" />
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      )}
+
       <div className="p-4 space-y-4">
         {/* Lifecycle action buttons */}
         <TaskLifecycleActions
