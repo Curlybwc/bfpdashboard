@@ -53,6 +53,9 @@ const TaskCard = ({
   blockerInfo, photoCount = 0, materialCount = 0, canReportIssue = false,
   canDelete = false,
   allProfiles,
+  onMute,
+  isCollapsed = false,
+  onToggleCollapse,
 }: TaskCardProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
