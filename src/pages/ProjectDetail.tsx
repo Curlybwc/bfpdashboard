@@ -1231,10 +1231,51 @@ const ProjectDetail = () => {
               )
             )
 
-
-                    // Render general tasks flat — no collapsible wrapper
-                    return (
-                      <div key="general-package" className="space-y-2">
+            {doneTaskCount > 0 && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between rounded-lg border p-3 text-left"
+                  onClick={() => setShowCompletedSection((prev) => !prev)}
+                >
+                  <span className="text-sm font-medium">{showCompletedSection ? 'Hide' : 'Show'} {doneTaskCount} completed tasks</span>
+                  {showCompletedSection ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+                {showCompletedSection && (
+                  <div className="mt-3 space-y-4">
+                    {completedPackageGroups.map((group) => {
+                      if (group.isStandalone) {
+                        const task = group.packageTask;
+                        return (
+                          <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                        );
+                      }
+                      const packageKey = `pkg:${group.packageTask.id}`;
+                      const open = expandedIds.has(packageKey);
+                      return (
+                        <div key={group.packageTask.id} className="rounded-lg border border-muted">
+                          <button className="w-full p-3 text-left flex items-center gap-2" onClick={() => toggleExpanded(packageKey)}>
+                            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm">{group.packageTask.task}</p>
+                            </div>
+                            <Badge variant="outline" className="text-xs">{group.summary.total} done</Badge>
+                          </button>
+                          {open && (
+                            <div className="border-t p-2 space-y-2">
+                              {group.childTasks.map((task) => (
+                                <TaskCard key={task.id} task={task} projectName={project.name} userId={user?.id ?? ''} isAdmin={isAdmin} onUpdate={invalidateProject} showProjectName={false} assigneeName={task.assigned_to_user_id ? assigneeMap[task.assigned_to_user_id] : undefined} photoCount={photoCountMap[task.id] || 0} materialCount={materialCountMap[task.id] || 0} canReportIssue={isContractor} canDelete={isManager} allProfiles={allProfiles} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
                         {bulkMode ? (
                           group.childTasks.map((task) => (
                             <div key={task.id} className="flex items-start gap-2">
