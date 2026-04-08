@@ -19,11 +19,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProjectList } from '@/hooks/useProjectList';
 import type { ProjectType } from '@/lib/supabase-types';
+import { useOrg } from '@/hooks/useOrg';
 import { useQueryClient } from '@tanstack/react-query';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const ProjectList = () => {
   const { user } = useAuth();
+  const { orgId } = useOrg();
   const { isAdmin, canManageProjects } = useAdmin();
   const { toast } = useToast();
   const canCreate = isAdmin || canManageProjects;
@@ -84,7 +86,7 @@ const ProjectList = () => {
     if (!user) return;
     const { data: project, error } = await supabase
       .from('projects')
-      .insert({ name, address, project_type: activeTab })
+      .insert({ name, address, project_type: activeTab, org_id: orgId })
       .select()
       .single();
     if (error) {

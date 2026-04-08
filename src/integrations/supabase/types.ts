@@ -405,6 +405,62 @@ export type Database = {
         }
         Relationships: []
       }
+      org_members: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          role?: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payout_runs: {
         Row: {
           created_at: string
@@ -491,6 +547,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_admin: boolean
+          org_id: string | null
           skip_qb_export: boolean
           tax_info_filed: boolean
         }
@@ -503,6 +560,7 @@ export type Database = {
           id: string
           is_active?: boolean
           is_admin?: boolean
+          org_id?: string | null
           skip_qb_export?: boolean
           tax_info_filed?: boolean
         }
@@ -515,10 +573,19 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_admin?: boolean
+          org_id?: string | null
           skip_qb_export?: boolean
           tax_info_filed?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_members: {
         Row: {
@@ -567,6 +634,7 @@ export type Database = {
           has_missing_estimates: boolean
           id: string
           name: string
+          org_id: string | null
           project_type: Database["public"]["Enums"]["project_type"]
           scope_id: string | null
           status: Database["public"]["Enums"]["project_status"]
@@ -579,6 +647,7 @@ export type Database = {
           has_missing_estimates?: boolean
           id?: string
           name: string
+          org_id?: string | null
           project_type?: Database["public"]["Enums"]["project_type"]
           scope_id?: string | null
           status?: Database["public"]["Enums"]["project_status"]
@@ -591,6 +660,7 @@ export type Database = {
           has_missing_estimates?: boolean
           id?: string
           name?: string
+          org_id?: string | null
           project_type?: Database["public"]["Enums"]["project_type"]
           scope_id?: string | null
           status?: Database["public"]["Enums"]["project_status"]
@@ -602,6 +672,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
@@ -2563,6 +2640,10 @@ export type Database = {
         }
         Returns: number
       }
+      get_org_role: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: Database["public"]["Enums"]["org_role"]
+      }
       get_project_role: {
         Args: { _project_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["project_member_role"]
@@ -2571,7 +2652,16 @@ export type Database = {
         Args: { _scope_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["scope_member_role"]
       }
+      get_user_org_id: { Args: { _user_id: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_org_admin: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_org_member: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_project_member: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
@@ -2642,6 +2732,7 @@ export type Database = {
         | "waiting_on_trade"
         | "other"
       materials_status: "Yes" | "Partial" | "No"
+      org_role: "owner" | "admin" | "member"
       payout_onboarding_status:
         | "not_started"
         | "in_progress"
@@ -2817,6 +2908,7 @@ export const Constants = {
         "other",
       ],
       materials_status: ["Yes", "Partial", "No"],
+      org_role: ["owner", "admin", "member"],
       payout_onboarding_status: [
         "not_started",
         "in_progress",
