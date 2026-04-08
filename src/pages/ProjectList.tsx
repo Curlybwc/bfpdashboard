@@ -25,6 +25,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 const ProjectList = () => {
   const { user } = useAuth();
+  const { orgId } = useOrg();
   const { isAdmin, canManageProjects } = useAdmin();
   const { toast } = useToast();
   const canCreate = isAdmin || canManageProjects;
