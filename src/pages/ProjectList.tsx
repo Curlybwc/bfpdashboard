@@ -86,7 +86,7 @@ const ProjectList = () => {
     if (!user) return;
     const { data: project, error } = await supabase
       .from('projects')
-      .insert({ name, address, project_type: activeTab })
+      .insert({ name, address, project_type: activeTab, org_id: orgId })
       .select()
       .single();
     if (error) {
