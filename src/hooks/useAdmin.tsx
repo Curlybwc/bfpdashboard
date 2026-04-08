@@ -5,31 +5,19 @@ import { useQuery } from '@tanstack/react-query';
 interface GlobalPermissionFlags {
   isAdmin: boolean;
   canManageProjects: boolean;
+  isOrgAdmin: boolean;
 }
 
 /**
- * GLOBAL permission flags from the `profiles` table.
+ * GLOBAL permission flags from `profiles` + `org_members`.
  *
- * ┌─────────────────────────────────────────────────────────────────────┐
- * │  ROLE MODEL — two independent layers:                              │
- * │                                                                    │
- * │  1. GLOBAL flags (this hook)                                       │
- * │     • isAdmin — full system access, all admin routes               │
- * │     • canManageProjects — can create projects/scopes, access       │
- * │       manager-only routes (field mode, walkthroughs, scopes)       │
- * │     → Used by: MobileNav, route guards (AdminGuard, ManagerGuard)  │
- * │                                                                    │
- * │  2. PROJECT-LEVEL roles (project_members.role)                     │
- * │     • 'manager' | 'contractor' | 'read_only'                      │
- * │     → Used by: ProjectDetail, TaskCard, permissions.ts helpers     │
- * │     → Determines per-project task visibility, actions, filtering   │
- * │                                                                    │
- * │  These layers are INDEPENDENT. A user with canManageProjects=true  │
- * │  still needs a project_members row to interact with a project.     │
- * │  isAdmin bypasses both layers.                                     │
- * └─────────────────────────────────────────────────────────────────────┘
+ * Three permission sources:
+ * 1. profiles.is_admin — legacy global super-admin
+ * 2. profiles.can_manage_projects — can create projects/scopes
+ * 3. org_members.role IN ('owner','admin') — org-level admin
  *
- * Backed by React Query — all consumers share a single cached fetch.
+ * isAdmin = profiles.is_admin OR org owner/admin
+ * canManageProjects = profiles.can_manage_projects OR org owner/admin
  */
 export const useGlobalPermissions = () => {
   const { user } = useAuth();
@@ -37,23 +25,34 @@ export const useGlobalPermissions = () => {
   const { data, isLoading, error } = useQuery<GlobalPermissionFlags>({
     queryKey: ['profile-permissions', user?.id],
     queryFn: async (): Promise<GlobalPermissionFlags> => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('is_admin, can_manage_projects')
-        .eq('id', user!.id)
-        .single();
+      const [profileRes, orgRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('is_admin, can_manage_projects')
+          .eq('id', user!.id)
+          .single(),
+        supabase
+          .from('org_members')
+          .select('role')
+          .eq('user_id', user!.id)
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
-      if (error) {
-        // Missing profile row → default permissions
-        if (error.code === 'PGRST116') {
-          return { isAdmin: false, canManageProjects: false };
-        }
-        throw error;
+      const profile = profileRes.data;
+      const profileError = profileRes.error;
+      const orgMember = orgRes.data;
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        throw profileError;
       }
 
+      const isOrgAdmin = orgMember?.role === 'owner' || orgMember?.role === 'admin';
+
       return {
-        isAdmin: data?.is_admin ?? false,
-        canManageProjects: data?.can_manage_projects ?? false,
+        isAdmin: (profile?.is_admin ?? false) || isOrgAdmin,
+        canManageProjects: (profile?.can_manage_projects ?? false) || isOrgAdmin,
+        isOrgAdmin,
       };
     },
     enabled: !!user,
@@ -64,6 +63,7 @@ export const useGlobalPermissions = () => {
   return {
     isAdmin: data?.isAdmin ?? false,
     canManageProjects: data?.canManageProjects ?? false,
+    isOrgAdmin: data?.isOrgAdmin ?? false,
     loading: isLoading,
     error: error ? (error instanceof Error ? error.message : 'Failed to load permissions') : null,
   };
@@ -71,6 +71,5 @@ export const useGlobalPermissions = () => {
 
 /**
  * @deprecated Alias for useGlobalPermissions — use useGlobalPermissions directly.
- * Kept temporarily so existing imports don't break during migration.
  */
 export const useAdmin = useGlobalPermissions;
