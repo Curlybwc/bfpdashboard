@@ -1105,6 +1105,7 @@ export type Database = {
           estimated_total_snapshot: number | null
           id: string
           name: string | null
+          org_id: string
           status: Database["public"]["Enums"]["scope_status"]
           updated_at: string
         }
@@ -1119,6 +1120,7 @@ export type Database = {
           estimated_total_snapshot?: number | null
           id?: string
           name?: string | null
+          org_id: string
           status?: Database["public"]["Enums"]["scope_status"]
           updated_at?: string
         }
@@ -1133,6 +1135,7 @@ export type Database = {
           estimated_total_snapshot?: number | null
           id?: string
           name?: string | null
+          org_id?: string
           status?: Database["public"]["Enums"]["scope_status"]
           updated_at?: string
         }
@@ -1149,6 +1152,13 @@ export type Database = {
             columns: ["converted_project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scopes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2664,6 +2674,10 @@ export type Database = {
       }
       is_project_member: {
         Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_same_org: {
+        Args: { _user_id_a: string; _user_id_b: string }
         Returns: boolean
       }
       is_scope_member: {
