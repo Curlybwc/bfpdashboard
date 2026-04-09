@@ -18,6 +18,7 @@ import type { ScopeStatus } from '@/lib/supabase-types';
 const ScopeList = () => {
   const { user } = useAuth();
   const { isAdmin, canManageProjects } = useAdmin();
+  const { orgId } = useOrg();
   const { toast } = useToast();
   const canCreate = isAdmin || canManageProjects;
   const [scopes, setScopes] = useState<any[]>([]);
