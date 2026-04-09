@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
+import { useOrg } from '@/hooks/useOrg';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import type { ScopeStatus } from '@/lib/supabase-types';
 const ScopeList = () => {
   const { user } = useAuth();
   const { isAdmin, canManageProjects } = useAdmin();
+  const { orgId } = useOrg();
   const { toast } = useToast();
   const canCreate = isAdmin || canManageProjects;
   const [scopes, setScopes] = useState<any[]>([]);
@@ -38,8 +40,8 @@ const ScopeList = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    const { data: scope, error } = await supabase.from('scopes').insert({ name: name || null, address, created_by: user.id }).select().single();
+    if (!user || !orgId) return;
+    const { data: scope, error } = await supabase.from('scopes').insert({ name: name || null, address, created_by: user.id, org_id: orgId } as any).select().single();
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     // Add creator as manager
     await supabase.from('scope_members').insert({ scope_id: scope.id, user_id: user.id, role: 'manager' });
