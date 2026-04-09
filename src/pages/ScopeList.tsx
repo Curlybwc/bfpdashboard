@@ -40,8 +40,8 @@ const ScopeList = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    const { data: scope, error } = await supabase.from('scopes').insert({ name: name || null, address, created_by: user.id }).select().single();
+    if (!user || !orgId) return;
+    const { data: scope, error } = await supabase.from('scopes').insert({ name: name || null, address, created_by: user.id, org_id: orgId } as any).select().single();
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     // Add creator as manager
     await supabase.from('scope_members').insert({ scope_id: scope.id, user_id: user.id, role: 'manager' });
