@@ -260,46 +260,52 @@ const TaskCard = ({
         )}
       </Card>
 
-      <TaskMaterialsSheet
-        taskId={task.id}
-        open={materialsOpen}
-        onOpenChange={setMaterialsOpen}
-        onMaterialsChange={onUpdate}
-      />
+      {materialsOpen && (
+        <TaskMaterialsSheet
+          taskId={task.id}
+          open={materialsOpen}
+          onOpenChange={setMaterialsOpen}
+          onMaterialsChange={onUpdate}
+        />
+      )}
 
-      <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
-            <AlertDialogDescription>
-              This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Go Back</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleComplete(true); }}>
-              Complete Anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {photoConfirmOpen && (
+        <AlertDialog open={photoConfirmOpen} onOpenChange={setPhotoConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>No "After" Photo</AlertDialogTitle>
+              <AlertDialogDescription>
+                This task doesn't have an "after" photo yet. It's best to add one when you can, but you can complete it now if needed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Go Back</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { setPhotoConfirmOpen(false); handleComplete(true); }}>
+                Complete Anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Task</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{task.task}"?{hasChildren ? ' This will also delete all subtasks.' : ''} This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {deleteConfirmOpen && (
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Task</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{task.task}"?{hasChildren ? ' This will also delete all subtasks.' : ''} This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 };

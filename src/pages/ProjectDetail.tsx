@@ -160,6 +160,7 @@ const ProjectDetail = () => {
   const [filterRoomArea, setFilterRoomArea] = useState<string>('all');
   const [showCompletedSection, setShowCompletedSection] = useState(false);
   const [hideDone, setHideDone] = useState(true);
+  const [visibleGroupCount, setVisibleGroupCount] = useState(15);
 
   // Derived role & permissions
   const projectRole = useMemo(
@@ -1092,7 +1093,7 @@ const ProjectDetail = () => {
             {activePackageGroups.length > 0 && (
               isManager ? (
                 <SortableTaskList
-                  items={activePackageGroups.map(g => ({ ...g.packageTask, _group: g }))}
+                  items={activePackageGroups.slice(0, visibleGroupCount).map(g => ({ ...g.packageTask, _group: g }))}
                   onReorder={async (orderedIds) => {
                     const { error } = await persistTaskOrder(orderedIds);
                     if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
@@ -1184,7 +1185,7 @@ const ProjectDetail = () => {
                 </SortableTaskList>
               ) : (
                 <div className="space-y-4">
-                  {activePackageGroups.map((group) => {
+                  {activePackageGroups.slice(0, visibleGroupCount).map((group) => {
                     if (group.isStandalone) {
                       const task = group.packageTask;
                       return (
@@ -1229,6 +1230,19 @@ const ProjectDetail = () => {
                   })}
                 </div>
               )
+            )}
+
+            {activePackageGroups.length > visibleGroupCount && (
+              <div className="mt-3 text-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setVisibleGroupCount(prev => prev + 15)}
+                >
+                  Show more ({activePackageGroups.length - visibleGroupCount} remaining)
+                </Button>
+              </div>
             )}
 
             {doneTaskCount > 0 && (
