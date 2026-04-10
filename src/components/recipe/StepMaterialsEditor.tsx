@@ -57,6 +57,7 @@ function normalizeUrl(raw: string): string | null {
 
 const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const { toast } = useToast();
+  const { orgId } = useOrg();
   const { sections: storeSections } = useStoreSections();
   const activeNames = storeSections.map(s => s.name);
   const [materials, setMaterials] = useState<StepMaterial[]>([]);

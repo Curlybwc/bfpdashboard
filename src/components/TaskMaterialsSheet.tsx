@@ -55,6 +55,7 @@ function normalizeUrl(raw: string): string | null {
 
 const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterialsChange }: TaskMaterialsSheetProps) => {
   const { toast } = useToast();
+  const { orgId } = useOrg();
   const { sections } = useStoreSections();
   const activeNames = sections.map(s => s.name);
   const [materials, setMaterials] = useState<TaskMaterial[]>([]);

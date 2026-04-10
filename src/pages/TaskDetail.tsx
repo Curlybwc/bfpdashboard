@@ -45,6 +45,7 @@ const TaskDetail = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
+  const { orgId } = useOrg();
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [dibsConfirmOpen, setDibsConfirmOpen] = useState(false);
