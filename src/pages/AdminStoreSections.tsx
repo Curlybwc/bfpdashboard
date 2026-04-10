@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrg } from '@/hooks/useOrg';
 import { useStoreSections, StoreSection } from '@/hooks/useStoreSections';
 import { useToast } from '@/hooks/use-toast';
 import { inferStoreSection } from '@/lib/inferStoreSection';

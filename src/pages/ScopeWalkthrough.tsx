@@ -4,6 +4,7 @@ import { matchExistingScopeItem, strongerStatus } from '@/lib/checklistMatch';
 import { detectRehabTemplates, type RehabTemplate } from '@/lib/rehabMatch';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrg } from '@/hooks/useOrg';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
