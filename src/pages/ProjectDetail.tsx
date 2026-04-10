@@ -1125,19 +1125,26 @@ const ProjectDetail = () => {
                     return (
                       <SortableTaskItem key={group.packageTask.id} id={group.packageTask.id}>
                         <div className="rounded-lg border">
-                          <div className="flex items-center">
-                            <button className="shrink-0 p-3 pr-0" onClick={() => toggleExpanded(packageKey)}>
-                              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                            </button>
-                            <Link to={`/projects/${project.id}/tasks/${group.packageTask.id}`} className="flex-1 min-w-0 p-3 pl-2">
-                              <p className="font-semibold text-sm">{group.packageTask.task}</p>
-                              {(group.packageTask.room_area || group.packageTask.trade) && (
-                                <p className="text-xs text-muted-foreground">
-                                  {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
-                                </p>
-                              )}
-                            </Link>
-                            <button className="shrink-0 p-3 pl-0 flex flex-wrap justify-end gap-1" onClick={() => toggleExpanded(packageKey)}>
+                          <div className="p-3">
+                            <div className="flex items-center gap-1">
+                              <button className="shrink-0" onClick={() => toggleExpanded(packageKey)}>
+                                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </button>
+                              <Link to={`/projects/${project.id}/tasks/${group.packageTask.id}`} className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm truncate">{group.packageTask.task}</p>
+                                {(group.packageTask.room_area || group.packageTask.trade) && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
+                                  </p>
+                                )}
+                              </Link>
+                              <PackageDeleteButton
+                                packageTask={group.packageTask}
+                                childCount={group.childTasks.length}
+                                onDelete={invalidateProject}
+                              />
+                            </div>
+                            <button className="flex flex-wrap gap-1 mt-1.5 ml-5" onClick={() => toggleExpanded(packageKey)}>
                               <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
                               <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
                               <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
@@ -1145,11 +1152,6 @@ const ProjectDetail = () => {
                               {group.summary.byStatus.review_needed > 0 && <Badge variant="outline" className="text-xs">Review {group.summary.byStatus.review_needed}</Badge>}
                               {group.summary.materialsNeeded > 0 && <Badge variant="outline" className="text-xs">Materials {group.summary.materialsNeeded}</Badge>}
                             </button>
-                            <PackageDeleteButton
-                              packageTask={group.packageTask}
-                              childCount={group.childTasks.length}
-                              onDelete={invalidateProject}
-                            />
                           </div>
                           {open && (
                             <div className="border-t p-2 space-y-2">
@@ -1197,19 +1199,21 @@ const ProjectDetail = () => {
                     const open = expandedIds.has(packageKey);
                     return (
                       <div key={group.packageTask.id} className="rounded-lg border">
-                        <div className="flex items-center">
-                          <button className="shrink-0 p-3 pr-0" onClick={() => toggleExpanded(packageKey)}>
-                            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </button>
-                          <Link to={`/projects/${project.id}/tasks/${group.packageTask.id}`} className="flex-1 min-w-0 p-3 pl-2">
-                            <p className="font-semibold text-sm">{group.packageTask.task}</p>
-                            {(group.packageTask.room_area || group.packageTask.trade) && (
-                              <p className="text-xs text-muted-foreground">
-                                {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
-                              </p>
-                            )}
-                          </Link>
-                          <button className="shrink-0 p-3 pl-0 flex flex-wrap justify-end gap-1" onClick={() => toggleExpanded(packageKey)}>
+                        <div className="p-3">
+                          <div className="flex items-center gap-1">
+                            <button className="shrink-0" onClick={() => toggleExpanded(packageKey)}>
+                              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                            <Link to={`/projects/${project.id}/tasks/${group.packageTask.id}`} className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm truncate">{group.packageTask.task}</p>
+                              {(group.packageTask.room_area || group.packageTask.trade) && (
+                                <p className="text-xs text-muted-foreground">
+                                  {[group.packageTask.room_area, group.packageTask.trade].filter(Boolean).join(' • ')}
+                                </p>
+                              )}
+                            </Link>
+                          </div>
+                          <button className="flex flex-wrap gap-1 mt-1.5 ml-5" onClick={() => toggleExpanded(packageKey)}>
                             <Badge variant="outline" className="text-xs">{group.summary.total} tasks</Badge>
                             <Badge variant="secondary" className="text-xs">Ready {group.summary.byStatus.ready}</Badge>
                             <Badge variant="secondary" className="text-xs">In Progress {group.summary.byStatus.in_progress}</Badge>
