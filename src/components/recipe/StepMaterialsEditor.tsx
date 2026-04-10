@@ -161,6 +161,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       vendor_url: normalizeUrl(vendorUrl),
       unit: unit.trim() || null,
       store_section: storeSection.trim() || null,
+      org_id: orgId,
     });
     if (error) {
       if (error.code === '23505') toast({ title: 'Already in library' });

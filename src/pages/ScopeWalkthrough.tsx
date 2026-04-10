@@ -295,7 +295,7 @@ const ScopeWalkthrough = () => {
 
               const { data: inserted, error: insertErr } = await supabase
                 .from('cost_items')
-                .insert({ name: item.editedDescription, normalized_name: norm, default_total_cost: unitCost, unit_type: unitType as any })
+                .insert({ name: item.editedDescription, normalized_name: norm, default_total_cost: unitCost, unit_type: unitType as any, org_id: orgId })
                 .select('id')
                 .single();
 

@@ -421,6 +421,7 @@ const TaskDetail = () => {
       trade: saveRecipeTrade.trim() || null,
       keywords: [],
       created_by: user.id,
+      org_id: orgId,
     }).select('id').single();
     if (recipeErr || !recipe) {
       toast({ title: 'Error', description: recipeErr?.message, variant: 'destructive' });
@@ -556,6 +557,7 @@ const TaskDetail = () => {
       trade: newRecipeTrade.trim() || null,
       keywords: kwArray,
       created_by: user.id,
+      org_id: orgId,
     }).select('id').single();
     if (recipeErr || !recipe) {
       toast({ title: 'Error creating recipe', description: recipeErr?.message, variant: 'destructive' });

@@ -232,6 +232,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       vendor_url: normalizeUrl(vendorUrl),
       unit: unit.trim() || null,
       store_section: storeSection.trim() || null,
+      org_id: orgId,
     });
     if (error) {
       if (error.code === '23505') toast({ title: 'Already in library' });
@@ -267,6 +268,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
           unit_cost: unitCost ? parseFloat(unitCost) : null,
           sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
           unit: unit.trim() || null, store_section: storeSection.trim() || null,
+          org_id: orgId,
         });
       }
     }
@@ -412,6 +414,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
           unit_cost: unitCost ? parseFloat(unitCost) : null,
           sku: sku.trim() || null, vendor_url: normalizeUrl(vendorUrl),
           unit: unit.trim() || null, store_section: storeSection.trim() || null,
+          org_id: orgId,
         });
       }
       toast({ title: `"${name.trim()}" synced to Materials Library` });
