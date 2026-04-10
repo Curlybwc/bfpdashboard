@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrg } from '@/hooks/useOrg';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ function normalize(s: string): string {
 
 export default function AdminMaterialLibrary() {
   const { toast } = useToast();
+  const { orgId } = useOrg();
   const [pushingId, setPushingId] = useState<string | null>(null);
   const [items, setItems] = useState<MaterialItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +108,7 @@ export default function AdminMaterialLibrary() {
       unit_cost: unitCost ? parseFloat(unitCost) : null,
       unit: unit.trim() || null,
       store_section: storeSection.trim() || null,
+      org_id: orgId,
     };
 
     if (editItem) {

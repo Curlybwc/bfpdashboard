@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrg } from '@/hooks/useOrg';
 import PageHeader from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,6 +90,7 @@ const SortableRehabItem = ({ item, onDelete }: { item: RehabItem; onDelete: () =
 const AdminRehabLibrary = () => {
   const { isAdmin, canManageProjects, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
+  const { orgId } = useOrg();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -164,6 +166,7 @@ const AdminRehabLibrary = () => {
       category: newCategory.trim() || null,
       keywords: keywords.length > 0 ? keywords : null,
       created_by: user.id,
+      org_id: orgId,
     });
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });

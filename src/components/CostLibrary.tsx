@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrg } from '@/hooks/useOrg';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ const UNIT_TYPES: UnitType[] = ['each', 'sqft', 'lf', 'piece'];
 
 const CostLibrary = () => {
   const { toast } = useToast();
+  const { orgId } = useOrg();
   const [items, setItems] = useState<CostItem[]>([]);
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -88,6 +90,7 @@ const CostLibrary = () => {
       piece_length_ft: addForm.piece_length_ft ? Number(addForm.piece_length_ft) : null,
       default_total_cost: Number(addForm.default_total_cost),
       active: addForm.active,
+      org_id: orgId,
     });
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     setShowAdd(false);

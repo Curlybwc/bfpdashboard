@@ -4,6 +4,7 @@ import { matchExistingScopeItem, strongerStatus } from '@/lib/checklistMatch';
 import { detectRehabTemplates, type RehabTemplate } from '@/lib/rehabMatch';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrg } from '@/hooks/useOrg';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -103,6 +104,7 @@ const ScopeWalkthrough = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { orgId } = useOrg();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [text, setText] = useState('');
@@ -293,7 +295,7 @@ const ScopeWalkthrough = () => {
 
               const { data: inserted, error: insertErr } = await supabase
                 .from('cost_items')
-                .insert({ name: item.editedDescription, normalized_name: norm, default_total_cost: unitCost, unit_type: unitType as any })
+                .insert({ name: item.editedDescription, normalized_name: norm, default_total_cost: unitCost, unit_type: unitType as any, org_id: orgId })
                 .select('id')
                 .single();
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrg } from '@/hooks/useOrg';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +57,7 @@ function normalizeUrl(raw: string): string | null {
 
 const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
   const { toast } = useToast();
+  const { orgId } = useOrg();
   const { sections: storeSections } = useStoreSections();
   const activeNames = storeSections.map(s => s.name);
   const [materials, setMaterials] = useState<StepMaterial[]>([]);
@@ -159,6 +161,7 @@ const StepMaterialsEditor = ({ stepId }: StepMaterialsEditorProps) => {
       vendor_url: normalizeUrl(vendorUrl),
       unit: unit.trim() || null,
       store_section: storeSection.trim() || null,
+      org_id: orgId,
     });
     if (error) {
       if (error.code === '23505') toast({ title: 'Already in library' });

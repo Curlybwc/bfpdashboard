@@ -116,6 +116,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          org_id: string | null
           updated_at: string
         }
         Insert: {
@@ -123,6 +124,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          org_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -130,9 +132,18 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          org_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       companies: {
         Row: {
@@ -174,6 +185,7 @@ export type Database = {
           id: string
           name: string
           normalized_name: string | null
+          org_id: string | null
           piece_length_ft: number | null
           unit_type: Database["public"]["Enums"]["unit_type"]
           updated_at: string
@@ -185,6 +197,7 @@ export type Database = {
           id?: string
           name: string
           normalized_name?: string | null
+          org_id?: string | null
           piece_length_ft?: number | null
           unit_type?: Database["public"]["Enums"]["unit_type"]
           updated_at?: string
@@ -196,11 +209,20 @@ export type Database = {
           id?: string
           name?: string
           normalized_name?: string | null
+          org_id?: string | null
           piece_length_ft?: number | null
           unit_type?: Database["public"]["Enums"]["unit_type"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cost_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       crew_group_members: {
         Row: {
@@ -370,6 +392,7 @@ export type Database = {
           is_active: boolean
           name: string
           normalized_name: string
+          org_id: string | null
           sku: string | null
           store_section: string | null
           unit: string | null
@@ -383,6 +406,7 @@ export type Database = {
           is_active?: boolean
           name: string
           normalized_name: string
+          org_id?: string | null
           sku?: string | null
           store_section?: string | null
           unit?: string | null
@@ -396,6 +420,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           normalized_name?: string
+          org_id?: string | null
           sku?: string | null
           store_section?: string | null
           unit?: string | null
@@ -403,7 +428,15 @@ export type Database = {
           updated_at?: string
           vendor_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "material_library_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       org_members: {
         Row: {
@@ -852,6 +885,7 @@ export type Database = {
           id: string
           keywords: string[] | null
           name: string
+          org_id: string | null
           updated_at: string
         }
         Insert: {
@@ -862,6 +896,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           name: string
+          org_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -872,9 +907,18 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           name?: string
+          org_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rehab_library_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rehab_library_items: {
         Row: {
@@ -1277,6 +1321,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          org_id: string | null
           sort_order: number
           updated_at: string
         }
@@ -1285,6 +1330,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          org_id?: string | null
           sort_order?: number
           updated_at?: string
         }
@@ -1293,10 +1339,19 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          org_id?: string | null
           sort_order?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "store_sections_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_blockers: {
         Row: {
@@ -1458,6 +1513,7 @@ export type Database = {
           id: string
           keywords: string[] | null
           name: string
+          org_id: string | null
           priority: number
           recipe_id: string | null
           trade: string | null
@@ -1470,6 +1526,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           name: string
+          org_id?: string | null
           priority?: number
           recipe_id?: string | null
           trade?: string | null
@@ -1482,12 +1539,20 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           name?: string
+          org_id?: string | null
           priority?: number
           recipe_id?: string | null
           trade?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "task_material_bundles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "task_material_bundles_recipe_id_fkey"
             columns: ["recipe_id"]
@@ -1734,6 +1799,7 @@ export type Database = {
           last_actual_avg: number | null
           last_actual_count: number
           name: string
+          org_id: string | null
           trade: string | null
           updated_at: string
         }
@@ -1748,6 +1814,7 @@ export type Database = {
           last_actual_avg?: number | null
           last_actual_count?: number
           name: string
+          org_id?: string | null
           trade?: string | null
           updated_at?: string
         }
@@ -1762,10 +1829,19 @@ export type Database = {
           last_actual_avg?: number | null
           last_actual_count?: number
           name?: string
+          org_id?: string | null
           trade?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "task_recipes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_workers: {
         Row: {
@@ -2639,6 +2715,10 @@ export type Database = {
       capture_recipe_from_task: {
         Args: { p_parent_task_id: string; p_recipe_id: string }
         Returns: Json
+      }
+      clone_seed_libraries_to_org: {
+        Args: { p_org_id: string }
+        Returns: undefined
       }
       complete_recurring_task: { Args: { p_task_id: string }; Returns: string }
       convert_scope_to_project: { Args: { p_scope_id: string }; Returns: Json }
