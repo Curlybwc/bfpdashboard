@@ -1090,7 +1090,10 @@ const ProjectDetail = () => {
           </div>
         ) : (
           <>
-            {activePackageGroups.length > 0 && (
+            {activePackageGroups.length > 0 && (() => {
+              const visibleGroups = activePackageGroups.slice(0, visibleGroupCount);
+              const hasMore = activePackageGroups.length > visibleGroupCount;
+              return (
               isManager ? (
                 <SortableTaskList
                   items={activePackageGroups.map(g => ({ ...g.packageTask, _group: g }))}
