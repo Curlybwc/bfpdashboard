@@ -160,6 +160,7 @@ const ProjectDetail = () => {
   const [filterRoomArea, setFilterRoomArea] = useState<string>('all');
   const [showCompletedSection, setShowCompletedSection] = useState(false);
   const [hideDone, setHideDone] = useState(true);
+  const [visibleGroupCount, setVisibleGroupCount] = useState(15);
 
   // Derived role & permissions
   const projectRole = useMemo(
