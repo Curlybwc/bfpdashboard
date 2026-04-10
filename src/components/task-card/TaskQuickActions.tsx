@@ -510,14 +510,16 @@ const TaskQuickActions = ({
         )}
       </div>
 
-      {/* Due Date Dialog */}
-      <Dialog open={dateDialogOpen} onOpenChange={setDateDialogOpen}>
-        <DialogContent className="sm:max-w-[350px]" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-          <DialogHeader><DialogTitle>Set Due Date</DialogTitle></DialogHeader>
-          <Calendar mode="single" selected={task.due_date ? new Date(task.due_date + 'T00:00:00') : undefined} onSelect={handleDueDate} className={cn("p-3 pointer-events-auto")} />
-          {task.due_date && <Button variant="ghost" size="sm" onClick={() => handleDueDate(undefined)}>Clear Due Date</Button>}
-        </DialogContent>
-      </Dialog>
+      {/* Due Date Dialog — lazy mount */}
+      {dateDialogOpen && (
+        <Dialog open={dateDialogOpen} onOpenChange={setDateDialogOpen}>
+          <DialogContent className="sm:max-w-[350px]" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+            <DialogHeader><DialogTitle>Set Due Date</DialogTitle></DialogHeader>
+            <Calendar mode="single" selected={task.due_date ? new Date(task.due_date + 'T00:00:00') : undefined} onSelect={handleDueDate} className={cn("p-3 pointer-events-auto")} />
+            {task.due_date && <Button variant="ghost" size="sm" onClick={() => handleDueDate(undefined)}>Clear Due Date</Button>}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Photo Upload Dialog */}
       <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
