@@ -33,6 +33,7 @@ interface RecipeStepCountRow {
 const AdminRecipes = () => {
   const { isAdmin, canManageProjects, loading: adminLoading } = useAdmin();
   const { user } = useAuth();
+  const { orgId } = useOrg();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -94,6 +95,7 @@ const AdminRecipes = () => {
       keywords,
       estimated_cost: newEstCost ? parseFloat(newEstCost) : null,
       created_by: user.id,
+      org_id: orgId,
     });
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });

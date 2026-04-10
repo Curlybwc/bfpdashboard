@@ -15,6 +15,7 @@ import { ChevronUp, ChevronDown, Plus, RotateCcw, Wand2, Loader2 } from 'lucide-
 
 export default function AdminStoreSections() {
   const { toast } = useToast();
+  const { orgId } = useOrg();
   const { sections, loading, refetch } = useStoreSections(true);
   const [showInactive, setShowInactive] = useState(false);
   const [newName, setNewName] = useState('');
@@ -35,6 +36,7 @@ export default function AdminStoreSections() {
     const { error } = await supabase.from('store_sections').insert({
       name: newName.trim(),
       sort_order: order,
+      org_id: orgId,
     } as any);
     setAdding(false);
     if (error) {
