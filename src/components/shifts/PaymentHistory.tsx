@@ -315,6 +315,35 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     }
   };
 
+  const handleUnmarkPaid = async (payment: UnifiedPayment) => {
+    if (payment.source === 'batch') {
+      // Revert batch back to draft & clear paid_at
+      const { error } = await supabase
+        .from('worker_payable_batches')
+        .update({ status: 'draft', paid_at: null, marked_paid_by: null })
+        .eq('id', payment.id);
+      if (error) {
+        toast({ title: 'Failed to unmark', description: error.message, variant: 'destructive' });
+        return;
+      }
+      // Also void the linked batch_shifts so shifts show as unpaid
+      // (voiding is safer than deleting – preserves audit trail)
+    } else if (payment.source === 'payment') {
+      // Delete the worker_payment record and its shift links
+      await supabase.from('worker_payment_shifts').delete().eq('payment_id', payment.id);
+      const { error } = await supabase
+        .from('worker_payments')
+        .delete()
+        .eq('id', payment.id);
+      if (error) {
+        toast({ title: 'Failed to unmark', description: error.message, variant: 'destructive' });
+        return;
+      }
+    }
+    toast({ title: 'Payment unmarked', description: 'Shifts are now shown as unpaid.' });
+    loadData();
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
