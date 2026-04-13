@@ -526,6 +526,21 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                       Export to QB
                     </Button>
                   )}
+                  {(p.source === 'payment' || p.batchStatus === 'paid' || p.batchStatus === 'exported') && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-[10px] gap-1 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (window.confirm(`Unmark ${p.workerName}'s $${p.amount.toFixed(2)} payment as paid?`)) {
+                          handleUnmarkPaid(p);
+                        }
+                      }}
+                    >
+                      <Undo2 className="h-2.5 w-2.5" />
+                      Unmark Paid
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
