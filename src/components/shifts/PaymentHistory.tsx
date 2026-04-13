@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle } from 'lucide-react';
+import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -315,6 +315,31 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     }
   };
 
+  const handleUnmarkPaid = async (payment: UnifiedPayment) => {
+    if (payment.source === 'batch') {
+      const { error } = await supabase
+        .from('worker_payable_batches')
+        .update({ status: 'draft', paid_at: null, marked_paid_by: null } as any)
+        .eq('id', payment.id);
+      if (error) {
+        toast({ title: 'Failed to unmark', description: error.message, variant: 'destructive' });
+        return;
+      }
+    } else if (payment.source === 'payment') {
+      await (supabase.from('worker_payment_shifts').delete() as any).eq('payment_id', payment.id);
+      const { error } = await supabase
+        .from('worker_payments')
+        .delete()
+        .eq('id', payment.id);
+      if (error) {
+        toast({ title: 'Failed to unmark', description: error.message, variant: 'destructive' });
+        return;
+      }
+    }
+    toast({ title: 'Payment unmarked', description: 'Shifts are now shown as unpaid.' });
+    loadData();
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -499,6 +524,21 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                     >
                       {exporting ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Upload className="h-2.5 w-2.5" />}
                       Export to QB
+                    </Button>
+                  )}
+                  {(p.source === 'payment' || p.batchStatus === 'paid' || p.batchStatus === 'exported') && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-[10px] gap-1 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (window.confirm(`Unmark ${p.workerName}'s $${p.amount.toFixed(2)} payment as paid?`)) {
+                          handleUnmarkPaid(p);
+                        }
+                      }}
+                    >
+                      <Undo2 className="h-2.5 w-2.5" />
+                      Unmark Paid
                     </Button>
                   )}
                 </div>
