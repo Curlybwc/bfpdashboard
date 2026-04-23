@@ -38,7 +38,8 @@ export function useProjectList(projectType: ProjectType) {
         companyMap[c.id] = c.short_name || c.name;
       });
 
-      const projects = (data ?? []) as ProjectRow[];
+      const sortKey = (name: string) => name.replace(/^\d+\s*/, '').toLowerCase();
+      const projects = ((data ?? []) as ProjectRow[]).sort((a, b) => sortKey(a.name).localeCompare(sortKey(b.name)));
       if (projects.length === 0) {
         return { projects, projectSummaryMap: {} as Record<string, ReturnType<typeof computeProjectHealthSummary>> };
       }
