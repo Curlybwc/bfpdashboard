@@ -23,10 +23,23 @@ const PAGE_SIZE = 50;
 
 const AdminActivityLog = () => {
   const [actionFilter, setActionFilter] = useState<string>('all');
+  const [actorFilter, setActorFilter] = useState<string>('all');
   const [page, setPage] = useState(0);
 
+  const { data: people } = useQuery({
+    queryKey: ['activity-log-people'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .order('full_name');
+      if (error) throw error;
+      return (data ?? []).filter(p => p.full_name);
+    },
+  });
+
   const { data, isLoading } = useQuery({
-    queryKey: ['activity-log', actionFilter, page],
+    queryKey: ['activity-log', actionFilter, actorFilter, page],
     queryFn: async () => {
       let query = supabase
         .from('activity_log')
@@ -36,6 +49,9 @@ const AdminActivityLog = () => {
 
       if (actionFilter !== 'all') {
         query = query.eq('action', actionFilter);
+      }
+      if (actorFilter !== 'all') {
+        query = query.eq('actor_id', actorFilter);
       }
 
       const { data: logs, error } = await query;
@@ -73,6 +89,17 @@ const AdminActivityLog = () => {
       <PageHeader title="Activity Log" backTo="/admin" />
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-3">
+          <Select value={actorFilter} onValueChange={(v) => { setActorFilter(v); setPage(0); }}>
+            <SelectTrigger className="w-[200px] h-8 text-xs">
+              <SelectValue placeholder="All people" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All people</SelectItem>
+              {(people ?? []).map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); setPage(0); }}>
             <SelectTrigger className="w-[180px] h-8 text-xs">
               <SelectValue placeholder="All actions" />
