@@ -26,8 +26,7 @@ export function useProjectList(projectType: ProjectType) {
         supabase
           .from('projects')
           .select('*')
-          .eq('project_type', projectType)
-          .order('name', { ascending: true }),
+          .eq('project_type', projectType),
         supabase.from('companies').select('id, short_name, name'),
       ]);
 
