@@ -176,8 +176,9 @@ const AdminPanel = () => {
     {
       label: 'Reports',
       icon: BarChart3,
-      description: 'Analytics, calendar & scope accuracy',
+      description: 'Analytics, calendar, scope accuracy & activity',
       items: [
+        { label: 'Activity Log', action: () => navigate('/admin/activity') },
         { label: 'Accounting', action: () => navigate('/admin/accounting') },
         { label: 'Analytics', action: () => navigate('/admin/analytics') },
         { label: 'Calendar', action: () => navigate('/admin/calendar') },
