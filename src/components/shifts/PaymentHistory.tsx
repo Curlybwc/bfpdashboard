@@ -528,6 +528,18 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                       Export to QB
                     </Button>
                   )}
+                  {p.source === 'batch' && p.batchStatus === 'draft' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-[10px] gap-1"
+                      onClick={() => setSplitTarget(p)}
+                      title="Split this bill into two"
+                    >
+                      <Split className="h-2.5 w-2.5" />
+                      Split
+                    </Button>
+                  )}
                   {(p.source === 'payment' || p.batchStatus === 'paid' || p.batchStatus === 'exported') && (
                     <Button
                       size="sm"
