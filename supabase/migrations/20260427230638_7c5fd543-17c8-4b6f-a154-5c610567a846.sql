@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.split_payable_batch(uuid, numeric) FROM PUBLIC, anon;

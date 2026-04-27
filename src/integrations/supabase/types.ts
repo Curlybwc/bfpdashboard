@@ -2411,6 +2411,7 @@ export type Database = {
           qb_export_error: string | null
           qb_exported_at: string | null
           settlement_method: string | null
+          split_from_batch_id: string | null
           status: string
           total_amount: number
           updated_at: string
@@ -2433,6 +2434,7 @@ export type Database = {
           qb_export_error?: string | null
           qb_exported_at?: string | null
           settlement_method?: string | null
+          split_from_batch_id?: string | null
           status?: string
           total_amount?: number
           updated_at?: string
@@ -2455,6 +2457,7 @@ export type Database = {
           qb_export_error?: string | null
           qb_exported_at?: string | null
           settlement_method?: string | null
+          split_from_batch_id?: string | null
           status?: string
           total_amount?: number
           updated_at?: string
@@ -2488,6 +2491,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_payable_batches_split_from_batch_id_fkey"
+            columns: ["split_from_batch_id"]
+            isOneToOne: false
+            referencedRelation: "worker_payable_batches"
             referencedColumns: ["id"]
           },
           {
@@ -2842,6 +2852,13 @@ export type Database = {
           p_worker_user_id: string
         }
         Returns: Json
+      }
+      split_payable_batch: {
+        Args: { p_batch_id: string; p_first_amount: number }
+        Returns: {
+          new_batch_id: string
+          original_batch_id: string
+        }[]
       }
       upsert_shift_with_allocations: {
         Args: {

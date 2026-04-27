@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2, X, Trash2, DollarSign, Building2, Search, Plus } from 'lucide-react';
+import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2, X, Trash2, DollarSign, Building2, Search, Plus, Split } from 'lucide-react';
+import SplitPaymentDialog from './SplitPaymentDialog';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
 import QBSettingsCard from './QBSettingsCard';
@@ -171,6 +172,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
   const [removingShiftId, setRemovingShiftId] = useState<string | null>(null);
   const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
   const [expandedExisting, setExpandedExisting] = useState<Set<string>>(new Set());
+  const [splitTarget, setSplitTarget] = useState<{ id: string; total: number; name: string } | null>(null);
 
   const [candidateGroups, setCandidateGroups] = useState<CandidateGroup[]>([]);
   const [exportedGroups, setExportedGroups] = useState<ExistingPayableGroup[]>([]);
@@ -1110,6 +1112,25 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                            Mark Paid (Local Only)
                         </Button>
                       )}
+                      {isDraft && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSplitTarget({
+                              id: group.batch.id,
+                              total: Number(group.batch.total_amount || group.totalDollars),
+                              name: group.contractorName,
+                            });
+                          }}
+                          title="Split into two bills"
+                        >
+                          <Split className="h-3 w-3" />
+                          Split
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CollapsibleTrigger>
@@ -1708,6 +1729,17 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
           </Tabs>
         )}
       </Card>
+
+      {splitTarget && (
+        <SplitPaymentDialog
+          open={!!splitTarget}
+          onOpenChange={(open) => { if (!open) setSplitTarget(null); }}
+          batchId={splitTarget.id}
+          totalAmount={splitTarget.total}
+          workerName={splitTarget.name}
+          onSuccess={() => { void loadPayroll(); }}
+        />
+      )}
     </div>
   );
 };

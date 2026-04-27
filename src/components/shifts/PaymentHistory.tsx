@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2 } from 'lucide-react';
+import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2, Split } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import SplitPaymentDialog from './SplitPaymentDialog';
 
 type PaymentRow = {
   id: string;
@@ -76,6 +77,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   const [payments, setPayments] = useState<UnifiedPayment[]>([]);
   const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
+  const [splitTarget, setSplitTarget] = useState<UnifiedPayment | null>(null);
 
   // Filters
   const [dateFrom, setDateFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -526,6 +528,18 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                       Export to QB
                     </Button>
                   )}
+                  {p.source === 'batch' && p.batchStatus === 'draft' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-[10px] gap-1"
+                      onClick={() => setSplitTarget(p)}
+                      title="Split this bill into two"
+                    >
+                      <Split className="h-2.5 w-2.5" />
+                      Split
+                    </Button>
+                  )}
                   {(p.source === 'payment' || p.batchStatus === 'paid' || p.batchStatus === 'exported') && (
                     <Button
                       size="sm"
@@ -546,6 +560,17 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
             </Card>
           ))}
         </div>
+      )}
+
+      {splitTarget && (
+        <SplitPaymentDialog
+          open={!!splitTarget}
+          onOpenChange={(open) => { if (!open) setSplitTarget(null); }}
+          batchId={splitTarget.id}
+          totalAmount={splitTarget.amount}
+          workerName={splitTarget.workerName}
+          onSuccess={loadData}
+        />
       )}
     </div>
   );
