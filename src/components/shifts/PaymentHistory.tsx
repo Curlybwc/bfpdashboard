@@ -561,6 +561,17 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
           ))}
         </div>
       )}
+
+      {splitTarget && (
+        <SplitPaymentDialog
+          open={!!splitTarget}
+          onOpenChange={(open) => { if (!open) setSplitTarget(null); }}
+          batchId={splitTarget.id}
+          totalAmount={splitTarget.amount}
+          workerName={splitTarget.workerName}
+          onSuccess={loadData}
+        />
+      )}
     </div>
   );
 };
