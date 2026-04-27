@@ -172,6 +172,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
   const [removingShiftId, setRemovingShiftId] = useState<string | null>(null);
   const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
   const [expandedExisting, setExpandedExisting] = useState<Set<string>>(new Set());
+  const [splitTarget, setSplitTarget] = useState<{ id: string; total: number; name: string } | null>(null);
 
   const [candidateGroups, setCandidateGroups] = useState<CandidateGroup[]>([]);
   const [exportedGroups, setExportedGroups] = useState<ExistingPayableGroup[]>([]);
