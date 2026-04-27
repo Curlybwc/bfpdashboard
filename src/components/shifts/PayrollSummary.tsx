@@ -1729,6 +1729,17 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
           </Tabs>
         )}
       </Card>
+
+      {splitTarget && (
+        <SplitPaymentDialog
+          open={!!splitTarget}
+          onOpenChange={(open) => { if (!open) setSplitTarget(null); }}
+          batchId={splitTarget.id}
+          totalAmount={splitTarget.total}
+          workerName={splitTarget.name}
+          onSuccess={() => { void loadPayroll(); }}
+        />
+      )}
     </div>
   );
 };
