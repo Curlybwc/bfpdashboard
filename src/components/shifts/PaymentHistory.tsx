@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2 } from 'lucide-react';
+import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2, Split } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import SplitPaymentDialog from './SplitPaymentDialog';
 
 type PaymentRow = {
   id: string;
@@ -76,6 +77,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   const [payments, setPayments] = useState<UnifiedPayment[]>([]);
   const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
+  const [splitTarget, setSplitTarget] = useState<UnifiedPayment | null>(null);
 
   // Filters
   const [dateFrom, setDateFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'));
