@@ -1112,6 +1112,25 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                            Mark Paid (Local Only)
                         </Button>
                       )}
+                      {isDraft && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSplitTarget({
+                              id: group.batch.id,
+                              total: Number(group.batch.total_amount || group.totalDollars),
+                              name: group.contractorName,
+                            });
+                          }}
+                          title="Split into two bills"
+                        >
+                          <Split className="h-3 w-3" />
+                          Split
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CollapsibleTrigger>
