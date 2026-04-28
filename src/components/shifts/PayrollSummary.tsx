@@ -1095,6 +1095,8 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
             const isDraft = group.batch.status === 'draft';
             const isExported = group.batch.status === 'exported';
             const exportError = group.batch.qb_export_error;
+            const isQbMatched = !!(group.batch as any).qb_matched_at;
+            const isPaid = group.batch.status === 'paid';
 
             return (
               <Collapsible key={group.batch.id} open={expandedExisting.has(key)} onOpenChange={() => toggleExisting(key)}>
@@ -1105,9 +1107,15 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
-                          <Badge variant={isExported ? 'default' : 'secondary'} className="text-[10px] h-5">
-                          {isExported ? 'In QuickBooks' : 'Pending Bill'}
+                          <Badge variant={isExported || isPaid ? 'default' : 'secondary'} className="text-[10px] h-5">
+                            {isPaid ? 'Marked Paid' : isExported ? 'In QuickBooks' : 'Pending Bill'}
                           </Badge>
+                          {isQbMatched && (
+                            <Badge className="text-[10px] h-5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-emerald-300 gap-0.5">
+                              <CheckCheck className="h-2.5 w-2.5" />
+                              Matched in QB
+                            </Badge>
+                          )}
                           {group.batch.qb_bill_doc_number && (
                             <Badge variant="outline" className="text-[10px] h-5">
                               QB #{group.batch.qb_bill_doc_number}
