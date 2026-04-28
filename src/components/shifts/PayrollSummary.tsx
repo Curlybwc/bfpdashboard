@@ -1207,6 +1207,20 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                         </a>
                       </Button>
                     )}
+                    {isExported && (
+                      <Button
+                        size="sm"
+                        variant={isQbMatched ? 'secondary' : 'outline'}
+                        disabled={updatingBatchId === group.batch.id}
+                        onClick={() => handleToggleQbMatched(group.batch.id, isQbMatched)}
+                        title={isQbMatched
+                          ? 'Clear the QuickBooks match flag'
+                          : 'Mark this bill as matched to a bank payment in QuickBooks'}
+                      >
+                        {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-1" />}
+                        {isQbMatched ? 'Unmatched' : 'Matched in QB'}
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       disabled={updatingBatchId === group.batch.id}
