@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2, Split } from 'lucide-react';
+import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2, Split, AlertTriangle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import SplitPaymentDialog from './SplitPaymentDialog';
@@ -236,7 +236,8 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     const pendingQbExport: UnifiedPayment[] = [];
     const pendingOffPlatform: UnifiedPayment[] = [];
     const inQuickbooks: UnifiedPayment[] = [];
-    const alreadyPaid: UnifiedPayment[] = [];
+    const paidInQb: UnifiedPayment[] = [];
+    const paidNotInQb: UnifiedPayment[] = [];
 
     filtered.forEach((p) => {
       if (p.batchStatus === 'draft') {
@@ -246,7 +247,14 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         inQuickbooks.push(p);
       } else {
         // 'paid' batch or worker_payment row
-        alreadyPaid.push(p);
+        // Distinguish: was this ever pushed to QuickBooks?
+        const inQb =
+          !!p.qbBillId ||
+          p.paymentMethod === 'QB Bill' ||
+          p.paymentMethod === 'QB Linked' ||
+          p.paymentMethod === 'Manual (QB)';
+        if (inQb) paidInQb.push(p);
+        else paidNotInQb.push(p);
       }
     });
 
@@ -255,7 +263,8 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       { key: 'pending_qb', label: 'Pending QB Export', items: pendingQbExport, total: sum(pendingQbExport) },
       { key: 'pending_off', label: 'Pending Off-Platform', items: pendingOffPlatform, total: sum(pendingOffPlatform) },
       { key: 'in_qb', label: 'In QuickBooks', items: inQuickbooks, total: sum(inQuickbooks) },
-      { key: 'already_paid', label: 'Already Paid', items: alreadyPaid, total: sum(alreadyPaid) },
+      { key: 'paid_in_qb', label: 'Paid · In QuickBooks', items: paidInQb, total: sum(paidInQb) },
+      { key: 'paid_not_in_qb', label: 'Paid · Not in QuickBooks', items: paidNotInQb, total: sum(paidNotInQb) },
     ].filter((g) => g.items.length > 0);
   }, [filtered]);
 
@@ -519,6 +528,12 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   <Badge variant="secondary" className="text-[10px]">
                     {group.items.length}
                   </Badge>
+                  {group.key === 'paid_not_in_qb' && (
+                    <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 dark:text-amber-300 gap-0.5">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      Needs QB push
+                    </Badge>
+                  )}
                 </div>
                 <Badge variant="outline" className="text-xs font-mono">
                   <DollarSign className="h-3 w-3 mr-0.5" />
@@ -542,6 +557,16 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                         Unpaid
                       </Badge>
                     )}
+                    {(p.source === 'payment' || p.batchStatus === 'paid') && !p.qbBillId &&
+                      p.paymentMethod !== 'QB Bill' && p.paymentMethod !== 'QB Linked' && p.paymentMethod !== 'Manual (QB)' && (
+                      <Badge
+                        className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300 gap-0.5"
+                        title="Marked paid locally but not yet recorded in QuickBooks"
+                      >
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        Not in QB
+                      </Badge>
+                    )}
                     {p.companyName && (
                       <Badge variant="outline" className="text-[10px] gap-0.5">
                         <Building2 className="h-2.5 w-2.5" />{p.companyName}
@@ -561,7 +586,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   <p className="text-sm font-mono font-medium whitespace-nowrap">
                     ${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
-                  {p.source === 'batch' && p.draftCategory === 'qb_export' && !p.qbBillId && (
+                  {p.source === 'batch' && !p.qbBillId && (p.batchStatus === 'draft' || p.batchStatus === 'paid') && p.draftCategory !== 'manual' && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -570,7 +595,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                       disabled={exporting}
                     >
                       {exporting ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Upload className="h-2.5 w-2.5" />}
-                      Export to QB
+                      Push to QB
                     </Button>
                   )}
                   {p.source === 'batch' && p.batchStatus === 'draft' && (
