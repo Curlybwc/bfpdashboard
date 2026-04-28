@@ -231,6 +231,34 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   const qbExportableTotal = useMemo(() => qbExportable.reduce((s, p) => s + p.amount, 0), [qbExportable]);
   const manualDraftTotal = useMemo(() => manualDrafts.reduce((s, p) => s + p.amount, 0), [manualDrafts]);
 
+  // Group filtered payments into categories for sectioned display with subtotals
+  const grouped = useMemo(() => {
+    const pendingQbExport: UnifiedPayment[] = [];
+    const pendingOffPlatform: UnifiedPayment[] = [];
+    const inQuickbooks: UnifiedPayment[] = [];
+    const alreadyPaid: UnifiedPayment[] = [];
+
+    filtered.forEach((p) => {
+      if (p.batchStatus === 'draft') {
+        if (p.draftCategory === 'manual') pendingOffPlatform.push(p);
+        else pendingQbExport.push(p);
+      } else if (p.batchStatus === 'exported') {
+        inQuickbooks.push(p);
+      } else {
+        // 'paid' batch or worker_payment row
+        alreadyPaid.push(p);
+      }
+    });
+
+    const sum = (arr: UnifiedPayment[]) => arr.reduce((s, p) => s + p.amount, 0);
+    return [
+      { key: 'pending_qb', label: 'Pending QB Export', items: pendingQbExport, total: sum(pendingQbExport) },
+      { key: 'pending_off', label: 'Pending Off-Platform', items: pendingOffPlatform, total: sum(pendingOffPlatform) },
+      { key: 'in_qb', label: 'In QuickBooks', items: inQuickbooks, total: sum(inQuickbooks) },
+      { key: 'already_paid', label: 'Already Paid', items: alreadyPaid, total: sum(alreadyPaid) },
+    ].filter((g) => g.items.length > 0);
+  }, [filtered]);
+
   // Get unique contractors and projects for filter dropdowns
   const contractorOptions = useMemo(() => {
     const unique = new Map<string, string>();
@@ -480,9 +508,26 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
           No payments found for the selected filters.
         </Card>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((p) => (
-            <Card key={`${p.source}-${p.id}`} className="p-3">
+        <div className="space-y-5">
+          {grouped.map((group) => (
+            <div key={group.key} className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {group.label}
+                  </h3>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {group.items.length}
+                  </Badge>
+                </div>
+                <Badge variant="outline" className="text-xs font-mono">
+                  <DollarSign className="h-3 w-3 mr-0.5" />
+                  {group.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {group.items.map((p) => (
+                  <Card key={`${p.source}-${p.id}`} className="p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -557,7 +602,10 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   )}
                 </div>
               </div>
-            </Card>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
