@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2, X, Trash2, DollarSign, Building2, Search, Plus, Split } from 'lucide-react';
+import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, CheckCheck, Link2, X, Trash2, DollarSign, Building2, Search, Plus, Split } from 'lucide-react';
 import SplitPaymentDialog from './SplitPaymentDialog';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
