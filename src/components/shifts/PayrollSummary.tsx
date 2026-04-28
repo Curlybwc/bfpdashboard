@@ -708,6 +708,26 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     await loadPayroll();
   };
 
+  const handleToggleQbMatched = async (batchId: string, currentlyMatched: boolean) => {
+    setUpdatingBatchId(batchId);
+    const { error } = await supabase.rpc('mark_batch_qb_matched', {
+      p_batch_id: batchId,
+      p_matched: !currentlyMatched,
+    });
+    setUpdatingBatchId(null);
+    if (error) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({
+      title: currentlyMatched ? 'Match cleared' : 'Marked as matched',
+      description: currentlyMatched
+        ? 'Bill is no longer marked as matched in QuickBooks.'
+        : 'Bill is marked as matched to a QuickBooks bank payment.',
+    });
+    await loadPayroll();
+  };
+
   const handleVoidBatch = async (batchId: string) => {
     setVoidingBatchId(batchId);
 
