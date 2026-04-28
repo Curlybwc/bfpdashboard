@@ -548,13 +548,17 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium">{p.workerName}</p>
                     <Badge variant="secondary" className="text-[10px]">{p.paymentMethod}</Badge>
-                    {(p.source === 'payment' || p.batchStatus === 'paid' || p.batchStatus === 'exported') ? (
+                    {(p.source === 'payment' || p.batchStatus === 'paid') ? (
                       <Badge className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-emerald-300">
                         Paid
                       </Badge>
+                    ) : p.batchStatus === 'exported' ? (
+                      <Badge className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-300">
+                        In QuickBooks
+                      </Badge>
                     ) : (
                       <Badge className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300">
-                        Unpaid
+                        Pending Bill
                       </Badge>
                     )}
                     {(p.source === 'payment' || p.batchStatus === 'paid') && !p.qbBillId &&
