@@ -300,7 +300,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
         const results = data?.results || [];
         for (const r of results) {
           if (r.success) {
-            toast({ title: 'Exported to QuickBooks', description: `Bill created (ID: ${r.qb_bill_id})` });
+            toast({ title: 'Pushed to QuickBooks', description: `Bill created (ID: ${r.qb_bill_id})` });
           } else {
             toast({ title: 'Export failed', description: r.error || 'Unknown error', variant: 'destructive' });
           }
@@ -1109,7 +1109,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                           }}
                         >
                           {updatingBatchId === group.batch.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
-                           Mark Paid (Local Only)
+                           Mark Paid
                         </Button>
                       )}
                       {isDraft && (
@@ -1168,7 +1168,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                         onClick={() => handleExportToQB(group.batch.id)}
                       >
                         {exportingBatchIds.has(group.batch.id) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                        Export to QuickBooks
+                        Push to QuickBooks
                       </Button>
                     )}
                     {isExported && qbBillUrl && (
@@ -1185,7 +1185,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                       onClick={() => handleMarkPaid(group.batch.id)}
                     >
                       {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                      Mark Paid (Local Only)
+                      Mark Paid
                     </Button>
                     {isDraft && (
                       <Button
