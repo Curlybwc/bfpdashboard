@@ -236,7 +236,8 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     const pendingQbExport: UnifiedPayment[] = [];
     const pendingOffPlatform: UnifiedPayment[] = [];
     const inQuickbooks: UnifiedPayment[] = [];
-    const alreadyPaid: UnifiedPayment[] = [];
+    const paidInQb: UnifiedPayment[] = [];
+    const paidNotInQb: UnifiedPayment[] = [];
 
     filtered.forEach((p) => {
       if (p.batchStatus === 'draft') {
@@ -246,7 +247,14 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
         inQuickbooks.push(p);
       } else {
         // 'paid' batch or worker_payment row
-        alreadyPaid.push(p);
+        // Distinguish: was this ever pushed to QuickBooks?
+        const inQb =
+          !!p.qbBillId ||
+          p.paymentMethod === 'QB Bill' ||
+          p.paymentMethod === 'QB Linked' ||
+          p.paymentMethod === 'Manual (QB)';
+        if (inQb) paidInQb.push(p);
+        else paidNotInQb.push(p);
       }
     });
 
@@ -255,7 +263,8 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       { key: 'pending_qb', label: 'Pending QB Export', items: pendingQbExport, total: sum(pendingQbExport) },
       { key: 'pending_off', label: 'Pending Off-Platform', items: pendingOffPlatform, total: sum(pendingOffPlatform) },
       { key: 'in_qb', label: 'In QuickBooks', items: inQuickbooks, total: sum(inQuickbooks) },
-      { key: 'already_paid', label: 'Already Paid', items: alreadyPaid, total: sum(alreadyPaid) },
+      { key: 'paid_in_qb', label: 'Paid · In QuickBooks', items: paidInQb, total: sum(paidInQb) },
+      { key: 'paid_not_in_qb', label: 'Paid · Not in QuickBooks', items: paidNotInQb, total: sum(paidNotInQb) },
     ].filter((g) => g.items.length > 0);
   }, [filtered]);
 
