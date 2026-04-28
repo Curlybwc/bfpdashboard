@@ -155,8 +155,8 @@ const Payroll = () => {
 
         <Tabs defaultValue={defaultTab}>
           <TabsList className="w-full">
-            <TabsTrigger value="prepare" className="flex-1 text-xs">Prepare Payroll</TabsTrigger>
-            <TabsTrigger value="history" className="flex-1 text-xs">Payment History</TabsTrigger>
+            <TabsTrigger value="prepare" className="flex-1 text-xs">Bills</TabsTrigger>
+            <TabsTrigger value="history" className="flex-1 text-xs">Bill History</TabsTrigger>
           </TabsList>
           <TabsContent value="prepare" className="mt-4">
             <PayrollSummary
