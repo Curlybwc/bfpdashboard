@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2, Split } from 'lucide-react';
+import { Loader2, DollarSign, Building2, Calendar, User, FolderOpen, X, Upload, CheckCircle, Undo2, Split, AlertTriangle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import SplitPaymentDialog from './SplitPaymentDialog';
@@ -528,6 +528,12 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   <Badge variant="secondary" className="text-[10px]">
                     {group.items.length}
                   </Badge>
+                  {group.key === 'paid_not_in_qb' && (
+                    <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 dark:text-amber-300 gap-0.5">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      Needs QB push
+                    </Badge>
+                  )}
                 </div>
                 <Badge variant="outline" className="text-xs font-mono">
                   <DollarSign className="h-3 w-3 mr-0.5" />
