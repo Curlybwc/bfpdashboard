@@ -508,9 +508,26 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
           No payments found for the selected filters.
         </Card>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((p) => (
-            <Card key={`${p.source}-${p.id}`} className="p-3">
+        <div className="space-y-5">
+          {grouped.map((group) => (
+            <div key={group.key} className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {group.label}
+                  </h3>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {group.items.length}
+                  </Badge>
+                </div>
+                <Badge variant="outline" className="text-xs font-mono">
+                  <DollarSign className="h-3 w-3 mr-0.5" />
+                  {group.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {group.items.map((p) => (
+                  <Card key={`${p.source}-${p.id}`} className="p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -585,7 +602,10 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   )}
                 </div>
               </div>
-            </Card>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
