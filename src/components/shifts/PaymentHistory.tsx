@@ -231,6 +231,34 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
   const qbExportableTotal = useMemo(() => qbExportable.reduce((s, p) => s + p.amount, 0), [qbExportable]);
   const manualDraftTotal = useMemo(() => manualDrafts.reduce((s, p) => s + p.amount, 0), [manualDrafts]);
 
+  // Group filtered payments into categories for sectioned display with subtotals
+  const grouped = useMemo(() => {
+    const pendingQbExport: UnifiedPayment[] = [];
+    const pendingOffPlatform: UnifiedPayment[] = [];
+    const inQuickbooks: UnifiedPayment[] = [];
+    const alreadyPaid: UnifiedPayment[] = [];
+
+    filtered.forEach((p) => {
+      if (p.batchStatus === 'draft') {
+        if (p.draftCategory === 'manual') pendingOffPlatform.push(p);
+        else pendingQbExport.push(p);
+      } else if (p.batchStatus === 'exported') {
+        inQuickbooks.push(p);
+      } else {
+        // 'paid' batch or worker_payment row
+        alreadyPaid.push(p);
+      }
+    });
+
+    const sum = (arr: UnifiedPayment[]) => arr.reduce((s, p) => s + p.amount, 0);
+    return [
+      { key: 'pending_qb', label: 'Pending QB Export', items: pendingQbExport, total: sum(pendingQbExport) },
+      { key: 'pending_off', label: 'Pending Off-Platform', items: pendingOffPlatform, total: sum(pendingOffPlatform) },
+      { key: 'in_qb', label: 'In QuickBooks', items: inQuickbooks, total: sum(inQuickbooks) },
+      { key: 'already_paid', label: 'Already Paid', items: alreadyPaid, total: sum(alreadyPaid) },
+    ].filter((g) => g.items.length > 0);
+  }, [filtered]);
+
   // Get unique contractors and projects for filter dropdowns
   const contractorOptions = useMemo(() => {
     const unique = new Map<string, string>();
