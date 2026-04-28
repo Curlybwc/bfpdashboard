@@ -1086,7 +1086,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                         <div className="flex items-center gap-2">
                           <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
                           <Badge variant={isExported ? 'default' : 'secondary'} className="text-[10px] h-5">
-                            {isExported ? 'Sent to QuickBooks' : 'Prepared'}
+                          {isExported ? 'In QuickBooks' : 'Pending Bill'}
                           </Badge>
                           {group.batch.qb_bill_doc_number && (
                             <Badge variant="outline" className="text-[10px] h-5">
