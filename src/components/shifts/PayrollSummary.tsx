@@ -300,7 +300,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
         const results = data?.results || [];
         for (const r of results) {
           if (r.success) {
-            toast({ title: 'Exported to QuickBooks', description: `Bill created (ID: ${r.qb_bill_id})` });
+            toast({ title: 'Pushed to QuickBooks', description: `Bill created (ID: ${r.qb_bill_id})` });
           } else {
             toast({ title: 'Export failed', description: r.error || 'Unknown error', variant: 'destructive' });
           }
@@ -1045,13 +1045,13 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                   </div>
                 ))}
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" disabled={creatingGroupKey === group.key || payingGroupKey === group.key} onClick={() => handleCreatePayable(group)}>
+                  <Button size="sm" variant="outline" disabled={creatingGroupKey === group.key || payingGroupKey === group.key} onClick={() => handleCreatePayable(group)} title="Creates a Pending Bill. You'll push it to QuickBooks from the Pending Bills section.">
                     {creatingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                    Prepare Payment
+                    Create Pending Bill
                   </Button>
-                  <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)}>
+                  <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)} title="Records this as paid in this app only. Does not push to QuickBooks.">
                     {payingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                    Record as Paid (Local Only)
+                    Record as Paid (skip QuickBooks)
                   </Button>
                 </div>
               </CollapsibleContent>
@@ -1086,7 +1086,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                         <div className="flex items-center gap-2">
                           <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
                           <Badge variant={isExported ? 'default' : 'secondary'} className="text-[10px] h-5">
-                            {isExported ? 'Sent to QuickBooks' : 'Prepared'}
+                          {isExported ? 'In QuickBooks' : 'Pending Bill'}
                           </Badge>
                           {group.batch.qb_bill_doc_number && (
                             <Badge variant="outline" className="text-[10px] h-5">
@@ -1109,7 +1109,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                           }}
                         >
                           {updatingBatchId === group.batch.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
-                           Mark Paid (Local Only)
+                           Mark Paid
                         </Button>
                       )}
                       {isDraft && (
@@ -1168,7 +1168,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                         onClick={() => handleExportToQB(group.batch.id)}
                       >
                         {exportingBatchIds.has(group.batch.id) ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                        Export to QuickBooks
+                        Push to QuickBooks
                       </Button>
                     )}
                     {isExported && qbBillUrl && (
@@ -1185,7 +1185,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                       onClick={() => handleMarkPaid(group.batch.id)}
                     >
                       {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                      Mark Paid (Local Only)
+                      Mark Paid
                     </Button>
                     {isDraft && (
                       <Button
@@ -1403,8 +1403,8 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
       <p className="text-xs text-muted-foreground">Shifts already paid (via any period) are automatically excluded, so you won't pay the same shift twice.</p>
 
       <Card className="p-3 text-xs text-muted-foreground">
-        <p>Ready to prepare: <span className="text-foreground font-medium">${totals.candidateDollars.toFixed(2)}</span></p>
-        <p>Prepared (not yet paid): <span className="text-foreground font-medium">${totals.exportedDollars.toFixed(2)}</span></p>
+        <p>Ready to bill: <span className="text-foreground font-medium">${totals.candidateDollars.toFixed(2)}</span></p>
+        <p>Pending bills (not yet paid): <span className="text-foreground font-medium">${totals.exportedDollars.toFixed(2)}</span></p>
         <p>Already paid: <span className="text-foreground font-medium">${totals.paidDollars.toFixed(2)}</span></p>
       </Card>
 
@@ -1413,8 +1413,8 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
           {/* Bill preview is primary in billFirstMode */}
           {billPreviewContent}
 
-          {collapsibleSection('Ready to Pay', filteredCandidateGroups.length, readyToPayContent)}
-          {collapsibleSection('Prepared Payments', filteredExportedGroups.length, preparedPaymentsContent)}
+          {collapsibleSection('Ready to Bill', filteredCandidateGroups.length, readyToPayContent)}
+          {collapsibleSection('Pending Bills', filteredExportedGroups.length, preparedPaymentsContent)}
           {collapsibleSection('Already Paid', filteredPaidGroups.length, alreadyPaidContent)}
           {collapsibleSection('Already Included Elsewhere', excludedShifts.length, excludedContent)}
         </>
@@ -1423,16 +1423,16 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
           {/* Standard mode: detail sections expanded, bill preview at bottom */}
           <Card className="p-3 space-y-2">
             <div>
-              <p className="text-sm font-medium">Ready to Pay</p>
-              <p className="text-xs text-muted-foreground">These contractor/project groups have unpaid shifts that can be prepared as a payment now.</p>
+              <p className="text-sm font-medium">Ready to Bill</p>
+              <p className="text-xs text-muted-foreground">Unpaid shifts grouped by contractor + project. Create a Pending Bill to start the QuickBooks workflow.</p>
             </div>
             {readyToPayContent}
           </Card>
 
           <Card className="p-3 space-y-2">
             <div>
-              <p className="text-sm font-medium">Prepared Payments</p>
-              <p className="text-xs text-muted-foreground">These payments have been prepared. Their shifts won't appear in Ready to Pay.</p>
+              <p className="text-sm font-medium">Pending Bills</p>
+              <p className="text-xs text-muted-foreground">Bills built locally but not yet pushed to QuickBooks. Push to QuickBooks here, then pay through your bank — QB will match the bank payment to the bill.</p>
             </div>
             {preparedPaymentsContent}
           </Card>
@@ -1461,12 +1461,12 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
       <Card className="p-3 space-y-2">
         <div className="flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-medium flex-1">Match Existing QuickBooks Payment</p>
+          <p className="text-sm font-medium flex-1">Record a Bill You Already Paid</p>
           <Button size="sm" variant="outline" onClick={() => setHistOpen(!histOpen)}>
             {histOpen ? 'Close' : 'Open'}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Link an existing QuickBooks transaction to local payment records, or record a local-only payment.</p>
+        <p className="text-xs text-muted-foreground">For shifts you already paid outside this app: link them to an existing QuickBooks transaction, or record them as paid locally without touching QuickBooks.</p>
 
         {histOpen && (
           <Tabs defaultValue="search-link" className="pt-2">
