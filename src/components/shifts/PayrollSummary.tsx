@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, Link2, X, Trash2, DollarSign, Building2, Search, Plus, Split } from 'lucide-react';
+import { Loader2, ChevronDown, Pencil, ExternalLink, AlertTriangle, CheckCircle, CheckCheck, Link2, X, Trash2, DollarSign, Building2, Search, Plus, Split } from 'lucide-react';
 import SplitPaymentDialog from './SplitPaymentDialog';
 import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
@@ -708,6 +708,26 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     await loadPayroll();
   };
 
+  const handleToggleQbMatched = async (batchId: string, currentlyMatched: boolean) => {
+    setUpdatingBatchId(batchId);
+    const { error } = await supabase.rpc('mark_batch_qb_matched', {
+      p_batch_id: batchId,
+      p_matched: !currentlyMatched,
+    });
+    setUpdatingBatchId(null);
+    if (error) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({
+      title: currentlyMatched ? 'Match cleared' : 'Marked as matched',
+      description: currentlyMatched
+        ? 'Bill is no longer marked as matched in QuickBooks.'
+        : 'Bill is marked as matched to a QuickBooks bank payment.',
+    });
+    await loadPayroll();
+  };
+
   const handleVoidBatch = async (batchId: string) => {
     setVoidingBatchId(batchId);
 
@@ -1075,6 +1095,8 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
             const isDraft = group.batch.status === 'draft';
             const isExported = group.batch.status === 'exported';
             const exportError = group.batch.qb_export_error;
+            const isQbMatched = !!(group.batch as any).qb_matched_at;
+            const isPaid = group.batch.status === 'paid';
 
             return (
               <Collapsible key={group.batch.id} open={expandedExisting.has(key)} onOpenChange={() => toggleExisting(key)}>
@@ -1085,9 +1107,15 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
-                          <Badge variant={isExported ? 'default' : 'secondary'} className="text-[10px] h-5">
-                          {isExported ? 'In QuickBooks' : 'Pending Bill'}
+                          <Badge variant={isExported || isPaid ? 'default' : 'secondary'} className="text-[10px] h-5">
+                            {isPaid ? 'Marked Paid' : isExported ? 'In QuickBooks' : 'Pending Bill'}
                           </Badge>
+                          {isQbMatched && (
+                            <Badge className="text-[10px] h-5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-emerald-300 gap-0.5">
+                              <CheckCheck className="h-2.5 w-2.5" />
+                              Matched in QB
+                            </Badge>
+                          )}
                           {group.batch.qb_bill_doc_number && (
                             <Badge variant="outline" className="text-[10px] h-5">
                               QB #{group.batch.qb_bill_doc_number}
@@ -1177,6 +1205,20 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                           <ExternalLink className="h-3 w-3 mr-1" />
                           Open in QuickBooks
                         </a>
+                      </Button>
+                    )}
+                    {isExported && (
+                      <Button
+                        size="sm"
+                        variant={isQbMatched ? 'secondary' : 'outline'}
+                        disabled={updatingBatchId === group.batch.id}
+                        onClick={() => handleToggleQbMatched(group.batch.id, isQbMatched)}
+                        title={isQbMatched
+                          ? 'Clear the QuickBooks match flag'
+                          : 'Mark this bill as matched to a bank payment in QuickBooks'}
+                      >
+                        {updatingBatchId === group.batch.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-1" />}
+                        {isQbMatched ? 'Unmatched' : 'Matched in QB'}
                       </Button>
                     )}
                     <Button

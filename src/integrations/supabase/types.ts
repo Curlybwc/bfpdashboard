@@ -2410,6 +2410,8 @@ export type Database = {
           qb_bill_id: string | null
           qb_export_error: string | null
           qb_exported_at: string | null
+          qb_matched_at: string | null
+          qb_matched_by: string | null
           settlement_method: string | null
           split_from_batch_id: string | null
           status: string
@@ -2433,6 +2435,8 @@ export type Database = {
           qb_bill_id?: string | null
           qb_export_error?: string | null
           qb_exported_at?: string | null
+          qb_matched_at?: string | null
+          qb_matched_by?: string | null
           settlement_method?: string | null
           split_from_batch_id?: string | null
           status?: string
@@ -2456,6 +2460,8 @@ export type Database = {
           qb_bill_id?: string | null
           qb_export_error?: string | null
           qb_exported_at?: string | null
+          qb_matched_at?: string | null
+          qb_matched_by?: string | null
           settlement_method?: string | null
           split_from_batch_id?: string | null
           status?: string
@@ -2817,6 +2823,10 @@ export type Database = {
       is_scope_member: {
         Args: { _scope_id: string; _user_id: string }
         Returns: boolean
+      }
+      mark_batch_qb_matched: {
+        Args: { p_batch_id: string; p_matched: boolean }
+        Returns: undefined
       }
       merge_projects: {
         Args: { p_project_a: string; p_project_b: string }
