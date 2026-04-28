@@ -557,6 +557,16 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                         Unpaid
                       </Badge>
                     )}
+                    {(p.source === 'payment' || p.batchStatus === 'paid') && !p.qbBillId &&
+                      p.paymentMethod !== 'QB Bill' && p.paymentMethod !== 'QB Linked' && p.paymentMethod !== 'Manual (QB)' && (
+                      <Badge
+                        className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300 gap-0.5"
+                        title="Marked paid locally but not yet recorded in QuickBooks"
+                      >
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        Not in QB
+                      </Badge>
+                    )}
                     {p.companyName && (
                       <Badge variant="outline" className="text-[10px] gap-0.5">
                         <Building2 className="h-2.5 w-2.5" />{p.companyName}
@@ -576,7 +586,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                   <p className="text-sm font-mono font-medium whitespace-nowrap">
                     ${p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
-                  {p.source === 'batch' && p.draftCategory === 'qb_export' && !p.qbBillId && (
+                  {p.source === 'batch' && !p.qbBillId && (p.batchStatus === 'draft' || p.batchStatus === 'paid') && p.draftCategory !== 'manual' && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -585,7 +595,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
                       disabled={exporting}
                     >
                       {exporting ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Upload className="h-2.5 w-2.5" />}
-                      Export to QB
+                      Push to QB
                     </Button>
                   )}
                   {p.source === 'batch' && p.batchStatus === 'draft' && (
