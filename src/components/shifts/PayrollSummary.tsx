@@ -1045,13 +1045,13 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                   </div>
                 ))}
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" disabled={creatingGroupKey === group.key || payingGroupKey === group.key} onClick={() => handleCreatePayable(group)}>
+                  <Button size="sm" variant="outline" disabled={creatingGroupKey === group.key || payingGroupKey === group.key} onClick={() => handleCreatePayable(group)} title="Creates a Pending Bill. You'll push it to QuickBooks from the Pending Bills section.">
                     {creatingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                    Prepare Payment
+                    Create Pending Bill
                   </Button>
-                  <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)}>
+                  <Button size="sm" disabled={payingGroupKey === group.key || creatingGroupKey === group.key} onClick={() => handleCreateAndMarkPaid(group)} title="Records this as paid in this app only. Does not push to QuickBooks.">
                     {payingGroupKey === group.key ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                    Record as Paid (Local Only)
+                    Record as Paid (skip QuickBooks)
                   </Button>
                 </div>
               </CollapsibleContent>
