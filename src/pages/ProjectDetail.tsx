@@ -1073,6 +1073,7 @@ const ProjectDetail = () => {
             selectedIds={selectedTaskIds}
             allVisibleIds={filteredTasksWithParents.filter(t => !t.is_package).map(t => t.id)}
             members={projectMembers}
+            allProfiles={allProfiles}
             onClear={exitBulkMode}
             onDone={handleBulkDone}
             onSelectAll={() => setSelectedTaskIds(new Set(filteredTasksWithParents.filter(t => !t.is_package).map(t => t.id)))}

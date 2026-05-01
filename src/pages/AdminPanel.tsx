@@ -162,6 +162,7 @@ const AdminPanel = () => {
         { label: 'Availability', action: () => setActiveView('availability') },
         { label: 'Crew Groups', action: () => setActiveView('crew-groups') },
         { label: 'Vendors', action: () => navigate('/admin/vendors') },
+        { label: 'Bulk-Add Candidate', action: () => navigate('/admin/bulk-candidates') },
       ],
     },
     {
