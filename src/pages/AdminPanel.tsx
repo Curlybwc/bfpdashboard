@@ -209,8 +209,8 @@ const AdminPanel = () => {
         <div className="space-y-2">
           {profiles.map((profile) => (
             <Card key={profile.id} className={`p-3 ${profile.is_active === false ? 'opacity-60' : ''}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="min-w-0 sm:flex-1">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm truncate">
                       {profile.full_name || 'Unnamed User'}
