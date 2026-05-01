@@ -10,13 +10,14 @@ interface BulkTaskBarProps {
   selectedIds: Set<string>;
   allVisibleIds: string[];
   members: { user_id: string; profiles?: { full_name: string | null } | null }[];
+  allProfiles?: { id: string; full_name: string | null }[];
   onClear: () => void;
   onDone: () => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
 }
 
-const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onSelectAll, onDeselectAll }: BulkTaskBarProps) => {
+const BulkTaskBar = ({ selectedIds, allVisibleIds, members, allProfiles, onClear, onDone, onSelectAll, onDeselectAll }: BulkTaskBarProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
@@ -38,6 +39,38 @@ const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onS
       onDone();
     }
   };
+
+  const addCandidate = async (userId: string) => {
+    if (ids.length === 0) return;
+    setLoading(true);
+    const rows = ids.map((task_id) => ({ task_id, user_id: userId }));
+    // upsert-like: ignore duplicates by selecting existing first
+    const { data: existing } = await supabase
+      .from('task_candidates')
+      .select('task_id')
+      .eq('user_id', userId)
+      .in('task_id', ids);
+    const existingSet = new Set((existing || []).map((r: any) => r.task_id));
+    const toInsert = rows.filter((r) => !existingSet.has(r.task_id));
+    if (toInsert.length === 0) {
+      setLoading(false);
+      toast({ title: 'Already a candidate on all selected tasks' });
+      onDone();
+      return;
+    }
+    const { error } = await supabase.from('task_candidates').insert(toInsert);
+    setLoading(false);
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: `Added as candidate on ${toInsert.length} task${toInsert.length !== 1 ? 's' : ''}` });
+      onDone();
+    }
+  };
+
+  const candidateOptions = (allProfiles && allProfiles.length > 0)
+    ? allProfiles.map((p) => ({ user_id: p.id, name: p.full_name || 'Unnamed' }))
+    : members.map((m) => ({ user_id: m.user_id, name: m.profiles?.full_name || 'Unnamed' }));
 
   return (
     <div className="sticky top-0 z-30 bg-card border-b shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
@@ -94,6 +127,17 @@ const BulkTaskBar = ({ selectedIds, allVisibleIds, members, onClear, onDone, onS
                 <SelectItem key={m.user_id} value={m.user_id}>
                   {m.profiles?.full_name || 'Unnamed'}
                 </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select onValueChange={(v) => addCandidate(v)} disabled={loading}>
+            <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectValue placeholder="Add as candidate" />
+            </SelectTrigger>
+            <SelectContent>
+              {candidateOptions.map((p) => (
+                <SelectItem key={p.user_id} value={p.user_id}>{p.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
