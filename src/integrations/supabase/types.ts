@@ -482,6 +482,56 @@ export type Database = {
           },
         ]
       }
+      org_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by_user_id: string | null
+          email: string
+          expires_at: string
+          id: string
+          invited_at: string
+          invited_by: string | null
+          org_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          status: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by_user_id?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          org_id: string
+          role?: Database["public"]["Enums"]["org_role"]
+          status?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by_user_id?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          org_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_invites_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_members: {
         Row: {
           created_at: string
@@ -2755,6 +2805,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_stranded_users: {
+        Args: never
+        Returns: {
+          current_org_id: string
+          current_org_member_count: number
+          current_org_name: string
+          current_org_project_count: number
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       admin_mark_visible_shifts_paid: {
         Args: {
           p_confirmation_note?: string
@@ -2764,6 +2826,13 @@ export type Database = {
           p_period_start: string
           p_shift_ids: string[]
           p_worker_user_id: string
+        }
+        Returns: Json
+      }
+      admin_move_user_to_my_org: {
+        Args: {
+          p_role?: Database["public"]["Enums"]["org_role"]
+          p_target_user_id: string
         }
         Returns: Json
       }
@@ -2838,6 +2907,7 @@ export type Database = {
       }
       push_recipe_step_to_tasks: { Args: { p_step_id: string }; Returns: Json }
       push_recipe_to_tasks: { Args: { p_recipe_id: string }; Returns: Json }
+      revoke_org_invite: { Args: { p_invite_id: string }; Returns: undefined }
       save_linked_historical_payments: {
         Args: {
           p_allocations: Json
