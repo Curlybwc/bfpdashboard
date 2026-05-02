@@ -207,6 +207,8 @@ const AdminPanel = () => {
       description: 'User permissions, aliases & impersonation',
       items: [
         { label: 'Users', action: () => setActiveView('users') },
+        { label: 'Invite Users', action: () => navigate('/admin/invites') },
+        { label: 'Users in Other Orgs', action: () => navigate('/admin/stranded-users') },
         { label: 'Aliases', action: () => setActiveView('aliases') },
         { label: 'Tenants', action: () => setActiveView('tenants') },
       ],
