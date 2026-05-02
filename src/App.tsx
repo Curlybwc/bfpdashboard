@@ -45,6 +45,8 @@ import AdminVendorMappings from "./pages/AdminVendorMappings";
 import AdminVendors from "./pages/AdminVendors";
 import AdminActivityLog from "./pages/AdminActivityLog";
 import AdminBulkCandidates from "./pages/AdminBulkCandidates";
+import AdminInvites from "./pages/AdminInvites";
+import AdminStrandedUsers from "./pages/AdminStrandedUsers";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
