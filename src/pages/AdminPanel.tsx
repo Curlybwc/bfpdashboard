@@ -37,7 +37,21 @@ const AdminPanel = () => {
   }, [isAdmin, adminLoading, navigate]);
 
   const fetchProfiles = async () => {
-    const { data } = await supabase.from('profiles').select('*').order('created_at');
+    if (!user) return;
+    // Only show users in the same org as the caller. Profiles in other orgs
+    // (e.g., self-signups that landed in their own private workspace) are
+    // surfaced separately via the "Stranded Users" admin tool.
+    const { data: me } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!me?.org_id) { setProfiles([]); return; }
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('org_id', me.org_id)
+      .order('created_at');
     if (data) setProfiles(data);
   };
 
@@ -193,6 +207,8 @@ const AdminPanel = () => {
       description: 'User permissions, aliases & impersonation',
       items: [
         { label: 'Users', action: () => setActiveView('users') },
+        { label: 'Invite Users', action: () => navigate('/admin/invites') },
+        { label: 'Users in Other Orgs', action: () => navigate('/admin/stranded-users') },
         { label: 'Aliases', action: () => setActiveView('aliases') },
         { label: 'Tenants', action: () => setActiveView('tenants') },
       ],

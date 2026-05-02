@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -7,14 +7,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { HardHat } from 'lucide-react';
+import { HardHat, Mail } from 'lucide-react';
 
 const Login = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite');
+  const inviteEmailParam = searchParams.get('email');
+  const [isSignUp, setIsSignUp] = useState(!!inviteToken);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(inviteEmailParam ?? '');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,14 +53,22 @@ const Login = () => {
         email,
         password,
         options: {
-          data: { full_name: fullName },
+          data: {
+            full_name: fullName,
+            ...(inviteToken ? { invite_token: inviteToken } : {}),
+          },
           emailRedirectTo: window.location.origin,
         },
       });
       if (error) {
         toast({ title: 'Sign up failed', description: error.message, variant: 'destructive' });
       } else {
-        toast({ title: 'Check your email', description: 'We sent you a confirmation link.' });
+        toast({
+          title: 'Check your email',
+          description: inviteToken
+            ? "We sent you a confirmation link. After confirming, you'll join the organization that invited you."
+            : 'We sent you a confirmation link.',
+        });
       }
     } else {
       const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -92,6 +103,17 @@ const Login = () => {
           <p className="text-sm text-muted-foreground">Contractor Task & Scope Manager</p>
         </CardHeader>
         <CardContent>
+          {inviteToken && isSignUp && (
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+              <Mail className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+              <div>
+                <p className="font-medium">You've been invited to join an organization.</p>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  Sign up with the invited email to accept. The invite is valid for 14 days.
+                </p>
+              </div>
+            </div>
+          )}
           {isForgotPassword ? (
             <>
               <form onSubmit={handleForgotPassword} className="space-y-4">
