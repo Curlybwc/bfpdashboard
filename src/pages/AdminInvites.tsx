@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Copy, Trash2, Loader2, Send, Link2 } from 'lucide-react';
+import { Mail, Trash2, Loader2, Send, Link2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Invite {
