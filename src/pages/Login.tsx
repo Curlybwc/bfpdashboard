@@ -103,6 +103,17 @@ const Login = () => {
           <p className="text-sm text-muted-foreground">Contractor Task & Scope Manager</p>
         </CardHeader>
         <CardContent>
+          {inviteToken && isSignUp && (
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+              <Mail className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+              <div>
+                <p className="font-medium">You've been invited to join an organization.</p>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  Sign up with the invited email to accept. The invite is valid for 14 days.
+                </p>
+              </div>
+            </div>
+          )}
           {isForgotPassword ? (
             <>
               <form onSubmit={handleForgotPassword} className="space-y-4">
