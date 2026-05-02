@@ -131,6 +131,8 @@ const AppRoutes = () => {
         <Route path="/admin/vendors" element={<AdminGuard><AdminVendors /></AdminGuard>} />
         <Route path="/admin/activity" element={<AdminGuard><AdminActivityLog /></AdminGuard>} />
         <Route path="/admin/bulk-candidates" element={<AdminGuard><AdminBulkCandidates /></AdminGuard>} />
+        <Route path="/admin/invites" element={<AdminGuard><AdminInvites /></AdminGuard>} />
+        <Route path="/admin/stranded-users" element={<AdminGuard><AdminStrandedUsers /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}
