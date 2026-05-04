@@ -199,6 +199,8 @@ const AdminPanel = () => {
         { label: 'Calendar', action: () => navigate('/admin/calendar') },
         { label: 'QB Vendor Mappings', action: () => navigate('/admin/vendor-mappings') },
         { label: 'Scope Accuracy', action: () => navigate('/admin/scope-accuracy') },
+        { label: 'Reimbursements (Review)', action: () => navigate('/admin/reimbursements') },
+        { label: 'Reimbursements (Payment Queue)', action: () => navigate('/admin/reimbursements/payment-queue') },
       ],
     },
     {
