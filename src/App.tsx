@@ -47,6 +47,9 @@ import AdminActivityLog from "./pages/AdminActivityLog";
 import AdminBulkCandidates from "./pages/AdminBulkCandidates";
 import AdminInvites from "./pages/AdminInvites";
 import AdminStrandedUsers from "./pages/AdminStrandedUsers";
+import Reimbursements from "./pages/Reimbursements";
+import AdminReimbursements from "./pages/AdminReimbursements";
+import AdminReimbursementPaymentQueue from "./pages/AdminReimbursementPaymentQueue";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
@@ -133,6 +136,9 @@ const AppRoutes = () => {
         <Route path="/admin/bulk-candidates" element={<AdminGuard><AdminBulkCandidates /></AdminGuard>} />
         <Route path="/admin/invites" element={<AdminGuard><AdminInvites /></AdminGuard>} />
         <Route path="/admin/stranded-users" element={<AdminGuard><AdminStrandedUsers /></AdminGuard>} />
+        <Route path="/reimbursements" element={<Reimbursements />} />
+        <Route path="/admin/reimbursements" element={<AdminGuard><AdminReimbursements /></AdminGuard>} />
+        <Route path="/admin/reimbursements/payment-queue" element={<AdminGuard><AdminReimbursementPaymentQueue /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {user && <MobileNav />}

@@ -75,6 +75,11 @@ const QBSettingsCard = () => {
   const [expLoading, setExpLoading] = useState(false);
   const [expSaving, setExpSaving] = useState(false);
 
+  // Reimbursement expense account state (per company)
+  const [reimbAccountId, setReimbAccountId] = useState('');
+  const [reimbAccountName, setReimbAccountName] = useState('');
+  const [reimbDirty, setReimbDirty] = useState(false);
+
   // Class mappings state
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [classMappings, setClassMappings] = useState<Record<string, { qb_class_id: string; qb_class_name: string }>>({});
@@ -146,7 +151,7 @@ const QBSettingsCard = () => {
     setQbVendors([]);
 
     const [settingsRes, projectsRes, profilesRes, classRes, vendorRes] = await Promise.all([
-      supabase.from('quickbooks_settings').select('labor_expense_account_id, labor_expense_account_name').eq('company_id', selectedCompanyId).maybeSingle(),
+      supabase.from('quickbooks_settings').select('labor_expense_account_id, labor_expense_account_name, qb_reimbursement_expense_account_id, qb_reimbursement_expense_account_name').eq('company_id', selectedCompanyId).maybeSingle(),
       supabase.from('projects').select('id, name, address, status').eq('status', 'active').eq('company_id', selectedCompanyId).order('name'),
       supabase.from('profiles').select('id, full_name, is_active').eq('is_active', true).order('full_name'),
       supabase.from('quickbooks_class_mappings').select('project_id, qb_class_id, qb_class_name'),
@@ -156,11 +161,16 @@ const QBSettingsCard = () => {
     if (settingsRes.data) {
       setExpAccountId(settingsRes.data.labor_expense_account_id || '');
       setExpAccountName(settingsRes.data.labor_expense_account_name || '');
+      setReimbAccountId((settingsRes.data as any).qb_reimbursement_expense_account_id || '');
+      setReimbAccountName((settingsRes.data as any).qb_reimbursement_expense_account_name || '');
     } else {
       setExpAccountId('');
       setExpAccountName('');
+      setReimbAccountId('');
+      setReimbAccountName('');
     }
     setExpDirty(false);
+    setReimbDirty(false);
 
     setProjects((projectsRes.data || []) as ProjectRow[]);
     setProfiles((profilesRes.data || []) as ProfileRow[]);
@@ -314,6 +324,14 @@ const QBSettingsCard = () => {
     setExpDirty(true);
   };
 
+  const selectReimbExpenseAccount = (accountId: string) => {
+    const account = qbAccounts.find((a) => a.id === accountId);
+    if (!account) return;
+    setReimbAccountId(account.id);
+    setReimbAccountName(account.fully_qualified_name);
+    setReimbDirty(true);
+  };
+
   const saveExpenseAccount = async (): Promise<boolean> => {
     if (!expAccountId.trim() || !selectedCompanyId) return false;
     setExpSaving(true);
@@ -344,6 +362,33 @@ const QBSettingsCard = () => {
         }));
     }
     setExpSaving(false);
+    if (error) {
+      toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
+
+  const saveReimbExpenseAccount = async (): Promise<boolean> => {
+    if (!selectedCompanyId) return false;
+    const { data: existing } = await supabase
+      .from('quickbooks_settings')
+      .select('id')
+      .eq('company_id', selectedCompanyId)
+      .maybeSingle();
+
+    const payload: any = {
+      qb_reimbursement_expense_account_id: reimbAccountId.trim() || null,
+      qb_reimbursement_expense_account_name: reimbAccountName.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    let error;
+    if (existing) {
+      ({ error } = await supabase.from('quickbooks_settings').update(payload).eq('id', existing.id));
+    } else {
+      ({ error } = await supabase.from('quickbooks_settings').insert({ ...payload, company_id: selectedCompanyId }));
+    }
     if (error) {
       toast({ title: 'Save failed', description: error.message, variant: 'destructive' });
       return false;
@@ -483,6 +528,12 @@ const QBSettingsCard = () => {
       else failures++;
     }
 
+    if (reimbDirty) {
+      const ok = await saveReimbExpenseAccount();
+      if (ok) { saved.push('reimbursement account'); setReimbDirty(false); }
+      else failures++;
+    }
+
     // Scope class edits to only projects visible under the current company
     const visibleProjectIds = new Set(projects.map((p) => p.id));
     const classEditIds = Object.keys(classEdits).filter((pid) => visibleProjectIds.has(pid));
@@ -516,7 +567,7 @@ const QBSettingsCard = () => {
     }
   };
 
-  const hasAnyUnsaved = expDirty || Object.keys(classEdits).length > 0 || Object.keys(vendorEdits).length > 0;
+  const hasAnyUnsaved = expDirty || reimbDirty || Object.keys(classEdits).length > 0 || Object.keys(vendorEdits).length > 0;
 
   return (
     <Card className="p-3">
@@ -716,6 +767,36 @@ const QBSettingsCard = () => {
                     <div className="space-y-1">
                       <Label className="text-xs">Display Name</Label>
                       <Input className="h-8 text-xs w-48" value={expAccountName} onChange={(e) => setExpAccountNameTracked(e.target.value)} placeholder="e.g. Contract Labor" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* A2. Reimbursement Expense Account */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reimbursement Expense Account</p>
+                <p className="text-xs text-muted-foreground">Used when posting contractor reimbursement bills. Often Repairs &amp; Maintenance.</p>
+                {qbAccountsLoaded && qbAccounts.length > 0 ? (
+                  <QBCombobox
+                    options={qbAccounts.map((a) => ({
+                      value: a.id,
+                      label: a.fully_qualified_name,
+                      detail: a.account_sub_type || a.account_type || undefined,
+                    }))}
+                    value={reimbAccountId || undefined}
+                    onSelect={selectReimbExpenseAccount}
+                    placeholder="Search expense accounts…"
+                    className="w-full"
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Account ID</Label>
+                      <Input className="h-8 text-xs w-40" value={reimbAccountId} onChange={(e) => { setReimbAccountId(e.target.value); setReimbDirty(true); }} placeholder="e.g. 80" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Display Name</Label>
+                      <Input className="h-8 text-xs w-48" value={reimbAccountName} onChange={(e) => { setReimbAccountName(e.target.value); setReimbDirty(true); }} placeholder="e.g. Repairs and Maintenance" />
                     </div>
                   </div>
                 )}
