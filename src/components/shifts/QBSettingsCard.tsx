@@ -772,6 +772,36 @@ const QBSettingsCard = () => {
                 )}
               </div>
 
+              {/* A2. Reimbursement Expense Account */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reimbursement Expense Account</p>
+                <p className="text-xs text-muted-foreground">Used when posting contractor reimbursement bills. Often Repairs &amp; Maintenance.</p>
+                {qbAccountsLoaded && qbAccounts.length > 0 ? (
+                  <QBCombobox
+                    options={qbAccounts.map((a) => ({
+                      value: a.id,
+                      label: a.fully_qualified_name,
+                      detail: a.account_sub_type || a.account_type || undefined,
+                    }))}
+                    value={reimbAccountId || undefined}
+                    onSelect={selectReimbExpenseAccount}
+                    placeholder="Search expense accounts…"
+                    className="w-full"
+                  />
+                ) : (
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Account ID</Label>
+                      <Input className="h-8 text-xs w-40" value={reimbAccountId} onChange={(e) => { setReimbAccountId(e.target.value); setReimbDirty(true); }} placeholder="e.g. 80" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Display Name</Label>
+                      <Input className="h-8 text-xs w-48" value={reimbAccountName} onChange={(e) => { setReimbAccountName(e.target.value); setReimbDirty(true); }} placeholder="e.g. Repairs and Maintenance" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* B. Project → Class Mappings */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
