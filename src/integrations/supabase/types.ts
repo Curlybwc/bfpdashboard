@@ -899,6 +899,8 @@ export type Database = {
           id: string
           labor_expense_account_id: string | null
           labor_expense_account_name: string | null
+          qb_reimbursement_expense_account_id: string | null
+          qb_reimbursement_expense_account_name: string | null
           singleton: boolean
           updated_at: string
         }
@@ -907,6 +909,8 @@ export type Database = {
           id?: string
           labor_expense_account_id?: string | null
           labor_expense_account_name?: string | null
+          qb_reimbursement_expense_account_id?: string | null
+          qb_reimbursement_expense_account_name?: string | null
           singleton?: boolean
           updated_at?: string
         }
@@ -915,6 +919,8 @@ export type Database = {
           id?: string
           labor_expense_account_id?: string | null
           labor_expense_account_name?: string | null
+          qb_reimbursement_expense_account_id?: string | null
+          qb_reimbursement_expense_account_name?: string | null
           singleton?: boolean
           updated_at?: string
         }
@@ -1061,6 +1067,105 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reimbursement_requests: {
+        Row: {
+          admin_notes: string | null
+          approved_amount: number | null
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string | null
+          contractor_response: string | null
+          created_at: string
+          created_by: string
+          description: string
+          expense_date: string
+          external_reference: string | null
+          id: string
+          info_request_note: string | null
+          marked_paid_by: string | null
+          on_behalf_of_user_id: string | null
+          org_id: string
+          paid_at: string | null
+          project_id: string | null
+          qb_bill_doc_number: string | null
+          qb_bill_id: string | null
+          qb_export_error: string | null
+          qb_exported_at: string | null
+          receipt_paths: string[]
+          rejection_reason: string | null
+          requested_amount: number
+          settlement_method: string | null
+          status: Database["public"]["Enums"]["reimbursement_status"]
+          submitter_user_id: string
+          updated_at: string
+          vendor_paid: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          approved_amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string | null
+          contractor_response?: string | null
+          created_at?: string
+          created_by: string
+          description: string
+          expense_date: string
+          external_reference?: string | null
+          id?: string
+          info_request_note?: string | null
+          marked_paid_by?: string | null
+          on_behalf_of_user_id?: string | null
+          org_id: string
+          paid_at?: string | null
+          project_id?: string | null
+          qb_bill_doc_number?: string | null
+          qb_bill_id?: string | null
+          qb_export_error?: string | null
+          qb_exported_at?: string | null
+          receipt_paths?: string[]
+          rejection_reason?: string | null
+          requested_amount: number
+          settlement_method?: string | null
+          status?: Database["public"]["Enums"]["reimbursement_status"]
+          submitter_user_id: string
+          updated_at?: string
+          vendor_paid: string
+        }
+        Update: {
+          admin_notes?: string | null
+          approved_amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string | null
+          contractor_response?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string
+          expense_date?: string
+          external_reference?: string | null
+          id?: string
+          info_request_note?: string | null
+          marked_paid_by?: string | null
+          on_behalf_of_user_id?: string | null
+          org_id?: string
+          paid_at?: string | null
+          project_id?: string | null
+          qb_bill_doc_number?: string | null
+          qb_bill_id?: string | null
+          qb_export_error?: string | null
+          qb_exported_at?: string | null
+          receipt_paths?: string[]
+          rejection_reason?: string | null
+          requested_amount?: number
+          settlement_method?: string | null
+          status?: Database["public"]["Enums"]["reimbursement_status"]
+          submitter_user_id?: string
+          updated_at?: string
+          vendor_paid?: string
+        }
+        Relationships: []
       }
       scope_checklist_reviews: {
         Row: {
@@ -2984,6 +3089,14 @@ export type Database = {
       project_member_role: "contractor" | "manager" | "read_only"
       project_status: "active" | "paused" | "complete"
       project_type: "construction" | "rental" | "general"
+      reimbursement_status:
+        | "submitted"
+        | "needs_info"
+        | "not_approved"
+        | "approved"
+        | "exported"
+        | "paid"
+        | "voided"
       scope_member_role: "viewer" | "editor" | "manager"
       scope_status: "Draft" | "Converted" | "Archived" | "active" | "archived"
       task_priority:
@@ -3162,6 +3275,15 @@ export const Constants = {
       project_member_role: ["contractor", "manager", "read_only"],
       project_status: ["active", "paused", "complete"],
       project_type: ["construction", "rental", "general"],
+      reimbursement_status: [
+        "submitted",
+        "needs_info",
+        "not_approved",
+        "approved",
+        "exported",
+        "paid",
+        "voided",
+      ],
       scope_member_role: ["viewer", "editor", "manager"],
       scope_status: ["Draft", "Converted", "Archived", "active", "archived"],
       task_priority: [
