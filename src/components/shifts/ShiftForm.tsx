@@ -128,6 +128,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [creatingTask, setCreatingTask] = useState(false);
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
+  const [taskSearch, setTaskSearch] = useState('');
 
   // For admin editing other users
   const [allUsers, setAllUsers] = useState<{ id: string; full_name: string | null }[]>([]);
@@ -475,8 +476,24 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
           ) : tasks.length === 0 ? (
             <NoEligibleTasksCard />
           ) : (
-            <div className="space-y-1.5">
-              {tasks.map(t => (
+            <>
+            {tasks.length > 4 && (
+              <Input
+                placeholder="Search tasks..."
+                value={taskSearch}
+                onChange={e => setTaskSearch(e.target.value)}
+                className="mb-1"
+              />
+            )}
+            <div className="space-y-1.5 max-h-80 overflow-y-auto">
+              {tasks
+                .filter(t => {
+                  if (allocations[t.id]) return true; // always show allocated
+                  const q = taskSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return t.task.toLowerCase().includes(q) || t.stage.toLowerCase().includes(q);
+                })
+                .map(t => (
                 <div key={t.id} className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{t.task}</p>
@@ -495,6 +512,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
                 </div>
               ))}
             </div>
+            </>
           )}
           {/* Quick add task */}
           <div className="flex items-center gap-2 pt-1">
