@@ -12,7 +12,7 @@ import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign, Trash2 } from 'lucide-react';
+import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign, Trash2, Plus } from 'lucide-react';
 import type { Shift, ShiftAllocation } from '@/hooks/useShifts';
 
 const NoEligibleTasksCard = () => {
@@ -123,6 +123,11 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
   const [allocations, setAllocations] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(false);
+
+  // Quick-add task inline
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0);
 
   // For admin editing other users
   const [allUsers, setAllUsers] = useState<{ id: string; full_name: string | null }[]>([]);
@@ -244,7 +249,42 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       setTasksLoading(false);
     };
     fetchTasks();
-  }, [projectId, selectedUserId, shiftDate]);
+  }, [projectId, selectedUserId, shiftDate, taskRefreshKey]);
+
+  const handleQuickCreateTask = async () => {
+    if (!newTaskTitle.trim() || !user || !projectId || !selectedUserId) return;
+    setCreatingTask(true);
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        project_id: projectId,
+        task: newTaskTitle.trim(),
+        stage: 'Ready',
+        priority: '2 – This Week',
+        materials_on_site: 'No',
+        assigned_to_user_id: selectedUserId,
+        assignment_mode: 'solo',
+        created_by: user.id,
+      })
+      .select('id, task, stage, assignment_mode')
+      .single();
+    setCreatingTask(false);
+    if (error || !data) {
+      toast({ title: 'Could not create task', description: error?.message, variant: 'destructive' });
+      return;
+    }
+    // Ensure user is a project member so allocations save cleanly (admin edit only)
+    if (isAdmin && selectedUserId !== user.id) {
+      await supabase.from('project_members').upsert(
+        { project_id: projectId, user_id: selectedUserId, role: 'contractor' as any },
+        { onConflict: 'project_id,user_id', ignoreDuplicates: true } as any,
+      );
+    }
+    setTasks(prev => [...prev, data as TaskRow]);
+    setNewTaskTitle('');
+    setTaskRefreshKey(k => k + 1);
+    toast({ title: 'Task created' });
+  };
 
   // Initialize allocations from edit data
   useEffect(() => {
