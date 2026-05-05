@@ -496,6 +496,25 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
               ))}
             </div>
           )}
+          {/* Quick add task */}
+          <div className="flex items-center gap-2 pt-1">
+            <Input
+              placeholder="Add a new task..."
+              value={newTaskTitle}
+              onChange={e => setNewTaskTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleQuickCreateTask(); } }}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!newTaskTitle.trim() || creatingTask}
+              onClick={handleQuickCreateTask}
+            >
+              {creatingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" />Add</>}
+            </Button>
+          </div>
         </div>
       )}
 
