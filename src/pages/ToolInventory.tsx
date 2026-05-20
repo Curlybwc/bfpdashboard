@@ -254,6 +254,119 @@ const ToolInventory = () => {
     await fetchData();
   };
 
+  // --- Bulk voice/text add ---
+  const startRecording = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      toast({ title: 'Voice not supported', description: 'Your browser does not support voice input. Type instead.', variant: 'destructive' });
+      return;
+    }
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+    let finalText = bulkText;
+    rec.onresult = (e: any) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += (finalText ? ' ' : '') + transcript;
+        else interim += transcript;
+      }
+      setBulkText(finalText + (interim ? ' ' + interim : ''));
+    };
+    rec.onerror = (e: any) => {
+      console.error('Speech error', e);
+      setRecording(false);
+    };
+    rec.onend = () => setRecording(false);
+    rec.start();
+    setRecognizer(rec);
+    setRecording(true);
+  };
+
+  const stopRecording = () => {
+    try { recognizer?.stop(); } catch {}
+    setRecording(false);
+  };
+
+  const handleBulkParse = async () => {
+    if (!bulkText.trim()) return;
+    setBulkParsing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('tool_inventory_parse', {
+        body: { input_text: bulkText },
+      });
+      if (error) throw error;
+      if (!data?.tools || data.tools.length === 0) {
+        toast({ title: 'No tools detected', description: 'Try being more specific.', variant: 'destructive' });
+      } else {
+        setBulkParsed(data.tools);
+      }
+    } catch (err: any) {
+      toast({ title: 'Parse failed', description: err.message || 'Unknown error', variant: 'destructive' });
+    } finally {
+      setBulkParsing(false);
+    }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (!bulkParsed || bulkParsed.length === 0) return;
+    setBulkSubmitting(true);
+    let created = 0, updated = 0, failed = 0;
+    for (const item of bulkParsed) {
+      try {
+        let toolTypeId = item.match_existing_id;
+        if (!toolTypeId) {
+          const { data: inserted, error: insErr } = await supabase
+            .from('tool_types')
+            .insert({ name: item.name, sku: item.sku, vendor_url: item.vendor_url } as any)
+            .select('id').single();
+          if (insErr || !inserted) { failed++; continue; }
+          toolTypeId = inserted.id;
+          created++;
+        } else {
+          updated++;
+        }
+        // Add to shop stock
+        const { data: existingStock } = await supabase
+          .from('tool_stock').select('id, qty')
+          .eq('tool_type_id', toolTypeId).eq('location_type', 'shop').is('project_id', null).maybeSingle();
+        if (existingStock) {
+          await supabase.from('tool_stock').update({
+            qty: existingStock.qty + item.shop_qty,
+            updated_at: new Date().toISOString(),
+            updated_by: user?.id,
+          } as any).eq('id', existingStock.id);
+        } else {
+          await supabase.from('tool_stock').insert({
+            tool_type_id: toolTypeId, location_type: 'shop', project_id: null,
+            qty: item.shop_qty, updated_by: user?.id,
+          } as any);
+        }
+      } catch {
+        failed++;
+      }
+    }
+    setBulkSubmitting(false);
+    toast({
+      title: 'Bulk add complete',
+      description: `${created} new, ${updated} updated${failed ? `, ${failed} failed` : ''}.`,
+    });
+    setBulkOpen(false);
+    setBulkText('');
+    setBulkParsed(null);
+    await fetchData();
+  };
+
+  const updateParsedItem = (idx: number, patch: Partial<NonNullable<typeof bulkParsed>[number]>) => {
+    setBulkParsed(prev => prev ? prev.map((it, i) => i === idx ? { ...it, ...patch } : it) : prev);
+  };
+
+  const removeParsedItem = (idx: number) => {
+    setBulkParsed(prev => prev ? prev.filter((_, i) => i !== idx) : prev);
+  };
+
   const filtered = toolTypes.filter(t => {
     if (!showInactive && !t.is_active) return false;
     if (!search.trim()) return true;
@@ -317,9 +430,14 @@ const ToolInventory = () => {
           title="Tool Inventory"
           backTo="/admin"
           actions={
-            <Button size="sm" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />Add Tool Type
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
+                <Sparkles className="h-4 w-4 mr-1" />Bulk Add
+              </Button>
+              <Button size="sm" onClick={() => setAddOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />Add Tool Type
+              </Button>
+            </div>
           }
         />
         <div className="p-4 space-y-4">
