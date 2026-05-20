@@ -11,7 +11,8 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw, MapPin, ArrowLeft } from 'lucide-react';
+import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw, MapPin, ArrowLeft, Mic, MicOff, Sparkles, Loader2, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
@@ -51,6 +52,17 @@ const ToolInventory = () => {
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkParsing, setBulkParsing] = useState(false);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkParsed, setBulkParsed] = useState<Array<{
+    name: string; sku: string | null; vendor_url: string | null;
+    shop_qty: number; match_existing_id: string | null;
+  }> | null>(null);
+  const [recording, setRecording] = useState(false);
+  const recognitionRef = (typeof window !== 'undefined') ? (window as any) : null;
+  const [recognizer, setRecognizer] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<ToolType | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [newName, setNewName] = useState('');
