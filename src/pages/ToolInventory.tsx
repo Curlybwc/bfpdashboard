@@ -61,7 +61,6 @@ const ToolInventory = () => {
     shop_qty: number; match_existing_id: string | null;
   }> | null>(null);
   const [recording, setRecording] = useState(false);
-  const recognitionRef = (typeof window !== 'undefined') ? (window as any) : null;
   const [recognizer, setRecognizer] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<ToolType | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
