@@ -11,7 +11,8 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw, MapPin, ArrowLeft } from 'lucide-react';
+import { Plus, Minus, Search, Archive, ExternalLink, Trash2, RotateCcw, MapPin, ArrowLeft, Mic, MicOff, Sparkles, Loader2, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
@@ -51,6 +52,16 @@ const ToolInventory = () => {
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkParsing, setBulkParsing] = useState(false);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkParsed, setBulkParsed] = useState<Array<{
+    name: string; sku: string | null; vendor_url: string | null;
+    shop_qty: number; match_existing_id: string | null;
+  }> | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [recognizer, setRecognizer] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<ToolType | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [newName, setNewName] = useState('');
@@ -242,6 +253,119 @@ const ToolInventory = () => {
     await fetchData();
   };
 
+  // --- Bulk voice/text add ---
+  const startRecording = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      toast({ title: 'Voice not supported', description: 'Your browser does not support voice input. Type instead.', variant: 'destructive' });
+      return;
+    }
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+    let finalText = bulkText;
+    rec.onresult = (e: any) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += (finalText ? ' ' : '') + transcript;
+        else interim += transcript;
+      }
+      setBulkText(finalText + (interim ? ' ' + interim : ''));
+    };
+    rec.onerror = (e: any) => {
+      console.error('Speech error', e);
+      setRecording(false);
+    };
+    rec.onend = () => setRecording(false);
+    rec.start();
+    setRecognizer(rec);
+    setRecording(true);
+  };
+
+  const stopRecording = () => {
+    try { recognizer?.stop(); } catch {}
+    setRecording(false);
+  };
+
+  const handleBulkParse = async () => {
+    if (!bulkText.trim()) return;
+    setBulkParsing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('tool_inventory_parse', {
+        body: { input_text: bulkText },
+      });
+      if (error) throw error;
+      if (!data?.tools || data.tools.length === 0) {
+        toast({ title: 'No tools detected', description: 'Try being more specific.', variant: 'destructive' });
+      } else {
+        setBulkParsed(data.tools);
+      }
+    } catch (err: any) {
+      toast({ title: 'Parse failed', description: err.message || 'Unknown error', variant: 'destructive' });
+    } finally {
+      setBulkParsing(false);
+    }
+  };
+
+  const handleBulkConfirm = async () => {
+    if (!bulkParsed || bulkParsed.length === 0) return;
+    setBulkSubmitting(true);
+    let created = 0, updated = 0, failed = 0;
+    for (const item of bulkParsed) {
+      try {
+        let toolTypeId = item.match_existing_id;
+        if (!toolTypeId) {
+          const { data: inserted, error: insErr } = await supabase
+            .from('tool_types')
+            .insert({ name: item.name, sku: item.sku, vendor_url: item.vendor_url } as any)
+            .select('id').single();
+          if (insErr || !inserted) { failed++; continue; }
+          toolTypeId = inserted.id;
+          created++;
+        } else {
+          updated++;
+        }
+        // Add to shop stock
+        const { data: existingStock } = await supabase
+          .from('tool_stock').select('id, qty')
+          .eq('tool_type_id', toolTypeId).eq('location_type', 'shop').is('project_id', null).maybeSingle();
+        if (existingStock) {
+          await supabase.from('tool_stock').update({
+            qty: existingStock.qty + item.shop_qty,
+            updated_at: new Date().toISOString(),
+            updated_by: user?.id,
+          } as any).eq('id', existingStock.id);
+        } else {
+          await supabase.from('tool_stock').insert({
+            tool_type_id: toolTypeId, location_type: 'shop', project_id: null,
+            qty: item.shop_qty, updated_by: user?.id,
+          } as any);
+        }
+      } catch {
+        failed++;
+      }
+    }
+    setBulkSubmitting(false);
+    toast({
+      title: 'Bulk add complete',
+      description: `${created} new, ${updated} updated${failed ? `, ${failed} failed` : ''}.`,
+    });
+    setBulkOpen(false);
+    setBulkText('');
+    setBulkParsed(null);
+    await fetchData();
+  };
+
+  const updateParsedItem = (idx: number, patch: Partial<NonNullable<typeof bulkParsed>[number]>) => {
+    setBulkParsed(prev => prev ? prev.map((it, i) => i === idx ? { ...it, ...patch } : it) : prev);
+  };
+
+  const removeParsedItem = (idx: number) => {
+    setBulkParsed(prev => prev ? prev.filter((_, i) => i !== idx) : prev);
+  };
+
   const filtered = toolTypes.filter(t => {
     if (!showInactive && !t.is_active) return false;
     if (!search.trim()) return true;
@@ -305,9 +429,14 @@ const ToolInventory = () => {
           title="Tool Inventory"
           backTo="/admin"
           actions={
-            <Button size="sm" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />Add Tool Type
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
+                <Sparkles className="h-4 w-4 mr-1" />Bulk Add
+              </Button>
+              <Button size="sm" onClick={() => setAddOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />Add Tool Type
+              </Button>
+            </div>
           }
         />
         <div className="p-4 space-y-4">
@@ -543,6 +672,138 @@ const ToolInventory = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={bulkOpen} onOpenChange={(o) => {
+          if (!o) { stopRecording(); setBulkText(''); setBulkParsed(null); }
+          setBulkOpen(o);
+        }}>
+          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Bulk Add Tools (Voice / Text)
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              {!bulkParsed && (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Walk through your shop and describe what you see. The AI will parse each tool and quantity. Existing tools get their shop count incremented; unknown ones are created.
+                  </p>
+                  <div className="relative">
+                    <Textarea
+                      value={bulkText}
+                      onChange={(e) => setBulkText(e.target.value)}
+                      placeholder='e.g. "Two DeWalt 20V impact drivers, a Milwaukee M18 circular saw, three Makita batteries, and a Bosch rotary hammer..."'
+                      className="min-h-[160px] pr-12"
+                      disabled={bulkParsing}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={recording ? 'destructive' : 'secondary'}
+                      className="absolute right-2 top-2 h-9 w-9"
+                      onClick={recording ? stopRecording : startRecording}
+                      disabled={bulkParsing}
+                    >
+                      {recording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {recording && (
+                    <p className="text-xs text-destructive flex items-center gap-1.5">
+                      <span className="inline-block h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                      Listening... tap the mic to stop
+                    </p>
+                  )}
+                  <Button
+                    onClick={handleBulkParse}
+                    disabled={!bulkText.trim() || bulkParsing}
+                    className="w-full"
+                  >
+                    {bulkParsing ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Parsing...</>
+                    ) : (
+                      <><Sparkles className="h-4 w-4 mr-2" />Parse with AI</>
+                    )}
+                  </Button>
+                </>
+              )}
+
+              {bulkParsed && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Review {bulkParsed.length} tool{bulkParsed.length !== 1 ? 's' : ''}</p>
+                    <Button size="sm" variant="ghost" onClick={() => setBulkParsed(null)}>Edit text</Button>
+                  </div>
+                  <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+                    {bulkParsed.map((item, idx) => {
+                      const existing = item.match_existing_id
+                        ? toolTypes.find(t => t.id === item.match_existing_id)
+                        : null;
+                      return (
+                        <Card key={idx} className="p-2.5 space-y-1.5">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 space-y-1.5">
+                              <Input
+                                value={item.name}
+                                onChange={(e) => updateParsedItem(idx, { name: e.target.value })}
+                                className="h-7 text-sm font-medium"
+                              />
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground">Qty</span>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={item.shop_qty}
+                                  onChange={(e) => updateParsedItem(idx, { shop_qty: Math.max(1, parseInt(e.target.value) || 1) })}
+                                  className="h-7 w-16 text-xs"
+                                />
+                                {existing ? (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                                    + adds to existing
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                                    New tool type
+                                  </span>
+                                )}
+                              </div>
+                              {!existing && (
+                                <Input
+                                  value={item.sku || ''}
+                                  onChange={(e) => updateParsedItem(idx, { sku: e.target.value || null })}
+                                  placeholder="SKU (optional)"
+                                  className="h-7 text-xs"
+                                />
+                              )}
+                            </div>
+                            <Button
+                              size="icon" variant="ghost" className="h-7 w-7 shrink-0"
+                              onClick={() => removeParsedItem(idx)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    onClick={handleBulkConfirm}
+                    disabled={bulkSubmitting || bulkParsed.length === 0}
+                    className="w-full"
+                  >
+                    {bulkSubmitting ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding...</>
+                    ) : (
+                      `Add ${bulkParsed.length} tool${bulkParsed.length !== 1 ? 's' : ''} to shop`
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );
