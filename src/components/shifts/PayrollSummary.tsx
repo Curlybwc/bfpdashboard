@@ -1033,6 +1033,10 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
         <p className="text-xs text-muted-foreground">No unpaid shifts available to prepare in this date range.</p>
       ) : (
         <div className="space-y-2">
+          <div className="flex items-center justify-between bg-muted/50 rounded px-3 py-2">
+            <p className="text-sm font-medium">Total Ready to Bill</p>
+            <p className="text-lg font-bold text-primary">${totals.candidateDollars.toFixed(2)}</p>
+          </div>
           {filteredCandidateGroups.map((group) => (
             <Collapsible key={group.key} open={expandedCandidates.has(group.key)} onOpenChange={() => toggleCandidate(group.key)}>
               <CollapsibleTrigger asChild>
