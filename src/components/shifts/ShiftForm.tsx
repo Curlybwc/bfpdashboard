@@ -129,6 +129,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
   const [creatingTask, setCreatingTask] = useState(false);
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
   const [taskSearch, setTaskSearch] = useState('');
+  const [onlyAllocated, setOnlyAllocated] = useState(false);
 
   // For admin editing other users
   const [allUsers, setAllUsers] = useState<{ id: string; full_name: string | null }[]>([]);
