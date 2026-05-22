@@ -12,7 +12,7 @@ import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign, Trash2, Plus } from 'lucide-react';
+import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign, Trash2, Plus, Filter } from 'lucide-react';
 import type { Shift, ShiftAllocation } from '@/hooks/useShifts';
 
 const NoEligibleTasksCard = () => {
@@ -129,6 +129,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
   const [creatingTask, setCreatingTask] = useState(false);
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
   const [taskSearch, setTaskSearch] = useState('');
+  const [onlyAllocated, setOnlyAllocated] = useState(false);
 
   // For admin editing other users
   const [allUsers, setAllUsers] = useState<{ id: string; full_name: string | null }[]>([]);
@@ -477,41 +478,59 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
             <NoEligibleTasksCard />
           ) : (
             <>
-            {tasks.length > 4 && (
-              <Input
-                placeholder="Search tasks..."
-                value={taskSearch}
-                onChange={e => setTaskSearch(e.target.value)}
-                className="mb-1"
-              />
-            )}
-            <div className="space-y-1.5 max-h-80 overflow-y-auto">
-              {tasks
-                .filter(t => {
-                  if (allocations[t.id]) return true; // always show allocated
-                  const q = taskSearch.trim().toLowerCase();
-                  if (!q) return true;
-                  return t.task.toLowerCase().includes(q) || t.stage.toLowerCase().includes(q);
-                })
-                .map(t => (
-                <div key={t.id} className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate">{t.task}</p>
-                    <p className="text-xs text-muted-foreground">{t.stage}{t.assignment_mode === 'crew' ? ' · Crew' : ''}</p>
-                  </div>
+              <div className="flex items-center gap-2">
+                {tasks.length > 4 && (
                   <Input
-                    type="number"
-                    step="0.25"
-                    min="0"
-                    className="w-20 text-right"
-                    value={allocations[t.id] || ''}
-                    onChange={e => setAllocationHours(t.id, e.target.value)}
-                    placeholder="0"
+                    placeholder="Search tasks..."
+                    value={taskSearch}
+                    onChange={e => setTaskSearch(e.target.value)}
+                    className="flex-1"
                   />
-                  <span className="text-xs text-muted-foreground w-4">h</span>
-                </div>
-              ))}
-            </div>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={onlyAllocated ? 'default' : 'outline'}
+                  className="shrink-0 h-9 gap-1"
+                  onClick={() => setOnlyAllocated(v => !v)}
+                >
+                  <Filter className="h-3.5 w-3.5" />
+                  {onlyAllocated ? 'Show all' : 'Allocated'}
+                </Button>
+              </div>
+              <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                {tasks
+                  .filter(t => {
+                    if (onlyAllocated && !allocations[t.id]) return false;
+                    const q = taskSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return t.task.toLowerCase().includes(q) || t.stage.toLowerCase().includes(q);
+                  })
+                  .sort((a, b) => {
+                    const aAlloc = !!allocations[a.id];
+                    const bAlloc = !!allocations[b.id];
+                    if (aAlloc === bAlloc) return 0;
+                    return aAlloc ? -1 : 1;
+                  })
+                  .map(t => (
+                  <div key={t.id} className={`flex items-center gap-2 rounded-md border px-3 py-2 ${allocations[t.id] ? 'bg-primary/5 border-primary/20' : 'border-border bg-card'}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate">{t.task}</p>
+                      <p className="text-xs text-muted-foreground">{t.stage}{t.assignment_mode === 'crew' ? ' · Crew' : ''}</p>
+                    </div>
+                    <Input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      className="w-20 text-right"
+                      value={allocations[t.id] || ''}
+                      onChange={e => setAllocationHours(t.id, e.target.value)}
+                      placeholder="0"
+                    />
+                    <span className="text-xs text-muted-foreground w-4">h</span>
+                  </div>
+                ))}
+              </div>
             </>
           )}
           {/* Quick add task */}
