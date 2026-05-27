@@ -2967,7 +2967,7 @@ export type Database = {
         Returns: Json
       }
       clock_in: {
-        Args: never
+        Args: { p_project_id?: string }
         Returns: {
           admin_edited_at: string | null
           admin_edited_by: string | null
