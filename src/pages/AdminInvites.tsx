@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Trash2, Loader2, Send, Link2 } from 'lucide-react';
+import { Mail, Trash2, Loader2, Send, Link2, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Invite {
@@ -125,6 +125,16 @@ const AdminInvites = () => {
     }
   };
 
+  const handleSms = (inv: Invite) => {
+    const url = buildInviteUrl(inv.token, inv.email);
+    const body = encodeURIComponent(
+      `You've been invited to join our team. Accept here: ${url}`
+    );
+    // sms: opens the device's Messages app with the body pre-filled.
+    // User picks the recipient. Works on iOS and Android.
+    window.location.href = `sms:?&body=${body}`;
+  };
+
   const handleRevoke = async (id: string) => {
     const { error } = await supabase.rpc('revoke_org_invite', { p_invite_id: id });
     if (error) {
@@ -214,6 +224,9 @@ const AdminInvites = () => {
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleCopy(inv)} title="Copy link">
                         <Link2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleSms(inv)} title="Text invite link">
+                        <MessageSquare className="h-3.5 w-3.5" />
                       </Button>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleRevoke(inv.id)} title="Revoke">
                         <Trash2 className="h-3.5 w-3.5" />
