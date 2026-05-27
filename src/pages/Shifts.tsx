@@ -477,7 +477,9 @@ const ShiftHistory = ({
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{projectMap[s.project_id] || 'Unknown Project'}</p>
+              <p className="text-sm font-medium truncate">
+                {s.project_id ? (projectMap[s.project_id] || 'Unknown Project') : 'Unassigned — tap to add project & tasks'}
+              </p>
               <p className="text-xs text-muted-foreground">
                 {s.shift_date}
                 {s.start_time && s.end_time ? ` · ${s.start_time.slice(0, 5)} – ${s.end_time.slice(0, 5)}` : ''}
@@ -490,7 +492,7 @@ const ShiftHistory = ({
               {s.is_flat_rate ? (
                 <span className="text-sm font-medium">${Number(s.flat_rate_amount || 0).toFixed(2)}</span>
               ) : (
-                <span className="text-sm font-medium">{s.total_hours}h</span>
+                <span className="text-sm font-medium">{Number(s.total_hours ?? 0)}h{s.clock_in_at && !s.clock_out_at ? ' · in progress' : ''}</span>
               )}
               {s.is_flat_rate && <Badge variant="secondary" className="text-[10px]">Flat</Badge>}
             </div>
