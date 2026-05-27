@@ -13,7 +13,7 @@
  *   - Images are compressed client-side (max 1400px edge, JPEG 0.82 quality)
  *     before upload to keep payloads in the 200KB–800KB range.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -83,15 +83,40 @@ async function compressImage(file: File): Promise<Blob> {
   });
 }
 
-function getPublicUrl(path: string): string {
-  const { data } = supabase.storage.from('task-photos').getPublicUrl(path);
-  return data.publicUrl;
+const SIGNED_URL_TTL = 60 * 60; // 1 hour
+
+async function getSignedUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(path, SIGNED_URL_TTL);
+  if (error || !data) return '';
+  return data.signedUrl;
 }
 
 const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskPhotosProps) => {
   const { toast } = useToast();
   const [uploading, setUploading] = useState<PhotoPhase | null>(null);
   const [viewerPhoto, setViewerPhoto] = useState<TaskPhoto | null>(null);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const missing = photos.filter((p) => !urls[p.storage_path]);
+      if (missing.length === 0) return;
+      const entries = await Promise.all(
+        missing.map(async (p) => [p.storage_path, await getSignedUrl(p.storage_path)] as const)
+      );
+      if (cancelled) return;
+      setUrls((prev) => {
+        const next = { ...prev };
+        for (const [k, v] of entries) next[k] = v;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos]);
+
+  const urlFor = (path: string) => urls[path] || '';
 
   const handleUpload = async (phase: PhotoPhase, file: File) => {
     setUploading(phase);
@@ -187,7 +212,7 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
                     className="shrink-0 rounded-md overflow-hidden border hover:ring-2 ring-primary transition-all"
                   >
                     <img
-                      src={getPublicUrl(photo.storage_path)}
+                      src={urlFor(photo.storage_path)}
                       alt={`${label} photo`}
                       className="h-20 w-20 object-cover"
                       loading="lazy"
@@ -211,7 +236,7 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
           {viewerPhoto && (
             <div className="flex flex-col">
               <img
-                src={getPublicUrl(viewerPhoto.storage_path)}
+                src={urlFor(viewerPhoto.storage_path)}
                 alt="Task photo"
                 className="w-full max-h-[60vh] object-contain bg-muted"
               />
@@ -221,7 +246,7 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
                 </p>
                 <div className="flex gap-2">
                   <a
-                    href={getPublicUrl(viewerPhoto.storage_path)}
+                    href={urlFor(viewerPhoto.storage_path)}
                     download
                     target="_blank"
                     rel="noopener noreferrer"
@@ -236,7 +261,7 @@ const TaskPhotos = ({ taskId, photos, userId, onPhotosChange, canUpload }: TaskP
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => handleShare(getPublicUrl(viewerPhoto.storage_path))}
+                    onClick={() => handleShare(urlFor(viewerPhoto.storage_path))}
                   >
                     <Share2 className="h-4 w-4 mr-1" />
                     Share

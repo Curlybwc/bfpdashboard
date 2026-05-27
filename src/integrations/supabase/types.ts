@@ -2910,6 +2910,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_get_profile_pay: {
+        Args: never
+        Returns: {
+          dd_on_file: boolean
+          hourly_rate: number
+          id: string
+          skip_qb_export: boolean
+          tax_info_filed: boolean
+        }[]
+      }
       admin_list_stranded_users: {
         Args: never
         Returns: {
@@ -2963,6 +2973,15 @@ export type Database = {
           p_user_id: string
         }
         Returns: number
+      }
+      get_my_profile_pay: {
+        Args: never
+        Returns: {
+          dd_on_file: boolean
+          hourly_rate: number
+          skip_qb_export: boolean
+          tax_info_filed: boolean
+        }[]
       }
       get_org_role: {
         Args: { _org_id: string; _user_id: string }
@@ -3060,6 +3079,10 @@ export type Database = {
           p_user_id?: string
         }
         Returns: Json
+      }
+      user_can_see_company: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
       }
     }
     Enums: {

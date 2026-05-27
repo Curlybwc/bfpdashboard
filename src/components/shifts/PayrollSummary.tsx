@@ -349,7 +349,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
         .gte('shift_date', fromDate)
         .lte('shift_date', toDate)
         .order('shift_date', { ascending: false }),
-      supabase.from('profiles').select('id, full_name, hourly_rate'),
+      supabase.from('profiles').select('id, full_name'),
       supabase.from('projects').select('id, name, company_id'),
       supabase.from('companies').select('id, name, short_name').order('name'),
       supabase.from('quickbooks_vendor_mappings').select('user_id, company_id, qb_vendor_id, qb_vendor_name'),
@@ -388,7 +388,14 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     setClassMappings(cmMap);
 
     const shiftRows = shifts || [];
-    const profileMap = new Map<string, Pick<ProfileRow, 'id' | 'full_name' | 'hourly_rate'>>((profiles || []).map((row) => [row.id, row]));
+    // Pay fields are no longer exposed via direct profile SELECT — fetch them via admin RPC.
+    const { data: payRows } = await supabase.rpc('admin_get_profile_pay' as any);
+    const payMap = new Map<string, { hourly_rate: number | null }>(
+      ((payRows || []) as { id: string; hourly_rate: number | null }[]).map((r) => [r.id, { hourly_rate: r.hourly_rate }])
+    );
+    const profileMap = new Map<string, { id: string; full_name: string | null; hourly_rate: number | null }>(
+      (profiles || []).map((row: any) => [row.id, { id: row.id, full_name: row.full_name, hourly_rate: payMap.get(row.id)?.hourly_rate ?? null }])
+    );
     const projectMap = new Map<string, string>((projects || []).map((row: Pick<ProjectRow, 'id' | 'name'>) => [row.id, row.name]));
 
     const shiftIds = shiftRows.map((row) => row.id);

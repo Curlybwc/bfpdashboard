@@ -47,12 +47,14 @@ const AdminPanel = () => {
       .eq('id', user.id)
       .maybeSingle();
     if (!me?.org_id) { setProfiles([]); return; }
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('org_id', me.org_id)
-      .order('created_at');
-    if (data) setProfiles(data);
+    const [{ data }, { data: payRows }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('org_id', me.org_id).order('created_at'),
+      supabase.rpc('admin_get_profile_pay' as any),
+    ]);
+    if (data) {
+      const payMap = new Map<string, any>(((payRows || []) as any[]).map((r) => [r.id, r]));
+      setProfiles(data.map((p: any) => ({ ...p, ...(payMap.get(p.id) || {}) })));
+    }
   };
 
   useEffect(() => {
