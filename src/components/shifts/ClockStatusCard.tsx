@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Square, Clock } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveShift } from '@/hooks/useActiveShift';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +25,27 @@ export default function ClockStatusCard() {
   const { data: active, isLoading, clockIn, clockOut } = useActiveShift(user?.id);
   const [now, setNow] = useState(() => Date.now());
   const [lastClosed, setLastClosed] = useState<{ id: string; hours: number } | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+
+  const { data: myProjects = [] } = useQuery({
+    queryKey: ['my-active-projects', user?.id],
+    enabled: !!user?.id && !active?.clock_in_at,
+    queryFn: async () => {
+      const { data: memberships } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', user!.id);
+      const pids = (memberships || []).map((m: any) => m.project_id);
+      if (pids.length === 0) return [] as { id: string; name: string }[];
+      const { data } = await supabase
+        .from('projects')
+        .select('id, name')
+        .in('id', pids)
+        .eq('status', 'active')
+        .order('name');
+      return (data || []) as { id: string; name: string }[];
+    },
+  });
 
   useEffect(() => {
     if (!active?.clock_in_at) return;
@@ -36,8 +60,12 @@ export default function ClockStatusCard() {
   const handleClockIn = async () => {
     setLastClosed(null);
     try {
-      await clockIn.mutateAsync();
-      toast({ title: 'Clocked in', description: 'Timer started.' });
+      await clockIn.mutateAsync(selectedProjectId || null);
+      toast({
+        title: 'Clocked in',
+        description: selectedProjectId ? 'Timer started on project.' : 'Timer started.',
+      });
+      setSelectedProjectId('');
     } catch (e: any) {
       toast({ title: 'Clock in failed', description: e.message, variant: 'destructive' });
     }
@@ -87,7 +115,7 @@ export default function ClockStatusCard() {
   return (
     <Card className="p-4 mb-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
             Not clocked in
@@ -101,8 +129,23 @@ export default function ClockStatusCard() {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground mt-1">
-              Tap to start. You can pick a project and tasks after you clock out.
+              Pick a project now (optional) or assign one later.
             </p>
+          )}
+          {myProjects.length > 0 && (
+            <div className="mt-2 max-w-xs">
+              <Select value={selectedProjectId || 'none'} onValueChange={(v) => setSelectedProjectId(v === 'none' ? '' : v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="No project (assign later)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No project (assign later)</SelectItem>
+                  {myProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
         <Button
