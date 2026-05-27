@@ -18,6 +18,7 @@ export function useAdminShifts(filters: AdminShiftsFilters, enabled: boolean) {
         .select('*')
         .gte('shift_date', filters.fromDate)
         .lte('shift_date', filters.toDate)
+        .not('total_hours', 'is', null)
         .order('shift_date', { ascending: false });
 
       if (filters.contractorId) {

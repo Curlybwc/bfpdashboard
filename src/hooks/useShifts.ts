@@ -4,11 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 export interface Shift {
   id: string;
   user_id: string;
-  project_id: string;
+  project_id: string | null;
   shift_date: string;
   start_time: string | null;
   end_time: string | null;
-  total_hours: number;
+  total_hours: number | null;
   hourly_rate_snapshot: number | null;
   created_at: string;
   created_by: string | null;
@@ -17,6 +17,8 @@ export interface Shift {
   admin_edited_by: string | null;
   is_flat_rate?: boolean;
   flat_rate_amount?: number | null;
+  clock_in_at?: string | null;
+  clock_out_at?: string | null;
 }
 
 export interface ShiftAllocation {
@@ -42,7 +44,7 @@ export function useMyShifts(userId: string | undefined) {
       if (error) throw error;
 
       const shifts = ((data ?? []) as Shift[]);
-      const pids = [...new Set(shifts.map((s) => s.project_id))];
+      const pids = [...new Set(shifts.map((s) => s.project_id).filter((p): p is string => !!p))];
       const projectMap: Record<string, string> = {};
 
       if (pids.length > 0) {

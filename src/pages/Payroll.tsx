@@ -21,7 +21,8 @@ function useWorkerFinancialSummary(workerId: string | undefined) {
       const { data: shifts, error: shiftsErr } = await supabase
         .from('shifts')
         .select('id, total_hours, hourly_rate_snapshot, is_flat_rate, flat_rate_amount')
-        .eq('user_id', workerId);
+        .eq('user_id', workerId)
+        .not('total_hours', 'is', null);
       if (shiftsErr) throw shiftsErr;
 
       const allShifts = shifts ?? [];
@@ -57,9 +58,10 @@ function useWorkerFinancialSummary(workerId: string | undefined) {
         if (s.is_flat_rate) {
           totalOwed += Number(s.flat_rate_amount || 0);
         } else {
-          const amount = s.total_hours * Number(s.hourly_rate_snapshot ?? 0);
+          const hrs = Number(s.total_hours ?? 0);
+          const amount = hrs * Number(s.hourly_rate_snapshot ?? 0);
           totalOwed += amount;
-          unpaidHours += s.total_hours;
+          unpaidHours += hrs;
         }
       }
 
