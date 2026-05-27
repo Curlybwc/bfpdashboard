@@ -94,7 +94,7 @@ export default function ShiftsCalendarView({
           const dateStr = format(day, 'yyyy-MM-dd');
           const dayShifts = shiftsByDate[dateStr] || [];
           const isToday = dateStr === format(new Date(), 'yyyy-MM-dd');
-          const totalHours = dayShifts.reduce((sum, s) => sum + s.total_hours, 0);
+          const totalHours = dayShifts.reduce((sum, s) => sum + Number(s.total_hours ?? 0), 0);
 
           return (
             <div
@@ -127,7 +127,7 @@ export default function ShiftsCalendarView({
                   onClick={(e) => { e.stopPropagation(); onEditShift(s); }}
                   className="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                 >
-                  {profileMap[s.user_id]?.split(' ')[0] || '?'} · {s.total_hours}h
+                  {profileMap[s.user_id]?.split(' ')[0] || '?'} · {Number(s.total_hours ?? 0)}h
                 </button>
               ))}
               {dayShifts.length > 3 && (

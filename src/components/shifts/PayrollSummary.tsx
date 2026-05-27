@@ -348,6 +348,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
         .select('*')
         .gte('shift_date', fromDate)
         .lte('shift_date', toDate)
+        .not('total_hours', 'is', null)
         .order('shift_date', { ascending: false }),
       supabase.from('profiles').select('id, full_name'),
       supabase.from('projects').select('id, name, company_id'),

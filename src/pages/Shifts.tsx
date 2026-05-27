@@ -270,13 +270,13 @@ const Shifts = () => {
           {!adminLoading2 && shifts.length > 0 && (() => {
             const totalOwed = shifts.reduce((sum, s) => {
               if (s.is_flat_rate) return sum + Number(s.flat_rate_amount || 0);
-              return sum + s.total_hours * Number(s.hourly_rate_snapshot ?? 0);
+              return sum + Number(s.total_hours ?? 0) * Number(s.hourly_rate_snapshot ?? 0);
             }, 0);
             return (
             <Card className="p-3 flex items-center justify-between bg-primary/5 border-primary/20">
               <div className="flex items-center gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-primary">{shifts.filter(s => !s.is_flat_rate).reduce((sum, s) => sum + s.total_hours, 0).toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-primary">{shifts.filter(s => !s.is_flat_rate).reduce((sum, s) => sum + Number(s.total_hours ?? 0), 0).toFixed(1)}</p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Hours</p>
                 </div>
                 <div className="h-8 w-px bg-border" />
@@ -354,7 +354,7 @@ const Shifts = () => {
                       onClick={() => handleEditShift(s)}
                     >
                       <p className="text-sm font-medium truncate">
-                        {profileMap[s.user_id] || 'Unknown'} · {projectMap[s.project_id] || 'Unknown Project'}
+                        {profileMap[s.user_id] || 'Unknown'} · {s.project_id ? (projectMap[s.project_id] || 'Unknown Project') : 'Unassigned — needs project/tasks'}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {s.shift_date}
@@ -378,9 +378,9 @@ const Shifts = () => {
                           </>
                         ) : (
                           <>
-                            <span className="text-sm font-medium">{s.total_hours}h</span>
+                            <span className="text-sm font-medium">{Number(s.total_hours ?? 0)}h</span>
                             <span className="text-xs text-muted-foreground ml-1">
-                              · ${(s.total_hours * Number(s.hourly_rate_snapshot ?? 0)).toFixed(2)}
+                              · ${(Number(s.total_hours ?? 0) * Number(s.hourly_rate_snapshot ?? 0)).toFixed(2)}
                             </span>
                           </>
                         )}
