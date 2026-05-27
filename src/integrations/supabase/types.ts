@@ -1446,6 +1446,8 @@ export type Database = {
         Row: {
           admin_edited_at: string | null
           admin_edited_by: string | null
+          clock_in_at: string | null
+          clock_out_at: string | null
           created_at: string
           created_by: string | null
           end_time: string | null
@@ -1453,10 +1455,10 @@ export type Database = {
           hourly_rate_snapshot: number | null
           id: string
           is_flat_rate: boolean
-          project_id: string
+          project_id: string | null
           shift_date: string
           start_time: string | null
-          total_hours: number
+          total_hours: number | null
           updated_at: string
           updated_by: string | null
           user_id: string
@@ -1464,6 +1466,8 @@ export type Database = {
         Insert: {
           admin_edited_at?: string | null
           admin_edited_by?: string | null
+          clock_in_at?: string | null
+          clock_out_at?: string | null
           created_at?: string
           created_by?: string | null
           end_time?: string | null
@@ -1471,10 +1475,10 @@ export type Database = {
           hourly_rate_snapshot?: number | null
           id?: string
           is_flat_rate?: boolean
-          project_id: string
+          project_id?: string | null
           shift_date: string
           start_time?: string | null
-          total_hours: number
+          total_hours?: number | null
           updated_at?: string
           updated_by?: string | null
           user_id: string
@@ -1482,6 +1486,8 @@ export type Database = {
         Update: {
           admin_edited_at?: string | null
           admin_edited_by?: string | null
+          clock_in_at?: string | null
+          clock_out_at?: string | null
           created_at?: string
           created_by?: string | null
           end_time?: string | null
@@ -1489,10 +1495,10 @@ export type Database = {
           hourly_rate_snapshot?: number | null
           id?: string
           is_flat_rate?: boolean
-          project_id?: string
+          project_id?: string | null
           shift_date?: string
           start_time?: string | null
-          total_hours?: number
+          total_hours?: number | null
           updated_at?: string
           updated_by?: string | null
           user_id?: string
@@ -2959,6 +2965,64 @@ export type Database = {
       capture_recipe_from_task: {
         Args: { p_parent_task_id: string; p_recipe_id: string }
         Returns: Json
+      }
+      clock_in: {
+        Args: never
+        Returns: {
+          admin_edited_at: string | null
+          admin_edited_by: string | null
+          clock_in_at: string | null
+          clock_out_at: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string | null
+          flat_rate_amount: number | null
+          hourly_rate_snapshot: number | null
+          id: string
+          is_flat_rate: boolean
+          project_id: string | null
+          shift_date: string
+          start_time: string | null
+          total_hours: number | null
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shifts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      clock_out: {
+        Args: never
+        Returns: {
+          admin_edited_at: string | null
+          admin_edited_by: string | null
+          clock_in_at: string | null
+          clock_out_at: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string | null
+          flat_rate_amount: number | null
+          hourly_rate_snapshot: number | null
+          id: string
+          is_flat_rate: boolean
+          project_id: string | null
+          shift_date: string
+          start_time: string | null
+          total_hours: number | null
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shifts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       clone_seed_libraries_to_org: {
         Args: { p_org_id: string }
