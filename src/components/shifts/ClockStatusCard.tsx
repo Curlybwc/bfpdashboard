@@ -2,8 +2,19 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Square, Clock } from 'lucide-react';
+import { Play, Square, Clock, AlertTriangle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,6 +29,17 @@ function formatElapsed(ms: number): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
+
+function formatHumanElapsed(ms: number): string {
+  const totalMin = Math.max(0, Math.floor(ms / 60000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+const RUNAWAY_THRESHOLD_MS = 12 * 60 * 60 * 1000;
 
 export default function ClockStatusCard() {
   const { user } = useAuth();
@@ -87,26 +109,58 @@ export default function ClockStatusCard() {
   if (active?.clock_in_at) {
     const startedAt = new Date(active.clock_in_at);
     const elapsedMs = now - startedAt.getTime();
+    const isRunaway = elapsedMs > RUNAWAY_THRESHOLD_MS;
     return (
-      <Card className="p-4 mb-4 border-2 border-primary/40 bg-primary/5">
+      <Card
+        className={
+          isRunaway
+            ? 'p-4 mb-4 border-2 border-destructive/60 bg-destructive/10'
+            : 'p-4 mb-4 border-2 border-primary/40 bg-primary/5'
+        }
+      >
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">On the clock</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              {isRunaway && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+              On the clock
+            </p>
             <p className="text-2xl font-mono font-bold tabular-nums">{formatElapsed(elapsedMs)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Started {startedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
             </p>
+            {isRunaway && (
+              <p className="text-xs text-destructive font-medium mt-1.5 max-w-xs">
+                Looks like you forgot to clock out. Tap Clock Out to close this shift now.
+              </p>
+            )}
           </div>
-          <Button
-            size="lg"
-            variant="destructive"
-            className="h-14 px-6 text-base min-w-[140px]"
-            onClick={handleClockOut}
-            disabled={clockOut.isPending}
-          >
-            <Square className="h-5 w-5 mr-2 fill-current" />
-            Clock Out
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="lg"
+                variant="destructive"
+                className="h-14 px-6 text-base min-w-[140px]"
+                disabled={clockOut.isPending}
+              >
+                <Square className="h-5 w-5 mr-2 fill-current" />
+                Clock Out
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clock out after {formatHumanElapsed(elapsedMs)}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {isRunaway
+                    ? `This shift has been open for ${formatHumanElapsed(elapsedMs)} — that looks unusually long. Only confirm if this is correct.`
+                    : `You'll log ${formatHumanElapsed(elapsedMs)} on this shift. You can still assign a project and tasks afterward.`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep working</AlertDialogCancel>
+                <AlertDialogAction onClick={handleClockOut}>Clock out</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </Card>
     );

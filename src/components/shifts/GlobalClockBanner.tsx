@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Square, Clock } from 'lucide-react';
+import { Square, Clock, AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveShift } from '@/hooks/useActiveShift';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +27,17 @@ function formatElapsed(ms: number): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
+
+function formatHumanElapsed(ms: number): string {
+  const totalMin = Math.max(0, Math.floor(ms / 60000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+const RUNAWAY_THRESHOLD_MS = 12 * 60 * 60 * 1000;
 
 export default function GlobalClockBanner() {
   const { user } = useAuth();
@@ -34,6 +56,7 @@ export default function GlobalClockBanner() {
   if (HIDDEN_PREFIXES.some((p) => location.pathname === p || location.pathname.startsWith(p + '/'))) return null;
 
   const elapsedMs = now - new Date(active.clock_in_at).getTime();
+  const isRunaway = elapsedMs > RUNAWAY_THRESHOLD_MS;
 
   const handleClockOut = async () => {
     try {
@@ -48,23 +71,52 @@ export default function GlobalClockBanner() {
   };
 
   return (
-    <div className="sticky top-0 z-40 w-full bg-primary text-primary-foreground border-b border-primary/40 shadow-sm">
+    <div
+      className={
+        isRunaway
+          ? 'sticky top-0 z-40 w-full bg-destructive text-destructive-foreground border-b border-destructive/40 shadow-sm'
+          : 'sticky top-0 z-40 w-full bg-primary text-primary-foreground border-b border-primary/40 shadow-sm'
+      }
+    >
       <div className="flex items-center justify-between gap-3 px-3 py-2 max-w-screen-xl mx-auto">
         <Link to="/today" className="flex items-center gap-2 min-w-0 hover:opacity-90">
-          <Clock className="h-4 w-4 shrink-0" />
-          <span className="text-xs uppercase tracking-wide opacity-90 hidden sm:inline">On the clock</span>
+          {isRunaway ? (
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+          ) : (
+            <Clock className="h-4 w-4 shrink-0" />
+          )}
+          <span className="text-xs uppercase tracking-wide opacity-90 hidden sm:inline">
+            {isRunaway ? 'Forgot to clock out?' : 'On the clock'}
+          </span>
           <span className="font-mono font-bold tabular-nums text-sm sm:text-base">{formatElapsed(elapsedMs)}</span>
         </Link>
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={handleClockOut}
-          disabled={clockOut.isPending}
-          className="h-8"
-        >
-          <Square className="h-3.5 w-3.5 mr-1.5 fill-current" />
-          Clock Out
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              size="sm"
+              variant={isRunaway ? 'secondary' : 'destructive'}
+              disabled={clockOut.isPending}
+              className="h-8"
+            >
+              <Square className="h-3.5 w-3.5 mr-1.5 fill-current" />
+              Clock Out
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clock out after {formatHumanElapsed(elapsedMs)}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {isRunaway
+                  ? `This shift has been open for ${formatHumanElapsed(elapsedMs)} — that looks unusually long. Only confirm if this is correct.`
+                  : `You'll log ${formatHumanElapsed(elapsedMs)} on this shift. You can still assign a project and tasks afterward.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep working</AlertDialogCancel>
+              <AlertDialogAction onClick={handleClockOut}>Clock out</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
