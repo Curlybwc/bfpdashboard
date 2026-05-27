@@ -52,6 +52,7 @@ import AdminReimbursements from "./pages/AdminReimbursements";
 import AdminReimbursementPaymentQueue from "./pages/AdminReimbursementPaymentQueue";
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import GlobalClockBanner from "./components/shifts/GlobalClockBanner";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +95,7 @@ const AppRoutes = () => {
   return (
     <>
       <ImpersonationBanner />
+      {user && <GlobalClockBanner />}
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
