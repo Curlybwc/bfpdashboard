@@ -17,6 +17,7 @@ import { getTaskOperationalStatus } from '@/lib/taskOperationalStatus';
 import AlertsBanner from '@/components/AlertsBanner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import ClockStatusCard from '@/components/shifts/ClockStatusCard';
 import {
   Sheet,
   SheetContent,
@@ -427,6 +428,7 @@ const Today = () => {
         }
       />
       <div className="p-4">
+        <ClockStatusCard />
         <AlertsBanner alerts={alerts} />
         {isContractor ? <ContractorView /> : <ManagerView />}
         <MutedSection />
