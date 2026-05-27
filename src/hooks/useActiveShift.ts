@@ -32,8 +32,10 @@ export function useActiveShift(userId: string | undefined) {
   };
 
   const clockIn = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc('clock_in');
+    mutationFn: async (projectId?: string | null) => {
+      const { data, error } = await supabase.rpc('clock_in', {
+        p_project_id: projectId ?? null,
+      });
       if (error) throw error;
       return data as unknown as Shift;
     },
