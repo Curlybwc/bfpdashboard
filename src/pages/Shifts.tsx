@@ -147,7 +147,8 @@ const Shifts = () => {
 
   const canEditShift = (shift: any) => {
     if (isAdmin) return true;
-    return shift.shift_date === new Date().toISOString().slice(0, 10);
+    // Workers can edit their own shifts on any past date (or today)
+    return shift.shift_date <= new Date().toISOString().slice(0, 10);
   };
 
   if (showForm) {
