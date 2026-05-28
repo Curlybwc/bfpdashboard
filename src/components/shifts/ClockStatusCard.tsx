@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Square, Clock, AlertTriangle } from 'lucide-react';
@@ -15,11 +14,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useActiveShift } from '@/hooks/useActiveShift';
 import { useToast } from '@/hooks/use-toast';
+import ShiftForm from '@/components/shifts/ShiftForm';
+import { fetchShiftById, fetchShiftAllocations, type Shift, type ShiftAllocation } from '@/hooks/useShifts';
 
 function formatElapsed(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -48,6 +55,10 @@ export default function ClockStatusCard() {
   const [now, setNow] = useState(() => Date.now());
   const [lastClosed, setLastClosed] = useState<{ id: string; hours: number } | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [allocOpen, setAllocOpen] = useState(false);
+  const [allocShift, setAllocShift] = useState<Shift | null>(null);
+  const [allocAllocations, setAllocAllocations] = useState<ShiftAllocation[]>([]);
+  const [allocLoading, setAllocLoading] = useState(false);
 
   const { data: myProjects = [] } = useQuery({
     queryKey: ['my-active-projects', user?.id],
@@ -105,6 +116,50 @@ export default function ClockStatusCard() {
       toast({ title: 'Clock out failed', description: e.message, variant: 'destructive' });
     }
   };
+
+  const openAllocationSheet = async (shiftId: string) => {
+    setAllocOpen(true);
+    setAllocLoading(true);
+    try {
+      const [s, a] = await Promise.all([
+        fetchShiftById(shiftId),
+        fetchShiftAllocations(shiftId),
+      ]);
+      setAllocShift(s);
+      setAllocAllocations(a);
+    } catch (e: any) {
+      toast({ title: 'Could not load shift', description: e.message, variant: 'destructive' });
+      setAllocOpen(false);
+    } finally {
+      setAllocLoading(false);
+    }
+  };
+
+  const allocationSheet = (
+    <Sheet open={allocOpen} onOpenChange={setAllocOpen}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Assign project &amp; tasks</SheetTitle>
+        </SheetHeader>
+        <div className="mt-4">
+          {allocLoading || !allocShift ? (
+            <div className="h-32 animate-pulse bg-muted/40 rounded-md" />
+          ) : (
+            <ShiftForm
+              editShift={allocShift}
+              editAllocations={allocAllocations}
+              onSaved={() => {
+                setAllocOpen(false);
+                setLastClosed(null);
+                toast({ title: 'Shift updated' });
+              }}
+              onCancel={() => setAllocOpen(false)}
+            />
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 
   if (active?.clock_in_at) {
     const startedAt = new Date(active.clock_in_at);
@@ -167,6 +222,7 @@ export default function ClockStatusCard() {
   }
 
   return (
+    <>
     <Card className="p-4 mb-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
@@ -177,9 +233,13 @@ export default function ClockStatusCard() {
           {lastClosed ? (
             <p className="text-xs text-muted-foreground mt-1">
               Last shift recorded: {lastClosed.hours.toFixed(2)} h.{' '}
-              <Link to={`/shifts?edit=${lastClosed.id}`} className="underline text-primary">
+              <button
+                type="button"
+                onClick={() => openAllocationSheet(lastClosed.id)}
+                className="underline text-primary hover:opacity-80"
+              >
                 Assign project &amp; tasks
-              </Link>
+              </button>
             </p>
           ) : (
             <p className="text-xs text-muted-foreground mt-1">
@@ -213,5 +273,7 @@ export default function ClockStatusCard() {
         </Button>
       </div>
     </Card>
+    {allocationSheet}
+    </>
   );
 }
