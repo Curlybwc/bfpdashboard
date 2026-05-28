@@ -60,6 +60,28 @@ export default function ClockStatusCard() {
   const [allocAllocations, setAllocAllocations] = useState<ShiftAllocation[]>([]);
   const [allocLoading, setAllocLoading] = useState(false);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const { data: todayShifts = [] } = useQuery({
+    queryKey: ['my-today-shifts', user?.id, todayStr, active?.id, lastClosed?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('id, total_hours, clock_in_at, clock_out_at')
+        .eq('user_id', user!.id)
+        .eq('shift_date', todayStr);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const closedHoursToday = todayShifts
+    .filter((s: any) => s.id !== active?.id && s.clock_out_at)
+    .reduce((sum: number, s: any) => sum + Number(s.total_hours ?? 0), 0);
+  const closedSegmentsToday = todayShifts.filter(
+    (s: any) => s.id !== active?.id && s.clock_out_at
+  ).length;
+
   const { data: myProjects = [] } = useQuery({
     queryKey: ['my-active-projects', user?.id],
     enabled: !!user?.id && !active?.clock_in_at,
@@ -183,6 +205,10 @@ export default function ClockStatusCard() {
             <p className="text-xs text-muted-foreground mt-0.5">
               Started {startedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {formatHumanElapsed(closedHoursToday * 3600_000 + elapsedMs)} logged today
+              {closedSegmentsToday + 1 > 1 ? ` across ${closedSegmentsToday + 1} shifts` : ''}
+            </p>
             {isRunaway && (
               <p className="text-xs text-destructive font-medium mt-1.5 max-w-xs">
                 Looks like you forgot to clock out. Tap Clock Out to close this shift now.
@@ -244,6 +270,12 @@ export default function ClockStatusCard() {
           ) : (
             <p className="text-xs text-muted-foreground mt-1">
               Pick a project now (optional) or assign one later.
+            </p>
+          )}
+          {closedHoursToday > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {formatHumanElapsed(closedHoursToday * 3600_000)} logged today
+              {closedSegmentsToday > 1 ? ` across ${closedSegmentsToday} shifts` : ''}
             </p>
           )}
           {myProjects.length > 0 && (
