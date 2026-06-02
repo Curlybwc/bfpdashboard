@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Square, Clock, AlertTriangle } from 'lucide-react';
+import { Play, Square, Clock, AlertTriangle, ArrowRightLeft } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
@@ -85,7 +85,7 @@ export default function ClockStatusCard() {
 
   const { data: myProjects = [] } = useQuery({
     queryKey: ['my-active-projects', user?.id],
-    enabled: !!user?.id && !active?.clock_in_at,
+    enabled: !!user?.id,
     queryFn: async () => {
       const { data: memberships } = await supabase
         .from('project_members')
@@ -102,6 +102,28 @@ export default function ClockStatusCard() {
       return (data || []) as { id: string; name: string }[];
     },
   });
+
+  const [switchProjectId, setSwitchProjectId] = useState<string>('');
+  const [switching, setSwitching] = useState(false);
+
+  const handleSwitchProject = async () => {
+    if (!switchProjectId || switchProjectId === active?.project_id) return;
+    setSwitching(true);
+    try {
+      await clockOut.mutateAsync();
+      await clockIn.mutateAsync(switchProjectId);
+      const newName = myProjects.find((p) => p.id === switchProjectId)?.name;
+      toast({
+        title: 'Switched project',
+        description: newName ? `Now clocked in on ${newName}.` : 'New shift started.',
+      });
+      setSwitchProjectId('');
+    } catch (e: any) {
+      toast({ title: 'Switch failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   useEffect(() => {
     if (!active?.clock_in_at) return;
@@ -189,6 +211,9 @@ export default function ClockStatusCard() {
     const elapsedMs = now - startedAt.getTime();
     const isRunaway = elapsedMs > RUNAWAY_THRESHOLD_MS;
     const isSoftWarn = !isRunaway && elapsedMs > SOFT_WARN_THRESHOLD_MS;
+    const currentProjectName = active.project_id
+      ? myProjects.find((p) => p.id === active.project_id)?.name
+      : null;
     return (
       <Card
         className={
@@ -209,6 +234,7 @@ export default function ClockStatusCard() {
             <p className="text-2xl font-mono font-bold tabular-nums">{formatElapsed(elapsedMs)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Started {startedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              {currentProjectName ? ` · ${currentProjectName}` : ''}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               {formatHumanElapsed(closedHoursToday * 3600_000 + elapsedMs)} logged today
@@ -253,6 +279,39 @@ export default function ClockStatusCard() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+        {myProjects.length > 0 && !isRunaway && (
+          <div className="mt-3 pt-3 border-t border-border/50">
+            <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+              Moving to a different project? Switch in one tap.
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Select value={switchProjectId || ''} onValueChange={setSwitchProjectId}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Pick a new project…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {myProjects
+                      .filter((p) => p.id !== active.project_id)
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-9 shrink-0"
+                onClick={handleSwitchProject}
+                disabled={!switchProjectId || switching}
+              >
+                {switching ? 'Switching…' : 'Switch'}
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     );
   }
