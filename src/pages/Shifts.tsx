@@ -332,6 +332,7 @@ const Shifts = () => {
               shifts={shifts}
               profileMap={profileMap}
               projectMap={projectMap}
+              paidShiftIds={paidShiftIds}
               onEditShift={handleEditShift}
               onDateClick={(dateStr) => {
                 handleNewShift({ date: dateStr, userId: contractorFilter || undefined });
