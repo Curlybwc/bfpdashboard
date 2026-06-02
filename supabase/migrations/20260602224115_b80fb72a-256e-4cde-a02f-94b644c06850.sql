@@ -1,0 +1,1 @@
+ALTER FUNCTION public.validate_shift() SET search_path = 'public';
