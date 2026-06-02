@@ -318,17 +318,9 @@ const Shifts = () => {
           })()}
 
           {/* Results */}
-          {adminLoading2 ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, idx) => (
-                <Card key={idx} className="p-3 space-y-2">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-3 w-28" />
-                </Card>
-              ))}
-            </div>
-          ) : adminView === 'calendar' ? (
-            <ShiftsCalendarView
+          {adminView === 'calendar' ? (
+            <div className={adminLoading2 ? 'opacity-60 pointer-events-none transition-opacity' : 'transition-opacity'}>
+              <ShiftsCalendarView
               shifts={shifts}
               profileMap={profileMap}
               projectMap={projectMap}
@@ -341,7 +333,17 @@ const Shifts = () => {
                 setFromDate(from);
                 setToDate(to);
               }}
-            />
+              />
+            </div>
+          ) : adminLoading2 ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <Card key={idx} className="p-3 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-28" />
+                </Card>
+              ))}
+            </div>
           ) : shifts.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No shifts found for this date range.</p>
           ) : (
