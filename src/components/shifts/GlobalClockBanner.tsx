@@ -38,6 +38,7 @@ function formatHumanElapsed(ms: number): string {
 }
 
 const RUNAWAY_THRESHOLD_MS = 12 * 60 * 60 * 1000;
+const SOFT_WARN_THRESHOLD_MS = 8 * 60 * 60 * 1000;
 
 export default function GlobalClockBanner() {
   const { user } = useAuth();
@@ -57,6 +58,7 @@ export default function GlobalClockBanner() {
 
   const elapsedMs = now - new Date(active.clock_in_at).getTime();
   const isRunaway = elapsedMs > RUNAWAY_THRESHOLD_MS;
+  const isSoftWarn = !isRunaway && elapsedMs > SOFT_WARN_THRESHOLD_MS;
 
   const handleClockOut = async () => {
     try {
@@ -75,18 +77,20 @@ export default function GlobalClockBanner() {
       className={
         isRunaway
           ? 'sticky top-0 z-40 w-full bg-destructive text-destructive-foreground border-b border-destructive/40 shadow-sm'
+          : isSoftWarn
+          ? 'sticky top-0 z-40 w-full bg-amber-500 text-white border-b border-amber-600/40 shadow-sm'
           : 'sticky top-0 z-40 w-full bg-primary text-primary-foreground border-b border-primary/40 shadow-sm'
       }
     >
       <div className="flex items-center justify-between gap-3 px-3 py-2 max-w-screen-xl mx-auto">
         <Link to="/today" className="flex items-center gap-2 min-w-0 hover:opacity-90">
-          {isRunaway ? (
+          {isRunaway || isSoftWarn ? (
             <AlertTriangle className="h-4 w-4 shrink-0" />
           ) : (
             <Clock className="h-4 w-4 shrink-0" />
           )}
           <span className="text-xs uppercase tracking-wide opacity-90 hidden sm:inline">
-            {isRunaway ? 'Forgot to clock out?' : 'On the clock'}
+            {isRunaway ? 'Forgot to clock out?' : isSoftWarn ? 'Still clocked in' : 'On the clock'}
           </span>
           <span className="font-mono font-bold tabular-nums text-sm sm:text-base">{formatElapsed(elapsedMs)}</span>
         </Link>
@@ -94,7 +98,7 @@ export default function GlobalClockBanner() {
           <AlertDialogTrigger asChild>
             <Button
               size="sm"
-              variant={isRunaway ? 'secondary' : 'destructive'}
+              variant={isRunaway || isSoftWarn ? 'secondary' : 'destructive'}
               disabled={clockOut.isPending}
               className="h-8"
             >
