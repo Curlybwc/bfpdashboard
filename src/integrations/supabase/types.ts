@@ -2916,6 +2916,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_force_clock_out: {
+        Args: { p_shift_id: string }
+        Returns: {
+          admin_edited_at: string | null
+          admin_edited_by: string | null
+          clock_in_at: string | null
+          clock_out_at: string | null
+          created_at: string
+          created_by: string | null
+          end_time: string | null
+          flat_rate_amount: number | null
+          hourly_rate_snapshot: number | null
+          id: string
+          is_flat_rate: boolean
+          project_id: string | null
+          shift_date: string
+          start_time: string | null
+          total_hours: number | null
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shifts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_get_profile_pay: {
         Args: never
         Returns: {
