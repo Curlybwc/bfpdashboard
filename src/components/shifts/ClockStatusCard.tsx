@@ -47,6 +47,7 @@ function formatHumanElapsed(ms: number): string {
 }
 
 const RUNAWAY_THRESHOLD_MS = 12 * 60 * 60 * 1000;
+const SOFT_WARN_THRESHOLD_MS = 8 * 60 * 60 * 1000;
 
 export default function ClockStatusCard() {
   const { user } = useAuth();
@@ -187,11 +188,14 @@ export default function ClockStatusCard() {
     const startedAt = new Date(active.clock_in_at);
     const elapsedMs = now - startedAt.getTime();
     const isRunaway = elapsedMs > RUNAWAY_THRESHOLD_MS;
+    const isSoftWarn = !isRunaway && elapsedMs > SOFT_WARN_THRESHOLD_MS;
     return (
       <Card
         className={
           isRunaway
             ? 'p-4 mb-4 border-2 border-destructive/60 bg-destructive/10'
+            : isSoftWarn
+            ? 'p-4 mb-4 border-2 border-amber-500/60 bg-amber-500/10'
             : 'p-4 mb-4 border-2 border-primary/40 bg-primary/5'
         }
       >
@@ -199,6 +203,7 @@ export default function ClockStatusCard() {
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
               {isRunaway && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+              {isSoftWarn && <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />}
               On the clock
             </p>
             <p className="text-2xl font-mono font-bold tabular-nums">{formatElapsed(elapsedMs)}</p>
@@ -212,6 +217,11 @@ export default function ClockStatusCard() {
             {isRunaway && (
               <p className="text-xs text-destructive font-medium mt-1.5 max-w-xs">
                 Looks like you forgot to clock out. Tap Clock Out to close this shift now.
+              </p>
+            )}
+            {isSoftWarn && (
+              <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mt-1.5 max-w-xs">
+                Still on the clock after {formatHumanElapsed(elapsedMs)} — don't forget to clock out.
               </p>
             )}
           </div>
