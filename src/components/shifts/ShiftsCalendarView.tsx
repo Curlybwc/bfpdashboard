@@ -10,6 +10,7 @@ interface ShiftsCalendarViewProps {
   shifts: Shift[];
   profileMap: Record<string, string>;
   projectMap: Record<string, string>;
+  paidShiftIds?: Set<string>;
   onEditShift: (shift: Pick<Shift, 'id'>) => void;
   onDateClick?: (dateStr: string) => void;
   onMonthChange?: (from: string, to: string) => void;
@@ -21,6 +22,7 @@ export default function ShiftsCalendarView({
   shifts,
   profileMap,
   projectMap,
+  paidShiftIds,
   onEditShift,
   onDateClick,
   onMonthChange,
@@ -121,15 +123,22 @@ export default function ShiftsCalendarView({
                 )}
               </div>
 
-              {dayShifts.slice(0, 3).map((s) => (
-                <button
-                  key={s.id}
-                  onClick={(e) => { e.stopPropagation(); onEditShift(s); }}
-                  className="w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                >
-                  {profileMap[s.user_id]?.split(' ')[0] || '?'} · {Number(s.total_hours ?? 0)}h
-                </button>
-              ))}
+              {dayShifts.slice(0, 3).map((s) => {
+                const isPaid = paidShiftIds?.has(s.id);
+                const chipClass = isPaid
+                  ? 'bg-green-600/15 text-green-700 dark:text-green-400 hover:bg-green-600/25'
+                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25';
+                return (
+                  <button
+                    key={s.id}
+                    onClick={(e) => { e.stopPropagation(); onEditShift(s); }}
+                    title={isPaid ? 'Paid' : 'Unpaid'}
+                    className={`w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight truncate transition-colors ${chipClass}`}
+                  >
+                    {profileMap[s.user_id]?.split(' ')[0] || '?'} · {Number(s.total_hours ?? 0)}h
+                  </button>
+                );
+              })}
               {dayShifts.length > 3 && (
                 <p className="text-[9px] text-muted-foreground text-center">
                   +{dayShifts.length - 3} more
