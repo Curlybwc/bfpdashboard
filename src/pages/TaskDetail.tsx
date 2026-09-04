@@ -884,7 +884,7 @@ const TaskDetail = () => {
         </div>
       )}
 
-      <div className="p-4 space-y-4">
+      <div className="mx-auto w-full max-w-5xl p-4 space-y-4">
         {/* Lifecycle action buttons */}
         <TaskLifecycleActions
           isActionableTask={isActionableTask}
