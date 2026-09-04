@@ -82,7 +82,7 @@ const MobileNav = () => {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card safe-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card safe-bottom lg:hidden">
         <div className="mx-auto flex max-w-md items-stretch justify-between gap-0.5 px-1 py-1">
           {primary.map(({ to, icon: Icon, label }) => (
             <Link key={to} to={to} className={tabClass(location.pathname.startsWith(to))} aria-label={label}>

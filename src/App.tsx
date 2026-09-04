@@ -52,6 +52,7 @@ const Reimbursements = lazy(() => import("./pages/Reimbursements"));
 const AdminReimbursements = lazy(() => import("./pages/AdminReimbursements"));
 const AdminReimbursementPaymentQueue = lazy(() => import("./pages/AdminReimbursementPaymentQueue"));
 import MobileNav from "./components/MobileNav";
+import DesktopSidebar from "./components/DesktopSidebar";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import GlobalClockBanner from "./components/shifts/GlobalClockBanner";
 import OfflineIndicator from "./components/OfflineIndicator";
