@@ -87,4 +87,30 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  /* Horizontal pill/action rows on phones */
+  .scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Keep content clear of the fixed bottom nav + home indicator */
+@layer base {
+  .pb-20 {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .pb-24 {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
 }
