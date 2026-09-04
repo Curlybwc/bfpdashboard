@@ -12,6 +12,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const companyId = body.company_id;
     const returnTo = body.return_to || "/shifts";
+    const allowShared = body.allow_shared === true;
+
 
     if (!companyId || typeof companyId !== "string") {
       return new Response(
@@ -32,8 +34,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build state: companyId:userId:timestamp:returnTo, signed with HMAC
-    const statePayload = `${companyId}:${userId}:${Date.now()}:${returnTo}`;
+    // Build state: companyId:userId:timestamp:returnTo:allowShared, signed with HMAC
+    const statePayload = `${companyId}:${userId}:${Date.now()}:${returnTo}:${allowShared ? "1" : "0"}`;
     const stateSig = await signState(statePayload, stateSecret);
     const state = `${statePayload}:${stateSig}`;
 
@@ -43,6 +45,10 @@ Deno.serve(async (req) => {
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("scope", scopes);
     authUrl.searchParams.set("state", state);
+    // Always make Intuit show the company chooser so a stale browser session
+    // cannot silently re-authorize the wrong QuickBooks company.
+    authUrl.searchParams.set("prompt", "select_account");
+
 
     return new Response(
       JSON.stringify({ auth_url: authUrl.toString() }),

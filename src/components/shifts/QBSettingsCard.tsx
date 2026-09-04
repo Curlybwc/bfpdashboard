@@ -128,6 +128,8 @@ const QBSettingsCard = () => {
 
   // Connect flow state
   const [qbConnecting, setQbConnecting] = useState(false);
+  const [allowShared, setAllowShared] = useState(false);
+
 
   // Legacy unassigned data counts
   const [legacyVendorCount, setLegacyVendorCount] = useState(0);
@@ -235,8 +237,9 @@ const QBSettingsCard = () => {
     setQbConnecting(true);
     try {
       const { data, error } = await supabase.functions.invoke('quickbooks_connect_begin', {
-        body: { company_id: selectedCompanyId, return_to: window.location.pathname },
+        body: { company_id: selectedCompanyId, return_to: window.location.pathname, allow_shared: allowShared },
       });
+
       if (error || !data?.auth_url) {
         toast({ title: 'Failed to start QuickBooks connection', description: error?.message || 'No auth URL returned', variant: 'destructive' });
         setQbConnecting(false);
@@ -745,6 +748,32 @@ const QBSettingsCard = () => {
                     </Button>
                   </div>
                 </div>
+
+                {(() => {
+                  const shared = companies.filter(
+                    (c) => c.id !== selectedCompany.id && c.qb_connection_id === selectedCompany.qb_connection_id,
+                  );
+                  if (shared.length === 0) return null;
+                  return (
+                    <p className="text-xs text-destructive">
+                      ⚠ This QuickBooks company is also linked to {shared.map((c) => c.name).join(', ')}. Vendor,
+                      account and class IDs are not interchangeable between entities — reconnect one of them to its own
+                      QuickBooks company unless this sharing is intentional.
+                    </p>
+                  );
+                })()}
+
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="h-3 w-3"
+                    checked={allowShared}
+                    onChange={(e) => setAllowShared(e.target.checked)}
+                  />
+                  Allow this company to share a QuickBooks company with another entity (only tick if intentional)
+                </label>
+
+
 
                 {validation?.connection?.name_mismatch && (
                   <p className="text-xs text-destructive">

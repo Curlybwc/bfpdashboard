@@ -49,11 +49,19 @@ Deno.serve(async (req) => {
     return redirectError("Invalid state signature");
   }
 
-  // Parts: companyId:userId:timestamp or companyId:userId:timestamp:returnTo
+  // Parts: companyId:userId:timestamp[:returnTo[:allowShared]]
   const companyId = parts[0];
   const userId = parts[1];
   const timestamp = parseInt(parts[2], 10);
-  const returnTo = parts.length >= 4 ? parts[3] : "/shifts";
+  let returnTo = "/shifts";
+  let allowShared = false;
+  if (parts.length >= 5) {
+    allowShared = parts[parts.length - 1] === "1";
+    returnTo = parts.slice(3, -1).join(":") || "/shifts";
+  } else if (parts.length === 4) {
+    returnTo = parts[3];
+  }
+
 
   // Check state isn't too old (10 min)
   if (isNaN(timestamp) || Date.now() - timestamp > 10 * 60 * 1000) {
@@ -180,15 +188,31 @@ Deno.serve(async (req) => {
     .neq("id", companyId)
     .maybeSingle();
 
-  if (otherCompany) {
-    // Another company is already linked to this QB connection.
-    // Still link the requesting company (admin chose this deliberately),
-    // but log a warning. Both companies will share the same QB connection.
+  if (otherCompany && !allowShared) {
+    // Hard stop: this QuickBooks company already belongs to another internal
+    // entity. Linking it here would let foreign-realm IDs leak between them.
+    const { data: thisCompany } = await adminClient
+      .from("companies")
+      .select("name")
+      .eq("id", companyId)
+      .maybeSingle();
     console.warn(
-      `QB connection ${resolvedConnectionId} (realm ${realmId}) is also linked to company "${otherCompany.name}" (${otherCompany.id}). ` +
-      `Now also linking to company ${companyId}.`
+      `Blocked linking QB connection ${resolvedConnectionId} (realm ${realmId}) to company ${companyId}: already linked to "${otherCompany.name}".`,
+    );
+    return redirectError(
+      `The QuickBooks company "${companyName || realmId}" is already linked to ${otherCompany.name}. ` +
+        `You likely picked the wrong company on the Intuit screen. Reconnect ${thisCompany?.name || "this company"} and choose its own QuickBooks company. ` +
+        `If sharing one QuickBooks company is intentional, tick "Allow sharing" in QuickBooks Settings and reconnect.`,
+      returnTo,
     );
   }
+
+  if (otherCompany) {
+    console.warn(
+      `QB connection ${resolvedConnectionId} (realm ${realmId}) deliberately shared with company "${otherCompany.name}" (${otherCompany.id}) and ${companyId}.`,
+    );
+  }
+
 
   // Update the requesting company's qb_connection_id
   const { error: linkError } = await adminClient
