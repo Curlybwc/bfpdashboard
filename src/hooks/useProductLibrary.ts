@@ -94,6 +94,17 @@ export function useProductPriceHistory(productId: string | null) {
   });
 }
 
+/**
+ * Escape a value for use inside a double-quoted PostgREST or() ilike filter.
+ * Handles grouping chars (parens/commas) via quoting and ilike wildcards via backslash.
+ */
+function escapeIlikeOrValue(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/[%_]/g, (m) => '\\' + m);
+}
+
 /** Where a product has been used — matched by direct link or normalized name. */
 export function useProductUsage(product: Product | null) {
   return useQuery({
