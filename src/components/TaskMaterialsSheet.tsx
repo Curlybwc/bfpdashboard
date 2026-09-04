@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOrg } from '@/hooks/useOrg';
 import { useStoreSections } from '@/hooks/useStoreSections';
-import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package } from 'lucide-react';
+import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package, Search } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
 import { inferStoreSection } from '@/lib/inferStoreSection';
@@ -666,6 +666,11 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
                   <SelectItem value="either">Either</SelectItem>
                 </SelectContent>
               </Select>
+            )}
+            {newItemType === 'material' && (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1 ml-auto" onClick={() => setPickerOpen(true)}>
+                <Search className="h-3 w-3" />Product Library
+              </Button>
             )}
           </div>
           <div className="flex gap-2">
