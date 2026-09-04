@@ -1018,7 +1018,7 @@ const ProjectDetail = () => {
                 className="pl-8"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 lg:w-auto">
               <Select value={filterCategory} onValueChange={(v) => {
                 setFilterCategory(v);
               }}>
