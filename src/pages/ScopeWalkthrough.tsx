@@ -814,30 +814,41 @@ const ScopeWalkthrough = () => {
           </Alert>
         )}
 
-        {blocks.length > 0 && (
-          <p className="text-sm text-muted-foreground">{blocks.length} block{blocks.length !== 1 ? 's' : ''} saved</p>
-        )}
+        <div className="flex items-center justify-between gap-2">
+          {blocks.length > 0 ? (
+            <p className="text-sm text-muted-foreground">{blocks.length} block{blocks.length !== 1 ? 's' : ''} saved</p>
+          ) : <span />}
+          {speech.listening && (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-destructive">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+              Listening
+            </span>
+          )}
+        </div>
 
         <textarea
           ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Dictate or type your walkthrough notes here..."
+          placeholder="Tap Dictate and talk, or type your walkthrough notes here..."
           className="flex w-full rounded-md border border-input bg-background px-3 py-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[200px] resize-none"
           rows={6}
         />
 
-        <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={handleSaveBlock} disabled={!text.trim()}>
-            Save Block
-          </Button>
-          <Button
-            className="flex-1"
-            onClick={handleReview}
-            disabled={loading || (!text.trim() && blocks.length === 0)}
-          >
-            {loading ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Reviewing...</> : 'Review Walkthrough'}
-          </Button>
+        <div className="sticky bottom-20 z-30 -mx-4 space-y-2 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
+          <DictateButton {...speech} className="w-full" label="Dictate notes" />
+          <div className="flex gap-2">
+            <Button variant="outline" className="h-12 flex-1" onClick={handleSaveBlock} disabled={!text.trim()}>
+              Save Block
+            </Button>
+            <Button
+              className="h-12 flex-1"
+              onClick={handleReview}
+              disabled={loading || (!text.trim() && blocks.length === 0)}
+            >
+              {loading ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Reviewing...</> : 'Review'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
