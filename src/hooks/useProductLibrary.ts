@@ -104,7 +104,7 @@ export function useProductUsage(product: Product | null) {
         .from('task_materials')
         .select('id, quantity, unit, unit_cost, purchased, delivered, name, product_library_id, tasks!inner(id, task, stage, project_id, projects!inner(id, name))')
         .eq('is_active', true)
-        .or(`product_library_id.eq.${product!.id},name.ilike.${product!.name.replace(/[%_,]/g, ' ')}`);
+        .or(`product_library_id.eq.${product!.id},name.ilike."${escapeIlikeOrValue(product!.name)}"`);
       if (error) throw error;
       return ((data as any[]) || []).map((r) => ({
         task_material_id: r.id,
