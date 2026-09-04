@@ -118,6 +118,7 @@ const AppRoutes = () => {
         <Route path="/scopes/:id" element={<ManagerGuard><ScopeDetail /></ManagerGuard>} />
         <Route path="/scopes/:id/walkthrough" element={<ManagerGuard><ScopeWalkthrough /></ManagerGuard>} />
         <Route path="/shopping" element={<Shopping />} />
+        <Route path="/products" element={<ProductLibrary />} />
         <Route path="/shifts" element={<Shifts />} />
         <Route path="/payroll" element={<AdminGuard><Payroll /></AdminGuard>} />
         <Route path="/availability" element={<Availability />} />

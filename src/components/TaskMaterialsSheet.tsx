@@ -73,6 +73,8 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [newItemType, setNewItemType] = useState<string>('material');
   const [newProvidedBy, setNewProvidedBy] = useState<string>('either');
   const [newStoreSection, setNewStoreSection] = useState<string>('');
+  const [newProductId, setNewProductId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
