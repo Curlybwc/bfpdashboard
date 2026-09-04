@@ -1087,7 +1087,7 @@ const ProjectDetail = () => {
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 lg:ml-auto">
               <Button
                 type="button"
                 variant={hideDone ? 'default' : 'outline'}
