@@ -95,7 +95,8 @@ const AppRoutes = () => {
   }
 
   return (
-    <>
+    <div className={user ? 'lg:pl-60' : undefined}>
+      {user && <DesktopSidebar />}
       <OfflineIndicator />
       <ImpersonationBanner />
       {user && <GlobalClockBanner />}
