@@ -135,6 +135,7 @@ const TaskDetail = () => {
   const [dueDate, setDueDate] = useState('');
   const [actualCost, setActualCost] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
+  const assignedToState = assignedTo;
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
 
@@ -240,8 +241,15 @@ const TaskDetail = () => {
     fetchTask();
   };
 
-  const handleSave = async (skipPhotoCheck = false) => {
+  const handleSave = async (
+    skipPhotoCheck = false,
+    overrides?: { stage?: TaskStage; assignedTo?: string },
+  ) => {
     if (!taskId || !task) return;
+
+    // Quick-action callers can pass fresh values that state has not flushed yet
+    const stage = overrides?.stage ?? stageState;
+    const assignedTo = overrides?.assignedTo ?? assignedToState;
 
     // Validation: recurring requires due date
     if (isRecurring && !dueDate) {
