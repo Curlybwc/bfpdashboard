@@ -1008,8 +1008,8 @@ const ProjectDetail = () => {
         />
 
         <Card className="mb-4">
-          <CardContent className="p-3 space-y-2">
-            <div className="relative">
+          <CardContent className="p-3 space-y-2 lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:space-y-0">
+            <div className="relative lg:min-w-[260px] lg:flex-1">
               <Search className="h-4 w-4 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
               <Input
                 value={taskSearch}
