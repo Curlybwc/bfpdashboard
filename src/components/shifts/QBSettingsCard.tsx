@@ -281,6 +281,8 @@ const QBSettingsCard = () => {
     }
   };
 
+  useEffect(() => { setValidation(null); }, [selectedCompanyId]);
+
   const runValidation = async () => {
     if (!selectedCompanyId) return;
     setValidating(true);
