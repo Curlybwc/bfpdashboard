@@ -6,51 +6,51 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { OrgProvider } from "@/hooks/useOrg";
 import { useGlobalPermissions } from "@/hooks/useAdmin";
-import { useEffect, ReactNode } from "react";
+import { useEffect, ReactNode, lazy, Suspense } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import ProjectList from "./pages/ProjectList";
-import ProjectDetail from "./pages/ProjectDetail";
-import ProjectMaterials from "./pages/ProjectMaterials";
-import ProjectWalkthrough from "./pages/ProjectWalkthrough";
-import TaskDetail from "./pages/TaskDetail";
-import ScopeList from "./pages/ScopeList";
-import ScopeDetail from "./pages/ScopeDetail";
-import ScopeWalkthrough from "./pages/ScopeWalkthrough";
-import AdminPanel from "./pages/AdminPanel";
-import AdminStoreSections from "./pages/AdminStoreSections";
-import AdminRecipes from "./pages/AdminRecipes";
-import AdminMaterialBundles from "./pages/AdminMaterialBundles";
-import AdminAssignmentRules from "./pages/AdminAssignmentRules";
-import AdminRehabLibrary from "./pages/AdminRehabLibrary";
-import ScopeAccuracy from "./pages/ScopeAccuracy";
-import ToolInventory from "./pages/ToolInventory";
-import MaterialInventory from "./pages/MaterialInventory";
-import ProductLibrary from "./pages/ProductLibrary";
+const ProjectList = lazy(() => import("./pages/ProjectList"));
+const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
+const ProjectMaterials = lazy(() => import("./pages/ProjectMaterials"));
+const ProjectWalkthrough = lazy(() => import("./pages/ProjectWalkthrough"));
+const TaskDetail = lazy(() => import("./pages/TaskDetail"));
+const ScopeList = lazy(() => import("./pages/ScopeList"));
+const ScopeDetail = lazy(() => import("./pages/ScopeDetail"));
+const ScopeWalkthrough = lazy(() => import("./pages/ScopeWalkthrough"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+const AdminStoreSections = lazy(() => import("./pages/AdminStoreSections"));
+const AdminRecipes = lazy(() => import("./pages/AdminRecipes"));
+const AdminMaterialBundles = lazy(() => import("./pages/AdminMaterialBundles"));
+const AdminAssignmentRules = lazy(() => import("./pages/AdminAssignmentRules"));
+const AdminRehabLibrary = lazy(() => import("./pages/AdminRehabLibrary"));
+const ScopeAccuracy = lazy(() => import("./pages/ScopeAccuracy"));
+const ToolInventory = lazy(() => import("./pages/ToolInventory"));
+const MaterialInventory = lazy(() => import("./pages/MaterialInventory"));
+const ProductLibrary = lazy(() => import("./pages/ProductLibrary"));
 import Today from "./pages/Today";
-import Shopping from "./pages/Shopping";
-import Shifts from "./pages/Shifts";
-import Payroll from "./pages/Payroll";
-import Availability from "./pages/Availability";
-import FieldModeCapture from "./pages/FieldModeCapture";
-import FieldModePreview from "./pages/FieldModePreview";
+const Shopping = lazy(() => import("./pages/Shopping"));
+const Shifts = lazy(() => import("./pages/Shifts"));
+const Payroll = lazy(() => import("./pages/Payroll"));
+const Availability = lazy(() => import("./pages/Availability"));
+const FieldModeCapture = lazy(() => import("./pages/FieldModeCapture"));
+const FieldModePreview = lazy(() => import("./pages/FieldModePreview"));
 import NotFound from "./pages/NotFound";
-import ResetPassword from "./pages/ResetPassword";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Eula from "./pages/Eula";
-import QBDisconnected from "./pages/QBDisconnected";
-import Analytics from "./pages/Analytics";
-import CalendarView from "./pages/CalendarView";
-import Accounting from "./pages/Accounting";
-import AdminVendorMappings from "./pages/AdminVendorMappings";
-import AdminVendors from "./pages/AdminVendors";
-import AdminActivityLog from "./pages/AdminActivityLog";
-import AdminBulkCandidates from "./pages/AdminBulkCandidates";
-import AdminInvites from "./pages/AdminInvites";
-import AdminStrandedUsers from "./pages/AdminStrandedUsers";
-import Reimbursements from "./pages/Reimbursements";
-import AdminReimbursements from "./pages/AdminReimbursements";
-import AdminReimbursementPaymentQueue from "./pages/AdminReimbursementPaymentQueue";
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const Eula = lazy(() => import("./pages/Eula"));
+const QBDisconnected = lazy(() => import("./pages/QBDisconnected"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const CalendarView = lazy(() => import("./pages/CalendarView"));
+const Accounting = lazy(() => import("./pages/Accounting"));
+const AdminVendorMappings = lazy(() => import("./pages/AdminVendorMappings"));
+const AdminVendors = lazy(() => import("./pages/AdminVendors"));
+const AdminActivityLog = lazy(() => import("./pages/AdminActivityLog"));
+const AdminBulkCandidates = lazy(() => import("./pages/AdminBulkCandidates"));
+const AdminInvites = lazy(() => import("./pages/AdminInvites"));
+const AdminStrandedUsers = lazy(() => import("./pages/AdminStrandedUsers"));
+const Reimbursements = lazy(() => import("./pages/Reimbursements"));
+const AdminReimbursements = lazy(() => import("./pages/AdminReimbursements"));
+const AdminReimbursementPaymentQueue = lazy(() => import("./pages/AdminReimbursementPaymentQueue"));
 import MobileNav from "./components/MobileNav";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import GlobalClockBanner from "./components/shifts/GlobalClockBanner";
@@ -99,6 +99,7 @@ const AppRoutes = () => {
       <OfflineIndicator />
       <ImpersonationBanner />
       {user && <GlobalClockBanner />}
+      <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center text-muted-foreground">Loading…</div>}>
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<Login />} />
@@ -147,6 +148,7 @@ const AppRoutes = () => {
         <Route path="/admin/reimbursements/payment-queue" element={<AdminGuard><AdminReimbursementPaymentQueue /></AdminGuard>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
       {user && <MobileNav />}
     </>
   );
