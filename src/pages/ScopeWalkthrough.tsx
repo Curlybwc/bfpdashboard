@@ -6,6 +6,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrg } from '@/hooks/useOrg';
 import PageHeader from '@/components/PageHeader';
+import DictateButton from '@/components/DictateButton';
+import { useSpeechInput } from '@/hooks/useSpeechInput';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -108,6 +110,7 @@ const ScopeWalkthrough = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [text, setText] = useState('');
+  const speech = useSpeechInput(setText, () => text);
   const [blocks, setBlocks] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
