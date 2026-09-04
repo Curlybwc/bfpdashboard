@@ -36,6 +36,9 @@ verify_jwt = false
 [functions.quickbooks_connection_status]
 verify_jwt = false
 
+[functions.quickbooks_validate_settings]
+verify_jwt = false
+
 [functions.quickbooks_export_payables]
 verify_jwt = false
 

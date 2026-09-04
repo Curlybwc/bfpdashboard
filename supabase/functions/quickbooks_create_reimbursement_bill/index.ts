@@ -1,5 +1,5 @@
 import { corsHeaders, requireAdminAuth } from "../_shared/auth.ts";
-import { getConnectionForCompany, qbApiFetch } from "../_shared/quickbooks.ts";
+import { checkQBRef, getConnectionForCompany, qbApiFetch, refFailureMessage } from "../_shared/quickbooks.ts";
 
 /**
  * Create a single QuickBooks Bill for an approved reimbursement request.
@@ -176,6 +176,60 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    // ---- Realm-scoped reference validation ----
+    {
+      const { data: companyRow } = await adminClient
+        .from("companies").select("name").eq("id", companyId).maybeSingle();
+      const companyName = companyRow?.name || "this company";
+      const realmId = conn.realm_id;
+
+      const stop = async (msg: string) => {
+        await adminClient.from("reimbursement_requests").update({ qb_export_error: msg }).eq("id", reimbursement_id);
+        return new Response(
+          JSON.stringify({ error: "invalid_reference", message: msg }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      };
+
+      const vendorCheck = await checkQBRef(conn, "Vendor", vendorMapping.qb_vendor_id);
+      if (!vendorCheck.ok) {
+        await adminClient.from("quickbooks_vendor_mappings")
+          .update({ qb_realm_id: null, verified_at: null, verification_error: vendorCheck.apiError || "Vendor not found in the connected QuickBooks company" })
+          .eq("company_id", companyId).eq("qb_vendor_id", vendorMapping.qb_vendor_id);
+        return await stop(refFailureMessage(companyName, `vendor "${vendorMapping.qb_vendor_name || "(unnamed)"}"`, vendorMapping.qb_vendor_id, realmId, vendorCheck,
+          "Open QuickBooks Settings for this company, run Validate QuickBooks Settings, then reload QB Vendors and re-select the vendor."));
+      }
+
+      const acctCheck = await checkQBRef(conn, "Account", qbSettings.qb_reimbursement_expense_account_id!);
+      if (!acctCheck.ok) {
+        await adminClient.from("quickbooks_settings")
+          .update({ reimbursement_account_realm_id: null, reimbursement_account_verified_at: null })
+          .eq("company_id", companyId);
+        return await stop(refFailureMessage(companyName, `reimbursement expense account "${qbSettings.qb_reimbursement_expense_account_name || "(unnamed)"}"`, qbSettings.qb_reimbursement_expense_account_id!, realmId, acctCheck,
+          "Open QuickBooks Settings for this company, click Load QB Accounts and select the correct reimbursement account."));
+      }
+
+      if (classId) {
+        const classCheck = await checkQBRef(conn, "Class", classId);
+        if (!classCheck.ok) {
+          await adminClient.from("quickbooks_class_mappings")
+            .update({ qb_realm_id: null, verified_at: null, verification_error: classCheck.apiError || "Class not found in the connected QuickBooks company" })
+            .eq("qb_class_id", classId);
+          return await stop(refFailureMessage(companyName, `class/project mapping "${className || classId}"`, classId, realmId, classCheck,
+            "Open QuickBooks Settings for this company, click Load QB Classes and re-select the class for this project."));
+        }
+      }
+
+      const nowIso = new Date().toISOString();
+      await adminClient.from("quickbooks_vendor_mappings")
+        .update({ qb_realm_id: realmId, verified_at: nowIso, verification_error: null })
+        .eq("company_id", companyId).eq("qb_vendor_id", vendorMapping.qb_vendor_id);
+      await adminClient.from("quickbooks_settings")
+        .update({ reimbursement_account_realm_id: realmId, reimbursement_account_verified_at: nowIso })
+        .eq("company_id", companyId);
+    }
+
 
     // Build the bill
     const lineDescription = `Reimbursement: ${reimb.vendor_paid} on ${reimb.expense_date}` +

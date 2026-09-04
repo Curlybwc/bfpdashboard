@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import QBCombobox from './QBCombobox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2, Pencil, Link2, AlertTriangle } from 'lucide-react';
+import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2, Pencil, Link2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -18,6 +18,14 @@ type ProfileRow = { id: string; full_name: string | null; is_active: boolean };
 type QBClass = { id: string; name: string; fully_qualified_name: string };
 type QBAccount = { id: string; name: string; fully_qualified_name: string; account_type: string | null; account_sub_type: string | null };
 type QBVendor = { id: string; display_name: string };
+type ValidationCheck = { kind: string; label: string; qb_id: string | null; saved_name: string | null; status: 'valid' | 'missing' | 'not_found' | 'inactive' | 'unknown'; detail: string; ref_id?: string };
+type ValidationResult = {
+  company: { id: string; name: string };
+  connection: { id: string; realm_id: string; stored_company_name: string | null; live_company_name: string | null; name_mismatch: boolean } | null;
+  summary: { valid: number; missing: number; invalid: number; unknown: number };
+  checks: ValidationCheck[];
+  message?: string;
+};
 
 const QBSettingsCard = () => {
   const { toast } = useToast();
@@ -102,6 +110,10 @@ const QBSettingsCard = () => {
   // QB vendors from API (for vendor picker)
   const [qbVendors, setQbVendors] = useState<QBVendor[]>([]);
   const [qbVendorsLoading, setQbVendorsLoading] = useState(false);
+
+  // QuickBooks settings validation
+  const [validating, setValidating] = useState(false);
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [qbVendorsLoaded, setQbVendorsLoaded] = useState(false);
   const [qbVendorsError, setQbVendorsError] = useState<string | null>(null);
 
@@ -267,6 +279,34 @@ const QBSettingsCard = () => {
       setAddCompanyOpen(false);
       await loadCompanies();
     }
+  };
+
+  useEffect(() => { setValidation(null); }, [selectedCompanyId]);
+
+  const runValidation = async () => {
+    if (!selectedCompanyId) return;
+    setValidating(true);
+    setValidation(null);
+    const { data, error } = await supabase.functions.invoke('quickbooks_validate_settings', {
+      body: { company_id: selectedCompanyId },
+    });
+    setValidating(false);
+    if (error) {
+      toast({ title: 'Validation failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const result = data as ValidationResult;
+    setValidation(result);
+    if (!result.connection) {
+      toast({ title: 'No QuickBooks connection', description: result.message || '', variant: 'destructive' });
+      return;
+    }
+    const bad = result.summary.invalid;
+    toast({
+      title: bad > 0 ? `${bad} invalid mapping${bad === 1 ? '' : 's'}` : 'All mappings valid',
+      description: bad > 0 ? 'Reload and re-select the affected records below.' : `Checked against ${result.connection.live_company_name || result.connection.realm_id}.`,
+      variant: bad > 0 ? 'destructive' : undefined,
+    });
   };
 
   const loadQBClasses = async () => {
@@ -682,14 +722,77 @@ const QBSettingsCard = () => {
               </div>
             )}
             {selectedCompany && selectedCompany.qb_connection_id && (
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                  Linked to: {qbConnections.find(c => c.id === selectedCompany.qb_connection_id)?.company_name || 'Unknown'}
-                </p>
-                <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={handleConnectQBForCompany} disabled={qbConnecting}>
-                  {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
-                  Reconnect
-                </Button>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground">
+                    Linked to: {validation?.connection?.live_company_name
+                      || qbConnections.find(c => c.id === selectedCompany.qb_connection_id)?.company_name
+                      || 'Unknown'}
+                    {' '}
+                    <span className="opacity-60">
+                      (realm {validation?.connection?.realm_id || qbConnections.find(c => c.id === selectedCompany.qb_connection_id)?.realm_id})
+                    </span>
+                    {!validation && <span className="opacity-60"> · unverified</span>}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={runValidation} disabled={validating}>
+                      {validating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ShieldCheck className="h-3 w-3 mr-1" />}
+                      Validate QuickBooks Settings
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={handleConnectQBForCompany} disabled={qbConnecting}>
+                      {qbConnecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Link2 className="h-3 w-3 mr-1" />}
+                      Reconnect
+                    </Button>
+                  </div>
+                </div>
+
+                {validation?.connection?.name_mismatch && (
+                  <p className="text-xs text-destructive">
+                    ⚠ Stored name "{validation.connection.stored_company_name}" did not match the live QuickBooks company
+                    "{validation.connection.live_company_name}". The stored name has been corrected — confirm this is the
+                    right QuickBooks company for {selectedCompany.name}, and reconnect if it is not.
+                  </p>
+                )}
+
+                {validation && (
+                  <div className="rounded border p-2 space-y-1 max-h-72 overflow-y-auto">
+                    <p className="text-xs font-medium">
+                      {validation.summary.valid} valid · {validation.summary.invalid} invalid · {validation.summary.missing} missing
+                      {validation.summary.unknown ? ` · ${validation.summary.unknown} unchecked` : ''}
+                    </p>
+                    {validation.checks
+                      .slice()
+                      .sort((a, b) => (a.status === 'valid' ? 1 : 0) - (b.status === 'valid' ? 1 : 0))
+                      .map((c, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs">
+                          <span className={
+                            c.status === 'valid' ? 'text-primary' :
+                            c.status === 'missing' ? 'text-muted-foreground' : 'text-destructive'
+                          }>
+                            {c.status === 'valid' ? '✓' : c.status === 'missing' ? '⚠' : '✕'}
+                          </span>
+                          <span className="flex-1">
+                            <span className="font-medium">{c.label}</span>
+                            {c.qb_id ? <span className="opacity-60"> · QB ID {c.qb_id}</span> : null}
+                            {c.status !== 'valid' && <span className="block text-muted-foreground">{c.detail}</span>}
+                          </span>
+                        </div>
+                      ))}
+                    {validation.summary.invalid + validation.summary.missing > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={loadQBAccounts} disabled={qbAccountsLoading}>
+                          Reload QB Accounts
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={loadQBVendors} disabled={qbVendorsLoading}>
+                          Reload QB Vendors
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={loadQBClasses} disabled={qbClassesLoading}>
+                          Reload QB Classes
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

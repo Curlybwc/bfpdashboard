@@ -248,3 +248,74 @@ export async function verifyState(payload: string, signature: string, secret: st
   const expected = await signState(payload, secret);
   return expected === signature;
 }
+
+/* ============================================================
+ * Realm-scoped reference validation
+ * QuickBooks entity IDs (Vendor, Account, Class, Customer) are only
+ * valid inside the realm they came from. Every reference must be
+ * checked against the realm we are about to post to.
+ * ============================================================ */
+
+export type QBEntityType = "Vendor" | "Account" | "Class" | "Customer";
+
+export interface QBRefCheck {
+  ok: boolean;
+  /** true when QB answered and the record simply does not exist in this realm */
+  notFound?: boolean;
+  /** true when the record exists but is inactive */
+  inactive?: boolean;
+  name?: string;
+  /** transport/API failure — inconclusive */
+  apiError?: string;
+}
+
+/** Look up a single entity by Id inside the connection's realm. */
+export async function checkQBRef(
+  conn: QBConnection,
+  type: QBEntityType,
+  id: string,
+): Promise<QBRefCheck> {
+  const safeId = String(id).replace(/'/g, "''");
+  const nameField = type === "Account" || type === "Class" ? "Name" : "DisplayName";
+  const query = encodeURIComponent(
+    `SELECT Id, ${nameField}, Active FROM ${type} WHERE Id = '${safeId}'`,
+  );
+  const res = await qbApiFetch(conn, "GET", `/query?query=${query}`);
+  if (!res.ok) {
+    // A 400 on a query for a non-existent Id is treated as not found by QB
+    if (res.status === 400 && /not found/i.test(res.error || "")) {
+      return { ok: false, notFound: true };
+    }
+    return { ok: false, apiError: res.error || `QB API error (${res.status})` };
+  }
+  const rows = (res.data as any)?.QueryResponse?.[type] || [];
+  if (rows.length === 0) return { ok: false, notFound: true };
+  const row = rows[0];
+  const name = row[nameField] || row.Name || row.DisplayName || undefined;
+  if (row.Active === false) return { ok: false, inactive: true, name };
+  return { ok: true, name };
+}
+
+/** Live company name for a realm, straight from QuickBooks. */
+export async function fetchRealmCompanyName(conn: QBConnection): Promise<string | null> {
+  const res = await qbApiFetch(conn, "GET", `/companyinfo/${conn.realm_id}`);
+  if (!res.ok) return null;
+  return (res.data as any)?.CompanyInfo?.CompanyName || null;
+}
+
+export function refFailureMessage(
+  companyName: string,
+  label: string,
+  qbId: string,
+  realmId: string,
+  check: QBRefCheck,
+  fixHint: string,
+): string {
+  if (check.apiError) {
+    return `Cannot export to ${companyName}: could not verify ${label} (QuickBooks ID ${qbId}) in QuickBooks company ${realmId}. ${check.apiError}`;
+  }
+  if (check.inactive) {
+    return `Cannot export to ${companyName}: ${label} (QuickBooks ID ${qbId}) is inactive in the connected QuickBooks company (realm ${realmId}). ${fixHint}`;
+  }
+  return `Cannot export to ${companyName}: ${label} (saved QuickBooks ID ${qbId}) does not exist in the connected QuickBooks company (realm ${realmId}) — this reference belongs to a different QuickBooks company. ${fixHint}`;
+}

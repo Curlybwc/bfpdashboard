@@ -1,5 +1,5 @@
 import { corsHeaders, requireAdminAuth } from "../_shared/auth.ts";
-import { getConnectionForCompany, qbApiFetch, QBConnection } from "../_shared/quickbooks.ts";
+import { checkQBRef, getConnectionForCompany, qbApiFetch, QBConnection, refFailureMessage } from "../_shared/quickbooks.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -253,9 +253,112 @@ Deno.serve(async (req) => {
       // Fetch QB settings for this company (already validated above)
       const { data: qbSettings } = await adminClient
         .from("quickbooks_settings")
-        .select("labor_expense_account_id, labor_expense_account_name")
+        .select("id, labor_expense_account_id, labor_expense_account_name")
         .eq("company_id", group.companyId)
         .maybeSingle();
+
+      const companyName = companyMap.get(group.companyId)?.name || group.companyId;
+      const realmId = conn.realm_id;
+
+      const failGroup = async (errorMsg: string) => {
+        for (const batchId of validBatchIds) {
+          await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+          results.push({ batch_id: batchId, success: false, error: errorMsg });
+          failedBatchIds.add(batchId);
+        }
+      };
+
+      // ---- Realm-scoped reference validation (never post a foreign-realm ID) ----
+      const vendorCheck = await checkQBRef(conn, "Vendor", group.qbVendorId);
+      if (!vendorCheck.ok) {
+        await adminClient
+          .from("quickbooks_vendor_mappings")
+          .update({ qb_realm_id: null, verified_at: null, verification_error: vendorCheck.apiError || (vendorCheck.inactive ? "Vendor is inactive in QuickBooks" : "Vendor not found in the connected QuickBooks company") })
+          .eq("company_id", group.companyId)
+          .eq("qb_vendor_id", group.qbVendorId);
+        await failGroup(refFailureMessage(
+          companyName,
+          `vendor "${group.qbVendorName || "(unnamed)"}"`,
+          group.qbVendorId,
+          realmId,
+          vendorCheck,
+          "Open QuickBooks Settings for this company, run Validate QuickBooks Settings, then reload QB Vendors and re-select the vendor.",
+        ));
+        continue;
+      }
+
+      const accountCheck = await checkQBRef(conn, "Account", qbSettings!.labor_expense_account_id!);
+      if (!accountCheck.ok) {
+        if (qbSettings?.id) {
+          await adminClient
+            .from("quickbooks_settings")
+            .update({ labor_account_realm_id: null, labor_account_verified_at: null })
+            .eq("id", qbSettings.id);
+        }
+        await failGroup(refFailureMessage(
+          companyName,
+          `labor expense account "${qbSettings!.labor_expense_account_name || "(unnamed)"}"`,
+          qbSettings!.labor_expense_account_id!,
+          realmId,
+          accountCheck,
+          "Open QuickBooks Settings for this company, click Load QB Accounts and select the correct labor expense account.",
+        ));
+        continue;
+      }
+
+      // Class references are optional — validate each distinct one that is used
+      let classFailure: string | null = null;
+      const checkedClasses = new Map<string, boolean>();
+      for (const line of group.lines) {
+        if (!line.classId) continue;
+        if (!checkedClasses.has(line.classId)) {
+          const classCheck = await checkQBRef(conn, "Class", line.classId);
+          checkedClasses.set(line.classId, classCheck.ok);
+          if (!classCheck.ok) {
+            await adminClient
+              .from("quickbooks_class_mappings")
+              .update({ qb_realm_id: null, verified_at: null, verification_error: classCheck.apiError || "Class not found in the connected QuickBooks company" })
+              .eq("qb_class_id", line.classId)
+              .eq("project_id", line.batch.project_id);
+            classFailure = refFailureMessage(
+              companyName,
+              `class/project mapping "${line.className || line.projectName}"`,
+              line.classId,
+              realmId,
+              classCheck,
+              "Open QuickBooks Settings for this company, click Load QB Classes and re-select the class for this project.",
+            );
+            break;
+          }
+        }
+      }
+      if (classFailure) {
+        await failGroup(classFailure);
+        continue;
+      }
+
+      // All references confirmed in this realm — record the verification
+      const nowIso = new Date().toISOString();
+      await adminClient
+        .from("quickbooks_vendor_mappings")
+        .update({ qb_realm_id: realmId, verified_at: nowIso, verification_error: null })
+        .eq("company_id", group.companyId)
+        .eq("qb_vendor_id", group.qbVendorId);
+      if (qbSettings?.id) {
+        await adminClient
+          .from("quickbooks_settings")
+          .update({ labor_account_realm_id: realmId, labor_account_verified_at: nowIso })
+          .eq("id", qbSettings.id);
+      }
+      for (const [classId, ok] of checkedClasses) {
+        if (ok) {
+          await adminClient
+            .from("quickbooks_class_mappings")
+            .update({ qb_realm_id: realmId, verified_at: nowIso, verification_error: null })
+            .eq("qb_class_id", classId);
+        }
+      }
+
 
       // Build bill lines — one line per batch to preserve project/class detail
       const billLines = group.lines.map((line) => {
