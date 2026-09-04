@@ -321,7 +321,7 @@ const ProjectWalkthrough = () => {
     <div className="pb-20">
       <PageHeader title="Walkthrough" backTo={`/projects/${id}`} />
 
-      <div className="p-4 space-y-4">
+      <div className="mx-auto w-full max-w-5xl p-4 space-y-4">
         {/* Input area */}
         {!hasParsed && (
           <div className="space-y-3">

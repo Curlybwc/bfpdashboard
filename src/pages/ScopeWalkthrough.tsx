@@ -523,7 +523,7 @@ const ScopeWalkthrough = () => {
             </Button>
           }
         />
-        <div className="p-4 space-y-6">
+        <div className="mx-auto w-full max-w-5xl p-4 space-y-6">
           {/* Detected Rehab Templates */}
           {detectedRehabs.length > 0 && (
             <div>
@@ -807,7 +807,7 @@ const ScopeWalkthrough = () => {
   return (
     <div className="pb-20">
       <PageHeader title="Walkthrough" backTo={`/scopes/${id}`} />
-      <div className="p-4 space-y-4">
+      <div className="mx-auto w-full max-w-5xl p-4 space-y-4">
         {scopeItemCount === 0 && (
           <Alert>
             <Info className="h-4 w-4" />

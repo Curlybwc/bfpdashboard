@@ -52,6 +52,7 @@ const Reimbursements = lazy(() => import("./pages/Reimbursements"));
 const AdminReimbursements = lazy(() => import("./pages/AdminReimbursements"));
 const AdminReimbursementPaymentQueue = lazy(() => import("./pages/AdminReimbursementPaymentQueue"));
 import MobileNav from "./components/MobileNav";
+import DesktopSidebar from "./components/DesktopSidebar";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import GlobalClockBanner from "./components/shifts/GlobalClockBanner";
 import OfflineIndicator from "./components/OfflineIndicator";
@@ -95,7 +96,8 @@ const AppRoutes = () => {
   }
 
   return (
-    <>
+    <div className={user ? 'lg:pl-60' : undefined}>
+      {user && <DesktopSidebar />}
       <OfflineIndicator />
       <ImpersonationBanner />
       {user && <GlobalClockBanner />}
@@ -150,7 +152,7 @@ const AppRoutes = () => {
       </Routes>
       </Suspense>
       {user && <MobileNav />}
-    </>
+    </div>
   );
 };
 

@@ -1008,8 +1008,8 @@ const ProjectDetail = () => {
         />
 
         <Card className="mb-4">
-          <CardContent className="p-3 space-y-2">
-            <div className="relative">
+          <CardContent className="p-3 space-y-2 lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:space-y-0">
+            <div className="relative lg:min-w-[260px] lg:flex-1">
               <Search className="h-4 w-4 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
               <Input
                 value={taskSearch}
@@ -1018,7 +1018,7 @@ const ProjectDetail = () => {
                 className="pl-8"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 lg:w-auto">
               <Select value={filterCategory} onValueChange={(v) => {
                 setFilterCategory(v);
               }}>
@@ -1087,7 +1087,7 @@ const ProjectDetail = () => {
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 lg:ml-auto">
               <Button
                 type="button"
                 variant={hideDone ? 'default' : 'outline'}
@@ -1113,7 +1113,7 @@ const ProjectDetail = () => {
             </div>
             {/* Show active filter badges */}
             {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 lg:w-full">
                 {filterStage !== 'all' && (
                   <Badge variant="secondary" className="text-xs gap-1">Stage: {filterStage}<button onClick={() => setFilterStage('all')}><X className="h-3 w-3" /></button></Badge>
                 )}
