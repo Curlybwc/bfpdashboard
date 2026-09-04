@@ -151,7 +151,7 @@ const AppRoutes = () => {
       </Routes>
       </Suspense>
       {user && <MobileNav />}
-    </>
+    </div>
   );
 };
 
