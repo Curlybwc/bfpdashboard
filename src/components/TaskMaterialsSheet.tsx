@@ -860,6 +860,20 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
           projectId={projectId ?? null}
         />
       )}
+
+      <ProductPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={(p) => {
+          setNewProductId(p.id);
+          setNewName(p.name);
+          if (p.unit) setNewUnit(p.unit);
+          if (p.unit_cost != null) setNewUnitCost(String(p.unit_cost));
+          if (p.sku) setNewSku(p.sku);
+          if (p.vendor_url) setNewVendorUrl(p.vendor_url);
+          if (p.store_section) setNewStoreSection(p.store_section);
+        }}
+      />
     </Drawer>
   );
 };
