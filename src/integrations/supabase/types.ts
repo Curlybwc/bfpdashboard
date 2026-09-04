@@ -431,45 +431,69 @@ export type Database = {
       }
       material_library: {
         Row: {
+          brand: string | null
+          category: string | null
           created_at: string
+          created_by: string | null
+          description: string | null
           id: string
           is_active: boolean
+          model: string | null
           name: string
           normalized_name: string
+          notes: string | null
           org_id: string | null
           sku: string | null
           store_section: string | null
+          subcategory: string | null
           unit: string | null
           unit_cost: number | null
           updated_at: string
+          vendor_name: string | null
           vendor_url: string | null
         }
         Insert: {
+          brand?: string | null
+          category?: string | null
           created_at?: string
+          created_by?: string | null
+          description?: string | null
           id?: string
           is_active?: boolean
+          model?: string | null
           name: string
           normalized_name: string
+          notes?: string | null
           org_id?: string | null
           sku?: string | null
           store_section?: string | null
+          subcategory?: string | null
           unit?: string | null
           unit_cost?: number | null
           updated_at?: string
+          vendor_name?: string | null
           vendor_url?: string | null
         }
         Update: {
+          brand?: string | null
+          category?: string | null
           created_at?: string
+          created_by?: string | null
+          description?: string | null
           id?: string
           is_active?: boolean
+          model?: string | null
           name?: string
           normalized_name?: string
+          notes?: string | null
           org_id?: string | null
           sku?: string | null
           store_section?: string | null
+          subcategory?: string | null
           unit?: string | null
           unit_cost?: number | null
           updated_at?: string
+          vendor_name?: string | null
           vendor_url?: string | null
         }
         Relationships: [
@@ -631,6 +655,86 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_price_history: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_recorded: string
+          id: string
+          notes: string | null
+          org_id: string | null
+          product_id: string
+          sku: string | null
+          source_project_id: string | null
+          source_task_id: string | null
+          unit: string | null
+          unit_cost: number | null
+          vendor_name: string | null
+          vendor_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_recorded?: string
+          id?: string
+          notes?: string | null
+          org_id?: string | null
+          product_id: string
+          sku?: string | null
+          source_project_id?: string | null
+          source_task_id?: string | null
+          unit?: string | null
+          unit_cost?: number | null
+          vendor_name?: string | null
+          vendor_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_recorded?: string
+          id?: string
+          notes?: string | null
+          org_id?: string | null
+          product_id?: string
+          sku?: string | null
+          source_project_id?: string | null
+          source_task_id?: string | null
+          unit?: string | null
+          unit_cost?: number | null
+          vendor_name?: string | null
+          vendor_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_price_history_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "material_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_history_source_project_id_fkey"
+            columns: ["source_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_history_source_task_id_fkey"
+            columns: ["source_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -1776,6 +1880,7 @@ export type Database = {
           is_active: boolean
           item_type: string
           name: string
+          product_library_id: string | null
           provided_by: string
           purchased: boolean
           quantity: number | null
@@ -1796,6 +1901,7 @@ export type Database = {
           is_active?: boolean
           item_type?: string
           name: string
+          product_library_id?: string | null
           provided_by?: string
           purchased?: boolean
           quantity?: number | null
@@ -1816,6 +1922,7 @@ export type Database = {
           is_active?: boolean
           item_type?: string
           name?: string
+          product_library_id?: string | null
           provided_by?: string
           purchased?: boolean
           quantity?: number | null
@@ -1829,6 +1936,13 @@ export type Database = {
           vendor_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "task_materials_product_library_id_fkey"
+            columns: ["product_library_id"]
+            isOneToOne: false
+            referencedRelation: "material_library"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "task_materials_task_id_fkey"
             columns: ["task_id"]
@@ -3124,6 +3238,20 @@ export type Database = {
       }
       push_recipe_step_to_tasks: { Args: { p_step_id: string }; Returns: Json }
       push_recipe_to_tasks: { Args: { p_recipe_id: string }; Returns: Json }
+      record_product_price: {
+        Args: {
+          p_notes?: string
+          p_product_id: string
+          p_sku?: string
+          p_source_project_id?: string
+          p_source_task_id?: string
+          p_unit?: string
+          p_unit_cost: number
+          p_vendor_name?: string
+          p_vendor_url?: string
+        }
+        Returns: string
+      }
       revoke_org_invite: { Args: { p_invite_id: string }; Returns: undefined }
       save_linked_historical_payments: {
         Args: {

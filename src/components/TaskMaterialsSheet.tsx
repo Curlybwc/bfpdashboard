@@ -11,11 +11,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOrg } from '@/hooks/useOrg';
 import { useStoreSections } from '@/hooks/useStoreSections';
-import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package } from 'lucide-react';
+import { Pencil, ExternalLink, Copy, Link, Trash2, RotateCcw, Package, Search } from 'lucide-react';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
 import { inferStoreSection } from '@/lib/inferStoreSection';
 import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
+import ProductPicker from '@/components/products/ProductPicker';
 
 interface TaskMaterial {
   id: string;
@@ -72,6 +73,8 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
   const [newItemType, setNewItemType] = useState<string>('material');
   const [newProvidedBy, setNewProvidedBy] = useState<string>('either');
   const [newStoreSection, setNewStoreSection] = useState<string>('');
+  const [newProductId, setNewProductId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
@@ -301,6 +304,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     const autoSection = newStoreSection || inferStoreSection(newName.trim(), activeNames);
     const { error } = await supabase.from('task_materials').insert({
       task_id: taskId,
+      product_library_id: newProductId,
       name: newName.trim(),
       quantity: newQty ? parseFloat(newQty) : null,
       unit: newUnit.trim() || null,
@@ -322,7 +326,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       name: newName, itemType: newItemType, sku: newSku, vendorUrl: newVendorUrl,
       unitCost: newUnitCost, unit: newUnit, storeSection: autoSection, qty: newQty,
     });
-    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost(''); setNewSku(''); setNewVendorUrl('');
+    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost(''); setNewSku(''); setNewVendorUrl(''); setNewProductId(null);
     setNewItemType('material'); setNewProvidedBy('either'); setNewStoreSection('');
     await fetchMaterials();
   };
@@ -663,6 +667,11 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
                 </SelectContent>
               </Select>
             )}
+            {newItemType === 'material' && (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1 ml-auto" onClick={() => setPickerOpen(true)}>
+                <Search className="h-3 w-3" />Product Library
+              </Button>
+            )}
           </div>
           <div className="flex gap-2">
             <MaterialAutocomplete
@@ -851,6 +860,20 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
           projectId={projectId ?? null}
         />
       )}
+
+      <ProductPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={(p) => {
+          setNewProductId(p.id);
+          setNewName(p.name);
+          if (p.unit) setNewUnit(p.unit);
+          if (p.unit_cost != null) setNewUnitCost(String(p.unit_cost));
+          if (p.sku) setNewSku(p.sku);
+          if (p.vendor_url) setNewVendorUrl(p.vendor_url);
+          if (p.store_section) setNewStoreSection(p.store_section);
+        }}
+      />
     </Drawer>
   );
 };
