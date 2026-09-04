@@ -128,6 +128,8 @@ const QBSettingsCard = () => {
 
   // Connect flow state
   const [qbConnecting, setQbConnecting] = useState(false);
+  const [allowShared, setAllowShared] = useState(false);
+
 
   // Legacy unassigned data counts
   const [legacyVendorCount, setLegacyVendorCount] = useState(0);
