@@ -401,7 +401,7 @@ const Today = () => {
       <PageHeader
         title="Today"
         actions={
-          <div className="flex gap-2">
+          <div className="scroll-x flex gap-2 [&>*]:shrink-0">
             <Sheet>
               <SheetTrigger asChild>
                 <Button size="sm" variant="outline">

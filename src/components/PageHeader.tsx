@@ -15,12 +15,18 @@ const PageHeader = ({ title, backTo, actions }: PageHeaderProps) => {
     <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="flex items-center gap-3 px-4 py-3">
         {backTo && (
-          <button onClick={() => navigate(backTo)} className="text-muted-foreground hover:text-foreground -ml-1">
+          <button
+            onClick={() => navigate(backTo)}
+            aria-label="Back"
+            className="-ml-2 flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-5 w-5" />
           </button>
         )}
-        <h1 className="flex-1 text-lg font-semibold truncate">{title}</h1>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{title}</h1>
+        {actions && (
+          <div className="scroll-x flex max-w-[60%] items-center gap-2 sm:max-w-none [&>*]:shrink-0">{actions}</div>
+        )}
       </div>
     </header>
   );
