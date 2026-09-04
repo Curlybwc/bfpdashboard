@@ -94,6 +94,17 @@ export function useProductPriceHistory(productId: string | null) {
   });
 }
 
+/**
+ * Escape a value for use inside a double-quoted PostgREST or() ilike filter.
+ * Handles grouping chars (parens/commas) via quoting and ilike wildcards via backslash.
+ */
+function escapeIlikeOrValue(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/[%_]/g, (m) => '\\' + m);
+}
+
 /** Where a product has been used — matched by direct link or normalized name. */
 export function useProductUsage(product: Product | null) {
   return useQuery({
@@ -104,7 +115,7 @@ export function useProductUsage(product: Product | null) {
         .from('task_materials')
         .select('id, quantity, unit, unit_cost, purchased, delivered, name, product_library_id, tasks!inner(id, task, stage, project_id, projects!inner(id, name))')
         .eq('is_active', true)
-        .or(`product_library_id.eq.${product!.id},name.ilike.${product!.name.replace(/[%_,]/g, ' ')}`);
+        .or(`product_library_id.eq.${product!.id},name.ilike."${escapeIlikeOrValue(product!.name)}"`);
       if (error) throw error;
       return ((data as any[]) || []).map((r) => ({
         task_material_id: r.id,
