@@ -928,6 +928,9 @@ export type Database = {
           project_id: string
           qb_class_id: string
           qb_class_name: string | null
+          qb_realm_id: string | null
+          verification_error: string | null
+          verified_at: string | null
         }
         Insert: {
           created_at?: string
@@ -935,6 +938,9 @@ export type Database = {
           project_id: string
           qb_class_id: string
           qb_class_name?: string | null
+          qb_realm_id?: string | null
+          verification_error?: string | null
+          verified_at?: string | null
         }
         Update: {
           created_at?: string
@@ -942,6 +948,9 @@ export type Database = {
           project_id?: string
           qb_class_id?: string
           qb_class_name?: string | null
+          qb_realm_id?: string | null
+          verification_error?: string | null
+          verified_at?: string | null
         }
         Relationships: [
           {
@@ -1001,30 +1010,42 @@ export type Database = {
         Row: {
           company_id: string | null
           id: string
+          labor_account_realm_id: string | null
+          labor_account_verified_at: string | null
           labor_expense_account_id: string | null
           labor_expense_account_name: string | null
           qb_reimbursement_expense_account_id: string | null
           qb_reimbursement_expense_account_name: string | null
+          reimbursement_account_realm_id: string | null
+          reimbursement_account_verified_at: string | null
           singleton: boolean
           updated_at: string
         }
         Insert: {
           company_id?: string | null
           id?: string
+          labor_account_realm_id?: string | null
+          labor_account_verified_at?: string | null
           labor_expense_account_id?: string | null
           labor_expense_account_name?: string | null
           qb_reimbursement_expense_account_id?: string | null
           qb_reimbursement_expense_account_name?: string | null
+          reimbursement_account_realm_id?: string | null
+          reimbursement_account_verified_at?: string | null
           singleton?: boolean
           updated_at?: string
         }
         Update: {
           company_id?: string | null
           id?: string
+          labor_account_realm_id?: string | null
+          labor_account_verified_at?: string | null
           labor_expense_account_id?: string | null
           labor_expense_account_name?: string | null
           qb_reimbursement_expense_account_id?: string | null
           qb_reimbursement_expense_account_name?: string | null
+          reimbursement_account_realm_id?: string | null
+          reimbursement_account_verified_at?: string | null
           singleton?: boolean
           updated_at?: string
         }
@@ -1043,25 +1064,34 @@ export type Database = {
           company_id: string | null
           created_at: string
           id: string
+          qb_realm_id: string | null
           qb_vendor_id: string
           qb_vendor_name: string | null
           user_id: string
+          verification_error: string | null
+          verified_at: string | null
         }
         Insert: {
           company_id?: string | null
           created_at?: string
           id?: string
+          qb_realm_id?: string | null
           qb_vendor_id: string
           qb_vendor_name?: string | null
           user_id: string
+          verification_error?: string | null
+          verified_at?: string | null
         }
         Update: {
           company_id?: string | null
           created_at?: string
           id?: string
+          qb_realm_id?: string | null
           qb_vendor_id?: string
           qb_vendor_name?: string | null
           user_id?: string
+          verification_error?: string | null
+          verified_at?: string | null
         }
         Relationships: [
           {
@@ -3203,6 +3233,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["scope_member_role"]
       }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      invalidate_company_qb_mappings: {
+        Args: { p_company_id: string; p_reason?: string }
+        Returns: undefined
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_org_admin: {
         Args: { _org_id: string; _user_id: string }
