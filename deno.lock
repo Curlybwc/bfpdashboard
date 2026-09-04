@@ -71,6 +71,7 @@
         "npm:eslint-plugin-react-refresh@~0.4.20",
         "npm:eslint@^9.32.0",
         "npm:globals@^15.15.0",
+        "npm:heic2any@^0.0.4",
         "npm:input-otp@^1.4.2",
         "npm:jsdom@^20.0.3",
         "npm:lovable-tagger@^1.1.13",
