@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import PageHeader from '@/components/PageHeader';
+import DictateButton from '@/components/DictateButton';
+import { useSpeechInput } from '@/hooks/useSpeechInput';
 import { applyBundles } from '@/lib/applyBundles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +53,7 @@ const ProjectWalkthrough = () => {
   const navigate = useNavigate();
 
   const [inputText, setInputText] = useState('');
+  const speech = useSpeechInput(setInputText, () => inputText);
   const [parsing, setParsing] = useState(false);
   const [drafts, setDrafts] = useState<DraftTask[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
