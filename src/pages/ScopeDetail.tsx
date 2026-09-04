@@ -351,10 +351,10 @@ const ScopeDetail = () => {
                 autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(); if (e.key === 'Escape') setEditingTitle(false); }}
               />
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleSaveTitle}>
+              <Button size="sm" variant="ghost" className="h-10 w-10 p-0 md:h-7 md:w-7" onClick={handleSaveTitle}>
                 <Check className="h-3.5 w-3.5" />
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingTitle(false)}>
+              <Button size="sm" variant="ghost" className="h-10 w-10 p-0 md:h-7 md:w-7" onClick={() => setEditingTitle(false)}>
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -365,7 +365,7 @@ const ScopeDetail = () => {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0"
+                  className="h-10 w-10 p-0 md:h-7 md:w-7"
                   onClick={() => { setTitleDraft(scope.name || ''); setEditingTitle(true); }}
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -530,14 +530,14 @@ const ScopeDetail = () => {
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">$ in text</Badge>
                       )}
                       {isActive && (
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => startEdit(item)}>
+                        <Button size="sm" variant="ghost" className="h-10 w-10 p-0 md:h-7 md:w-7" onClick={() => startEdit(item)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       )}
                       {canDeleteScopeItem(isAdmin) && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive">
+                            <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-destructive hover:text-destructive md:h-7 md:w-7">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </AlertDialogTrigger>
