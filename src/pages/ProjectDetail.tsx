@@ -1113,7 +1113,7 @@ const ProjectDetail = () => {
             </div>
             {/* Show active filter badges */}
             {(filterStage !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all' || filterTrade !== 'all' || filterRoomArea !== 'all') && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 lg:w-full">
                 {filterStage !== 'all' && (
                   <Badge variant="secondary" className="text-xs gap-1">Stage: {filterStage}<button onClick={() => setFilterStage('all')}><X className="h-3 w-3" /></button></Badge>
                 )}
