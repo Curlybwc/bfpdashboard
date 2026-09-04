@@ -49,11 +49,19 @@ Deno.serve(async (req) => {
     return redirectError("Invalid state signature");
   }
 
-  // Parts: companyId:userId:timestamp or companyId:userId:timestamp:returnTo
+  // Parts: companyId:userId:timestamp[:returnTo[:allowShared]]
   const companyId = parts[0];
   const userId = parts[1];
   const timestamp = parseInt(parts[2], 10);
-  const returnTo = parts.length >= 4 ? parts[3] : "/shifts";
+  let returnTo = "/shifts";
+  let allowShared = false;
+  if (parts.length >= 5) {
+    allowShared = parts[parts.length - 1] === "1";
+    returnTo = parts.slice(3, -1).join(":") || "/shifts";
+  } else if (parts.length === 4) {
+    returnTo = parts[3];
+  }
+
 
   // Check state isn't too old (10 min)
   if (isNaN(timestamp) || Date.now() - timestamp > 10 * 60 * 1000) {
