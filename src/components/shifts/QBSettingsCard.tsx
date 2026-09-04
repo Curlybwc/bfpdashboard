@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import QBCombobox from './QBCombobox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2, Pencil, Link2, AlertTriangle } from 'lucide-react';
+import { Loader2, ChevronDown, Save, Settings, RefreshCw, Plus, Building2, Pencil, Link2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -18,6 +18,14 @@ type ProfileRow = { id: string; full_name: string | null; is_active: boolean };
 type QBClass = { id: string; name: string; fully_qualified_name: string };
 type QBAccount = { id: string; name: string; fully_qualified_name: string; account_type: string | null; account_sub_type: string | null };
 type QBVendor = { id: string; display_name: string };
+type ValidationCheck = { kind: string; label: string; qb_id: string | null; saved_name: string | null; status: 'valid' | 'missing' | 'not_found' | 'inactive' | 'unknown'; detail: string; ref_id?: string };
+type ValidationResult = {
+  company: { id: string; name: string };
+  connection: { id: string; realm_id: string; stored_company_name: string | null; live_company_name: string | null; name_mismatch: boolean } | null;
+  summary: { valid: number; missing: number; invalid: number; unknown: number };
+  checks: ValidationCheck[];
+  message?: string;
+};
 
 const QBSettingsCard = () => {
   const { toast } = useToast();
@@ -102,6 +110,10 @@ const QBSettingsCard = () => {
   // QB vendors from API (for vendor picker)
   const [qbVendors, setQbVendors] = useState<QBVendor[]>([]);
   const [qbVendorsLoading, setQbVendorsLoading] = useState(false);
+
+  // QuickBooks settings validation
+  const [validating, setValidating] = useState(false);
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [qbVendorsLoaded, setQbVendorsLoaded] = useState(false);
   const [qbVendorsError, setQbVendorsError] = useState<string | null>(null);
 
@@ -267,6 +279,32 @@ const QBSettingsCard = () => {
       setAddCompanyOpen(false);
       await loadCompanies();
     }
+  };
+
+  const runValidation = async () => {
+    if (!selectedCompanyId) return;
+    setValidating(true);
+    setValidation(null);
+    const { data, error } = await supabase.functions.invoke('quickbooks_validate_settings', {
+      body: { company_id: selectedCompanyId },
+    });
+    setValidating(false);
+    if (error) {
+      toast({ title: 'Validation failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    const result = data as ValidationResult;
+    setValidation(result);
+    if (!result.connection) {
+      toast({ title: 'No QuickBooks connection', description: result.message || '', variant: 'destructive' });
+      return;
+    }
+    const bad = result.summary.invalid;
+    toast({
+      title: bad > 0 ? `${bad} invalid mapping${bad === 1 ? '' : 's'}` : 'All mappings valid',
+      description: bad > 0 ? 'Reload and re-select the affected records below.' : `Checked against ${result.connection.live_company_name || result.connection.realm_id}.`,
+      variant: bad > 0 ? 'destructive' : undefined,
+    });
   };
 
   const loadQBClasses = async () => {
