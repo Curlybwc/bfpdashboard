@@ -128,6 +128,7 @@ const TaskDetail = () => {
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
+  const stageState = stage;
   const [priority, setPriority] = useState<TaskPriority>('2 – This Week');
   const [roomArea, setRoomArea] = useState('');
   const [trade, setTrade] = useState('');
