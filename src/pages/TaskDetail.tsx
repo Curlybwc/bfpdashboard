@@ -128,6 +128,7 @@ const TaskDetail = () => {
   // Editable fields
   const [taskText, setTaskText] = useState('');
   const [stage, setStage] = useState<TaskStage>('Ready');
+  const stageState = stage;
   const [priority, setPriority] = useState<TaskPriority>('2 – This Week');
   const [roomArea, setRoomArea] = useState('');
   const [trade, setTrade] = useState('');
@@ -135,6 +136,7 @@ const TaskDetail = () => {
   const [dueDate, setDueDate] = useState('');
   const [actualCost, setActualCost] = useState('');
   const [assignedTo, setAssignedTo] = useState<string>('unassigned');
+  const assignedToState = assignedTo;
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
 
@@ -240,8 +242,15 @@ const TaskDetail = () => {
     fetchTask();
   };
 
-  const handleSave = async (skipPhotoCheck = false) => {
+  const handleSave = async (
+    skipPhotoCheck = false,
+    overrides?: { stage?: TaskStage; assignedTo?: string },
+  ) => {
     if (!taskId || !task) return;
+
+    // Quick-action callers can pass fresh values that state has not flushed yet
+    const stage = overrides?.stage ?? stageState;
+    const assignedTo = overrides?.assignedTo ?? assignedToState;
 
     // Validation: recurring requires due date
     if (isRecurring && !dueDate) {
@@ -899,6 +908,72 @@ const TaskDetail = () => {
           onOpenMaterials={() => setMaterialsOpen(true)}
         />
 
+        {/* Mobile quick actions: change status / assignee without scrolling */}
+        {canEditTaskMetadata && (
+          <Card className="space-y-3 p-3 md:hidden">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Quick update</Label>
+            <div className="flex flex-wrap gap-2">
+              {TASK_STAGES.map((s) => (
+                <Button
+                  key={s}
+                  type="button"
+                  size="sm"
+                  variant={stage === s ? 'default' : 'outline'}
+                  className="h-10 flex-1 min-w-[6rem]"
+                  disabled={saving}
+                  onClick={() => {
+                    setStage(s);
+                    handleSave(false, { stage: s });
+                  }}
+                >
+                  {s}
+                </Button>
+              ))}
+            </div>
+            {!isCrewMode && (
+              <Select
+                value={assignedTo}
+                onValueChange={(v) => {
+                  setAssignedTo(v);
+                  handleSave(true, { assignedTo: v });
+                }}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Assign someone" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  <SelectItem value="outside_vendor">Outside Vendor</SelectItem>
+                  {soloMemberProfiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name || 'Unnamed'}</SelectItem>
+                  ))}
+                  {soloOtherProfiles.map((p) => (
+                    <SelectItem key={`o-${p.id}`} value={p.id}>{p.full_name || 'Unnamed'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-11 flex-1"
+                onClick={() => document.getElementById('task-photos')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              >
+                Photos
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-11 flex-1"
+                onClick={() => setMaterialsOpen(true)}
+              >
+                Materials
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Active blocker display card */}
         {task.is_blocked && activeBlocker && (
           <Card className="p-3 space-y-2 border-destructive/50 bg-destructive/5">
@@ -930,6 +1005,7 @@ const TaskDetail = () => {
         )}
 
         {/* Task Photos */}
+        <div id="task-photos" className="scroll-mt-28" />
         <TaskPhotos
           taskId={taskId!}
           photos={photos}

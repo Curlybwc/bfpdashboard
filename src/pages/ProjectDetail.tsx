@@ -36,6 +36,8 @@ import { buildTaskPackageGroups } from '@/lib/taskPackages';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import AlertsBanner from '@/components/AlertsBanner';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { MoreHorizontal } from 'lucide-react';
 import { generateAlerts } from '@/lib/alerts';
 
 const PackageDeleteButton = ({ packageTask, childCount, onDelete }: { packageTask: any; childCount: number; onDelete: () => void }) => {
@@ -149,6 +151,7 @@ const ProjectDetail = () => {
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [taskSearch, setTaskSearch] = useState('');
@@ -771,29 +774,92 @@ const ProjectDetail = () => {
             </DialogContent>
           </Dialog>
 
-          {userCanEditProject && (
-            <Button size="sm" variant="outline" onClick={openEditDialog}>
-              <Pencil className="h-4 w-4" />
+          {/* Desktop: all actions inline */}
+          <div className="hidden md:contents">
+            {userCanEditProject && (
+              <Button size="sm" variant="outline" onClick={openEditDialog}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {isManager && (
+              <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
+                <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
+              <Package className="h-4 w-4 mr-1" />Materials
             </Button>
-          )}
+            {isAdmin && (
+              <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
+                <CalendarDays className="h-4 w-4 mr-1" />Calendar
+              </Button>
+            )}
+            {isManager && (
+              <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
+                <Mic className="h-4 w-4 mr-1" />Walkthrough
+              </Button>
+            )}
+          </div>
+
+          {/* Mobile: one-tap essentials + everything else in a sheet */}
           {isManager && (
-            <Button size="sm" variant={bulkMode ? "secondary" : "outline"} onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}>
+            <Button
+              size="sm"
+              variant={bulkMode ? 'secondary' : 'outline'}
+              className="md:hidden"
+              onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}
+            >
               <CheckSquare className="h-4 w-4 mr-1" />{bulkMode ? 'Cancel' : 'Bulk'}
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/materials`)}>
-            <Package className="h-4 w-4 mr-1" />Materials
-          </Button>
-          {isAdmin && (
-            <Button size="sm" variant="outline" onClick={() => navigate(`/admin/calendar?project=${id}`)}>
-              <CalendarDays className="h-4 w-4 mr-1" />Calendar
-            </Button>
-          )}
-          {isManager && (
-            <Button size="sm" variant="outline" onClick={() => navigate(`/projects/${id}/walkthrough`)}>
-              <Mic className="h-4 w-4 mr-1" />Walkthrough
-            </Button>
-          )}
+          <Sheet open={mobileActionsOpen} onOpenChange={setMobileActionsOpen}>
+            <SheetTrigger asChild>
+              <Button size="sm" variant="outline" className="md:hidden">
+                <MoreHorizontal className="h-4 w-4 mr-1" />More
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <SheetHeader className="text-left">
+                <SheetTitle>Project actions</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 grid gap-2">
+                <Button
+                  variant="outline"
+                  className="h-12 justify-start text-base"
+                  onClick={() => { setMobileActionsOpen(false); navigate(`/projects/${id}/materials`); }}
+                >
+                  <Package className="h-5 w-5 mr-2" />Materials
+                </Button>
+                {isManager && (
+                  <Button
+                    variant="outline"
+                    className="h-12 justify-start text-base"
+                    onClick={() => { setMobileActionsOpen(false); navigate(`/projects/${id}/walkthrough`); }}
+                  >
+                    <Mic className="h-5 w-5 mr-2" />Walkthrough
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    className="h-12 justify-start text-base"
+                    onClick={() => { setMobileActionsOpen(false); navigate(`/admin/calendar?project=${id}`); }}
+                  >
+                    <CalendarDays className="h-5 w-5 mr-2" />Calendar
+                  </Button>
+                )}
+                {userCanEditProject && (
+                  <Button
+                    variant="outline"
+                    className="h-12 justify-start text-base"
+                    onClick={() => { setMobileActionsOpen(false); openEditDialog(); }}
+                  >
+                    <Pencil className="h-5 w-5 mr-2" />Edit project
+                  </Button>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       )}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

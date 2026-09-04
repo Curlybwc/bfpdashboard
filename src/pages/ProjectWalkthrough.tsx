@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import PageHeader from '@/components/PageHeader';
+import DictateButton from '@/components/DictateButton';
+import { useSpeechInput } from '@/hooks/useSpeechInput';
 import { applyBundles } from '@/lib/applyBundles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +53,7 @@ const ProjectWalkthrough = () => {
   const navigate = useNavigate();
 
   const [inputText, setInputText] = useState('');
+  const speech = useSpeechInput(setInputText, () => inputText);
   const [parsing, setParsing] = useState(false);
   const [drafts, setDrafts] = useState<DraftTask[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -322,17 +325,32 @@ const ProjectWalkthrough = () => {
         {/* Input area */}
         {!hasParsed && (
           <div className="space-y-3">
-            <Label>Describe the work to be done</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>Describe the work to be done</Label>
+              {speech.listening && (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-destructive">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+                  Listening
+                </span>
+              )}
+            </div>
             <Textarea
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               rows={6}
-              placeholder="e.g. Mike needs to install the kitchen backsplash tile this week. We need 40 sqft of subway tile and 2 bags of thinset. Also have the electrician rough in the master bath — ASAP."
+              placeholder="Tap Dictate and talk, or type. e.g. Mike needs to install the kitchen backsplash tile this week. We need 40 sqft of subway tile and 2 bags of thinset."
               className="text-base"
             />
-            <Button onClick={handleParse} disabled={parsing || !inputText.trim()} className="w-full">
-              {parsing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Parsing...</> : 'Parse Tasks'}
-            </Button>
+            <div className="sticky bottom-20 z-30 -mx-4 flex gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
+              <DictateButton {...speech} className="flex-1 md:flex-none" />
+              <Button
+                onClick={handleParse}
+                disabled={parsing || !inputText.trim()}
+                className="h-12 flex-1 text-base"
+              >
+                {parsing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Parsing...</> : 'Parse Tasks'}
+              </Button>
+            </div>
           </div>
         )}
 
