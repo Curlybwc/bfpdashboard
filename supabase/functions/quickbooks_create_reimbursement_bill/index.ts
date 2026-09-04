@@ -1,5 +1,5 @@
 import { corsHeaders, requireAdminAuth } from "../_shared/auth.ts";
-import { getConnectionForCompany, qbApiFetch } from "../_shared/quickbooks.ts";
+import { checkQBRef, getConnectionForCompany, qbApiFetch, refFailureMessage } from "../_shared/quickbooks.ts";
 
 /**
  * Create a single QuickBooks Bill for an approved reimbursement request.
