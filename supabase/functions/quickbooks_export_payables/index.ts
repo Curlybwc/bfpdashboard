@@ -1,5 +1,5 @@
 import { corsHeaders, requireAdminAuth } from "../_shared/auth.ts";
-import { getConnectionForCompany, qbApiFetch, QBConnection } from "../_shared/quickbooks.ts";
+import { checkQBRef, getConnectionForCompany, qbApiFetch, QBConnection, refFailureMessage } from "../_shared/quickbooks.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
