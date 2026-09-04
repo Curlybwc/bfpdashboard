@@ -26,6 +26,7 @@ import AdminRehabLibrary from "./pages/AdminRehabLibrary";
 import ScopeAccuracy from "./pages/ScopeAccuracy";
 import ToolInventory from "./pages/ToolInventory";
 import MaterialInventory from "./pages/MaterialInventory";
+import ProductLibrary from "./pages/ProductLibrary";
 import Today from "./pages/Today";
 import Shopping from "./pages/Shopping";
 import Shifts from "./pages/Shifts";

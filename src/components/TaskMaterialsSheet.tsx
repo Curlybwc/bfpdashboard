@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import RecordLeftoverSheet from '@/components/RecordLeftoverSheet';
 import { inferStoreSection } from '@/lib/inferStoreSection';
 import MaterialAutocomplete, { type LibraryMaterial } from '@/components/MaterialAutocomplete';
+import ProductPicker from '@/components/products/ProductPicker';
 
 interface TaskMaterial {
   id: string;
@@ -301,6 +302,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
     const autoSection = newStoreSection || inferStoreSection(newName.trim(), activeNames);
     const { error } = await supabase.from('task_materials').insert({
       task_id: taskId,
+      product_library_id: newProductId,
       name: newName.trim(),
       quantity: newQty ? parseFloat(newQty) : null,
       unit: newUnit.trim() || null,
@@ -322,7 +324,7 @@ const TaskMaterialsSheet = ({ taskId, projectId, open, onOpenChange, onMaterials
       name: newName, itemType: newItemType, sku: newSku, vendorUrl: newVendorUrl,
       unitCost: newUnitCost, unit: newUnit, storeSection: autoSection, qty: newQty,
     });
-    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost(''); setNewSku(''); setNewVendorUrl('');
+    setNewName(''); setNewQty(''); setNewUnit(''); setNewUnitCost(''); setNewSku(''); setNewVendorUrl(''); setNewProductId(null);
     setNewItemType('material'); setNewProvidedBy('either'); setNewStoreSection('');
     await fetchMaterials();
   };
