@@ -346,6 +346,15 @@ const Analytics = () => {
           </div>
         </div>
       </Card>
+
+      <LaborBreakdownSheet
+        open={!!drillProject}
+        onOpenChange={(v) => { if (!v) setDrillProject(null); }}
+        projectId={drillProject?.id ?? null}
+        projectName={drillProject?.name ?? ''}
+        shifts={shifts as any}
+        profileMap={profileMap}
+      />
     </div>
   );
 };
