@@ -97,3 +97,33 @@ export function useProjectList() {
     },
   });
 }
+
+export interface ShiftAllocationDetail {
+  id: string;
+  task_id: string;
+  hours: number;
+  task_name: string;
+  task_project_id: string | null;
+}
+
+export function useShiftAllocations(shiftId: string | undefined) {
+  return useQuery({
+    queryKey: ['shift-allocations', shiftId],
+    queryFn: async (): Promise<ShiftAllocationDetail[]> => {
+      if (!shiftId) return [];
+      const { data, error } = await supabase
+        .from('shift_task_allocations')
+        .select('id, task_id, hours, tasks(id, task, project_id)')
+        .eq('shift_id', shiftId);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.id,
+        task_id: r.task_id,
+        hours: Number(r.hours ?? 0),
+        task_name: r.tasks?.task ?? 'Unknown task',
+        task_project_id: r.tasks?.project_id ?? null,
+      }));
+    },
+    enabled: !!shiftId,
+  });
+}
