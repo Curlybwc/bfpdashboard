@@ -299,11 +299,18 @@ const QBSettingsCard = () => {
       return;
     }
     const result = data as ValidationResult;
-    setValidation(result);
     if (!result.connection) {
-      toast({ title: 'No QuickBooks connection', description: result.message || '', variant: 'destructive' });
+      // Stale/disconnected connection: don't store the result — the summary
+      // render block expects `summary` which is absent in this payload.
+      setValidation(null);
+      toast({
+        title: 'QuickBooks connection unavailable',
+        description: (result.message || 'This connection can no longer be used.') + ' Reconnect QuickBooks for this company, then validate again.',
+        variant: 'destructive',
+      });
       return;
     }
+    setValidation(result);
     const bad = result.summary.invalid;
     toast({
       title: bad > 0 ? `${bad} invalid mapping${bad === 1 ? '' : 's'}` : 'All mappings valid',
@@ -783,7 +790,7 @@ const QBSettingsCard = () => {
                   </p>
                 )}
 
-                {validation && (
+                {validation?.summary && (
                   <div className="rounded border p-2 space-y-1 max-h-72 overflow-y-auto">
                     <p className="text-xs font-medium">
                       {validation.summary.valid} valid · {validation.summary.invalid} invalid · {validation.summary.missing} missing
