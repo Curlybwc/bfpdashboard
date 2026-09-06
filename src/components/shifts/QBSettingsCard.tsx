@@ -790,7 +790,7 @@ const QBSettingsCard = () => {
                   </p>
                 )}
 
-                {validation && (
+                {validation?.summary && (
                   <div className="rounded border p-2 space-y-1 max-h-72 overflow-y-auto">
                     <p className="text-xs font-medium">
                       {validation.summary.valid} valid · {validation.summary.invalid} invalid · {validation.summary.missing} missing
