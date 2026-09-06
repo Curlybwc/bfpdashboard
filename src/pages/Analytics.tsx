@@ -9,6 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import LaborBreakdownSheet from '@/components/analytics/LaborBreakdownSheet';
 
 /* ── Types ── */
 interface ProjectSummary {
@@ -22,6 +23,7 @@ interface ProjectSummary {
 }
 
 interface LaborEntry {
+  projectId: string;
   projectName: string;
   totalHours: number;
   totalCost: number;
@@ -53,17 +55,21 @@ const Analytics = () => {
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [profiles, setProfiles] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [drillProject, setDrillProject] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
       setLoading(true);
-      const [projRes, taskRes, shiftRes, matRes] = await Promise.all([
+      const [projRes, taskRes, shiftRes, matRes, profRes] = await Promise.all([
         supabase.from('projects').select('id, name').order('name'),
         supabase.from('tasks').select('id, project_id, stage, is_blocked, completed_at, created_at'),
-        supabase.from('shifts').select('id, project_id, total_hours, hourly_rate_snapshot, shift_date, is_flat_rate, flat_rate_amount'),
+        supabase.from('shifts').select('id, project_id, user_id, total_hours, hourly_rate_snapshot, shift_date, is_flat_rate, flat_rate_amount'),
         supabase.from('task_materials').select('id, task_id, name, quantity, purchased, delivered, confirmed_on_site, is_active'),
+        supabase.from('profiles').select('id, full_name'),
       ]);
+      setProfiles(profRes.data || []);
       setProjects(projRes.data || []);
       setTasks(taskRes.data || []);
       setShifts(shiftRes.data || []);
@@ -131,12 +137,18 @@ const Analytics = () => {
     const map: Record<string, LaborEntry> = {};
     filteredShifts.forEach(s => {
       const name = projectMap[s.project_id] || 'Unknown';
-      if (!map[s.project_id]) map[s.project_id] = { projectName: name, totalHours: 0, totalCost: 0 };
+      if (!map[s.project_id]) map[s.project_id] = { projectId: s.project_id, projectName: name, totalHours: 0, totalCost: 0 };
       map[s.project_id].totalHours += (s as any).is_flat_rate ? 0 : (Number(s.total_hours) || 0);
       map[s.project_id].totalCost += (s as any).is_flat_rate ? Number((s as any).flat_rate_amount || 0) : (Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0);
     });
     return Object.values(map).sort((a, b) => b.totalHours - a.totalHours);
   }, [filteredShifts, projectMap]);
+
+  const profileMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    profiles.forEach(p => { m[p.id] = p.full_name || 'Unknown'; });
+    return m;
+  }, [profiles]);
 
   // Material stats
   const materialStats = useMemo(() => {
