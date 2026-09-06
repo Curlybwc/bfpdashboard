@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Shift } from '@/hooks/useShifts';
 
 interface AdminShiftsFilters {
-  contractorId?: string;
+  contractorIds?: string[];
   projectId?: string;
   fromDate: string;
   toDate: string;
@@ -21,8 +21,8 @@ export function useAdminShifts(filters: AdminShiftsFilters, enabled: boolean) {
         .not('total_hours', 'is', null)
         .order('shift_date', { ascending: false });
 
-      if (filters.contractorId) {
-        query = query.eq('user_id', filters.contractorId);
+      if (filters.contractorIds && filters.contractorIds.length > 0) {
+        query = query.in('user_id', filters.contractorIds);
       }
       if (filters.projectId) {
         query = query.eq('project_id', filters.projectId);
@@ -95,5 +95,35 @@ export function useProjectList() {
       if (error) throw error;
       return (data ?? []) as { id: string; name: string }[];
     },
+  });
+}
+
+export interface ShiftAllocationDetail {
+  id: string;
+  task_id: string;
+  hours: number;
+  task_name: string;
+  task_project_id: string | null;
+}
+
+export function useShiftAllocations(shiftId: string | undefined) {
+  return useQuery({
+    queryKey: ['shift-allocations', shiftId],
+    queryFn: async (): Promise<ShiftAllocationDetail[]> => {
+      if (!shiftId) return [];
+      const { data, error } = await supabase
+        .from('shift_task_allocations')
+        .select('id, task_id, hours, tasks(id, task, project_id)')
+        .eq('shift_id', shiftId);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.id,
+        task_id: r.task_id,
+        hours: Number(r.hours ?? 0),
+        task_name: r.tasks?.task ?? 'Unknown task',
+        task_project_id: r.tasks?.project_id ?? null,
+      }));
+    },
+    enabled: !!shiftId,
   });
 }
