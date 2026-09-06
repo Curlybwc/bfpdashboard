@@ -565,6 +565,7 @@ const ProjectDetail = () => {
           isAdmin ? (
             <Button size="sm" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="h-4 w-4" />
+              <span className="sm:hidden">Delete project</span>
             </Button>
           ) : undefined
         }
