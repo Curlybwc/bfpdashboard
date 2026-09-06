@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Shift } from '@/hooks/useShifts';
 
 interface AdminShiftsFilters {
-  contractorId?: string;
+  contractorIds?: string[];
   projectId?: string;
   fromDate: string;
   toDate: string;
@@ -21,8 +21,8 @@ export function useAdminShifts(filters: AdminShiftsFilters, enabled: boolean) {
         .not('total_hours', 'is', null)
         .order('shift_date', { ascending: false });
 
-      if (filters.contractorId) {
-        query = query.eq('user_id', filters.contractorId);
+      if (filters.contractorIds && filters.contractorIds.length > 0) {
+        query = query.in('user_id', filters.contractorIds);
       }
       if (filters.projectId) {
         query = query.eq('project_id', filters.projectId);
