@@ -33,7 +33,7 @@ export default function ShiftDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto sm:side-right md:max-w-md md:ml-auto md:h-full md:max-h-full">
+      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto md:max-w-md md:ml-auto md:h-full md:max-h-full">
         {shift && (
           <>
             <SheetHeader className="text-left">
