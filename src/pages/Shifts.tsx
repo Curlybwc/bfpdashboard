@@ -14,7 +14,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Clock, Trash2, X, List, CalendarDays, DollarSign } from 'lucide-react';
+import { Plus, Clock, Trash2, X, List, CalendarDays, DollarSign, ChevronDown } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import ShiftDaySheet from '@/components/shifts/ShiftDaySheet';
+import ShiftDetailSheet from '@/components/shifts/ShiftDetailSheet';
 import { fetchShiftAllocations, fetchShiftById, useMyShifts, type Shift, type ShiftAllocation } from '@/hooks/useShifts';
 import { useAdminShifts, useContractorList, useProjectList } from '@/hooks/useAdminShifts';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,7 +43,11 @@ const Shifts = () => {
   const [newShiftDefaults, setNewShiftDefaults] = useState<{ date?: string; userId?: string }>({});
 
   // Filter state — initialized from query params for drill-down support
-  const [contractorFilter, setContractorFilter] = useState(searchParams.get('contractor') || '');
+  const [contractorFilter, setContractorFilter] = useState<string[]>(
+    (searchParams.get('contractor') || '').split(',').map((v) => v.trim()).filter(Boolean)
+  );
+  const [daySheetDate, setDaySheetDate] = useState<string | null>(null);
+  const [detailShift, setDetailShift] = useState<Shift | null>(null);
   const [projectFilter, setProjectFilter] = useState(searchParams.get('project') || '');
   const [fromDate, setFromDate] = useState(searchParams.get('from') || defaultFromDate());
   const [toDate, setToDate] = useState(searchParams.get('to') || new Date().toISOString().slice(0, 10));
@@ -71,7 +79,7 @@ const Shifts = () => {
 
   // Admin data
   const adminFilters = useMemo(() => ({
-    contractorId: contractorFilter || undefined,
+    contractorIds: contractorFilter.length > 0 ? contractorFilter : undefined,
     projectId: projectFilter || undefined,
     fromDate,
     toDate,
@@ -138,7 +146,7 @@ const Shifts = () => {
   };
 
   const clearFilters = () => {
-    setContractorFilter('');
+    setContractorFilter([]);
     setProjectFilter('');
     setFromDate(defaultFromDate());
     setToDate(new Date().toISOString().slice(0, 10));
@@ -175,7 +183,17 @@ const Shifts = () => {
     const profileMap = adminData?.profileMap ?? {};
     const projectMap = adminData?.projectMap ?? {};
     const paidShiftIds = adminData?.paidShiftIds ?? new Set<string>();
-    const hasActiveFilters = contractorFilter || projectFilter || fromDate !== defaultFromDate() || toDate !== new Date().toISOString().slice(0, 10);
+    const singleContractor = contractorFilter.length === 1 ? contractorFilter[0] : null;
+    const daySheetShifts = daySheetDate ? shifts.filter((s) => s.shift_date === daySheetDate) : [];
+    const contractorLabel = contractorFilter.length === 0
+      ? 'All contractors'
+      : contractorFilter.length === 1
+        ? (contractors ?? []).find((c) => c.id === contractorFilter[0])?.full_name || '1 person'
+        : `${contractorFilter.length} people`;
+    const toggleContractor = (id: string) => {
+      setContractorFilter((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    };
+    const hasActiveFilters = contractorFilter.length > 0 || projectFilter || fromDate !== defaultFromDate() || toDate !== new Date().toISOString().slice(0, 10);
 
     return (
       <div className="pb-20">
@@ -216,7 +234,7 @@ const Shifts = () => {
                 <Badge variant="secondary" className="text-[10px]">Filtered from Payroll</Badge>
                 {searchParams.get('contractor') && (
                   <Badge variant="outline" className="text-[10px]">
-                    Contractor: {profileMap[searchParams.get('contractor')!] || searchParams.get('contractor')!.slice(0, 8)}
+                    Contractor: {searchParams.get('contractor')!.split(',').map((id) => profileMap[id] || id.slice(0, 8)).join(', ')}
                   </Badge>
                 )}
                 {searchParams.get('project') && (
@@ -230,17 +248,38 @@ const Shifts = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <div className="space-y-1">
                 <Label className="text-xs">Contractor</Label>
-                <Select value={contractorFilter || 'all'} onValueChange={(v) => setContractorFilter(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All contractors</SelectItem>
-                    {(contractors ?? []).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.full_name || 'Unnamed'}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-8 w-full justify-between text-xs font-normal px-2">
+                      <span className="truncate">{contractorLabel}</span>
+                      <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-64 p-0">
+                    <div className="flex items-center justify-between px-3 py-2 border-b">
+                      <span className="text-xs font-medium">Select people</span>
+                      {contractorFilter.length > 0 && (
+                        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setContractorFilter([])}>
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {(contractors ?? []).map((c) => (
+                        <label
+                          key={c.id}
+                          className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50"
+                        >
+                          <Checkbox
+                            checked={contractorFilter.includes(c.id)}
+                            onCheckedChange={() => toggleContractor(c.id)}
+                          />
+                          <span className="truncate">{c.full_name || 'Unnamed'}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Project</Label>
@@ -290,24 +329,24 @@ const Shifts = () => {
                   <p className="text-2xl font-bold text-primary">${totalOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total Owed</p>
                 </div>
-                {contractorFilter && profileMap[contractorFilter] && (
+                {singleContractor && profileMap[singleContractor] && (
                   <>
                     <div className="h-8 w-px bg-border" />
                     <div>
-                      <p className="text-sm font-medium">{profileMap[contractorFilter]}</p>
+                      <p className="text-sm font-medium">{profileMap[singleContractor]}</p>
                       <p className="text-[10px] text-muted-foreground">{fromDate} → {toDate}</p>
                     </div>
                   </>
                 )}
               </div>
-              {contractorFilter && (
+              {singleContractor && (
                 <Button
                   size="sm"
                   variant="outline"
                   className="gap-1"
                   asChild
                 >
-                  <a href={`/payroll?worker=${contractorFilter}&workerName=${encodeURIComponent(profileMap[contractorFilter] || '')}`}>
+                  <a href={`/payroll?worker=${singleContractor}&workerName=${encodeURIComponent(profileMap[singleContractor] || '')}`}>
                     <DollarSign className="h-3.5 w-3.5" />
                     Pay Worker
                   </a>
@@ -325,10 +364,11 @@ const Shifts = () => {
               profileMap={profileMap}
               projectMap={projectMap}
               paidShiftIds={paidShiftIds}
-              onEditShift={handleEditShift}
-              onDateClick={(dateStr) => {
-                handleNewShift({ date: dateStr, userId: contractorFilter || undefined });
+              onEditShift={(s) => {
+                const full = shifts.find((x) => x.id === s.id) || null;
+                setDetailShift(full);
               }}
+              onDateClick={(dateStr) => setDaySheetDate(dateStr)}
               onMonthChange={(from, to) => {
                 setFromDate(from);
                 setToDate(to);
@@ -355,7 +395,7 @@ const Shifts = () => {
                     <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div
                       className="flex-1 min-w-0 cursor-pointer hover:bg-muted/50 rounded -m-1 p-1"
-                      onClick={() => handleEditShift(s)}
+                      onClick={() => setDetailShift(s)}
                     >
                       <p className="text-sm font-medium truncate">
                         {profileMap[s.user_id] || 'Unknown'} · {s.project_id ? (projectMap[s.project_id] || 'Unknown Project') : 'Unassigned — needs project/tasks'}
@@ -420,6 +460,32 @@ const Shifts = () => {
             </div>
           )}
         </div>
+
+        <ShiftDaySheet
+          dateStr={daySheetDate}
+          open={!!daySheetDate}
+          onOpenChange={(o) => { if (!o) setDaySheetDate(null); }}
+          shifts={daySheetShifts}
+          profileMap={profileMap}
+          projectMap={projectMap}
+          paidShiftIds={paidShiftIds}
+          onSelectShift={(s) => { setDaySheetDate(null); setDetailShift(s); }}
+          onAddShift={(dateStr) => {
+            setDaySheetDate(null);
+            handleNewShift({ date: dateStr, userId: singleContractor || undefined });
+          }}
+        />
+
+        <ShiftDetailSheet
+          shift={detailShift}
+          open={!!detailShift}
+          onOpenChange={(o) => { if (!o) setDetailShift(null); }}
+          profileMap={profileMap}
+          projectMap={projectMap}
+          isPaid={!!detailShift && paidShiftIds.has(detailShift.id)}
+          onEdit={(s) => { setDetailShift(null); handleEditShift(s); }}
+          onDelete={handleDeleteShift}
+        />
       </div>
     );
   }
