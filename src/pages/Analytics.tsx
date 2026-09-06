@@ -9,6 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import LaborBreakdownSheet from '@/components/analytics/LaborBreakdownSheet';
 
 /* ── Types ── */
 interface ProjectSummary {
@@ -22,6 +23,7 @@ interface ProjectSummary {
 }
 
 interface LaborEntry {
+  projectId: string;
   projectName: string;
   totalHours: number;
   totalCost: number;
@@ -53,17 +55,21 @@ const Analytics = () => {
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [profiles, setProfiles] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [drillProject, setDrillProject] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
       setLoading(true);
-      const [projRes, taskRes, shiftRes, matRes] = await Promise.all([
+      const [projRes, taskRes, shiftRes, matRes, profRes] = await Promise.all([
         supabase.from('projects').select('id, name').order('name'),
         supabase.from('tasks').select('id, project_id, stage, is_blocked, completed_at, created_at'),
-        supabase.from('shifts').select('id, project_id, total_hours, hourly_rate_snapshot, shift_date, is_flat_rate, flat_rate_amount'),
+        supabase.from('shifts').select('id, project_id, user_id, total_hours, hourly_rate_snapshot, shift_date, is_flat_rate, flat_rate_amount'),
         supabase.from('task_materials').select('id, task_id, name, quantity, purchased, delivered, confirmed_on_site, is_active'),
+        supabase.from('profiles').select('id, full_name'),
       ]);
+      setProfiles(profRes.data || []);
       setProjects(projRes.data || []);
       setTasks(taskRes.data || []);
       setShifts(shiftRes.data || []);
@@ -131,12 +137,18 @@ const Analytics = () => {
     const map: Record<string, LaborEntry> = {};
     filteredShifts.forEach(s => {
       const name = projectMap[s.project_id] || 'Unknown';
-      if (!map[s.project_id]) map[s.project_id] = { projectName: name, totalHours: 0, totalCost: 0 };
+      if (!map[s.project_id]) map[s.project_id] = { projectId: s.project_id, projectName: name, totalHours: 0, totalCost: 0 };
       map[s.project_id].totalHours += (s as any).is_flat_rate ? 0 : (Number(s.total_hours) || 0);
       map[s.project_id].totalCost += (s as any).is_flat_rate ? Number((s as any).flat_rate_amount || 0) : (Number(s.total_hours) || 0) * (Number(s.hourly_rate_snapshot) || 0);
     });
     return Object.values(map).sort((a, b) => b.totalHours - a.totalHours);
   }, [filteredShifts, projectMap]);
+
+  const profileMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    profiles.forEach(p => { m[p.id] = p.full_name || 'Unknown'; });
+    return m;
+  }, [profiles]);
 
   // Material stats
   const materialStats = useMemo(() => {
@@ -251,23 +263,47 @@ const Analytics = () => {
       {/* Labor Hours by Project */}
       {laborData.length > 0 && (
         <Card className="p-4 mb-6">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Labor Hours by Project</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-1">Labor Hours by Project</h3>
+          <p className="text-xs text-muted-foreground mb-3">Tap a project to see hours by contractor.</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={laborData.slice(0, 10)} layout="vertical" margin={{ left: 8 }}>
+              <BarChart
+                data={laborData.slice(0, 10)}
+                layout="vertical"
+                margin={{ left: 8 }}
+                onClick={(state: any) => {
+                  const p = state?.activePayload?.[0]?.payload;
+                  if (p?.projectId) setDrillProject({ id: p.projectId, name: p.projectName });
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 87%)" />
                 <XAxis type="number" tick={{ fontSize: 12 }} />
                 <YAxis type="category" dataKey="projectName" width={120} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value: number) => `${value.toFixed(1)}h`} />
-                <Bar dataKey="totalHours" name="Hours" fill="hsl(220, 60%, 35%)" radius={[0, 4, 4, 0]} />
+                <Tooltip formatter={(value: number) => `${value.toFixed(1)}h`} cursor={{ fill: 'hsl(220, 13%, 92%)' }} />
+                <Bar dataKey="totalHours" name="Hours" fill="hsl(220, 60%, 35%)" radius={[0, 4, 4, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+          <div className="mt-3 space-y-1">
+            {laborData.slice(0, 10).map(l => (
+              <button
+                key={l.projectId}
+                onClick={() => setDrillProject({ id: l.projectId, name: l.projectName })}
+                className="w-full flex items-center justify-between gap-3 rounded-md px-2 py-2 min-h-[44px] text-left hover:bg-accent/50 transition-colors"
+              >
+                <span className="text-sm text-foreground truncate">{l.projectName}</span>
+                <span className="text-sm text-muted-foreground shrink-0">
+                  {l.totalHours.toFixed(1)}h · ${l.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </button>
+            ))}
           </div>
           <div className="mt-3 text-right">
             <p className="text-sm text-muted-foreground">
               Total labor cost: <span className="font-semibold text-foreground">${totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </p>
           </div>
+
         </Card>
       )}
 
@@ -310,6 +346,15 @@ const Analytics = () => {
           </div>
         </div>
       </Card>
+
+      <LaborBreakdownSheet
+        open={!!drillProject}
+        onOpenChange={(v) => { if (!v) setDrillProject(null); }}
+        projectId={drillProject?.id ?? null}
+        projectName={drillProject?.name ?? ''}
+        shifts={shifts as any}
+        profileMap={profileMap}
+      />
     </div>
   );
 };
