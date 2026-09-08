@@ -18,6 +18,7 @@ import { Plus, Clock, Trash2, X, List, CalendarDays, DollarSign, ChevronDown } f
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import ShiftDaySheet from '@/components/shifts/ShiftDaySheet';
+import { isShiftDateEditable } from '@/lib/shiftWindow';
 import ShiftDetailSheet from '@/components/shifts/ShiftDetailSheet';
 import { fetchShiftAllocations, fetchShiftById, useMyShifts, type Shift, type ShiftAllocation } from '@/hooks/useShifts';
 import { useAdminShifts, useContractorList, useProjectList } from '@/hooks/useAdminShifts';
@@ -133,15 +134,14 @@ const Shifts = () => {
 
   const handleDeleteShift = async (shiftId: string) => {
     setDeleting(shiftId);
-    // Delete allocations first, then shift
-    await supabase.from('shift_task_allocations').delete().eq('shift_id', shiftId);
+    // shift_task_allocations cascade on shift delete
     const { error } = await supabase.from('shifts').delete().eq('id', shiftId);
     setDeleting(null);
     if (error) {
       toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Shift deleted' });
-      adminRefetch();
+      if (isAdmin) adminRefetch(); else refetch();
     }
   };
 
@@ -153,11 +153,7 @@ const Shifts = () => {
     setSearchParams({}, { replace: true });
   };
 
-  const canEditShift = (shift: any) => {
-    if (isAdmin) return true;
-    // Workers can edit their own shifts on any past date (or today)
-    return shift.shift_date <= new Date().toISOString().slice(0, 10);
-  };
+  const canEditShift = (shift: any) => isShiftDateEditable(isAdmin, shift?.shift_date);
 
   if (showForm) {
     return (
@@ -508,6 +504,8 @@ const Shifts = () => {
           loading={isLoading}
           canEdit={canEditShift}
           onEdit={handleEditShift}
+          onDelete={handleDeleteShift}
+          deleting={deleting}
         />
       </div>
     </div>
@@ -516,13 +514,15 @@ const Shifts = () => {
 
 // Non-admin shift history list
 const ShiftHistory = ({
-  shifts, projectMap, loading, canEdit, onEdit,
+  shifts, projectMap, loading, canEdit, onEdit, onDelete, deleting,
 }: {
   shifts: any[];
   projectMap: Record<string, string>;
   loading: boolean;
   canEdit: (s: any) => boolean;
   onEdit: (s: any) => void;
+  onDelete: (shiftId: string) => void;
+  deleting: string | null;
 }) => {
   if (loading) return (
     <div className="space-y-2">
@@ -565,6 +565,41 @@ const ShiftHistory = ({
                 <span className="text-sm font-medium">{Number(s.total_hours ?? 0)}h{s.clock_in_at && !s.clock_out_at ? ' · in progress' : ''}</span>
               )}
               {s.is_flat_rate && <Badge variant="secondary" className="text-[10px]">Flat</Badge>}
+              {canEdit(s) ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive shrink-0"
+                      disabled={deleting === s.id}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="Delete shift"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this shift?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This removes your shift on {s.shift_date} and the hours you put against tasks. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => onDelete(s.id)}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Badge variant="outline" className="text-[10px]">Locked</Badge>
+              )}
             </div>
           </div>
         </Card>

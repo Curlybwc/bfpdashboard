@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign, Trash2, Plus, Filter } from 'lucide-react';
+import { isShiftDateEditable, shiftWindowStart, shiftWindowEnd } from '@/lib/shiftWindow';
 import type { Shift, ShiftAllocation } from '@/hooks/useShifts';
 
 const NoEligibleTasksCard = () => {
@@ -393,7 +394,18 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       {/* Date */}
       <div className="space-y-1">
         <Label className="text-xs">Shift Date</Label>
-        <Input type="date" value={shiftDate} onChange={e => setShiftDate(e.target.value)} />
+        <Input
+          type="date"
+          value={shiftDate}
+          min={isAdmin ? undefined : shiftWindowStart()}
+          max={isAdmin ? undefined : shiftWindowEnd()}
+          onChange={e => setShiftDate(e.target.value)}
+        />
+        {!isAdmin && (
+          <p className="text-[11px] text-muted-foreground">
+            You can log or change shifts from the last 7 days ({shiftWindowStart()} – {shiftWindowEnd()}).
+          </p>
+        )}
       </div>
 
       {/* Flat Rate toggle */}
@@ -560,7 +572,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
         {onCancel && (
           <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
         )}
-        {editShift && (
+        {editShift && isShiftDateEditable(isAdmin, editShift.shift_date) && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="icon" className="shrink-0">
