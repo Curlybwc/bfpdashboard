@@ -393,7 +393,18 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       {/* Date */}
       <div className="space-y-1">
         <Label className="text-xs">Shift Date</Label>
-        <Input type="date" value={shiftDate} onChange={e => setShiftDate(e.target.value)} />
+        <Input
+          type="date"
+          value={shiftDate}
+          min={isAdmin ? undefined : shiftWindowStart()}
+          max={isAdmin ? undefined : shiftWindowEnd()}
+          onChange={e => setShiftDate(e.target.value)}
+        />
+        {!isAdmin && (
+          <p className="text-[11px] text-muted-foreground">
+            You can log or change shifts from the last 7 days ({shiftWindowStart()} – {shiftWindowEnd()}).
+          </p>
+        )}
       </div>
 
       {/* Flat Rate toggle */}
