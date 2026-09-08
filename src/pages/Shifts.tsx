@@ -504,6 +504,8 @@ const Shifts = () => {
           loading={isLoading}
           canEdit={canEditShift}
           onEdit={handleEditShift}
+          onDelete={handleDeleteShift}
+          deleting={deleting}
         />
       </div>
     </div>
