@@ -572,7 +572,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
         {onCancel && (
           <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
         )}
-        {editShift && (
+        {editShift && isShiftDateEditable(isAdmin, editShift.shift_date) && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="icon" className="shrink-0">
