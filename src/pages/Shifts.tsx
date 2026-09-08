@@ -514,13 +514,15 @@ const Shifts = () => {
 
 // Non-admin shift history list
 const ShiftHistory = ({
-  shifts, projectMap, loading, canEdit, onEdit,
+  shifts, projectMap, loading, canEdit, onEdit, onDelete, deleting,
 }: {
   shifts: any[];
   projectMap: Record<string, string>;
   loading: boolean;
   canEdit: (s: any) => boolean;
   onEdit: (s: any) => void;
+  onDelete: (shiftId: string) => void;
+  deleting: string | null;
 }) => {
   if (loading) return (
     <div className="space-y-2">
