@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Loader2, Clock, Hash, AlertCircle, ArrowRight, DollarSign, Trash2, Plus, Filter } from 'lucide-react';
+import { isShiftDateEditable, shiftWindowStart, shiftWindowEnd } from '@/lib/shiftWindow';
 import type { Shift, ShiftAllocation } from '@/hooks/useShifts';
 
 const NoEligibleTasksCard = () => {
