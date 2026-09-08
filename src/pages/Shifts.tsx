@@ -565,6 +565,41 @@ const ShiftHistory = ({
                 <span className="text-sm font-medium">{Number(s.total_hours ?? 0)}h{s.clock_in_at && !s.clock_out_at ? ' · in progress' : ''}</span>
               )}
               {s.is_flat_rate && <Badge variant="secondary" className="text-[10px]">Flat</Badge>}
+              {canEdit(s) ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive shrink-0"
+                      disabled={deleting === s.id}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="Delete shift"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this shift?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This removes your shift on {s.shift_date} and the hours you put against tasks. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => onDelete(s.id)}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Badge variant="outline" className="text-[10px]">Locked</Badge>
+              )}
             </div>
           </div>
         </Card>
