@@ -18,6 +18,7 @@ import { Plus, Clock, Trash2, X, List, CalendarDays, DollarSign, ChevronDown } f
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import ShiftDaySheet from '@/components/shifts/ShiftDaySheet';
+import { isShiftDateEditable } from '@/lib/shiftWindow';
 import ShiftDetailSheet from '@/components/shifts/ShiftDetailSheet';
 import { fetchShiftAllocations, fetchShiftById, useMyShifts, type Shift, type ShiftAllocation } from '@/hooks/useShifts';
 import { useAdminShifts, useContractorList, useProjectList } from '@/hooks/useAdminShifts';
