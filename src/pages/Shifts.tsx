@@ -133,15 +133,14 @@ const Shifts = () => {
 
   const handleDeleteShift = async (shiftId: string) => {
     setDeleting(shiftId);
-    // Delete allocations first, then shift
-    await supabase.from('shift_task_allocations').delete().eq('shift_id', shiftId);
+    // shift_task_allocations cascade on shift delete
     const { error } = await supabase.from('shifts').delete().eq('id', shiftId);
     setDeleting(null);
     if (error) {
       toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Shift deleted' });
-      adminRefetch();
+      if (isAdmin) adminRefetch(); else refetch();
     }
   };
 
@@ -153,11 +152,7 @@ const Shifts = () => {
     setSearchParams({}, { replace: true });
   };
 
-  const canEditShift = (shift: any) => {
-    if (isAdmin) return true;
-    // Workers can edit their own shifts on any past date (or today)
-    return shift.shift_date <= new Date().toISOString().slice(0, 10);
-  };
+  const canEditShift = (shift: any) => isShiftDateEditable(isAdmin, shift?.shift_date);
 
   if (showForm) {
     return (
