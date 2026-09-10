@@ -76,6 +76,7 @@ const Today = () => {
 
   const { data, loading, error, refresh } = useTodayData(user?.id, isAdmin);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const prefs = useTodayPreferences();
 
   const restoreScrollPosition = useCallback((scrollY: number) => {
@@ -402,21 +403,9 @@ const Today = () => {
         title="Today"
         actions={
           <div className="scroll-x flex gap-2 [&>*]:shrink-0">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <CalendarDays className="h-4 w-4 mr-1" />Availability
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>Availability</SheetTitle>
-                </SheetHeader>
-                <div className="mt-4">
-                  <AvailabilityForm />
-                </div>
-              </SheetContent>
-            </Sheet>
+            <Button size="sm" variant="outline" onClick={() => setAvailabilityOpen(true)}>
+              <CalendarDays className="h-4 w-4 mr-1" />Availability
+            </Button>
             <Button size="sm" variant="outline" onClick={() => navigate('/shifts')}>
               <Clock className="h-4 w-4 mr-1" />Log Shift
             </Button>
@@ -428,6 +417,16 @@ const Today = () => {
           </div>
         }
       />
+      <Sheet open={availabilityOpen} onOpenChange={setAvailabilityOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Availability</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <AvailabilityForm />
+          </div>
+        </SheetContent>
+      </Sheet>
       <div className="p-4">
         <ClockStatusCard />
         {(isAdmin || isManager) && <ActiveShiftsLiveCard />}

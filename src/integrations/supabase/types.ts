@@ -3134,6 +3134,7 @@ export type Database = {
         Args: { p_task_id: string }
         Returns: undefined
       }
+      business_today: { Args: never; Returns: string }
       can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
       capture_recipe_from_task: {
         Args: { p_parent_task_id: string; p_recipe_id: string }

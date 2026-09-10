@@ -8,8 +8,12 @@
  */
 export const CONTRACTOR_SHIFT_WINDOW_DAYS = 7;
 
+/** Local calendar date (not UTC) as YYYY-MM-DD. */
 function toISO(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /** Today, in YYYY-MM-DD. */
