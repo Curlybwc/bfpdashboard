@@ -152,11 +152,14 @@ Lossless for all pre-existing data: no existing column value is overwritten. **N
 
 **Not isolated. STOP.**
 
-Verified facts: this project runs a single Lovable Cloud database instance serving both preview and the published app. A Lovable draft stages *schema* changes — they are applied to the project only when the draft is accepted — but the draft shares that same database for reads and for data operations. A draft is a code/schema branch, not a database branch.
+**Environment evidence inspected today (no changes made):** backend project info reports Backend = Lovable Cloud (managed by Lovable); **Live (prod) instance: ref `fuwjacbhgkgibdvjwryr`**; **session tools bound to: Live (`fuwjacbhgkgibdvjwryr`)**; client `.env` points at the **same** ref and URL `https://fuwjacbhgkgibdvjwryr.supabase.co`; instance size Tiny; paused = false. **No Test instance ref is reported for this project** — the metadata lists a Live instance only. A backend health check returned auth and database reachable on that single instance. The Cloud project record in this session likewise names one instance serving both preview and the published app.
 
-Consequences: inside a draft you cannot observe the seed's real effect on real rows before it is real, you cannot exercise the RLS policies against real data in a throwaway way, and any data-level statement issued from the draft lands on live data. Migrations 1–4 are structurally safe to stage in a draft; **migration 5 (the seed) has no safe rehearsal here.**
+**Answers.** (1) No — this project does **not** currently have separate Test and Live database environments. (2) Not applicable. (3) Confirmed: there is exactly one current database, ref `fuwjacbhgkgibdvjwryr`, and it holds the live BFP data inspected in this report — the same database the published app and every query in this session used. (4) Evidence is listed above and is limited to backend project/environment metadata, backend health, and the client env refs; nothing was inferred from app behaviour. (5) No environment change was made.
+
+A Lovable draft is therefore not a rehearsal environment: it is a code/schema branch over this same database. Reads inside a draft read live rows, and any data-level statement issued from it lands on live data. Migrations 1–4 are structurally safe to stage in a draft; **migration 5 (the seed) has no safe rehearsal here.**
 
 Required before implementation: a genuinely separate Supabase/Lovable Cloud project holding a restored copy of this schema and a representative data copy, where migrations 1–5 and the full G and H test passes run end-to-end. Once that passes, apply to production through a draft with an immediate post-apply verification pass. Until that staging target exists, Package A stays **NO-GO for execution**.
+
 
 ## K. Remaining questions
 
