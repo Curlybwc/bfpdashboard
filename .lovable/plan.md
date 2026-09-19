@@ -163,4 +163,57 @@ Required before implementation: a genuinely separate Supabase/Lovable Cloud proj
 
 ## K. Remaining questions
 
-None requiring your business judgment — every People, Organization and Property decision is now settled. One operational decision is yours, and it is about how to proceed rather than about the model: do you want me to prepare the staging project as the next step, or hold Package A entirely until you have one?
+None requiring your business judgment — every People, Organization and Property decision is now settled. One operational decision is yours: approve the staging procedure in section L, or hold Package A until a staging project exists.
+
+## L. Staging-copy capability findings and procedure (inspection only)
+
+### 1–2. What a remix does and does not carry over
+
+**The official documentation is inconsistent on the single most important point.** Queried today, it states in one place that a remix of a Cloud project *stays connected to the original project's Cloud backend* (so data, auth users, secrets and storage are not copied and the remix would be writing to production), and in another place that a remix *gets its own separate backend with an empty database*. These cannot both be true, and I will not guess which applies to this project.
+
+What is not in dispute across both readings:
+
+| Item | Copied to a remix? |
+|---|---|
+| Application code / repo | Yes — full copy |
+| New independent project entry | Yes |
+| New independent backend + database | **Unverified — must be confirmed on the remix itself before any write** |
+| Schema (tables, functions, policies) | Recreated from migrations if the remix gets its own backend; shared if it does not |
+| Row data | **Never copied** |
+| Auth users | **Never copied** |
+| Secrets and integration credentials (QuickBooks, Stripe, Twilio, AI keys) | **Never copied** — must be re-added |
+| Storage files (receipts, task photos) | **Never copied** |
+| Custom domains | **Never copied** — `bfpdashboard.lovable.app` stays with production |
+
+What would remain pointed at production if nothing is changed: the QuickBooks OAuth redirect URI and `APP_BASE_URL`, any Twilio/Stripe/AI credentials if re-added from production values, and — in the worst case — the database itself, if the remix shares the original backend.
+
+### 3. Safest procedure (do not execute yet)
+
+1. Create the staging project in the same workspace.
+2. **Hard gate before anything else:** read the staging project's backend project info and compare its instance ref to `fuwjacbhgkgibdvjwryr`. If it is the same ref, the staging project is production — stop immediately, make no writes, and fall back to step 3 below. Only a different ref proves isolation.
+3. If the ref is the same (shared backend), abandon the remix path and instead create a **fresh project**, paste in the code, and let Lovable Cloud provision a new backend for it. A fresh project cannot inherit the production ref.
+4. On the confirmed-isolated staging backend, apply the existing migration history to recreate schema, functions and RLS.
+5. Add **no** production secrets. Leave QuickBooks, Stripe and Twilio secrets unset, or set them to sandbox values. Unset credentials make those edge functions fail closed — which is the desired staging behaviour — so no QuickBooks write can reach a real company, no payment action can run, and no message can reach a real person.
+6. Point `APP_BASE_URL` and the QuickBooks redirect URI at the staging URL, never the production domain. Do not attach a custom domain.
+7. Seed **synthetic** auth users, not real ones: one global admin, one org owner/admin, one project manager, one plain contractor who is a member of exactly one project, and one user in a separate workspace org. Give them fake emails on a domain you control or a disposable domain, so no real inbox can be hit.
+8. Seed a representative but synthetic data set: two or three companies, four or five projects with realistic `company_id` assignments, project memberships, a handful of tasks and shifts. Do not copy real contractor names, rates, receipts or QuickBooks IDs — RLS behaviour does not depend on real values, and real payroll data in a second database is a needless exposure.
+9. Run migrations 1–5 and the full G and H passes there.
+10. Only then apply to production, and run the verification pass immediately after.
+
+### 4. Does creating the copy change production?
+
+Creating a remix or a new project does not itself alter this project's code, schema, data or settings. The risk is not creation — it is the possibility that the copy shares this backend, which is why step 2 is a hard gate before any write.
+
+### 5. Recommendation
+
+**Create a fresh project and bring the code and migrations across, rather than remixing.** A remix's backend behaviour is exactly the point the documentation contradicts itself on, and the failure mode — believing you are rehearsing while writing to live payroll data — is the worst outcome available. A fresh project has no ambiguity: it provisions its own backend. If you prefer the remix for convenience, it is acceptable only with the step 2 ref check enforced before a single write.
+
+### 6. Steps requiring you in the Lovable UI or an external provider
+
+- Creating the remix or new project (dashboard or project menu).
+- Enabling Lovable Cloud on the staging project if it is not provisioned automatically.
+- Adding any sandbox secrets in the staging project's Settings → Secrets.
+- Creating the Intuit **sandbox** company and sandbox app credentials, if you want to exercise QuickBooks rather than let it fail closed.
+- Confirming no custom domain is attached to staging.
+- Confirming sign-ups or invites in the staging project if email confirmation is on.
+
