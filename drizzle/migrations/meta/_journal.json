@@ -15,6 +15,13 @@
       "when": 1789865815068,
       "tag": "0001_ezzie_package_a_helper_execute_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789934401562,
+      "tag": "0002_flat_rate_shift_null_total_hours",
+      "breakpoints": true
     }
   ]
 }
