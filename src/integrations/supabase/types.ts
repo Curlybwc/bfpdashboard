@@ -100,6 +100,45 @@ export type Database = {
         }
         Relationships: []
       }
+      business_organizations: {
+        Row: {
+          created_at: string
+          id: string
+          legal_name: string | null
+          name: string
+          normalized_name: string | null
+          notes: string | null
+          organization_type: string
+          source_system: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          name: string
+          normalized_name?: string | null
+          notes?: string | null
+          organization_type: string
+          source_system?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          name?: string
+          normalized_name?: string | null
+          notes?: string | null
+          organization_type?: string
+          source_system?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       checklist_items: {
         Row: {
           active: boolean
@@ -191,6 +230,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          business_organization_id: string | null
           created_at: string
           id: string
           name: string
@@ -198,6 +238,7 @@ export type Database = {
           short_name: string | null
         }
         Insert: {
+          business_organization_id?: string | null
           created_at?: string
           id?: string
           name: string
@@ -205,6 +246,7 @@ export type Database = {
           short_name?: string | null
         }
         Update: {
+          business_organization_id?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -212,6 +254,13 @@ export type Database = {
           short_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "companies_business_organization_id_fkey"
+            columns: ["business_organization_id"]
+            isOneToOne: false
+            referencedRelation: "business_organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "companies_qb_connection_id_fkey"
             columns: ["qb_connection_id"]
@@ -588,6 +637,152 @@ export type Database = {
           },
         ]
       }
+      organization_external_ids: {
+        Row: {
+          created_at: string
+          external_id: string
+          external_type: string | null
+          id: string
+          metadata: Json
+          organization_id: string
+          source_system: string | null
+          status: string
+          system_key: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          external_id: string
+          external_type?: string | null
+          id?: string
+          metadata?: Json
+          organization_id: string
+          source_system?: string | null
+          status?: string
+          system_key: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          external_id?: string
+          external_type?: string | null
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          source_system?: string | null
+          status?: string
+          system_key?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_external_ids_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "business_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_person_roles: {
+        Row: {
+          created_at: string
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          organization_id: string
+          person_id: string
+          role_code: string
+          source_system: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          organization_id: string
+          person_id: string
+          role_code: string
+          source_system?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          organization_id?: string
+          person_id?: string
+          role_code?: string
+          source_system?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_person_roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "business_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_person_roles_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_relationships: {
+        Row: {
+          child_organization_id: string
+          created_at: string
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          parent_organization_id: string
+          relationship_type: string
+          source_system: string | null
+        }
+        Insert: {
+          child_organization_id: string
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          parent_organization_id: string
+          relationship_type: string
+          source_system?: string | null
+        }
+        Update: {
+          child_organization_id?: string
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          parent_organization_id?: string
+          relationship_type?: string
+          source_system?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_relationships_child_organization_id_fkey"
+            columns: ["child_organization_id"]
+            isOneToOne: false
+            referencedRelation: "business_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_relationships_parent_organization_id_fkey"
+            columns: ["parent_organization_id"]
+            isOneToOne: false
+            referencedRelation: "business_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string
@@ -655,6 +850,183 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      people: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          legal_name: string | null
+          notes: string | null
+          preferred_name: string | null
+          source_system: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          legal_name?: string | null
+          notes?: string | null
+          preferred_name?: string | null
+          source_system?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          legal_name?: string | null
+          notes?: string | null
+          preferred_name?: string | null
+          source_system?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      person_auth_identities: {
+        Row: {
+          auth_system: string
+          external_subject_id: string
+          id: string
+          linked_at: string
+          metadata: Json
+          person_id: string
+          status: string
+          unlinked_at: string | null
+        }
+        Insert: {
+          auth_system: string
+          external_subject_id: string
+          id?: string
+          linked_at?: string
+          metadata?: Json
+          person_id: string
+          status?: string
+          unlinked_at?: string | null
+        }
+        Update: {
+          auth_system?: string
+          external_subject_id?: string
+          id?: string
+          linked_at?: string
+          metadata?: Json
+          person_id?: string
+          status?: string
+          unlinked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_auth_identities_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      person_contact_methods: {
+        Row: {
+          contact_type: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          normalized_value: string
+          person_id: string
+          source_record_id: string | null
+          source_system: string | null
+          updated_at: string
+          value: string
+          verification_status: string
+          visibility_scope: string
+        }
+        Insert: {
+          contact_type: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          normalized_value: string
+          person_id: string
+          source_record_id?: string | null
+          source_system?: string | null
+          updated_at?: string
+          value: string
+          verification_status?: string
+          visibility_scope?: string
+        }
+        Update: {
+          contact_type?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          normalized_value?: string
+          person_id?: string
+          source_record_id?: string | null
+          source_system?: string | null
+          updated_at?: string
+          value?: string
+          verification_status?: string
+          visibility_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_contact_methods_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      person_external_ids: {
+        Row: {
+          created_at: string
+          external_id: string
+          external_type: string | null
+          id: string
+          metadata: Json
+          person_id: string
+          source_system: string | null
+          status: string
+          system_key: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          external_id: string
+          external_type?: string | null
+          id?: string
+          metadata?: Json
+          person_id: string
+          source_system?: string | null
+          status?: string
+          system_key: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          external_id?: string
+          external_type?: string | null
+          id?: string
+          metadata?: Json
+          person_id?: string
+          source_system?: string | null
+          status?: string
+          system_key?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_external_ids_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
@@ -779,6 +1151,7 @@ export type Database = {
           is_active: boolean
           is_admin: boolean
           org_id: string | null
+          person_id: string | null
           skip_qb_export: boolean
           tax_info_filed: boolean
         }
@@ -792,6 +1165,7 @@ export type Database = {
           is_active?: boolean
           is_admin?: boolean
           org_id?: string | null
+          person_id?: string | null
           skip_qb_export?: boolean
           tax_info_filed?: boolean
         }
@@ -805,6 +1179,7 @@ export type Database = {
           is_active?: boolean
           is_admin?: boolean
           org_id?: string | null
+          person_id?: string | null
           skip_qb_export?: boolean
           tax_info_filed?: boolean
         }
@@ -814,6 +1189,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
@@ -867,6 +1249,7 @@ export type Database = {
           name: string
           org_id: string | null
           project_type: Database["public"]["Enums"]["project_type"]
+          property_id: string | null
           scope_id: string | null
           status: Database["public"]["Enums"]["project_status"]
           updated_at: string
@@ -880,6 +1263,7 @@ export type Database = {
           name: string
           org_id?: string | null
           project_type?: Database["public"]["Enums"]["project_type"]
+          property_id?: string | null
           scope_id?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
@@ -893,6 +1277,7 @@ export type Database = {
           name?: string
           org_id?: string | null
           project_type?: Database["public"]["Enums"]["project_type"]
+          property_id?: string | null
           scope_id?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
@@ -913,10 +1298,172 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "projects_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "projects_scope_id_fkey"
             columns: ["scope_id"]
             isOneToOne: false
             referencedRelation: "scopes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      properties: {
+        Row: {
+          address_line_1: string
+          address_line_2: string | null
+          city: string | null
+          country: string
+          created_at: string
+          display_name: string
+          id: string
+          normalized_address_key: string | null
+          notes: string | null
+          postal_code: string | null
+          property_type: string | null
+          source_system: string | null
+          state: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address_line_1: string
+          address_line_2?: string | null
+          city?: string | null
+          country?: string
+          created_at?: string
+          display_name: string
+          id?: string
+          normalized_address_key?: string | null
+          notes?: string | null
+          postal_code?: string | null
+          property_type?: string | null
+          source_system?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address_line_1?: string
+          address_line_2?: string | null
+          city?: string | null
+          country?: string
+          created_at?: string
+          display_name?: string
+          id?: string
+          normalized_address_key?: string | null
+          notes?: string | null
+          postal_code?: string | null
+          property_type?: string | null
+          source_system?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      property_external_ids: {
+        Row: {
+          created_at: string
+          external_id: string
+          external_type: string | null
+          id: string
+          metadata: Json
+          property_id: string
+          source_system: string | null
+          status: string
+          system_key: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          external_id: string
+          external_type?: string | null
+          id?: string
+          metadata?: Json
+          property_id: string
+          source_system?: string | null
+          status?: string
+          system_key: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          external_id?: string
+          external_type?: string | null
+          id?: string
+          metadata?: Json
+          property_id?: string
+          source_system?: string | null
+          status?: string
+          system_key?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_external_ids_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_organization_relationships: {
+        Row: {
+          created_at: string
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          organization_id: string
+          ownership_percentage: number | null
+          property_id: string
+          relationship_type: string
+          source_record_id: string | null
+          source_system: string | null
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          organization_id: string
+          ownership_percentage?: number | null
+          property_id: string
+          relationship_type: string
+          source_record_id?: string | null
+          source_system?: string | null
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          organization_id?: string
+          ownership_percentage?: number | null
+          property_id?: string
+          relationship_type?: string
+          source_record_id?: string | null
+          source_system?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_organization_relationships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "business_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_organization_relationships_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
@@ -2545,6 +3092,47 @@ export type Database = {
         }
         Relationships: []
       }
+      units: {
+        Row: {
+          created_at: string
+          id: string
+          is_whole_property_unit: boolean
+          property_id: string
+          status: string
+          unit_label: string
+          unit_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_whole_property_unit?: boolean
+          property_id: string
+          status?: string
+          unit_label: string
+          unit_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_whole_property_unit?: boolean
+          property_id?: string
+          status?: string
+          unit_label?: string
+          unit_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "units_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           address_line_1: string | null
@@ -3136,6 +3724,18 @@ export type Database = {
       }
       business_today: { Args: never; Returns: string }
       can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
+      can_view_business_organization: {
+        Args: { _business_organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_view_person: {
+        Args: { _person_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_view_property: {
+        Args: { _property_id: string; _user_id: string }
+        Returns: boolean
+      }
       capture_recipe_from_task: {
         Args: { p_parent_task_id: string; p_recipe_id: string }
         Returns: Json
@@ -3259,6 +3859,7 @@ export type Database = {
         Args: { _scope_id: string; _user_id: string }
         Returns: boolean
       }
+      is_shared_core_admin: { Args: { _user_id: string }; Returns: boolean }
       mark_batch_qb_matched: {
         Args: { p_batch_id: string; p_matched: boolean }
         Returns: undefined

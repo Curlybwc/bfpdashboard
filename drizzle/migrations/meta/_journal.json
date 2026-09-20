@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789865790954,
+      "tag": "0000_ezzie_package_a_shared_core",
+      "breakpoints": true
+    }
+  ]
+}
