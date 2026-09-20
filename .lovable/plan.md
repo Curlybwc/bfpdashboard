@@ -1,196 +1,140 @@
-# BFP Dashboard — Current-State Capability Inventory (inspection only)
+# B1 Foundation — Feasibility / Integration Risk Review (inspection only)
 
-Evidence collection across capture → scope → conversion → tasks → materials → assignment → execution → shifts/payroll → estimate-vs-actual → Today views. No code, data, or settings changed. Nothing here is a proposal; every claim cites the file/function/table it was verified in.
+Critique of the proposed additive B1 foundations against the current production schema, verified by direct queries this turn (pg_policies, pg_constraint, pg_indexes, pg_trigger) plus the A–V inventory. Nothing changed; nothing implemented.
 
-## A. User-visible entry points
+## A. Verdict: GO WITH CHANGES
 
-| Flow | Route / page | Key components |
-|---|---|---|
-| Scope list & create | `/scopes` `src/pages/ScopeList.tsx` | "New" dialog (admin / can_manage_projects only) |
-| Scope detail & manual items | `/scopes/:id` `src/pages/ScopeDetail.tsx` | `src/hooks/useScopeMutations.ts`, `useScopeDetail.ts`, `useScopeChecklistCoverage.ts`, `FinalPassSheet.tsx`, `DeduplicateSheet.tsx` |
-| Scope walkthrough (AI) | `/scopes/:id/walkthrough` `src/pages/ScopeWalkthrough.tsx` | `DictateButton.tsx`, `useSpeechInput.ts`, rehab-template generation UI |
-| Scope accuracy | `/scopes/accuracy` `src/pages/ScopeAccuracy.tsx` | variance vs `actual_total_cost` |
-| Project detail | `/projects/:id` `src/pages/ProjectDetail.tsx` | task list, packages, mobile action sheet |
-| Project walkthrough | `src/pages/ProjectWalkthrough.tsx` | feeds field-mode pipeline |
-| Field capture | `FieldModeCapture.tsx` → `FieldModePreview.tsx` | voice/text → parse → review → submit |
-| Task detail | `/tasks/:id` `src/pages/TaskDetail.tsx` | lifecycle actions, subtasks, recipe suggestion/create/expand, materials (`TaskMaterialsSheet.tsx`), photos, comments, blocker UI |
-| Shifts | `/shifts` `src/pages/Shifts.tsx` | `ShiftForm.tsx`, `ShiftsCalendarView.tsx`, `ShiftDaySheet.tsx`, `ShiftDetailSheet.tsx` |
-| Clock in/out | Today + global | `ClockStatusCard.tsx`, `GlobalClockBanner.tsx`, `ActiveShiftsLiveCard.tsx` |
-| Payroll | `/payroll` `src/pages/Payroll.tsx` | `PayrollSummary.tsx`, `PaymentHistory.tsx`, `SplitPaymentDialog.tsx` |
-| Accounting | `/accounting` `src/pages/Accounting.tsx` | historical payments, ledger |
-| Analytics | `/analytics` `src/pages/Analytics.tsx` | `LaborBreakdownSheet.tsx` drill-down |
-| Today | `/today` `src/pages/Today.tsx` | `useTodayData.ts`, `NextUpCard`, `WhatNextCard`, `AlertsBanner`, `DailyReminders` |
-| Shopping | `/shopping` `src/pages/Shopping.tsx` | `useShopping.ts` global shopping list |
-| Product library | `/products` `src/pages/ProductLibrary.tsx` | `ProductFormDialog`, `ProductPicker`, `ProductDetailSheet`, `useProductLibrary.ts` |
-| Materials/tools | `MaterialInventory.tsx`, `ToolInventory.tsx`, `ProjectMaterials.tsx` | tool voice-parse bulk add |
-| Admin | `/admin/*` | `AdminRehabLibrary.tsx`, `AdminRecipes.tsx`, `AdminMaterialBundles.tsx`, `AdminAssignmentRules.tsx`, `AdminCrewGroups.tsx`, `AdminAliases.tsx`, `AdminStoreSections.tsx`, `CostLibrary.tsx`, invites/tenants/users |
+The B1 direction is technically feasible on this schema with no destructive changes. All proposed table names are unused (verified against the full table list — 78 tables, none named scope_concepts*, scope_captures, scope_interpretations, scope_change_*, work_information_gaps). Changes required before build:
 
-## B. Server / edge / RPC / DB functions
+1. **scope_captures must NOT clone field_captures** — see C.
+2. **Defer scope_concept_recipe_links / _cost_links / _checklist_links to B2** — see C.
+3. **Every new top-level table needs org_id** — org scoping is the codebase's core isolation rule (`is_org_member`/`get_user_org_id` pattern in every existing policy).
+4. scope_interpretations needs an explicit immutability mechanism (revoke UPDATE or a guard trigger), not convention.
 
-- Conversion: `convert_scope_to_project(p_scope_id)` — auth (admin or can_manage_projects), active-scope check, estimate snapshot, project + manager membership insert, 1:1 task inserts, `apply_assignment_rules` per task.
-- Scope parsing: edge `scope_walkthrough_parse` (LLM + deterministic checklist mapping), `scope_walkthrough_apply` (approved status/notes updates only).
-- Field capture: edge `field_mode_parse`, `field_mode_submit` (task inserts stage `Not Ready`, materials, bundle application, assignment rules).
-- Tools: edge `tool_inventory_parse`.
-- Recipes: `expand_recipe` (room-sqft math: `perimeter_ft = round(sqrt(sqft)*4,2)`), `capture_recipe_from_task`, `push_recipe_to_tasks`, `push_recipe_step_to_tasks`, trigger `reassign_default_variant`.
-- Recurring: `complete_recurring_task`, trigger `validate_recurrence`.
-- Tasks: trigger `sync_task_is_blocked`, trigger `log_task_activity`, trigger `protect_actual_cost`.
-- Assignment: `apply_assignment_rules`, `get_project_role`, `is_project_member`.
-- Shifts: `clock_in`, `clock_out`, `upsert_shift_with_allocations`, `admin_force_clock_out`, `business_today()` (America/Chicago), triggers `validate_shift`, `validate_shift_allocation`.
-- Payroll: `admin_mark_visible_shifts_paid`, `split_payable_batch`, `save_local_historical_payment`, `save_linked_historical_payments`, `mark_batch_qb_matched`, triggers `protect_profile_pay_fields`, `protect_admin_flag`; helpers `get_my_profile_pay`, `admin_get_profile_pay`.
-- QuickBooks edges: `quickbooks_connect_begin/callback/status`, `quickbooks_validate_settings`, `quickbooks_export_payables`, `quickbooks_list_accounts/classes/vendors`, `quickbooks_vendor_search/pull/push`, `quickbooks_record_expense`, `quickbooks_create_reimbursement_bill`, `quickbooks_search_transactions`; trigger `on_company_qb_connection_change`, `invalidate_company_qb_mappings`.
-- Stripe: `stripe_connect_account_link`, `stripe_sync_payout_profile`, `stripe_create_payout_run`, `stripe_submit_payout_run`.
-- Org/admin: `handle_new_user` trigger, `on_org_created`, `clone_seed_libraries_to_org`, `revoke_org_invite`, `merge_projects`, `admin_move_user_to_my_org`, `admin_list_stranded_users`, `admin_delete_user` edge, `admin_impersonate` edge.
-- Reimbursements: `admin_mark_reimbursement_paid`, `reimbursement_signed_url`, trigger `validate_reimbursement_amounts`.
-- Ezzie core helpers: `is_shared_core_admin`, `can_view_person`, `can_view_property`, `can_view_business_organization`.
+## B. Exact conflicts with existing structures
 
-## C. Tables / key columns / relationships
+- **Name collisions: none.** No existing table, column, or function shares the proposed names.
+- **field_captures role overlap (the only real conflict):** `field_captures` already stores `raw_text, ai_output, parse_status, include_materials, error, created_by, created_at` with FK → projects ON DELETE CASCADE and project-scoped RLS (`is_project_member` SELECT; contractor/manager INSERT/UPDATE; admin delete — verified in pg_policies). A second raw-capture table duplicates its semantics. It cannot be generalized instead: `project_id` is NOT NULL there, and pre-construction scopes have no project, so a separate `scope_captures` is correct — but it must reuse field_captures' column vocabulary (status/error/metadata), not invent a third dialect.
+- **`convert_scope_to_project` (SECURITY DEFINER):** inserts tasks without referencing any new column. SECURITY DEFINER bypasses RLS, so additive nullable columns on scope_items are invisible to it — no conflict, but it also means concepts will not propagate to tasks until the conversion engine is rebuilt (expected in B1 scope).
+- **Dual writers on scope_items:** `ScopeWalkthrough.tsx` client-side apply + `scope_walkthrough_apply` edge + `ScopeDetail`/`FinalPassSheet`/`DeduplicateSheet` all UPDATE scope_items directly (status/notes/price). B1 adds no second writer (change-ops tables stay unwritten until B2), so no conflict today — but B2 must route through change-ops or these become competing writers.
+- **Triggers:** scopes and scope_items carry only `update_*_updated_at` triggers (verified in pg_trigger). No validation trigger will fight new columns.
+- **RLS shape to mirror (verified):** scope child tables today use SELECT `is_admin OR is_scope_member(scope_id)`; INSERT/UPDATE/DELETE `is_admin OR get_scope_role ∈ (editor, manager)`. scopes themselves add the org-admin branch (`is_org_admin OR is_scope_member`). New child tables must replicate both branches or org admins silently lose access to rows they can see today.
+- **Index debt context:** `scope_items` currently has ONLY its PK index (verified in pg_indexes) — no index on scope_id, cost_item_id, or recipe_hint_id. Any new FK columns must be indexed, and this is the moment to add `scope_items(scope_id)` without behavior change.
 
-- `scopes` (name, address, status, `converted_project_id`, `converted_at`, `baseline_locked_at`, `estimated_total_snapshot`, `checklist_template_id`, `org_id`) → `scope_items` → `scope_members`, `scope_checklist_reviews`.
-- `scope_items` (description, status text, qty, unit, `unit_cost_override`, `computed_total`, `pricing_status`, `cost_item_id`→cost_items, `recipe_hint_id`→task_recipes, `phase_key`, `estimated_hours/labor_cost/material_cost`, `added_after_conversion`, notes).
-- Libraries: `cost_items`; `rehab_library` + `rehab_library_items` (`recipe_hint_id`); `checklist_templates` + `checklist_items` (`default_cost_item_id`, `normalized_label`).
-- `projects` (name, address, `scope_id`, `company_id`, `property_id`, `has_missing_estimates`, status, project_type, org_id) → `project_members`.
-- `tasks` (39 cols: `parent_task_id`, `is_package`, `sort_order`, stage, priority, `assigned_to_user_id`, `claimed_by_user_id/claimed_at`, `started_at/started_by_user_id`, `completed_at`, `needs_manager_review`, `is_blocked`, `assignment_mode`, `lead_user_id`, `is_outside_vendor`, `source_scope_item_id`, `recipe_hint_id`, `expanded_recipe_id`, `source_recipe_id/source_recipe_step_id`, `field_capture_id`, `bundles_applied`, `actual_total_cost`, trade, room_area, recurrence fields) → `task_materials` (sku, vendor_url, store_section, `provided_by`, `item_type`, `unit_cost`, `is_active`, `confirmed_on_site`, `product_library_id`), `task_candidates`, `task_workers`, `task_blockers`, `task_comments`, `task_photos`.
-- Recipes: `task_recipes` → `task_recipe_steps` → `task_recipe_step_materials`; `recipe_variants`.
-- Materials ecosystem: `material_library`, `product_price_history`, `task_material_bundles` + `task_material_bundle_items` (keywords, priority), `store_sections`, `material_inventory`, `tool_types`, `tool_stock`.
-- Assignment: `assignment_rules`, `crew_groups` + `crew_group_members`, `profile_aliases`.
-- Field: `field_captures` (raw_text, ai_output jsonb, parse_status).
-- Time/pay: `shifts` (clock_in_at/out_at, `hourly_rate_snapshot`, `is_flat_rate/flat_rate_amount`, date window) → `shift_task_allocations`; `worker_payments` → `worker_payment_shifts`; `worker_payable_batches` → `worker_payable_batch_shifts`; `payout_runs`; `worker_payout_profiles`; `worker_tax_profiles`; `worker_availability`.
-- Money/other: `reimbursement_requests`, `vendors`, `cost_items`, `quickbooks_connections/settings/vendor_mappings/class_mappings`, `companies` (`qb_connection_id`, `business_organization_id`), `tenants`.
-- Org: `organizations`, `org_members`, `org_invites`, `profiles` (org_id, is_admin, can_manage_projects, pay fields, `skip_qb_export`, `person_id`), `activity_log`.
-- Ezzie core (Package A, live): `people`, `person_contact_methods`, `person_auth_identities`, `person_external_ids`, `business_organizations`, `organization_relationships`, `organization_person_roles`, `organization_external_ids`, `properties`, `units`, `property_organization_relationships`, `property_external_ids`; links `profiles.person_id`, `companies.business_organization_id`, `projects.property_id`.
+## C. Merge / simplify / defer recommendations (with evidence)
 
-## D. Scope item granularity and conversion behavior
+1. **Merge: scope_captures ↔ field_captures vocabulary.** Keep them as two tables (field_captures.project_id NOT NULL blocks reuse for scopes) but copy its field semantics (status, error, metadata) so one parser pipeline can later read both. Evidence: field_captures DDL above.
+2. **Defer: scope_concept_recipe_links / _cost_links / _checklist_links.** B1 wires nothing to concepts (`scope_walkthrough_parse` untouched per item 6), so these would be dead tables from day one — the codebase already carries half-built dead capabilities (A–V §S). The per-item single links already exist as columns: `scope_items.recipe_hint_id` (FK verified) and `scope_items.cost_item_id` (FK verified). Create the concept link tables in B2 when semantic matching actually needs them.
+3. **Simplify: checklist concept links.** Checklist coverage already has `checklist_items.normalized_label` + `default_cost_item_id` and the deterministic matcher in `scope_walkthrough_parse` — a concept→checklist link table would compete with the working matcher. Fold into the concept aliases instead.
+4. **Keep separate: scope_interpretations and scope_change_sets/operations.** No existing structure holds versioned AI output for scopes (field_captures.ai_output is a single mutable jsonb on a project row — provenance is lost on re-run). These fill a genuine gap.
+5. **Keep: work_information_gaps.** Nothing similar exists (`task_blockers` is orthogonal — resolved-state, not missing-info Q&A).
 
-One scope item = one line of work (e.g. "Replace kitchen counters"). Status set: `Not Checked / OK / Repair / Replace / Get Bid`. Conversion filter: status in (Repair, Replace, Get Bid) OR computed_total > 0 (`convert_scope_to_project`, mirrored in `src/lib/scopeConversion.ts`). Conversion is strictly 1:1 item→task; task gets only description, `source_scope_item_id`, `recipe_hint_id`, stage `Ready`, priority `2 – This Week`, materials `No`. All cost/estimate detail stays on the scope item.
+## D. Recommended B1 structure (design text only — not applied)
 
-## E. Raw input / provenance
+```text
+scope_concepts:          id, org_id NOT NULL→organizations, canonical_name NOT NULL,
+                         status NOT NULL DEFAULT 'active' (active/inactive),
+                         notes, created_by→auth.users, created_at, updated_at
+                         -- NO unique on canonical_name (per principle); matching done in code
+scope_concept_aliases:   id, org_id, concept_id NOT NULL→scope_concepts ON DELETE CASCADE,
+                         alias NOT NULL, source_system DEFAULT 'bfp_dashboard', created_by, created_at
+                         -- unique (concept_id, lower(alias)) ONLY (per-concept idempotency, not global)
+scope_items.scope_concept_id  uuid NULL →scope_concepts ON DELETE SET NULL  + INDEX
+scope_items(scope_id)         INDEX  (pre-existing debt, additive)
 
-- Retained: `field_captures.raw_text` + `ai_output` jsonb, linked via `tasks.field_capture_id`; `tasks.source_scope_item_id` links converted tasks back to scope items; `source_recipe_id`/`source_recipe_step_id` link expanded children back to recipe steps; `estimated_total_snapshot` + `has_missing_estimates` frozen at conversion; `hourly_rate_snapshot` on shifts; `activity_log` via `log_task_activity` trigger.
-- Lost at conversion: qty, unit, unit cost, computed_total, estimated hours/labor/material, notes, phase_key, cost_item_id, checklist linkage — none reach the task.
-- Lost in walkthrough: raw walkthrough text is NOT persisted for scopes (no `field_captures` equivalent; only resulting items survive). `price_evidence`/`price_confidence` from the parser are computed but not stored on `scope_items`.
+scope_captures:          id, org_id, scope_id NOT NULL→scopes ON DELETE CASCADE,
+                         property_id NULL→properties, created_by, source_type NOT NULL,
+                         source_system DEFAULT 'bfp_dashboard', external_source_id,
+                         raw_text NOT NULL, status DEFAULT 'raw',
+                         metadata jsonb, captured_at NOT NULL DEFAULT now()
+                         INDEX (scope_id, captured_at DESC)
+scope_capture_assets:    id, capture_id NOT NULL→scope_captures ON DELETE CASCADE,
+                         kind, storage_path, byte_size, created_at
+scope_interpretations:   id, org_id, capture_id NOT NULL→scope_captures ON DELETE CASCADE,
+                         scope_id NOT NULL (denormalized for RLS), model, prompt_version,
+                         interpretation_json NOT NULL, supersedes_id NULL self-FK,
+                         created_by, created_at  -- INSERT/SELECT only; UPDATE revoked or guard-triggered
+scope_item_evidence_links: id, org_id, scope_id NOT NULL (denorm), scope_item_id NOT NULL→scope_items
+                         ON DELETE CASCADE, interpretation_id NULL, capture_id NULL,
+                         relationship_type NOT NULL CHECK IN (supports,adds,changes,
+                         contradicts,supersedes,clarifies), created_by, created_at
+                         INDEX (scope_item_id), INDEX (interpretation_id)
 
-## F. AI vs deterministic behavior
+scope_change_sets:       id, org_id, scope_id NOT NULL→scopes ON DELETE CASCADE,
+                         interpretation_id NULL, source NOT NULL (ai/manual),
+                         status NOT NULL DEFAULT 'proposed' (proposed/approved/applied/
+                         rejected/superseded), created_by, created_at, applied_at, applied_by
+scope_change_operations: id, org_id, change_set_id NOT NULL→scope_change_sets ON DELETE CASCADE,
+                         scope_id NOT NULL (denorm), operation_type NOT NULL,
+                         target_table NOT NULL, target_id uuid NULL,
+                         proposed_values jsonb NOT NULL, confidence numeric,
+                         requires_human_review NOT NULL DEFAULT true,
+                         result_status NULL, applied_at NULL, applied_by NULL, error NULL
 
-- `scope_walkthrough_parse`: LLM proposes matched updates/new items; deterministic server code overrides checklist assignment (cost-item id → exact normalized label → fuzzy Jaccard), computes `not_addressed_checklist_items` deterministically.
-- `field_mode_parse`: AI extraction of tasks/materials; `field_mode_submit`: fully deterministic inserts + deterministic bundle matching (priority, then score).
-- `tool_inventory_parse`: AI parse of spoken tool lists.
-- Client-side deterministic matchers: `checklistMatch.ts` (normalizer + synonyms + adaptive Jaccard), `rehabMatch.ts`, `recipeMatch.ts`, `bundleMatch.ts` — all keyword/normalized/Jaccard scoring, no AI.
-- Dedupe on apply (`ScopeWalkthrough.tsx` `matchExistingScopeItem`): cost-item match → exact normalized → substring → fuzzy; ties return null (no wrong merge).
+work_information_gaps:   id, org_id NOT NULL, property_id NULL→properties,
+                         scope_id NULL→scopes, scope_item_id NULL→scope_items,
+                         project_id NULL→projects, task_id NULL→tasks,
+                         task_material_id NULL→task_materials,
+                         question NOT NULL, status NOT NULL DEFAULT 'open'
+                         (open/answered/no_longer_needed/superseded),
+                         urgency NOT NULL DEFAULT 'nice_to_need' → use the six proposed values,
+                         responsible_user_id NULL, responsible_role NULL,
+                         due_at, required_before_event NULL,
+                         answer NULL, answered_by NULL, answered_at NULL, evidence jsonb,
+                         created_by, created_at, updated_at
+                         CHECK (at least one target non-null); INDEX per target column
+```
 
-## G. Checklist behavior
+All tables: standard GRANT block (authenticated CRUD where policies allow, service_role full, no anon), RLS enabled, `updated_at` triggers where the column exists. Denormalized `scope_id`/`org_id` columns exist solely so RLS predicates stay single-table — this matches how `task_blockers` and `field_captures` already carry their authorization anchor.
 
-`checklist_templates` → `checklist_items` (normalized labels, `default_cost_item_id`); per-scope state in `scope_checklist_reviews` (state mirrors item statuses). Coverage = checklist items not addressed, computed in the parser; `useScopeChecklistCoverage` shows coverage on ScopeDetail; `FinalPassSheet.tsx` is the checklist-driven final review that inserts/updates scope items and upserts reviews. Checklists are QA coverage only — they never generate tasks.
+## E. RLS strategy — reuse existing helpers, no new functions
 
-## H. Cost Library vs Rehab Library
+No new SECURITY DEFINER helpers needed; `is_admin`, `is_org_member`, `is_scope_member`, `get_scope_role` are live and EXECUTE-hardened. Mirror existing policies exactly:
 
-- Cost Library (`cost_items`, `CostLibrary.tsx`): name, unit_type, piece_length_ft, `default_total_cost`, active. Feeds walkthrough matching/creation, `useResetToLibraryPrice`, `useUpdateLibraryPrice`. Pricing only, org-scoped, no task linkage.
-- Rehab Library (`rehab_library` + `rehab_library_items`, `AdminRehabLibrary.tsx`, `rehabMatch.ts`): trade-scoped templates of typical scope items with `default_status` and `recipe_hint_id`. Walkthrough text keyword-detection suggests templates; manual "Generate" inserts all template items as scope_items (carrying `recipe_hint_id`) — the ONLY writer of `scope_items.recipe_hint_id`.
-- Overlap: both can create scope items (rehab directly, cost indirectly via pricing); differ in that rehab = work-content templates, cost = price book.
+- Concept tables (org-scoped): SELECT `is_org_member(auth.uid(), org_id)`; write `is_admin OR is_org_admin(org_id)`.
+- Capture/interpretation/evidence/change tables (scope-scoped): SELECT `is_admin OR is_scope_member(scope_id)`; write `is_admin OR get_scope_role(scope_id) ∈ (editor, manager)` — byte-for-byte the scope_items policy shape (verified above), so org admins keep access via their existing admin branch and contractors get no new reach.
+- scope_interpretations: additionally REVOKE UPDATE (immutability by grant, not convention).
+- work_information_gaps: SELECT org members; INSERT by scope/project editors+managers or admin; UPDATE (answer/close) by admin, responsible_user_id, or the creating user — no contractor broadening beyond org membership, which is the existing floor.
 
-## I. Recipes
+## F. Migration ordering
 
-`task_recipes` (keywords, trade, active) → steps (title, sort_order, trade, notes, assignment_mode, `default_candidate_user_ids`) → step materials (name, qty, unit, sku, vendor_url, store_section, provided_by, item_type, unit_cost). `recipe_variants` + `reassign_default_variant` trigger manage alternate paths.
-- Hint: `tasks.recipe_hint_id` (from scope conversion or set manually) → suggestion in `useTaskDetailData`/`TaskDetail`; keyword fallback via `recipeMatch.suggestRecipes`.
-- Expand: `expand_recipe` RPC — refuses if task already has children or `expanded_recipe_id`; room-area math scales quantities; children get `source_recipe_id/step_id`, crew lead = first default candidate.
-- Capture: `capture_recipe_from_task` writes existing children back into a recipe (upsert by sort_order, prune extras).
-- Sync: `push_recipe_to_tasks` / `push_recipe_step_to_tasks` propagate library edits to active spawned tasks; `SubtaskRow.tsx` syncs hint metadata back to the recipe.
-- Parent/child: `is_package`, `sort_order`; `tryAutoCompleteParent` (taskLifecycle.ts) auto-completes parent when all children are Done (client-side).
+1. One additive migration: enums/checks inline → tables (concepts first, then scope_items link column + indexes, then captures → assets → interpretations → evidence → change sets → operations → gaps) → GRANTs → RLS enable → policies → immutability revoke on interpretations.
+2. Run `supabase--get_types` only after the migration reports success.
+3. No backfill exists (all new columns/tables start empty); any concept seeding is a data operation, not schema.
+4. Staging first (ref `iuaqsqdxflakhphnwyec`), per standing practice.
 
-## J. Materials / bundles / procurement
+## G. Compatibility risks to current flows
 
-`task_materials` is the operational list per task: purchased/delivered flags, `confirmed_on_site`, soft-remove `is_active`, `provided_by`, `item_type` (material/tool/labor), product link. Bundles (`task_material_bundles` + items, keywords + priority) auto-attach by matching (`applyBundles.ts`, `bundleMatch.ts`) on field-capture submit and task flows; `tasks.bundles_applied` marks completion with name/sku/unit dedupe. `material_library` + `push_material_library_to_all` = global product catalog with normalized-name matching; `product_price_history` records purchases (`record_product_price`); `material_inventory`, `tool_types`/`tool_stock`, `store_sections` handle stock/locations/aisles. Shopping (`useShopping.ts`, Shopping.tsx) aggregates active materials on non-Done tasks with status tabs and bulk vendor links. `tasks.materials_on_site` (Yes/Partial/No) is a manual rollup flag.
+- **ScopeWalkthrough / FinalPass / Deduplicate / ScopeDetail:** all keep writing scope_items exactly as today. `useScopeDetail` uses `select('*')` — the new nullable `scope_concept_id` simply rides along; verify no component does exhaustive column mapping or strict object-shape assertions on scope_items (A–V §T notes `as any` casts already exist in recipe hooks — same class of drift, low risk).
+- **DeduplicateSheet merge semantics undefined for concepts:** when two items merge, which `scope_concept_id` survives must be decided before B2 (technical, not business — recommend keep the earliest created item's value).
+- **convert_scope_to_project:** unaffected, but its rebuilt successor must be taught to carry `scope_concept_id` and capture/interpretation lineage forward — flag now so B2/B3 don't inherit silent provenance loss (the exact failure A–V §E documents for estimates).
+- **FieldModeCapture / ProjectWalkthrough:** project-level; zero interaction with scope-scoped tables.
+- **Payroll/shifts/QB/Today/assignment rules:** no shared surface; untouched.
 
-## K. Assignment / aliases / crew / membership
+## H. Generated-types / build risks
 
-- `assignment_rules` + `apply_assignment_rules` RPC: server-side routing on task creation (project + scope conversion + field capture), including `is_outside_vendor` (clears assignee).
-- Solo: `assigned_to_user_id`; claim sets `claimed_by_user_id`/`claimed_at`.
-- Crew: `assignment_mode='crew'`, candidate pool in `task_candidates`, workers in `task_workers`, `lead_user_id`; `crew_groups` presets; recipe `default_candidate_user_ids` propagate on expansion and library sync.
-- Aliases: `profile_aliases` + `AdminAliases.tsx` map alternate names for AI/assignment matching.
-- Auto-membership: task assignment auto-creates `project_members` rows for non-members (assignment onboarding); conversion adds caller as project `manager`; scope creation adds creator as scope `manager`.
+`src/integrations/supabase/types.ts` (≈127KB) is regenerated by the platform after the migration — same procedure as Package A, proven. Risks are minor: (a) any code doing exhaustive switch on scope_items keys would see the new column (none found); (b) new tables are invisible to the client until types refresh, so no client code should reference them in the same change set as the migration; (c) typecheck/build must run after types regenerate, as in Package A.
 
-## L. Repeated walkthrough / dedupe / reconciliation
+## I. Rollback ordering
 
-Re-running a walkthrough on the same scope is a merge, not a duplication: parser sees existing items and proposes `matched_updates`; client applies `matchExistingScopeItem` (cost id → exact → substring → fuzzy, ties abstain), `strongerStatus` keeps the more severe status, notes append without duplication, missing price/qty filled only when absent. `DeduplicateSheet.tsx` offers a separate 3-pass manual dedupe (cost id, exact desc, Jaccard). Checklist reviews upsert on `(scope_id, checklist_item_id)`.
+Reverse dependency order: drop policies → revoke immutability (if trigger used, drop trigger first) → drop evidence links → interpretations → capture assets → scope_captures → change operations → change sets → work_information_gaps → concept aliases → `ALTER TABLE scope_items DROP COLUMN scope_concept_id` → scope_concepts → drop the additive `scope_items(scope_id)` index last (harmless to keep). No trigger or function on existing tables is added, so nothing pre-existing is restored. Same caveat as Package A: `scope_items.updated_at` will advance on any row touched; nothing else changes.
 
-## M. Scope → Project conversion
+## J. B1 staging test matrix
 
-Carried: project name/address/org from scope; per item: description→task, `source_scope_item_id`, `recipe_hint_id`. Snapshot: `estimated_total_snapshot` on scope, `has_missing_estimates` on project. Lost: all per-item money/qty/notes (see E). NOT written despite existing: `scopes.converted_project_id`, `converted_at`, `baseline_locked_at`, status→`Converted`. Duplicate protection: NONE — an active scope can be converted repeatedly, creating duplicate projects. Ownership: new project gets NO `company_id` and NO `property_id` (Package A link columns exist but conversion doesn't set them).
+1. Preflight: 0 tables with B1 names exist on staging.
+2. Apply migration; GRANT/RLS present; `supabase--get_types`; typecheck + build.
+3. RLS impersonation with seeded staging users: global admin; org owner/admin; scope manager; scope editor; scope viewer; contractor in org but NOT a scope member; a second-org user. Assert per table: non-members see 0 scope rows; viewer read-only; editor/manager write; admin full; interpretations reject UPDATE for everyone but service_role; cross-org user sees 0 concepts.
+4. Regression on live flows in staging: create scope → walkthrough parse/apply → manual item edit → FinalPass → dedupe → convert to project → task appears; confirm identical behavior to pre-migration (this is the "keep current functionality" guarantee).
+5. Immutability: attempt UPDATE on scope_interpretations as admin — expect denial.
+6. FK behaviors: delete scope → captures/interpretations/evidence/change sets cascade; delete concept → scope_items.scope_concept_id NULLed, aliases cascade; delete gap target rows → behavior per FK choice (SET NULL for gaps).
+7. Confirm production untouched until an explicitly authorized production migration.
 
-## N. Project walkthrough / Field Mode vs Scope Walkthrough
+## K. Business questions genuinely unresolved
 
-Field mode (`FieldModeCapture` → `field_mode_parse` → `FieldModePreview` → `field_mode_submit`) operates on an EXISTING project: creates tasks directly (stage `Not Ready`, `needs_manager_review=true`, priority mapped from high/normal/low), materials, bundle application, assignment rules, and persists `field_captures` raw provenance. Scope walkthrough operates pre-project: creates/edits `scope_items` with pricing, checklist coverage, library growth — no tasks until conversion. `ProjectWalkthrough.tsx` is the room-by-room capture UI feeding field mode. Key asymmetries: field capture retains raw text (scopes don't); field-capture tasks get bundles+assignment rules immediately (converted tasks get assignment rules only).
+1. Who curates the canonical concept vocabulary — Jen only, or also office/manager staff? (Determines the write policy on scope_concepts.)
+2. Should a worker's dictated raw capture text be visible to all scope members, or restricted to managers? (Determines scope_captures SELECT policy.)
+3. When a work-information gap is raised, who is accountable for answering — a named person, a role (e.g. "manager"), or Jen by default? (Determines responsible_role defaults and whether gap answering needs a notification path later.)
 
-## O. Task hierarchy, dependencies, stages
+## L. Behavior confirmation
 
-Hierarchy: `parent_task_id` + `is_package` + `sort_order` (`taskPackages.ts`, `SubtaskRow.tsx`); packages come from recipe expansion. Stages: Ready / In Progress / Not Ready / Hold / Done; claim/start/complete metadata columns; `taskLifecycle.ts` drives transitions client-side; parent auto-completes when children done. Blockers: `task_blockers` (reason enum, resolved_at) orthogonal to stage; `sync_task_is_blocked` trigger maintains `tasks.is_blocked`. `needs_manager_review` gates field-created tasks. `taskOperationalStatus.ts` derives display status (ready/blocked/review/done). No true dependency graph (no depends_on) — blockers are the only dependency mechanism.
-
-## P. Time / shift / payroll / job-cost dependencies
-
-Shifts hang off `project_id` and allocate hours to `task_id` via `shift_task_allocations` (validated by triggers; flat-rate bypasses hours rules). `hourly_rate_snapshot` freezes pay at shift time; `worker_payment_shifts` links payments to shifts for historical rates. Payable batches (`worker_payable_batches` + `_shifts`) are the QuickBooks bill unit, scoped by `company_id` — which comes from `projects.company_id`, so payroll→QB correctness depends on project→company assignment. Job-cost: `tasks.actual_total_cost` (protected by trigger) rolls up client-side (`projectSummary.ts`); `ScopeAccuracy.tsx` compares scope `computed_total` vs actual across projects. Shift edit window: contractors today−7…today via `business_today()` (America/Chicago) in RLS + `upsert_shift_with_allocations` + `shiftWindow.ts`; admins unrestricted.
-
-## Q. Views depending on this chain
-
-Today (`useTodayData.ts` 5-phase hydration: memberships → tasks → crew → blocked/review → enrichment): Working Now / Up Next / Available / Needs Review / Blocked partitions. `alerts.ts` derives blocked/overdue/photo reminders. `DailyReminders` prompts shift logging. `NextUpCard`/`WhatNextCard`. Clock UI (`ClockStatusCard`, `GlobalClockBanner`, `ActiveShiftsLiveCard`) reads `shifts`. Shifts calendar (`ShiftsCalendarView`, paid=green/unpaid=amber chips, multi-contractor filter) + `ShiftDaySheet`/`ShiftDetailSheet` (per-task allocations). Payroll `PayrollSummary` (bi-weekly periods anchored 2026-01-05, "Total Ready to Bill"), `PaymentHistory`, `SplitPaymentDialog`. Analytics labor-by-project with contractor/day/task drill (`LaborBreakdownSheet`). `ScopeAccuracy`. All depend on stage, assignment, blocker, review, allocation, and payment fields created by the flows above.
-
-## R. Tests protecting behavior
-
-`src/test/`: `scopeConversion.test.ts` (convertible filter, total, missing estimates), `checklistMatch.test.ts` (normalizer/Jaccard/status merge/dedupe matcher), `bundleMatch.test.ts` (bundle scoring), `taskPackages.test.ts` (grouping), `taskOperationalStatus.test.ts` (status derivation), `example.test.ts`. No tests cover: conversion RPC, walkthrough parse/apply, shifts, payroll, recipes, assignment rules.
-
-## S. Half-built / dead / unused capabilities
-
-- `scopes.converted_project_id`, `converted_at`, `baseline_locked_at`, status `Converted`/`Draft` in enum — never written.
-- `scope_items.added_after_conversion` — never set by conversion.
-- `scope_items.recipe_hint_id` — only rehab templates set it; walkthrough items never get one.
-- `scope_walkthrough_apply` — narrow function; main apply path is client-side in the page.
-- Parser outputs `price_evidence`/`price_confidence`/`suggested_qty` — displayed but not persisted.
-- `recipe_variants` exist with default-variant trigger, but expansion uses steps, not variants.
-- Ezzie core tables (people, properties, business_organizations, etc.) are seeded and linked, but no app UI reads them yet.
-- Push-notification scaffolding absent (postponed by design).
-- `scopes.status` enum contains both `Draft/Converted/Archived` and `active/archived` — mixed case conventions.
-
-## T. Architectural inconsistencies / tech debt (do not blindly copy)
-
-1. Business logic split arbitrarily: conversion + assignment server-side; lifecycle transitions, cost rollups, parent auto-complete, bundle matching client-side — dual sources of truth (e.g. `scopeConversion.ts` mirrors the RPC filter and can drift).
-2. Dual normalizer/matcher implementations in edge functions vs `src/lib/checklistMatch.ts` (walkthrough parser re-implements normalization).
-3. Scope status enum mixes two vocabularies (`Draft/Converted/Archived` vs `active/archived`).
-4. No duplicate-conversion guard; converted scope stays `active`.
-5. Estimate detail severed at conversion — estimate-vs-actual requires joining back through `source_scope_item_id`.
-6. Client-side cost rollups (`projectSummary.ts`) won't scale with task count.
-7. Shift date-window logic exists in three places (RLS, RPC, `shiftWindow.ts`).
-8. Workspace `organizations` ≠ legal `business_organizations`; `companies` bridges them — three org concepts coexist.
-9. Field capture retains raw provenance; scope walkthrough doesn't — inconsistent evidence retention.
-10. `useRecipeVariants` bypasses generated types (`as any` cast) — type drift risk.
-
-## U. DO NOT REGRESS — capabilities worth preserving
-
-1. AI walkthrough parsing with human review/selection before any write.
-2. Merge-not-duplicate re-walkthrough reconciliation with tie-abstention.
-3. Checklist coverage semantics (what's not addressed) and final pass.
-4. Cost library auto-growth from walkthroughs + reset-to-library pricing.
-5. Rehab template detection/generation, including `recipe_hint_id` seeding.
-6. 1:1 conversion provenance (`source_scope_item_id`) and estimate snapshot.
-7. Recipe suggest/hint → expand with room-area quantity math; capture-from-task; push-to-active-tasks sync; crew candidate propagation.
-8. Material bundles with keyword/priority matching and dedupe; soft-remove materials; provided_by/item_type; shopping aggregation.
-9. Assignment rules + outside-vendor routing + auto project membership + aliases.
-10. Blockers as orthogonal state with manager resolution; needs_manager_review gate for field-created tasks.
-11. Field capture raw-text provenance (`field_captures`).
-12. Clock in/out, 12h warnings, admin force-out, split shifts, 7-day contractor window, shift→task allocations, flat-rate support.
-13. Payroll: rate snapshots, bi-weekly periods, batch split, payment-shift linking, skip_qb_export, QB realm-scoped export.
-14. Today view partitions and operational alerts.
-15. Dedupe sheet (3-pass) and ScopeAccuracy variance view.
-16. RLS role model (org/project/scope roles) and security-definer helper pattern.
-
-## V. CURRENT LIMITATIONS (not capabilities)
-
-1. No duplicate-conversion protection; scope stays active and reusable as a conversion source.
-2. Conversion drops all per-item cost/qty/notes — tasks start bare.
-3. No automatic recipes/materials/bundles at conversion (assignment rules only).
-4. Scope walkthrough raw text is discarded after parsing.
-5. New projects have no company/property — QB routing requires manual fix-up.
-6. One scope item can only ever become one task; multi-step work requires manual recipe expansion later.
-7. `recipe_hint_id` coverage is sparse (rehab-generated items only).
-8. Estimate-vs-actual is cross-project averages, not per-item (per-item estimate never reaches the task).
-9. No dependency graph between tasks (blockers only).
-10. No notifications (PWA push postponed).
-11. Conversion RPC and client mirror can drift; no test locks the RPC behavior.
-12. Mixed legacy/Ezzie identity: `profiles` remains the operational user record; `people` is not yet read by the app.
+Yes — B1 as revised is buildable with **zero user-visible change**: it creates new tables, one nullable FK column on scope_items, indexes, and policies; modifies no existing table column, function, trigger, or policy; and no UI references the new structures. Every current flow (ScopeDetail, walkthrough, FinalPass, dedupe, conversion, Field Mode, shifts/payroll, QB, Today) retains byte-identical behavior.
