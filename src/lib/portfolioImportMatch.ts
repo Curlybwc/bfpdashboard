@@ -38,7 +38,7 @@ export interface IncomingPropertyRow {
 }
 
 export type MatchResult =
-  | { status: 'matched'; id: string; method: 'external_id' | 'project_link' | 'normalized_address' }
+  | { status: 'matched'; id: string; method: 'external_id' | 'project_link' | 'normalized_address' | 'contact_exact' }
   | { status: 'new' }
   | { status: 'needs_attention'; reason: string; candidates: string[] };
 
@@ -81,7 +81,7 @@ export function matchPerson(row: IncomingPerson, people: CanonicalPerson[]): Mat
   if (ext.length === 1) return { status: 'matched', id: ext[0].id, method: 'external_id' };
   const keys = [normalizeEmail(row.email), normalizePhone(row.phone)].filter(Boolean) as string[];
   const hits = [...new Set(people.filter((p) => p.contacts.some((c) => keys.includes(c))).map((p) => p.id))];
-  if (hits.length === 1) return { status: 'matched', id: hits[0], method: 'normalized_address' === 'x' ? 'external_id' : ('contact_exact' as never) };
+  if (hits.length === 1) return { status: 'matched', id: hits[0], method: 'contact_exact' };
   if (hits.length > 1) return { status: 'needs_attention', reason: 'contact matches multiple people', candidates: hits };
   return { status: 'new' }; // name-only never matches; a same-name person becomes a review item upstream
 }
