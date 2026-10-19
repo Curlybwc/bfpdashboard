@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
 import QBSettingsCard from './QBSettingsCard';
 import QBCombobox from './QBCombobox';
+import QBPreSyncDialog, { runPreSyncCheck, type PreSyncResult } from './QBPreSyncDialog';
+import QBClassAuditDialog from './QBClassAuditDialog';
 import type { Tables } from '@/integrations/supabase/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -329,9 +331,10 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     } catch {
       toast({ title: 'Export failed', variant: 'destructive' });
     }
+    void batchId;
     setExportingBatchIds((prev) => {
       const next = new Set(prev);
-      next.delete(batchId);
+      batchIds.forEach((id) => next.delete(id));
       return next;
     });
   };
