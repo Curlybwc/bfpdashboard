@@ -9,7 +9,8 @@ Deno.serve(async (req) => {
   try {
     const { adminClient } = await requireAdminAuth(req);
 
-    const { batch_ids } = await req.json() as { batch_ids: string[] };
+    const { batch_ids, dry_run } = await req.json() as { batch_ids: string[]; dry_run?: boolean };
+    const dryRun = dry_run === true;
     if (!Array.isArray(batch_ids) || batch_ids.length === 0) {
       return new Response(
         JSON.stringify({ error: "bad_request", message: "batch_ids is required" }),
@@ -119,7 +120,7 @@ Deno.serve(async (req) => {
       // Hard-stop: project_id required for payroll bill creation
       if (!batch.project_id) {
         const errorMsg = "Batch has no project assigned. A project is required for payroll bill creation.";
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -131,7 +132,7 @@ Deno.serve(async (req) => {
         const errorMsg = batch.project_id
           ? `Project "${projectMap.get(batch.project_id)?.name || batch.project_id}" has no company assigned. Assign a company to the project before exporting.`
           : "Batch has no company_id and no project. Assign a company before exporting.";
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -140,7 +141,7 @@ Deno.serve(async (req) => {
       const company = companyMap.get(companyId);
       if (!company?.qb_connection_id) {
         const errorMsg = `Company "${company?.name || companyId}" has no QuickBooks connection linked. Link a QuickBooks connection in settings.`;
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -151,7 +152,7 @@ Deno.serve(async (req) => {
         const { conn, error: connErr } = await getConnectionForCompany(adminClient, companyId);
         if (!conn) {
           const errorMsg = connErr || `Cannot connect to QuickBooks for company "${company.name}".`;
-          await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+          if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
           results.push({ batch_id: batchId, success: false, error: errorMsg });
           failedBatchIds.add(batchId);
           continue;
@@ -170,7 +171,7 @@ Deno.serve(async (req) => {
       if (!vendorMapping) {
         const workerName = profileMap.get(batch.worker_user_id) || batch.worker_user_id;
         const errorMsg = `No QuickBooks vendor mapped for "${workerName}" in company "${company.name}". Add a vendor mapping in QuickBooks Settings for this company.`;
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -185,26 +186,29 @@ Deno.serve(async (req) => {
 
       if (!qbSettings?.labor_expense_account_id) {
         const errorMsg = `No QuickBooks expense account configured for company "${company.name}". Set up the labor expense account in QuickBooks Settings.`;
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
       }
 
-      // Look up class mapping for this project (optional — no hard stop, but preserve if present)
-      let classId: string | null = null;
-      let className: string | null = null;
-      if (batch.project_id) {
-        const { data: classMapping } = await adminClient
-          .from("quickbooks_class_mappings")
-          .select("qb_class_id, qb_class_name")
-          .eq("project_id", batch.project_id)
-          .maybeSingle();
-        if (classMapping) {
-          classId = classMapping.qb_class_id;
-          className = classMapping.qb_class_name;
-        }
+      // Hard-stop: every project must have a saved QuickBooks Class ID.
+      // Matching is by saved ID only — never by property-name text.
+      const { data: classMapping } = await adminClient
+        .from("quickbooks_class_mappings")
+        .select("qb_class_id, qb_class_name")
+        .eq("project_id", batch.project_id)
+        .maybeSingle();
+      if (!classMapping?.qb_class_id) {
+        const projName = projectMap.get(batch.project_id)?.name || batch.project_id;
+        const errorMsg = `Property "${projName}" has no saved QuickBooks Class. Open QuickBooks Settings for "${company.name}", load QB Classes and select the class for this property. Nothing was pushed.`;
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        results.push({ batch_id: batchId, success: false, error: errorMsg, issue: "missing_class", project_name: projName } as any);
+        failedBatchIds.add(batchId);
+        continue;
       }
+      const classId: string = classMapping.qb_class_id;
+      const className: string | null = classMapping.qb_class_name;
 
       // Build grouping key — includes project for one-bill-per-project
       const groupKey = `${companyId}::${vendorMapping.qb_vendor_id}::${batch.project_id}::${batch.period_start}::${batch.period_end}`;
@@ -262,7 +266,7 @@ Deno.serve(async (req) => {
 
       const failGroup = async (errorMsg: string) => {
         for (const batchId of validBatchIds) {
-          await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+          if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
           results.push({ batch_id: batchId, success: false, error: errorMsg });
           failedBatchIds.add(batchId);
         }
@@ -359,6 +363,22 @@ Deno.serve(async (req) => {
         }
       }
 
+      if (dryRun) {
+        for (const line of group.lines) {
+          if (failedBatchIds.has(line.batch.id)) continue;
+          results.push({
+            batch_id: line.batch.id,
+            success: true,
+            ready: true,
+            project_name: line.projectName,
+            worker_name: line.workerName,
+            vendor_name: group.qbVendorName,
+            class_name: line.className,
+            amount: line.amount,
+          } as any);
+        }
+        continue;
+      }
 
       // Build bill lines — one line per batch to preserve project/class detail
       const billLines = group.lines.map((line) => {
@@ -396,7 +416,7 @@ Deno.serve(async (req) => {
       if (!result.ok) {
         const errorMsg = `QuickBooks API error (${result.status}): ${result.error || "Unknown error"}`;
         for (const batchId of validBatchIds) {
-          await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+          if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
           results.push({ batch_id: batchId, success: false, error: errorMsg });
         }
         continue;
@@ -406,9 +426,21 @@ Deno.serve(async (req) => {
       const qbBillId = billData?.Bill?.Id || null;
       const qbDocNumber = billData?.Bill?.DocNumber || null;
 
+      // Read the bill back and confirm every line carries the expected class.
+      // "Bill created" and "class verified" are tracked separately.
+      let classVerified = false;
+      if (qbBillId) {
+        const readBack = await qbApiFetch(conn, "GET", `/bill/${encodeURIComponent(qbBillId)}`);
+        const lines = ((readBack.data as any)?.Bill?.Line || []).filter((l: any) => l.DetailType === "AccountBasedExpenseLineDetail");
+        const expected = group.lines.map((l) => l.classId);
+        classVerified = readBack.ok && lines.length === expected.length &&
+          lines.every((l: any) => expected.includes(l.AccountBasedExpenseLineDetail?.ClassRef?.value));
+      }
+
       // Update all batches in this group
       for (const batchId of validBatchIds) {
         const batch = batchMap.get(batchId);
+        const line = group.lines.find((l) => l.batch.id === batchId);
         // Preserve 'paid' status if already marked paid; otherwise set to 'exported'
         const newStatus = batch?.status === "paid" ? "paid" : "exported";
         const { error: updateErr } = await adminClient
@@ -419,8 +451,10 @@ Deno.serve(async (req) => {
             qb_bill_id: qbBillId,
             qb_bill_doc_number: qbDocNumber,
             qb_exported_at: new Date().toISOString(),
-            qb_export_error: null,
+            qb_export_error: classVerified ? null : "Bill created, but class assignment could not be verified on read-back. Check the class in QuickBooks.",
             company_id: group.companyId,
+            qb_class_verified_at: classVerified ? new Date().toISOString() : null,
+            qb_class_verified_id: classVerified ? line?.classId ?? null : null,
           })
           .eq("id", batchId);
 

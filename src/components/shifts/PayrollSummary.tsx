@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { Shift } from '@/hooks/useShifts';
 import QBSettingsCard from './QBSettingsCard';
 import QBCombobox from './QBCombobox';
+import QBPreSyncDialog, { runPreSyncCheck, type PreSyncResult } from './QBPreSyncDialog';
+import QBClassAuditDialog from './QBClassAuditDialog';
 import type { Tables } from '@/integrations/supabase/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -287,11 +289,30 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     }
   };
 
-  const handleExportToQB = async (batchId: string) => {
-    setExportingBatchIds((prev) => new Set(prev).add(batchId));
+  const [preSyncOpen, setPreSyncOpen] = useState(false);
+  const [preSyncResults, setPreSyncResults] = useState<PreSyncResult[] | null>(null);
+
+  const openPreSync = async (batchIds: string[]) => {
+    if (batchIds.length === 0) return;
+    setExportingBatchIds((prev) => new Set([...prev, ...batchIds]));
+    try {
+      setPreSyncResults(await runPreSyncCheck(batchIds));
+      setPreSyncOpen(true);
+    } catch (e: any) {
+      toast({ title: 'Pre-sync check failed', description: e.message, variant: 'destructive' });
+    }
+    setExportingBatchIds((prev) => { const n = new Set(prev); batchIds.forEach((id) => n.delete(id)); return n; });
+  };
+
+  // Pushing always goes through the pre-sync check first.
+  const handleExportToQB = (batchId: string) => openPreSync([batchId]);
+
+  const pushBatches = async (batchIds: string[]) => {
+    const batchId = batchIds[0];
+    setExportingBatchIds((prev) => new Set([...prev, ...batchIds]));
     try {
       const { data, error } = await supabase.functions.invoke('quickbooks_export_payables', {
-        body: { batch_ids: [batchId] },
+        body: { batch_ids: batchIds },
       });
 
       if (error) {
@@ -310,9 +331,10 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
     } catch {
       toast({ title: 'Export failed', variant: 'destructive' });
     }
+    void batchId;
     setExportingBatchIds((prev) => {
       const next = new Set(prev);
-      next.delete(batchId);
+      batchIds.forEach((id) => next.delete(id));
       return next;
     });
   };
@@ -1097,6 +1119,27 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
   // Prepared Payments content
   const preparedPaymentsContent = (
     <>
+      <div className="flex flex-wrap justify-end gap-2 mb-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={filteredExportedGroups.every((g) => g.batch.qb_bill_id)}
+          onClick={() => openPreSync(filteredExportedGroups.filter((g) => !g.batch.qb_bill_id && (g.batch.status === 'draft' || g.batch.status === 'paid')).map((g) => g.batch.id))}
+        >
+          <CheckCircle className="h-4 w-4 mr-1" />Check QB readiness
+        </Button>
+        <QBClassAuditDialog />
+      </div>
+      <QBPreSyncDialog
+        open={preSyncOpen}
+        onOpenChange={setPreSyncOpen}
+        results={preSyncResults}
+        labelFor={(id) => {
+          const g = filteredExportedGroups.find((x) => x.batch.id === id);
+          return g ? `${g.contractorName} · ${g.projectName}` : id.slice(0, 8);
+        }}
+        onPush={pushBatches}
+      />
       {filteredExportedGroups.length === 0 ? (
         <p className="text-xs text-muted-foreground">No prepared payments for this date range.</p>
       ) : (
@@ -1120,12 +1163,21 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                         <div className="flex items-center gap-2">
                           <p className="text-sm truncate">{group.contractorName} · {group.projectName}</p>
                           <Badge variant={isExported || isPaid ? 'default' : 'secondary'} className="text-[10px] h-5">
-                            {isPaid ? 'Marked Paid' : isExported ? 'In QuickBooks' : 'Pending Bill'}
+                            {isPaid ? 'Marked Paid' : isExported ? 'Bill Created in QB' : 'Pending Bill'}
                           </Badge>
+                          {group.batch.qb_bill_id && (
+                            (group.batch as any).qb_class_verified_at ? (
+                              <Badge variant="outline" className="text-[10px] h-5 gap-0.5"><CheckCircle className="h-2.5 w-2.5" />Class Verified</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] h-5 gap-0.5 border-destructive/50 text-destructive" title="Class on this bill has not been verified. Run Audit bill classes.">
+                                <AlertTriangle className="h-2.5 w-2.5" />Class Unverified
+                              </Badge>
+                            )
+                          )}
                           {isQbMatched && (
                             <Badge className="text-[10px] h-5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-emerald-300 gap-0.5">
                               <CheckCheck className="h-2.5 w-2.5" />
-                              Matched in QB
+                              {(group.batch as any).qb_class_verified_at ? 'Payment Matched' : 'Payment Matched · class unverified'}
                             </Badge>
                           )}
                           {group.batch.qb_bill_doc_number && (
