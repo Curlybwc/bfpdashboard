@@ -9,7 +9,8 @@ Deno.serve(async (req) => {
   try {
     const { adminClient } = await requireAdminAuth(req);
 
-    const { batch_ids } = await req.json() as { batch_ids: string[] };
+    const { batch_ids, dry_run } = await req.json() as { batch_ids: string[]; dry_run?: boolean };
+    const dryRun = dry_run === true;
     if (!Array.isArray(batch_ids) || batch_ids.length === 0) {
       return new Response(
         JSON.stringify({ error: "bad_request", message: "batch_ids is required" }),
@@ -191,20 +192,23 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Look up class mapping for this project (optional — no hard stop, but preserve if present)
-      let classId: string | null = null;
-      let className: string | null = null;
-      if (batch.project_id) {
-        const { data: classMapping } = await adminClient
-          .from("quickbooks_class_mappings")
-          .select("qb_class_id, qb_class_name")
-          .eq("project_id", batch.project_id)
-          .maybeSingle();
-        if (classMapping) {
-          classId = classMapping.qb_class_id;
-          className = classMapping.qb_class_name;
-        }
+      // Hard-stop: every project must have a saved QuickBooks Class ID.
+      // Matching is by saved ID only — never by property-name text.
+      const { data: classMapping } = await adminClient
+        .from("quickbooks_class_mappings")
+        .select("qb_class_id, qb_class_name")
+        .eq("project_id", batch.project_id)
+        .maybeSingle();
+      if (!classMapping?.qb_class_id) {
+        const projName = projectMap.get(batch.project_id)?.name || batch.project_id;
+        const errorMsg = `Property "${projName}" has no saved QuickBooks Class. Open QuickBooks Settings for "${company.name}", load QB Classes and select the class for this property. Nothing was pushed.`;
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        results.push({ batch_id: batchId, success: false, error: errorMsg, issue: "missing_class", project_name: projName } as any);
+        failedBatchIds.add(batchId);
+        continue;
       }
+      const classId: string = classMapping.qb_class_id;
+      const className: string | null = classMapping.qb_class_name;
 
       // Build grouping key — includes project for one-bill-per-project
       const groupKey = `${companyId}::${vendorMapping.qb_vendor_id}::${batch.project_id}::${batch.period_start}::${batch.period_end}`;
@@ -359,6 +363,22 @@ Deno.serve(async (req) => {
         }
       }
 
+      if (dryRun) {
+        for (const line of group.lines) {
+          if (failedBatchIds.has(line.batch.id)) continue;
+          results.push({
+            batch_id: line.batch.id,
+            success: true,
+            ready: true,
+            project_name: line.projectName,
+            worker_name: line.workerName,
+            vendor_name: group.qbVendorName,
+            class_name: line.className,
+            amount: line.amount,
+          } as any);
+        }
+        continue;
+      }
 
       // Build bill lines — one line per batch to preserve project/class detail
       const billLines = group.lines.map((line) => {
