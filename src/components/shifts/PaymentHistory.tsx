@@ -310,10 +310,11 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast({
-        title: 'Export successful',
-        description: `${data?.bills_created || ids.length} bill(s) exported to QuickBooks.`,
-      });
+      const results: any[] = data?.results || [];
+      const ok = results.filter((r) => r.success);
+      const blocked = results.filter((r) => !r.success);
+      if (ok.length) toast({ title: 'Pushed to QuickBooks', description: `${ok.length} entr${ok.length === 1 ? 'y' : 'ies'} pushed.` });
+      for (const r of blocked) toast({ title: 'Blocked — not pushed', description: r.error, variant: 'destructive' });
       loadData();
     } catch (err: any) {
       toast({
