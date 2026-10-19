@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.quickbooks_vendor_push]
 verify_jwt = false
+
+[functions.quickbooks_audit_bill_classes]
+verify_jwt = false
