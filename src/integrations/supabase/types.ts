@@ -3301,6 +3301,8 @@ export type Database = {
           project_id: string | null
           qb_bill_doc_number: string | null
           qb_bill_id: string | null
+          qb_class_verified_at: string | null
+          qb_class_verified_id: string | null
           qb_export_error: string | null
           qb_exported_at: string | null
           qb_matched_at: string | null
@@ -3326,6 +3328,8 @@ export type Database = {
           project_id?: string | null
           qb_bill_doc_number?: string | null
           qb_bill_id?: string | null
+          qb_class_verified_at?: string | null
+          qb_class_verified_id?: string | null
           qb_export_error?: string | null
           qb_exported_at?: string | null
           qb_matched_at?: string | null
@@ -3351,6 +3355,8 @@ export type Database = {
           project_id?: string | null
           qb_bill_doc_number?: string | null
           qb_bill_id?: string | null
+          qb_class_verified_at?: string | null
+          qb_class_verified_id?: string | null
           qb_export_error?: string | null
           qb_exported_at?: string | null
           qb_matched_at?: string | null
