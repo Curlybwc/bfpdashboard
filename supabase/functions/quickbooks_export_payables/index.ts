@@ -406,9 +406,21 @@ Deno.serve(async (req) => {
       const qbBillId = billData?.Bill?.Id || null;
       const qbDocNumber = billData?.Bill?.DocNumber || null;
 
+      // Read the bill back and confirm every line carries the expected class.
+      // "Bill created" and "class verified" are tracked separately.
+      let classVerified = false;
+      if (qbBillId) {
+        const readBack = await qbApiFetch(conn, "GET", `/bill/${encodeURIComponent(qbBillId)}`);
+        const lines = ((readBack.data as any)?.Bill?.Line || []).filter((l: any) => l.DetailType === "AccountBasedExpenseLineDetail");
+        const expected = group.lines.map((l) => l.classId);
+        classVerified = readBack.ok && lines.length === expected.length &&
+          lines.every((l: any) => expected.includes(l.AccountBasedExpenseLineDetail?.ClassRef?.value));
+      }
+
       // Update all batches in this group
       for (const batchId of validBatchIds) {
         const batch = batchMap.get(batchId);
+        const line = group.lines.find((l) => l.batch.id === batchId);
         // Preserve 'paid' status if already marked paid; otherwise set to 'exported'
         const newStatus = batch?.status === "paid" ? "paid" : "exported";
         const { error: updateErr } = await adminClient
@@ -419,8 +431,10 @@ Deno.serve(async (req) => {
             qb_bill_id: qbBillId,
             qb_bill_doc_number: qbDocNumber,
             qb_exported_at: new Date().toISOString(),
-            qb_export_error: null,
+            qb_export_error: classVerified ? null : "Bill created, but class assignment could not be verified on read-back. Check the class in QuickBooks.",
             company_id: group.companyId,
+            qb_class_verified_at: classVerified ? new Date().toISOString() : null,
+            qb_class_verified_id: classVerified ? line?.classId ?? null : null,
           })
           .eq("id", batchId);
 
