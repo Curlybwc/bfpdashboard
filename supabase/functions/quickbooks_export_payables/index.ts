@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
       // Hard-stop: project_id required for payroll bill creation
       if (!batch.project_id) {
         const errorMsg = "Batch has no project assigned. A project is required for payroll bill creation.";
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
         const errorMsg = batch.project_id
           ? `Project "${projectMap.get(batch.project_id)?.name || batch.project_id}" has no company assigned. Assign a company to the project before exporting.`
           : "Batch has no company_id and no project. Assign a company before exporting.";
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
       const company = companyMap.get(companyId);
       if (!company?.qb_connection_id) {
         const errorMsg = `Company "${company?.name || companyId}" has no QuickBooks connection linked. Link a QuickBooks connection in settings.`;
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
         const { conn, error: connErr } = await getConnectionForCompany(adminClient, companyId);
         if (!conn) {
           const errorMsg = connErr || `Cannot connect to QuickBooks for company "${company.name}".`;
-          await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+          if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
           results.push({ batch_id: batchId, success: false, error: errorMsg });
           failedBatchIds.add(batchId);
           continue;
@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
       if (!vendorMapping) {
         const workerName = profileMap.get(batch.worker_user_id) || batch.worker_user_id;
         const errorMsg = `No QuickBooks vendor mapped for "${workerName}" in company "${company.name}". Add a vendor mapping in QuickBooks Settings for this company.`;
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
 
       if (!qbSettings?.labor_expense_account_id) {
         const errorMsg = `No QuickBooks expense account configured for company "${company.name}". Set up the labor expense account in QuickBooks Settings.`;
-        await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+        if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
         results.push({ batch_id: batchId, success: false, error: errorMsg });
         failedBatchIds.add(batchId);
         continue;
@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
 
       const failGroup = async (errorMsg: string) => {
         for (const batchId of validBatchIds) {
-          await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+          if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
           results.push({ batch_id: batchId, success: false, error: errorMsg });
           failedBatchIds.add(batchId);
         }
@@ -416,7 +416,7 @@ Deno.serve(async (req) => {
       if (!result.ok) {
         const errorMsg = `QuickBooks API error (${result.status}): ${result.error || "Unknown error"}`;
         for (const batchId of validBatchIds) {
-          await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
+          if (!dryRun) await adminClient.from("worker_payable_batches").update({ qb_export_error: errorMsg }).eq("id", batchId);
           results.push({ batch_id: batchId, success: false, error: errorMsg });
         }
         continue;
