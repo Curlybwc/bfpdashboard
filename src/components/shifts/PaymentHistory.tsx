@@ -94,7 +94,7 @@ const PaymentHistory = ({ workerFilter }: PaymentHistoryProps) => {
     setLoading(true);
 
     const [profilesRes, projectsRes, companiesRes, paymentsRes, batchesRes] = await Promise.all([
-      supabase.from('profiles').select('id, full_name').eq('is_active', true),
+      supabase.from('profiles').select('id, full_name'),
       supabase.from('projects').select('id, name'),
       supabase.from('companies').select('id, name, short_name'),
       supabase
