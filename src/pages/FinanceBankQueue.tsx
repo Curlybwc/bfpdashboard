@@ -179,7 +179,7 @@ export default function FinanceBankQueue() {
     <div className="mx-auto w-full max-w-7xl space-y-4 p-4">
       <PageHeader title="Classification Queue" backTo="/admin/accounting" />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="flex flex-col gap-3">
           <div>
             <CardTitle>Stage 1 — review only</CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -187,7 +187,7 @@ export default function FinanceBankQueue() {
               Stage 1. Splits and classes come from statement evidence, never from the amount alone.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={companyId} onValueChange={setCompanyId}>
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Company" />
