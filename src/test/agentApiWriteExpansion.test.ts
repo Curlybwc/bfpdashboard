@@ -1,6 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-vi.mock('../../supabase/functions/_shared/quickbooks.ts', () => ({ getConnectionForCompany: vi.fn(), checkQBRef: vi.fn() }));
-import { validateNewBody, date, SETTLEMENT_METHODS } from '../../supabase/functions/agent_api/write-expansion';
+import { describe, it, expect } from 'vitest';
+import { validateNewBody, date, SETTLEMENT_METHODS } from '../../supabase/functions/agent_api/write-validation';
 const base = { action:'create_time_entry', worker:'Andrew', project:'137 Forestwood', date:'2026-10-21', flat_rate:500, purpose:'Replace faucet' };
 describe('agent write owner rules', () => {
  it('requires a human-entered payment purpose',()=> {expect(()=>validateNewBody({...base,purpose:undefined})).toThrow('missing_purpose');expect(()=>validateNewBody({...base,purpose:' '})).toThrow('missing_purpose');});
