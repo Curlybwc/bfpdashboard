@@ -1242,6 +1242,7 @@ export type Database = {
       projects: {
         Row: {
           address: string | null
+          client_ref: string | null
           company_id: string | null
           created_at: string
           has_missing_estimates: boolean
@@ -1256,6 +1257,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          client_ref?: string | null
           company_id?: string | null
           created_at?: string
           has_missing_estimates?: boolean
@@ -1270,6 +1272,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          client_ref?: string | null
           company_id?: string | null
           created_at?: string
           has_missing_estimates?: boolean
@@ -2127,6 +2130,7 @@ export type Database = {
         Row: {
           admin_edited_at: string | null
           admin_edited_by: string | null
+          client_ref: string | null
           clock_in_at: string | null
           clock_out_at: string | null
           created_at: string
@@ -2135,11 +2139,14 @@ export type Database = {
           flat_rate_amount: number | null
           hourly_rate_snapshot: number | null
           id: string
+          invoice_no: string | null
           is_flat_rate: boolean
           project_id: string | null
+          purpose: string | null
           shift_date: string
           start_time: string | null
           total_hours: number | null
+          trade: string | null
           updated_at: string
           updated_by: string | null
           user_id: string
@@ -2147,6 +2154,7 @@ export type Database = {
         Insert: {
           admin_edited_at?: string | null
           admin_edited_by?: string | null
+          client_ref?: string | null
           clock_in_at?: string | null
           clock_out_at?: string | null
           created_at?: string
@@ -2155,11 +2163,14 @@ export type Database = {
           flat_rate_amount?: number | null
           hourly_rate_snapshot?: number | null
           id?: string
+          invoice_no?: string | null
           is_flat_rate?: boolean
           project_id?: string | null
+          purpose?: string | null
           shift_date: string
           start_time?: string | null
           total_hours?: number | null
+          trade?: string | null
           updated_at?: string
           updated_by?: string | null
           user_id: string
@@ -2167,6 +2178,7 @@ export type Database = {
         Update: {
           admin_edited_at?: string | null
           admin_edited_by?: string | null
+          client_ref?: string | null
           clock_in_at?: string | null
           clock_out_at?: string | null
           created_at?: string
@@ -2175,11 +2187,14 @@ export type Database = {
           flat_rate_amount?: number | null
           hourly_rate_snapshot?: number | null
           id?: string
+          invoice_no?: string | null
           is_flat_rate?: boolean
           project_id?: string | null
+          purpose?: string | null
           shift_date?: string
           start_time?: string | null
           total_hours?: number | null
+          trade?: string | null
           updated_at?: string
           updated_by?: string | null
           user_id?: string
@@ -2779,6 +2794,7 @@ export type Database = {
           bundles_applied: boolean
           claimed_at: string | null
           claimed_by_user_id: string | null
+          client_ref: string | null
           completed_at: string | null
           created_at: string
           created_by: string
@@ -2820,6 +2836,7 @@ export type Database = {
           bundles_applied?: boolean
           claimed_at?: string | null
           claimed_by_user_id?: string | null
+          client_ref?: string | null
           completed_at?: string | null
           created_at?: string
           created_by: string
@@ -2861,6 +2878,7 @@ export type Database = {
           bundles_applied?: boolean
           claimed_at?: string | null
           claimed_by_user_id?: string | null
+          client_ref?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string
@@ -3138,6 +3156,7 @@ export type Database = {
           address_line_1: string | null
           address_line_2: string | null
           city: string | null
+          client_ref: string | null
           company_id: string
           country: string | null
           created_at: string
@@ -3159,6 +3178,7 @@ export type Database = {
           address_line_1?: string | null
           address_line_2?: string | null
           city?: string | null
+          client_ref?: string | null
           company_id: string
           country?: string | null
           created_at?: string
@@ -3180,6 +3200,7 @@ export type Database = {
           address_line_1?: string | null
           address_line_2?: string | null
           city?: string | null
+          client_ref?: string | null
           company_id?: string
           country?: string | null
           created_at?: string
@@ -3294,11 +3315,13 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          invoice_no: string | null
           marked_paid_by: string | null
           paid_at: string | null
           period_end: string
           period_start: string
           project_id: string | null
+          purpose: string | null
           qb_bill_doc_number: string | null
           qb_bill_id: string | null
           qb_class_verified_at: string | null
@@ -3321,11 +3344,13 @@ export type Database = {
           created_at?: string
           created_by: string
           id?: string
+          invoice_no?: string | null
           marked_paid_by?: string | null
           paid_at?: string | null
           period_end: string
           period_start: string
           project_id?: string | null
+          purpose?: string | null
           qb_bill_doc_number?: string | null
           qb_bill_id?: string | null
           qb_class_verified_at?: string | null
@@ -3348,11 +3373,13 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          invoice_no?: string | null
           marked_paid_by?: string | null
           paid_at?: string | null
           period_end?: string
           period_start?: string
           project_id?: string | null
+          purpose?: string | null
           qb_bill_doc_number?: string | null
           qb_bill_id?: string | null
           qb_class_verified_at?: string | null
@@ -3467,6 +3494,7 @@ export type Database = {
           created_by: string
           external_reference: string | null
           id: string
+          invoice_no: string | null
           marked_paid_by: string | null
           memo: string | null
           paid_at: string | null
@@ -3476,8 +3504,10 @@ export type Database = {
           payment_source: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id: string | null
           project_id: string | null
+          purpose: string | null
           qb_txn_amount: number | null
           qb_txn_type: string | null
+          settlement_method: string | null
           status: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id: string | null
           stripe_payout_id: string | null
@@ -3491,6 +3521,7 @@ export type Database = {
           created_by: string
           external_reference?: string | null
           id?: string
+          invoice_no?: string | null
           marked_paid_by?: string | null
           memo?: string | null
           paid_at?: string | null
@@ -3500,8 +3531,10 @@ export type Database = {
           payment_source: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id?: string | null
           project_id?: string | null
+          purpose?: string | null
           qb_txn_amount?: number | null
           qb_txn_type?: string | null
+          settlement_method?: string | null
           status?: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id?: string | null
           stripe_payout_id?: string | null
@@ -3515,6 +3548,7 @@ export type Database = {
           created_by?: string
           external_reference?: string | null
           id?: string
+          invoice_no?: string | null
           marked_paid_by?: string | null
           memo?: string | null
           paid_at?: string | null
@@ -3524,8 +3558,10 @@ export type Database = {
           payment_source?: Database["public"]["Enums"]["worker_payment_source"]
           payout_run_id?: string | null
           project_id?: string | null
+          purpose?: string | null
           qb_txn_amount?: number | null
           qb_txn_type?: string | null
+          settlement_method?: string | null
           status?: Database["public"]["Enums"]["worker_payment_status"]
           stripe_balance_transaction_id?: string | null
           stripe_payout_id?: string | null
@@ -3659,6 +3695,7 @@ export type Database = {
         Returns: {
           admin_edited_at: string | null
           admin_edited_by: string | null
+          client_ref: string | null
           clock_in_at: string | null
           clock_out_at: string | null
           created_at: string
@@ -3667,11 +3704,14 @@ export type Database = {
           flat_rate_amount: number | null
           hourly_rate_snapshot: number | null
           id: string
+          invoice_no: string | null
           is_flat_rate: boolean
           project_id: string | null
+          purpose: string | null
           shift_date: string
           start_time: string | null
           total_hours: number | null
+          trade: string | null
           updated_at: string
           updated_by: string | null
           user_id: string
@@ -3724,6 +3764,16 @@ export type Database = {
         }
         Returns: Json
       }
+      agent_dashboard_write: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_dry_run?: boolean
+          p_record: Json
+        }
+        Returns: Json
+      }
+      agent_entry_locked: { Args: { p_id: string }; Returns: boolean }
       apply_assignment_rules: {
         Args: { p_task_id: string }
         Returns: undefined
@@ -3751,6 +3801,7 @@ export type Database = {
         Returns: {
           admin_edited_at: string | null
           admin_edited_by: string | null
+          client_ref: string | null
           clock_in_at: string | null
           clock_out_at: string | null
           created_at: string
@@ -3759,11 +3810,14 @@ export type Database = {
           flat_rate_amount: number | null
           hourly_rate_snapshot: number | null
           id: string
+          invoice_no: string | null
           is_flat_rate: boolean
           project_id: string | null
+          purpose: string | null
           shift_date: string
           start_time: string | null
           total_hours: number | null
+          trade: string | null
           updated_at: string
           updated_by: string | null
           user_id: string
@@ -3780,6 +3834,7 @@ export type Database = {
         Returns: {
           admin_edited_at: string | null
           admin_edited_by: string | null
+          client_ref: string | null
           clock_in_at: string | null
           clock_out_at: string | null
           created_at: string
@@ -3788,11 +3843,14 @@ export type Database = {
           flat_rate_amount: number | null
           hourly_rate_snapshot: number | null
           id: string
+          invoice_no: string | null
           is_flat_rate: boolean
           project_id: string | null
+          purpose: string | null
           shift_date: string
           start_time: string | null
           total_hours: number | null
+          trade: string | null
           updated_at: string
           updated_by: string | null
           user_id: string
@@ -3917,6 +3975,24 @@ export type Database = {
           p_pay_period_start?: string
           p_project_id?: string
           p_worker_user_id: string
+        }
+        Returns: Json
+      }
+      save_shift_with_purpose: {
+        Args: {
+          p_allocations: Json
+          p_end_time: string
+          p_flat_rate_amount: number
+          p_invoice_no?: string
+          p_is_admin_edit: boolean
+          p_is_flat_rate: boolean
+          p_project_id: string
+          p_purpose: string
+          p_shift_date: string
+          p_shift_id: string
+          p_start_time: string
+          p_total_hours: number
+          p_user_id: string
         }
         Returns: Json
       }

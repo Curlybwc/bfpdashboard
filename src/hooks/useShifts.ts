@@ -17,6 +17,8 @@ export interface Shift {
   admin_edited_by: string | null;
   is_flat_rate?: boolean;
   flat_rate_amount?: number | null;
+  purpose?: string | null;
+  invoice_no?: string | null;
   clock_in_at?: string | null;
   clock_out_at?: string | null;
 }

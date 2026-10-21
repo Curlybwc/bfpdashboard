@@ -113,6 +113,8 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
 
   const [projects, setProjects] = useState<{ id: string; name: string; address: string | null }[]>([]);
   const [projectId, setProjectId] = useState(editShift?.project_id || '');
+  const [purpose, setPurpose] = useState(editShift?.purpose || '');
+  const [invoiceNo, setInvoiceNo] = useState(editShift?.invoice_no || '');
   const [shiftDate, setShiftDate] = useState(editShift?.shift_date || defaultDate || new Date().toISOString().slice(0, 10));
   const [isFlatRate, setIsFlatRate] = useState(!!(editShift as any)?.is_flat_rate);
   const [flatRateAmount, setFlatRateAmount] = useState((editShift as any)?.flat_rate_amount ? String((editShift as any).flat_rate_amount) : '');
@@ -319,6 +321,10 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
 
   const handleSave = async () => {
     if (!user || !canSave) return;
+    if (!purpose.trim()) {
+      toast({ title: 'Payment purpose required', description: 'Enter what this payment is for.', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
 
     const allocArray = isFlatRate ? [] : Object.entries(allocations)
@@ -327,7 +333,7 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
 
     const isAdminEdit = isAdmin && selectedUserId !== user.id;
 
-    const { data, error } = await supabase.rpc('upsert_shift_with_allocations', {
+    const { data, error } = await supabase.rpc('save_shift_with_purpose', {
       p_shift_id: editShift?.id || null,
       p_user_id: selectedUserId,
       p_project_id: projectId,
@@ -339,6 +345,8 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       p_is_admin_edit: isAdminEdit,
       p_is_flat_rate: isFlatRate,
       p_flat_rate_amount: isFlatRate ? parseFloat(flatRateAmount) : null,
+      p_purpose: purpose.trim(),
+      p_invoice_no: invoiceNo.trim() || null,
     });
 
     setSaving(false);
@@ -409,6 +417,14 @@ const ShiftForm = ({ editShift, editAllocations, defaultDate, defaultUserId, onS
       </div>
 
       {/* Flat Rate toggle */}
+      <div className="space-y-1">
+        <Label htmlFor="shift-purpose" className="text-xs">Payment purpose *</Label>
+        <Input id="shift-purpose" value={purpose} onChange={e => setPurpose(e.target.value)} required />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="shift-invoice" className="text-xs">Invoice number</Label>
+        <Input id="shift-invoice" value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} />
+      </div>
       {isAdmin && (
         <div className="flex items-center gap-3">
           <DollarSign className="h-4 w-4 text-muted-foreground" />

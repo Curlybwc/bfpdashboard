@@ -10,6 +10,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getConnectionForCompany, checkQBRef } from '../_shared/quickbooks.ts';
 import { validateCreateTask, validateSetPropertyClass, type ValidationFailure } from './validation.ts';
+import { NEW_ACTIONS, handleNewWrite, InputError, getWorkers, getVendors } from './write-expansion.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,8 +18,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
-const RESOURCE_LIST = ['bills', 'projects', 'tasks', 'time-entries'];
-const ACTION_LIST = ['set_property_class', 'create_task'];
+const RESOURCE_LIST = ['bills', 'projects', 'tasks', 'time-entries', 'workers', 'vendors'];
+const ACTION_LIST = ['set_property_class', 'create_task', ...NEW_ACTIONS];
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
@@ -94,6 +95,10 @@ Deno.serve(async (req) => {
         return json(await getTasks(supabase, { project }));
       case 'time-entries':
         return json(await getTimeEntries(supabase, { from, to, worker, project }));
+      case 'workers':
+        return json(await getWorkers(supabase, worker));
+      case 'vendors':
+        return json(await getVendors(supabase, url.searchParams.get('vendor'), url.searchParams.get('company')));
       default:
         return json({
           error: `Unknown resource "${resource}".`,
@@ -143,9 +148,11 @@ async function handleWrite(supabase: any, req: Request): Promise<Response> {
       case 'create_task':
         return await createTask(supabase, body);
       default:
+        if (NEW_ACTIONS.includes(action)) return json(await handleNewWrite(supabase, body as Record<string, unknown>));
         return json({ error: `Unknown action "${action}".`, available: ACTION_LIST }, 400);
     }
   } catch (err) {
+    if (err instanceof InputError) return json({ error: err.code, message: err.message }, err.status);
     return json({ error: 'write_failed', detail: String((err as Error)?.message ?? err) }, 500);
   }
 }
@@ -231,9 +238,24 @@ async function setPropertyClass(supabase: any, body: unknown): Promise<Response>
 
 /** Create a task on a property, exactly the way the app's own task form does. */
 async function createTask(supabase: any, body: unknown): Promise<Response> {
+  const clientRef = (body as Record<string, unknown>).client_ref;
+  if (clientRef !== undefined && (typeof clientRef !== 'string' || !clientRef.trim() || clientRef.trim().length > 200)) {
+    return fail({error:'invalid_client_ref',detail:'client_ref must be a nonempty string up to 200 characters.'});
+  }
   const v = validateCreateTask(body);
   if (!v.ok) return fail(v.failure);
   const p = v.value;
+
+  if (typeof clientRef === 'string') {
+    const {data: existing,error} = await supabase.from('tasks').select('id, task, stage, priority, due_date, trade, assigned_to_user_id, created_by, project_id, created_at').eq('client_ref',clientRef.trim()).maybeSingle();
+    if(error) throw error;
+    if(existing) {
+      const project = await supabase.from('projects').select('name').eq('id',existing.project_id).maybeSingle();
+      const worker = existing.assigned_to_user_id ? await supabase.from('profiles').select('full_name').eq('id',existing.assigned_to_user_id).maybeSingle() : null;
+      const task = {...existing,property:project.data?.name??null,assigned_to:worker?.data?.full_name??null};
+      return json(p.dry_run ? {dry_run:true,would_save:task,saved:false,duplicate:true} : {saved:false,task,duplicate:true});
+    }
+  }
 
   const resolved = await resolveOneProject(supabase, p.project);
   if ('error' in resolved) return fail(resolved.error, resolved.status);
@@ -307,9 +329,11 @@ async function createTask(supabase: any, body: unknown): Promise<Response> {
       assigned_to_user_id: assigneeId,
       created_by: creatorId,
       assignment_mode: 'solo',
+      ...(typeof clientRef === 'string' ? {client_ref:clientRef.trim()} : {}),
     } as never)
     .select('id, task, stage, priority, due_date, trade, assigned_to_user_id, created_by, project_id, created_at')
     .single();
+  if (insertErr?.code === '23505' && typeof clientRef === 'string') return createTask(supabase, body);
   if (insertErr) throw insertErr;
 
   const workerName = assigneeId
@@ -409,7 +433,7 @@ async function getBills(supabase: any, f: Filters) {
   // Payroll bills (batches)
   let batchQ = supabase
     .from('worker_payable_batches')
-    .select('id, worker_user_id, project_id, company_id, period_start, period_end, total_amount, status, paid_at, qb_bill_doc_number, settlement_method, accounting_source, created_at')
+    .select('id, worker_user_id, project_id, company_id, period_start, period_end, total_amount, status, paid_at, qb_bill_doc_number, settlement_method, accounting_source, created_at, purpose, invoice_no')
     .order('created_at', { ascending: false });
   if (workerIds) batchQ = batchQ.in('worker_user_id', workerIds);
   if (projectIds) batchQ = batchQ.in('project_id', projectIds);
@@ -419,7 +443,7 @@ async function getBills(supabase: any, f: Filters) {
   // Direct worker payments
   let payQ = supabase
     .from('worker_payments')
-    .select('id, worker_user_id, project_id, company_id, amount, status, paid_date, payment_source, external_reference, memo, pay_period_start, pay_period_end, qb_txn_type')
+    .select('id, worker_user_id, project_id, company_id, amount, status, paid_date, payment_source, external_reference, memo, pay_period_start, pay_period_end, qb_txn_type, purpose, invoice_no, settlement_method')
     .order('paid_date', { ascending: false });
   if (workerIds) payQ = payQ.in('worker_user_id', workerIds);
   if (projectIds) payQ = payQ.in('project_id', projectIds);
@@ -455,6 +479,8 @@ async function getBills(supabase: any, f: Filters) {
       period_start: b.period_start,
       period_end: b.period_end,
       amount: Number(b.total_amount),
+      purpose: b.purpose,
+      invoice_no: b.invoice_no,
       status: b.status,
       paid_at: b.paid_at,
       qb_bill_doc_number: b.qb_bill_doc_number,
@@ -472,10 +498,13 @@ async function getBills(supabase: any, f: Filters) {
       period_start: p.pay_period_start,
       period_end: p.pay_period_end,
       amount: Number(p.amount),
+      purpose: p.purpose,
+      invoice_no: p.invoice_no,
       status: p.status,
       paid_at: p.paid_date,
       qb_bill_doc_number: p.external_reference,
       settlement_method: p.payment_source,
+      recorded_settlement_method: p.settlement_method,
     })),
   ];
 
@@ -509,7 +538,7 @@ async function getTimeEntries(supabase: any, f: Filters) {
   const projectIds = await resolveProjectIds(supabase, f.project);
   let q = supabase
     .from('shifts')
-    .select('id, user_id, project_id, shift_date, start_time, end_time, total_hours, hourly_rate_snapshot, is_flat_rate, flat_rate_amount, created_at')
+    .select('id, user_id, project_id, shift_date, start_time, end_time, total_hours, hourly_rate_snapshot, is_flat_rate, flat_rate_amount, created_at, purpose, invoice_no, trade, client_ref')
     .order('shift_date', { ascending: false });
   if (workerIds) q = q.in('user_id', workerIds);
   if (projectIds) q = q.in('project_id', projectIds);
@@ -530,6 +559,10 @@ async function getTimeEntries(supabase: any, f: Filters) {
     property: projectName.get(s.project_id) ?? 'Unknown project',
     project_id: s.project_id,
     date: s.shift_date,
+    purpose: s.purpose,
+    invoice_no: s.invoice_no,
+    trade: s.trade,
+    client_ref: s.client_ref,
     start_time: s.start_time,
     end_time: s.end_time,
     hours: s.total_hours === null ? null : Number(s.total_hours),
