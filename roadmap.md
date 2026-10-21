@@ -1,5 +1,11 @@
 # Roadmap
 
+## Agent API — Full write expansion
+- [ ] Add required payment purpose/invoice metadata and retry-safe create references
+- [ ] Add guarded pay entries, reconciliation, projects/members, workers, tasks, vendors actions and reads
+- [ ] Test dry runs, validation, duplicate prevention, locking, and existing contract; deploy endpoint
+- [ ] Document exact contracts and model limitations
+
 ## Ezzie Package B — Property Registry Expansion
 - [x] Schema SQL (tenancies, utilities, equipment/filters, maintenance, events, many-to-many loans + insurance, tax, valuations, compliance, documents)
 - [x] Derived placed_in_service_on synced from confirmed event
