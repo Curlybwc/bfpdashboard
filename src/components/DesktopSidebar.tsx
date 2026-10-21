@@ -81,6 +81,31 @@ const DesktopSidebar = () => {
   const isActive = (to: string) =>
     to === '/admin' ? location.pathname === '/admin' : location.pathname.startsWith(to);
 
+  // Every sidebar group is openable and closable (Jen's direction,
+  // 2026-10-21). Groups start open; the group holding the current
+  // page re-opens on navigation.
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (title: string) =>
+    setClosedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  const activeGroupTitle = groups.find((g) =>
+    g.items.some((item) => isActive(item.to)),
+  )?.title;
+  useEffect(() => {
+    if (activeGroupTitle) {
+      setClosedGroups((prev) => {
+        if (!prev.has(activeGroupTitle)) return prev;
+        const next = new Set(prev);
+        next.delete(activeGroupTitle);
+        return next;
+      });
+    }
+  }, [activeGroupTitle]);
+
   // Finance expands into an indented tree of its surfaces (Jen's
   // direction, 2026-10-21; twin of the Ezzie app's Finance tree).
   const financeActive = FINANCE_PATH_PREFIXES.some((prefix) =>
@@ -103,9 +128,20 @@ const DesktopSidebar = () => {
       <nav className="flex-1 overflow-y-auto px-2 pb-2">
         {groups.map((group) => (
           <div key={group.title} className="mb-4">
-            <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => toggleGroup(group.title)}
+              aria-expanded={!closedGroups.has(group.title)}
+              className="flex w-full items-center justify-between px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
               {group.title}
-            </p>
+              {closedGroups.has(group.title) ? (
+                <ChevronRight className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </button>
+            {!closedGroups.has(group.title) && (
             <ul className="space-y-0.5">
               {group.items.map(({ to, icon: Icon, label }) => (
                 <li key={to}>
@@ -124,6 +160,7 @@ const DesktopSidebar = () => {
                 </li>
               ))}
             </ul>
+            )}
           </div>
         ))}
         {isAdmin && (
