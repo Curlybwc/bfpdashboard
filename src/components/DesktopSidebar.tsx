@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   FolderKanban,
@@ -5,6 +6,8 @@ import {
   LogOut,
   Shield,
   CalendarCheck,
+  ChevronDown,
+  ChevronRight,
   ShoppingCart,
   Receipt,
   Clock,
@@ -18,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalPermissions } from '@/hooks/useAdmin';
+import { FINANCE_NAV_CHILDREN, FINANCE_PATH_PREFIXES } from '@/lib/financeNavigation';
 import { cn } from '@/lib/utils';
 
 type Item = { to: string; icon: any; label: string; exact?: boolean };
@@ -66,7 +70,6 @@ const DesktopSidebar = () => {
               { to: '/admin/calendar', icon: CalendarDays, label: 'Calendar' },
               { to: '/admin/inventory/materials', icon: Boxes, label: 'Materials inventory' },
               { to: '/admin/inventory/tools', icon: Wrench, label: 'Tools' },
-              { to: '/payroll', icon: DollarSign, label: 'Payroll' },
               { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
               { to: '/admin', icon: Shield, label: 'Admin' },
             ],
@@ -77,6 +80,18 @@ const DesktopSidebar = () => {
 
   const isActive = (to: string) =>
     to === '/admin' ? location.pathname === '/admin' : location.pathname.startsWith(to);
+
+  // Finance expands into an indented tree of its surfaces (Jen's
+  // direction, 2026-10-21; twin of the Ezzie app's Finance tree).
+  const financeActive = FINANCE_PATH_PREFIXES.some((prefix) =>
+    location.pathname.startsWith(prefix),
+  );
+  const [financeOpen, setFinanceOpen] = useState(false);
+  useEffect(() => {
+    if (financeActive) setFinanceOpen(true);
+  }, [financeActive]);
+
+  const isFinanceChildActive = (to: string) => location.pathname.startsWith(to);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r bg-card lg:flex">
@@ -111,6 +126,58 @@ const DesktopSidebar = () => {
             </ul>
           </div>
         ))}
+        {isAdmin && (
+          <div className="mb-4">
+            <div
+              className={cn(
+                'flex items-center rounded-md pr-1 transition-colors',
+                financeActive
+                  ? 'bg-accent font-medium text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+              )}
+            >
+              <Link
+                to="/admin/accounting"
+                className="flex flex-1 items-center gap-2 px-2 py-1.5 text-sm"
+              >
+                <DollarSign className="h-4 w-4 shrink-0" />
+                <span className="truncate">Finance</span>
+              </Link>
+              <button
+                type="button"
+                aria-label="Toggle Finance menu"
+                aria-expanded={financeOpen}
+                onClick={() => setFinanceOpen((open) => !open)}
+                className="rounded p-1 hover:bg-accent"
+              >
+                {financeOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+            {financeOpen && (
+              <ul className="mb-1 ml-4 space-y-0.5 border-l pl-2 pt-0.5">
+                {FINANCE_NAV_CHILDREN.map((child) => (
+                  <li key={child.to}>
+                    <Link
+                      to={child.to}
+                      className={cn(
+                        'block rounded-md px-2 py-1.5 text-[13px] transition-colors',
+                        isFinanceChildActive(child.to)
+                          ? 'bg-accent font-medium text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                      )}
+                    >
+                      {child.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </nav>
       <div className="border-t p-2">
         <button
