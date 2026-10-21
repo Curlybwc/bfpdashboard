@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
@@ -48,12 +48,35 @@ function stateBadge(row: BankQueueRow) {
   if (row.review_state === 'edited') return <Badge variant="secondary">Edited</Badge>;
   switch (row.proposal_state) {
     case 'proposed':
-      return <Badge variant="secondary">Proposed</Badge>;
+      return (
+        <Badge variant="secondary" title="Ezzie matched a rule and proposed the account — ready for you to approve.">
+          Proposed
+        </Badge>
+      );
     case 'needs_review':
-      return <Badge variant="outline">Needs review</Badge>;
+      return (
+        <Badge
+          variant="outline"
+          title="Ezzie knows what this is and proposed the account, but something is unresolved — usually the property/class split needs statement evidence before it can be approved."
+        >
+          Needs review
+        </Badge>
+      );
     default:
-      return <Badge variant="outline">Unidentified</Badge>;
+      return (
+        <Badge
+          variant="outline"
+          title="Ezzie could not identify this transaction at all — no rule matched the bank text. It needs identification (an account number or a statement) before anything can be proposed."
+        >
+          Unidentified
+        </Badge>
+      );
   }
+}
+
+function usDate(d: string): string {
+  const [y, m, day] = d.split('-');
+  return `${Number(m)}/${Number(day)}/${y}`;
 }
 
 export default function FinanceBankQueue() {
@@ -179,6 +202,38 @@ export default function FinanceBankQueue() {
     };
   }, [rows]);
 
+  // Frozen top scrollbar (Jen, 2026-10-21): a second horizontal
+  // scrollbar pinned above the table, synced with the table's own
+  // scroll, so sideways scrolling never requires a trip to the bottom.
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const [scrollWidth, setScrollWidth] = useState(0);
+
+  useEffect(() => {
+    const wrap = tableWrapRef.current;
+    const top = topScrollRef.current;
+    if (!wrap || !top) return;
+    const scroller = wrap.querySelector(':scope > div');
+    if (!scroller) return;
+    const measure = () => setScrollWidth(scroller.scrollWidth);
+    measure();
+    const onTableScroll = () => {
+      if (top.scrollLeft !== scroller.scrollLeft) top.scrollLeft = scroller.scrollLeft;
+    };
+    const onTopScroll = () => {
+      if (scroller.scrollLeft !== top.scrollLeft) scroller.scrollLeft = top.scrollLeft;
+    };
+    scroller.addEventListener('scroll', onTableScroll, { passive: true });
+    top.addEventListener('scroll', onTopScroll, { passive: true });
+    const ro = new ResizeObserver(measure);
+    ro.observe(scroller);
+    return () => {
+      scroller.removeEventListener('scroll', onTableScroll);
+      top.removeEventListener('scroll', onTopScroll);
+      ro.disconnect();
+    };
+  }, [rows, loading]);
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 p-4">
       <PageHeader title="Classification Queue" backTo="/admin/accounting" />
@@ -255,20 +310,29 @@ export default function FinanceBankQueue() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
-            <Table className="[&_td]:px-2 [&_th]:px-2">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description (bank text)</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Proposed account</TableHead>
-                  <TableHead>Proposed class</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead />
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+            <div
+              ref={topScrollRef}
+              className="sticky top-2 z-10 mb-1 overflow-x-auto bg-card"
+              aria-hidden="true"
+            >
+              <div style={{ width: scrollWidth || undefined, height: 1 }} />
+            </div>
+            <div ref={tableWrapRef}>
+              <Table className="[&_td]:px-2 [&_th]:px-2">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description (bank text)</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Proposed account</TableHead>
+                    <TableHead>Proposed class</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead />
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {visibleRows.map((row) => {
                   const draft = drafts[row.id] ?? {
                     account: row.proposal_account ?? '',
@@ -277,8 +341,8 @@ export default function FinanceBankQueue() {
                   };
                   return (
                     <TableRow key={row.id}>
-                      <TableCell className="whitespace-nowrap text-xs">{row.txn_date}</TableCell>
-                      <TableCell className="max-w-[230px] break-words text-xs">{row.raw_name}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">{usDate(row.txn_date)}</TableCell>
+                      <TableCell className="break-words text-xs">{row.raw_name}</TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         {money(Number(row.signed_amount))}
                       </TableCell>
@@ -342,8 +406,10 @@ export default function FinanceBankQueue() {
                     </TableCell>
                   </TableRow>
                 )}
-              </TableBody>
-            </Table>
+                </TableBody>
+              </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
