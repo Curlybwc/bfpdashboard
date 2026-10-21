@@ -42,6 +42,7 @@ const QBDisconnected = lazy(() => import("./pages/QBDisconnected"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const CalendarView = lazy(() => import("./pages/CalendarView"));
 const Accounting = lazy(() => import("./pages/Accounting"));
+const FinanceBankQueue = lazy(() => import("./pages/FinanceBankQueue"));
 const AdminVendorMappings = lazy(() => import("./pages/AdminVendorMappings"));
 const AdminVendors = lazy(() => import("./pages/AdminVendors"));
 const AdminActivityLog = lazy(() => import("./pages/AdminActivityLog"));
@@ -139,6 +140,7 @@ const AppRoutes = () => {
         <Route path="/admin/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
         <Route path="/admin/calendar" element={<AdminGuard><CalendarView /></AdminGuard>} />
         <Route path="/admin/accounting" element={<AdminGuard><Accounting /></AdminGuard>} />
+        <Route path="/finance/bank-queue" element={<AdminGuard><FinanceBankQueue /></AdminGuard>} />
         <Route path="/admin/vendor-mappings" element={<AdminGuard><AdminVendorMappings /></AdminGuard>} />
         <Route path="/admin/vendors" element={<AdminGuard><AdminVendors /></AdminGuard>} />
         <Route path="/admin/activity" element={<AdminGuard><AdminActivityLog /></AdminGuard>} />
