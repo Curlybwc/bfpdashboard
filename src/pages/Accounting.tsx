@@ -100,7 +100,7 @@ const Accounting = () => {
 
   return (
     <div className="pb-20">
-      <PageHeader title="Accounting" backTo="/admin" />
+      <PageHeader title="Pay History" backTo="/payroll" />
       <div className="px-4 pt-2">
         <Link to="/finance/bank-queue" className="text-sm font-medium text-primary underline underline-offset-4">
           Bank Classification Queue — QuickBooks Write-Back Stage 1 (review only, nothing posts to QuickBooks)

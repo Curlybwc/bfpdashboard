@@ -147,7 +147,7 @@ export default function FinanceBankQueue() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 p-4">
-      <PageHeader title="Bank classification queue" backTo="/admin/accounting" />
+      <PageHeader title="Classification Queue" backTo="/admin/accounting" />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
