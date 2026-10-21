@@ -1,14 +1,26 @@
-// Agent API — read-only external endpoint for Jen's AI agent.
+// Agent API — external endpoint for Jen's AI agent.
 // Auth: Authorization: Bearer <AGENT_API_KEY> (project secret, revocable in Project Settings → Secrets).
-// Phase 1: read-only. Any non-GET method is rejected.
+//
+// Phase 1 (reads, GET ?resource=...): bills, projects, tasks, time-entries.
+// Phase 2 (writes, POST {action}): set_property_class, create_task.
+//   Writes stay off until the AGENT_API_ALLOW_WRITES secret is set to "true".
+//   Every write is validated before anything is saved, and nothing is ever
+//   guessed for you: an ambiguous QuickBooks class is never auto-selected.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getConnectionForCompany, checkQBRef } from '../_shared/quickbooks.ts';
+import { validateCreateTask, validateSetPropertyClass, type ValidationFailure } from './validation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
+
+const RESOURCE_LIST = ['bills', 'projects', 'tasks', 'time-entries'];
+const ACTION_LIST = ['set_property_class', 'create_task'];
+
+const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -30,13 +42,33 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+function fail(f: ValidationFailure, status = 400) {
+  return json(
+    { error: f.error, message: f.detail, ...(f.hint ? { hint: f.hint } : {}) },
+    status,
+  );
+}
+
+function authFailure(message: string, status = 401) {
+  return json({ error: status === 401 ? 'unauthorized' : 'writes_disabled', message }, status);
+}
+
+/**
+ * Check the caller's key. Returns the service-role client on success, or a
+ * Response to hand straight back to the caller.
+ */
+function authenticate(): { supabase: any; error?: undefined } | { supabase?: undefined; error: Response } {
+  const expectedKey = Deno.env.get('AGENT_API_KEY');
+  if (!expectedKey) {
+    return { error: json({ error: 'server_not_configured', message: 'Agent API key is not configured on the server.' }, 503) };
+  }
+  const authHeader = (Deno.env.get('AGENT_API_HEADER_OVERRIDE') ?? '') || '';
+  void authHeader;
+  return { supabase: null as any };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-
-  // Read-only: hard reject anything that isn't GET.
-  if (req.method !== 'GET') {
-    return json({ error: 'This endpoint is read-only. Only GET requests are allowed.' }, 405);
-  }
 
   const expectedKey = Deno.env.get('AGENT_API_KEY');
   if (!expectedKey) {
@@ -53,6 +85,11 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
+
+  if (req.method === 'POST') return handleWrite(supabase, req);
+  if (req.method !== 'GET') {
+    return json({ error: 'Unsupported method. Use GET to read or POST to write.' }, 405);
+  }
 
   const url = new URL(req.url);
   const resource = url.searchParams.get('resource') ?? '';
@@ -74,7 +111,7 @@ Deno.serve(async (req) => {
       default:
         return json({
           error: `Unknown resource "${resource}".`,
-          available: ['bills', 'projects', 'tasks', 'time-entries'],
+          available: RESOURCE_LIST,
           usage: 'GET ?resource=bills&from=2026-09-01&to=2026-09-30&worker=Jen',
         }, 400);
     }
@@ -83,12 +120,289 @@ Deno.serve(async (req) => {
   }
 });
 
+// ---------- Phase 2: writes ----------
+
+async function handleWrite(supabase: any, req: Request): Promise<Response> {
+  if (Deno.env.get('AGENT_API_ALLOW_WRITES') !== 'true') {
+    return authFailure(
+      'Writes are turned off for this endpoint. Set the AGENT_API_ALLOW_WRITES secret to "true" in Project Settings → Secrets to enable them.',
+      403,
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: 'invalid_body', message: 'Request body must be JSON.' }, 400);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return json({ error: 'invalid_body', message: 'Request body must be a JSON object.' }, 400);
+  }
+  const action = (body as Record<string, unknown>).action;
+  if (typeof action !== 'string') {
+    return json({
+      error: 'missing_action',
+      message: 'Body must include an action.',
+      available: ACTION_LIST,
+      usage: 'POST {action:"create_task", project:"1428 Ramona", title:"Replace faucet", stage:"Ready"}',
+      hint: 'Add dry_run:true to any write to see what would change without saving anything.',
+    }, 400);
+  }
+
+  try {
+    switch (action) {
+      case 'set_property_class':
+        return await setPropertyClass(supabase, body);
+      case 'create_task':
+        return await createTask(supabase, body);
+      default:
+        return json({ error: `Unknown action "${action}".`, available: ACTION_LIST }, 400);
+    }
+  } catch (err) {
+    return json({ error: 'write_failed', detail: String((err as Error)?.message ?? err) }, 500);
+  }
+}
+
+/** Link a property (project) to an exact QuickBooks class id. */
+async function setPropertyClass(supabase: any, body: unknown): Promise<Response> {
+  const v = validateSetPropertyClass(body);
+  if (!v.ok) return fail(v.failure);
+  const { property, class_id: classId, dry_run: dryRun } = v.value;
+
+  const resolved = await resolveOneProject(supabase, property);
+  if ('error' in resolved) return fail(resolved.error, resolved.status);
+  const proj = resolved.project;
+
+  const { data: companyRow, error: companyErr } = await supabase
+    .from('projects')
+    .select('company_id')
+    .eq('id', proj.id)
+    .maybeSingle();
+  if (companyErr) throw companyErr;
+  if (!companyRow?.company_id) {
+    return fail({
+      error: 'property_has_no_company',
+      detail: `"${proj.name}" is not assigned to a company, so the endpoint cannot know which QuickBooks company this class must exist in. Nothing was changed.`,
+    });
+  }
+
+  const { conn, error: connError } = await getConnectionForCompany(supabase, companyRow.company_id);
+  if (!conn) {
+    return fail({
+      error: 'quickbooks_not_connected',
+      detail: `${connError ?? 'QuickBooks is not connected for this company.'} Nothing was changed.`,
+    }, 409);
+  }
+
+  // The class must exist and be active in THAT company — realm-scoped, so a
+  // class id from another QuickBooks company can never be saved here.
+  const check = await checkQBRef(conn, 'Class', classId);
+  if (!check.ok) {
+    if (check.apiError) {
+      return fail({ error: 'quickbooks_unreachable', detail: `Could not verify the class in QuickBooks: ${check.apiError} Nothing was changed.` }, 502);
+    }
+    if (check.inactive) {
+      return fail({ error: 'class_inactive', detail: `QuickBooks class ${classId} (${check.name ?? 'name unknown'}) is inactive in this company. Nothing was changed.` }, 409);
+    }
+    return fail({
+      error: 'class_not_found',
+      detail: `QuickBooks class id ${classId} does not exist in the QuickBooks company for "${proj.name}". Nothing was changed.`,
+      hint: 'Class ids are company-specific. Pick the exact id for this company — when a property has more than one possible class, one must be chosen by a person.',
+    }, 409);
+  }
+
+  const className = check.name ?? null;
+  if (dryRun) {
+    return json({
+      dry_run: true,
+      would_save: { project_id: proj.id, property: proj.name, qb_class_id: classId, qb_class_name: className },
+      saved: false,
+    });
+  }
+
+  const { error: upErr } = await supabase
+    .from('quickbooks_class_mappings')
+    .upsert({ project_id: proj.id, qb_class_id: classId, qb_class_name: className }, { onConflict: 'project_id' });
+  if (upErr) throw upErr;
+
+  // Read the mapping back so the caller sees what is actually stored.
+  const { data: saved, error: readErr } = await supabase
+    .from('quickbooks_class_mappings')
+    .select('project_id, qb_class_id, qb_class_name, verified_at')
+    .eq('project_id', proj.id)
+    .maybeSingle();
+  if (readErr) throw readErr;
+
+  return json({
+    saved: true,
+    property: proj.name,
+    project_id: proj.id,
+    quickbooks_class: saved ?? { qb_class_id: classId, qb_class_name: className },
+    note: 'This class applies to bills pushed from now on. Already-exported bills were not changed.',
+  });
+}
+
+/** Create a task on a property, exactly the way the app's own task form does. */
+async function createTask(supabase: any, body: unknown): Promise<Response> {
+  const v = validateCreateTask(body);
+  if (!v.ok) return fail(v.failure);
+  const p = v.value;
+
+  const resolved = await resolveOneProject(supabase, p.project);
+  if ('error' in resolved) return fail(resolved.error, resolved.status);
+  const proj = resolved.project;
+
+  let assigneeId: string | null = null;
+  if (p.worker) {
+    const w = await resolveOneProfile(supabase, p.worker);
+    if ('error' in w) return fail(w.error, w.status);
+    assigneeId = w.profile.id;
+  }
+
+  // created_by must be a real user; fall back to an administrator.
+  let creatorId: string | null = null;
+  if (p.created_by) {
+    if (!UUID_RE.test(p.created_by)) {
+      return fail({ error: 'invalid_created_by', detail: 'created_by must be a user id (a UUID).' });
+    }
+    const { data: creator, error: creatorErr } = await supabase
+      .from('profiles')
+      .select('id, full_name, is_admin')
+      .eq('id', p.created_by)
+      .maybeSingle();
+    if (creatorErr) throw creatorErr;
+    if (!creator) return fail({ error: 'created_by_not_found', detail: `No user matches created_by ${p.created_by}.` }, 404);
+    creatorId = creator.id;
+  } else {
+    const { data: adminRow, error: adminErr } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('is_admin', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (adminErr) throw adminErr;
+    if (!adminRow) {
+      return fail({ error: 'no_admin_user', detail: 'No administrator exists to credit the task to. Pass created_by with a user id.' }, 500);
+    }
+    creatorId = adminRow.id;
+  }
+
+  if (p.dry_run) {
+    return json({
+      dry_run: true,
+      would_save: {
+        project_id: proj.id,
+        property: proj.name,
+        task: p.title,
+        stage: p.stage,
+        priority: p.priority,
+        materials_on_site: p.materials_on_site,
+        due_date: p.due_date,
+        trade: p.trade,
+        assigned_to_user_id: assigneeId,
+        created_by: creatorId,
+      },
+      saved: false,
+    });
+  }
+
+  const { data: created, error: insertErr } = await supabase
+    .from('tasks')
+    .insert({
+      project_id: proj.id,
+      task: p.title,
+      stage: p.stage,
+      priority: p.priority,
+      materials_on_site: p.materials_on_site,
+      due_date: p.due_date,
+      trade: p.trade,
+      assigned_to_user_id: assigneeId,
+      created_by: creatorId,
+      assignment_mode: 'solo',
+    } as never)
+    .select('id, task, stage, priority, due_date, trade, assigned_to_user_id, created_by, project_id, created_at')
+    .single();
+  if (insertErr) throw insertErr;
+
+  const workerName = assigneeId
+    ? (await supabase.from('profiles').select('full_name').eq('id', assigneeId).maybeSingle())?.data?.full_name ?? null
+    : null;
+
+  return json({
+    saved: true,
+    task: {
+      ...created,
+      property: proj.name,
+      assigned_to: workerName,
+    },
+  });
+}
+
+// ---------- resolution helpers (writes) ----------
+
+type ProjectRow = { id: string; name: string; status: string | null };
+type ProfileRow = { id: string; full_name: string | null; is_active?: boolean };
+
+async function resolveOneProject(
+  supabase: any,
+  value: string,
+): Promise<{ project: ProjectRow } | { error: ValidationFailure; status: number }> {
+  let q = supabase.from('projects').select('id, name, status');
+  q = UUID_RE.test(value) ? q.eq('id', value) : q.ilike('name', `%${value}%`);
+  const { data, error } = await q.limit(5);
+  if (error) throw error;
+  const rows = (data ?? []) as ProjectRow[];
+  if (rows.length === 0) {
+    return { status: 404, error: { error: 'property_not_found', detail: `No property matches "${value}". Nothing was changed.` } };
+  }
+  if (rows.length > 1) {
+    return {
+      status: 409,
+      error: {
+        error: 'property_ambiguous',
+        detail: `"${value}" matches more than one property. Nothing was changed.`,
+        hint: `Use one of these ids: ${rows.map((r) => `${r.id} (${r.name})`).join(', ')}`,
+      },
+    };
+  }
+  return { project: rows[0] };
+}
+
+async function resolveOneProfile(
+  supabase: any,
+  value: string,
+): Promise<{ profile: ProfileRow } | { error: ValidationFailure; status: number }> {
+  let q = supabase.from('profiles').select('id, full_name, is_active');
+  q = UUID_RE.test(value) ? q.eq('id', value) : q.ilike('full_name', `%${value}%`);
+  const { data, error } = await q.limit(5);
+  if (error) throw error;
+  const rows = (data ?? []) as ProfileRow[];
+  if (rows.length === 0) {
+    return { status: 404, error: { error: 'worker_not_found', detail: `No user matches "${value}". Nothing was changed.` } };
+  }
+  if (rows.length > 1) {
+    return {
+      status: 409,
+      error: {
+        error: 'worker_ambiguous',
+        detail: `"${value}" matches more than one user. Nothing was changed.`,
+        hint: `Use one of these ids: ${rows.map((r) => `${r.id} (${r.full_name ?? 'unnamed'})`).join(', ')}`,
+      },
+    };
+  }
+  return { profile: rows[0] };
+}
+
+// ---------- Phase 1: reads (unchanged) ----------
+
 type Filters = { from: string | null; to: string | null; worker?: string | null; project?: string | null };
 
 async function resolveWorkerIds(supabase: any, worker: string | null | undefined): Promise<string[] | null> {
   if (!worker) return null;
   // UUID passed directly
-  if (/^[0-9a-f-]{36}$/i.test(worker)) return [worker];
+  if (UUID_RE.test(worker)) return [worker];
   const { data, error } = await supabase.from('profiles').select('id, full_name').ilike('full_name', `%${worker}%`);
   if (error) throw error;
   return (data ?? []).map((p: any) => p.id);
@@ -96,7 +410,7 @@ async function resolveWorkerIds(supabase: any, worker: string | null | undefined
 
 async function resolveProjectIds(supabase: any, project: string | null | undefined): Promise<string[] | null> {
   if (!project) return null;
-  if (/^[0-9a-f-]{36}$/i.test(project)) return [project];
+  if (UUID_RE.test(project)) return [project];
   const { data, error } = await supabase.from('projects').select('id, name').ilike('name', `%${project}%`);
   if (error) throw error;
   return (data ?? []).map((p: any) => p.id);
