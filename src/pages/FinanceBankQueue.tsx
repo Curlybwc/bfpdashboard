@@ -251,7 +251,7 @@ export default function FinanceBankQueue() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
-            <Table>
+            <Table className="[&_td]:px-2 [&_th]:px-2">
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -259,7 +259,7 @@ export default function FinanceBankQueue() {
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Proposed account</TableHead>
                   <TableHead>Proposed class</TableHead>
-                  <TableHead>Basis</TableHead>
+                  <TableHead>Basis (why)</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead />
                 </TableRow>
@@ -272,8 +272,8 @@ export default function FinanceBankQueue() {
                   };
                   return (
                     <TableRow key={row.id}>
-                      <TableCell className="whitespace-nowrap">{row.txn_date}</TableCell>
-                      <TableCell className="max-w-xs break-words">{row.raw_name}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">{row.txn_date}</TableCell>
+                      <TableCell className="max-w-[230px] break-words text-xs">{row.raw_name}</TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         {money(Number(row.signed_amount))}
                       </TableCell>
@@ -284,7 +284,7 @@ export default function FinanceBankQueue() {
                             setDrafts((d) => ({ ...d, [row.id]: { ...draft, account: e.target.value } }))
                           }
                           placeholder="—"
-                          className="w-52"
+                          className="h-8 w-40 text-xs"
                         />
                       </TableCell>
                       <TableCell>
@@ -294,11 +294,14 @@ export default function FinanceBankQueue() {
                             setDrafts((d) => ({ ...d, [row.id]: { ...draft, klass: e.target.value } }))
                           }
                           placeholder="—"
-                          className="w-40"
+                          className="h-8 w-32 text-xs"
                         />
                       </TableCell>
-                      <TableCell className="max-w-sm text-xs text-muted-foreground">
-                        {row.proposal_basis ?? 'No rule matched yet.'}
+                      <TableCell className="max-w-[210px] break-words text-xs text-muted-foreground">
+                        {row.proposal_basis ??
+                          (row.proposal_state === 'unidentified'
+                            ? 'No rule matched yet — needs an account number or statement to identify.'
+                            : 'No rule matched yet.')}
                       </TableCell>
                       <TableCell>{stateBadge(row)}</TableCell>
                       <TableCell className="whitespace-nowrap">
