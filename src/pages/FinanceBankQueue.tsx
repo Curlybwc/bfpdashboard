@@ -59,6 +59,7 @@ export default function FinanceBankQueue() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState<string>('');
   const [rows, setRows] = useState<BankQueueRow[]>([]);
+  const [accountTab, setAccountTab] = useState<string>('all');
   const [drafts, setDrafts] = useState<Record<string, { account: string; klass: string }>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -86,6 +87,7 @@ export default function FinanceBankQueue() {
     if (!companyId) return;
     setLoading(true);
     setError(null);
+    setAccountTab('all');
     const { data, error: rpcError } = await (supabase as any).rpc('bookkeeping_bank_queue_list', {
       _company_id: companyId,
     });
@@ -133,6 +135,34 @@ export default function FinanceBankQueue() {
     await load();
     if (approved > 0) toast.success(`Approved ${approved} rows — recorded in Ezzie only`);
   };
+
+  // Per-account view, mirroring the Open Items Register's tabs:
+  // account × direction (Jen, 2026-10-21 — transactions are seen per
+  // account in Ezzie the same way as in the register).
+  const accountTabs = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; count: number }>();
+    for (const r of rows) {
+      const dir = Number(r.signed_amount) >= 0 ? 'Income' : 'Expenses';
+      const key = `${r.account_display}|${dir}`;
+      const entry = map.get(key) ?? {
+        key,
+        label: `${r.account_display} · ${dir}`,
+        count: 0,
+      };
+      entry.count += 1;
+      map.set(key, entry);
+    }
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [rows]);
+
+  const visibleRows = useMemo(() => {
+    if (accountTab === 'all') return rows;
+    return rows.filter(
+      (r) =>
+        `${r.account_display}|${Number(r.signed_amount) >= 0 ? 'Income' : 'Expenses'}` ===
+        accountTab,
+    );
+  }, [rows, accountTab]);
 
   const counts = useMemo(() => {
     return {
@@ -184,6 +214,39 @@ export default function FinanceBankQueue() {
             review · {counts.unidentified} unidentified · {counts.approved} approved · net{' '}
             {money(counts.net)}
           </p>
+          {accountTabs.length > 1 && (
+            <div className="mb-3 flex flex-wrap gap-1" role="tablist" aria-label="Accounts">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={accountTab === 'all'}
+                onClick={() => setAccountTab('all')}
+                className={
+                  accountTab === 'all'
+                    ? 'rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground'
+                    : 'rounded-full border px-3 py-1 text-xs font-medium hover:bg-accent'
+                }
+              >
+                All accounts · {rows.length}
+              </button>
+              {accountTabs.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={accountTab === t.key}
+                  onClick={() => setAccountTab(t.key)}
+                  className={
+                    accountTab === t.key
+                      ? 'rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground'
+                      : 'rounded-full border px-3 py-1 text-xs font-medium hover:bg-accent'
+                  }
+                >
+                  {t.label} · {t.count}
+                </button>
+              ))}
+            </div>
+          )}
           {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
@@ -202,7 +265,7 @@ export default function FinanceBankQueue() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => {
+                {visibleRows.map((row) => {
                   const draft = drafts[row.id] ?? {
                     account: row.proposal_account ?? '',
                     klass: row.proposal_class ?? '',
@@ -258,10 +321,12 @@ export default function FinanceBankQueue() {
                     </TableRow>
                   );
                 })}
-                {rows.length === 0 && (
+                {visibleRows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} className="text-sm text-muted-foreground">
-                      No bank transactions loaded for this company yet.
+                      {rows.length === 0
+                        ? 'No bank transactions loaded for this company yet.'
+                        : 'No transactions in this account view.'}
                     </TableCell>
                   </TableRow>
                 )}
