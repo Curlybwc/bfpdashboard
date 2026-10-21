@@ -53,20 +53,6 @@ function authFailure(message: string, status = 401) {
   return json({ error: status === 401 ? 'unauthorized' : 'writes_disabled', message }, status);
 }
 
-/**
- * Check the caller's key. Returns the service-role client on success, or a
- * Response to hand straight back to the caller.
- */
-function authenticate(): { supabase: any; error?: undefined } | { supabase?: undefined; error: Response } {
-  const expectedKey = Deno.env.get('AGENT_API_KEY');
-  if (!expectedKey) {
-    return { error: json({ error: 'server_not_configured', message: 'Agent API key is not configured on the server.' }, 503) };
-  }
-  const authHeader = (Deno.env.get('AGENT_API_HEADER_OVERRIDE') ?? '') || '';
-  void authHeader;
-  return { supabase: null as any };
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
