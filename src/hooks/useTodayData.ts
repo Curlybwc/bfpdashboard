@@ -224,7 +224,7 @@ async function fetchBlockedAndReview(
 
 /** Phase 5: enrichment — projects, parents, assignees, photos, crew counts */
 async function fetchEnrichment(allTasks: any[], userId: string) {
-  const projectIds = [...new Set(allTasks.map(t => t.project_id))];
+  const projectIds = [...new Set(allTasks.map(t => t.project_id).filter((id): id is string => !!id))];
   const parentIds = [...new Set(allTasks.map(t => t.parent_task_id).filter(Boolean))];
   const assigneeIds = [...new Set(
     allTasks.map(t => t.assigned_to_user_id).filter((id): id is string => !!id && id !== userId),

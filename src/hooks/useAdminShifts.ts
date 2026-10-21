@@ -33,9 +33,9 @@ export function useAdminShifts(filters: AdminShiftsFilters, enabled: boolean) {
       const shifts = (data ?? []) as Shift[];
 
       // Fetch profile names, project names, and paid shift IDs in parallel
-      const userIds = [...new Set(shifts.map((s) => s.user_id))];
-      const projectIds = [...new Set(shifts.map((s) => s.project_id))];
-      const shiftIds = shifts.map((s) => s.id);
+      const userIds = [...new Set(shifts.map((s) => s.user_id).filter((id): id is string => !!id))];
+      const projectIds = [...new Set(shifts.map((s) => s.project_id).filter((id): id is string => !!id))];
+      const shiftIds = shifts.map((s) => s.id).filter((id): id is string => !!id);
 
       const [profilesRes, projectsRes, paidBatchRes, paidPaymentRes] = await Promise.all([
         userIds.length > 0
@@ -51,6 +51,11 @@ export function useAdminShifts(filters: AdminShiftsFilters, enabled: boolean) {
           ? supabase.from('worker_payment_shifts').select('shift_id').in('shift_id', shiftIds)
           : Promise.resolve({ data: [] as { shift_id: string }[], error: null }),
       ]);
+
+      if (profilesRes.error) throw profilesRes.error;
+      if (projectsRes.error) throw projectsRes.error;
+      if (paidBatchRes.error) throw paidBatchRes.error;
+      if (paidPaymentRes.error) throw paidPaymentRes.error;
 
       const profileMap: Record<string, string> = {};
       (profilesRes.data ?? []).forEach((p) => { profileMap[p.id] = p.full_name || 'Unknown'; });
