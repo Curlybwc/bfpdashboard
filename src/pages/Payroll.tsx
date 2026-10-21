@@ -22,7 +22,7 @@ function useWorkerFinancialSummary(workerId: string | undefined) {
         .from('shifts')
         .select('id, total_hours, hourly_rate_snapshot, is_flat_rate, flat_rate_amount')
         .eq('user_id', workerId)
-        .not('total_hours', 'is', null);
+        .or('total_hours.not.is.null,is_flat_rate.eq.true');
       if (shiftsErr) throw shiftsErr;
 
       const allShifts = shifts ?? [];
