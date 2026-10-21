@@ -383,7 +383,7 @@ async function resolveOneProfile(
 
 // ---------- Phase 1: reads (unchanged) ----------
 
-type Filters = { from: string | null; to: string | null; worker?: string | null; project?: string | null };
+type Filters = { from?: string | null; to?: string | null; worker?: string | null; project?: string | null };
 
 async function resolveWorkerIds(supabase: any, worker: string | null | undefined): Promise<string[] | null> {
   if (!worker) return null;
@@ -438,7 +438,9 @@ async function getBills(supabase: any, f: Filters) {
 
   const workerName = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p.full_name ?? 'Unknown']));
   const projectName = new Map((projectsRes.data ?? []).map((p: any) => [p.id, p.name]));
-  const classByProject = new Map((classRes.data ?? []).map((c: any) => [c.project_id, { id: c.qb_class_id, name: c.qb_class_name }]));
+  const classByProject = new Map<string, { id: string; name: string | null }>(
+    (classRes.data ?? []).map((c: any) => [c.project_id as string, { id: c.qb_class_id as string, name: c.qb_class_name as string | null }]),
+  );
 
   const bills = [
     ...(batchRes.data ?? []).map((b: any) => ({

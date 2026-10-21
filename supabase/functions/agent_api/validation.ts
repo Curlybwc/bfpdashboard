@@ -20,7 +20,7 @@ function str(v: unknown, max: number): string | null {
   return t.length > 0 && t.length <= max ? t : null;
 }
 
-function boolOrUndefined(v: unknown): boolean | undefined {
+function boolOrUndefined(v: unknown): boolean | string | undefined {
   if (v === undefined || v === null) return undefined;
   if (v === true) return true;
   if (v === false) return false;
