@@ -34,6 +34,7 @@ type BankQueueRow = {
   review_state: 'unreviewed' | 'approved' | 'edited';
   account_display: string;
   source: string;
+  review_notes: string | null;
 };
 
 type Company = { id: string; name: string };
@@ -60,7 +61,9 @@ export default function FinanceBankQueue() {
   const [companyId, setCompanyId] = useState<string>('');
   const [rows, setRows] = useState<BankQueueRow[]>([]);
   const [accountTab, setAccountTab] = useState<string>('all');
-  const [drafts, setDrafts] = useState<Record<string, { account: string; klass: string }>>({});
+  const [drafts, setDrafts] = useState<
+    Record<string, { account: string; klass: string; notes: string }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +116,7 @@ export default function FinanceBankQueue() {
       _account: draft ? draft.account : null,
       _class: draft ? draft.klass : null,
       _approve: approve,
+      _notes: draft ? draft.notes : null,
     });
     setSavingId(null);
     if (rpcError) {
@@ -179,7 +183,7 @@ export default function FinanceBankQueue() {
     <div className="mx-auto w-full max-w-7xl space-y-4 p-4">
       <PageHeader title="Classification Queue" backTo="/admin/accounting" />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="flex flex-col gap-3">
           <div>
             <CardTitle>Stage 1 — review only</CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -187,7 +191,7 @@ export default function FinanceBankQueue() {
               Stage 1. Splits and classes come from statement evidence, never from the amount alone.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={companyId} onValueChange={setCompanyId}>
               <SelectTrigger className="w-64">
                 <SelectValue placeholder="Company" />
@@ -251,7 +255,7 @@ export default function FinanceBankQueue() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
-            <Table>
+            <Table className="[&_td]:px-2 [&_th]:px-2">
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -259,9 +263,9 @@ export default function FinanceBankQueue() {
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Proposed account</TableHead>
                   <TableHead>Proposed class</TableHead>
-                  <TableHead>Basis</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead />
+                  <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -269,11 +273,12 @@ export default function FinanceBankQueue() {
                   const draft = drafts[row.id] ?? {
                     account: row.proposal_account ?? '',
                     klass: row.proposal_class ?? '',
+                    notes: row.review_notes ?? '',
                   };
                   return (
                     <TableRow key={row.id}>
-                      <TableCell className="whitespace-nowrap">{row.txn_date}</TableCell>
-                      <TableCell className="max-w-xs break-words">{row.raw_name}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">{row.txn_date}</TableCell>
+                      <TableCell className="max-w-[230px] break-words text-xs">{row.raw_name}</TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         {money(Number(row.signed_amount))}
                       </TableCell>
@@ -284,7 +289,7 @@ export default function FinanceBankQueue() {
                             setDrafts((d) => ({ ...d, [row.id]: { ...draft, account: e.target.value } }))
                           }
                           placeholder="—"
-                          className="w-52"
+                          className="h-8 w-40 text-xs"
                         />
                       </TableCell>
                       <TableCell>
@@ -294,11 +299,8 @@ export default function FinanceBankQueue() {
                             setDrafts((d) => ({ ...d, [row.id]: { ...draft, klass: e.target.value } }))
                           }
                           placeholder="—"
-                          className="w-40"
+                          className="h-8 w-32 text-xs"
                         />
-                      </TableCell>
-                      <TableCell className="max-w-sm text-xs text-muted-foreground">
-                        {row.proposal_basis ?? 'No rule matched yet.'}
                       </TableCell>
                       <TableCell>{stateBadge(row)}</TableCell>
                       <TableCell className="whitespace-nowrap">
@@ -317,6 +319,16 @@ export default function FinanceBankQueue() {
                         >
                           Approve
                         </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={draft.notes}
+                          onChange={(e) =>
+                            setDrafts((d) => ({ ...d, [row.id]: { ...draft, notes: e.target.value } }))
+                          }
+                          placeholder="Optional — goes to the QuickBooks memo"
+                          className="h-8 w-56 text-xs"
+                        />
                       </TableCell>
                     </TableRow>
                   );
