@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { format, startOfYear, startOfMonth } from 'date-fns';
 import { CalendarIcon, Search, X, Pencil } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
@@ -100,6 +101,11 @@ const Accounting = () => {
   return (
     <div className="pb-20">
       <PageHeader title="Accounting" backTo="/admin" />
+      <div className="px-4 pt-2">
+        <Link to="/finance/bank-queue" className="text-sm font-medium text-primary underline underline-offset-4">
+          Bank Classification Queue — QuickBooks Write-Back Stage 1 (review only, nothing posts to QuickBooks)
+        </Link>
+      </div>
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-muted-foreground">Payment Ledger</h2>
