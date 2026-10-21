@@ -44,6 +44,7 @@ const CalendarView = lazy(() => import("./pages/CalendarView"));
 const Accounting = lazy(() => import("./pages/Accounting"));
 const FinanceBankQueue = lazy(() => import("./pages/FinanceBankQueue"));
 const AdminVendorMappings = lazy(() => import("./pages/AdminVendorMappings"));
+const AdminClassificationLearning = lazy(() => import("./pages/AdminClassificationLearning"));
 const AdminVendors = lazy(() => import("./pages/AdminVendors"));
 const AdminActivityLog = lazy(() => import("./pages/AdminActivityLog"));
 const AdminBulkCandidates = lazy(() => import("./pages/AdminBulkCandidates"));
@@ -142,6 +143,7 @@ const AppRoutes = () => {
         <Route path="/admin/accounting" element={<AdminGuard><Accounting /></AdminGuard>} />
         <Route path="/finance/bank-queue" element={<AdminGuard><FinanceBankQueue /></AdminGuard>} />
         <Route path="/admin/vendor-mappings" element={<AdminGuard><AdminVendorMappings /></AdminGuard>} />
+        <Route path="/admin/classification-rules" element={<AdminGuard><AdminClassificationLearning /></AdminGuard>} />
         <Route path="/admin/vendors" element={<AdminGuard><AdminVendors /></AdminGuard>} />
         <Route path="/admin/activity" element={<AdminGuard><AdminActivityLog /></AdminGuard>} />
         <Route path="/admin/bulk-candidates" element={<AdminGuard><AdminBulkCandidates /></AdminGuard>} />

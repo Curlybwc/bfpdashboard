@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCheck, RefreshCw } from 'lucide-react';
+import { CheckCheck, GraduationCap, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -79,6 +79,25 @@ function usDate(d: string): string {
   return `${Number(m)}/${Number(day)}/${y}`;
 }
 
+// Learning loop v1 (Jen, 2026-10-21): when Jen classifies a row she can
+// teach Ezzie a standing rule — bank text containing the pattern gets
+// this account/class proposed automatically from then on. The pattern
+// is derived from the bank text (first distinctive word) and stays
+// editable before saving, because a wrong pattern teaches wrong.
+const PATTERN_STOPWORDS = new Set([
+  'BILL', 'PAID', 'ACH', 'PMT', 'DEBIT', 'CREDIT', 'CONF', 'PURCHASE',
+  'PAYROLL', 'PPD', 'CCD', 'ENTRY', 'BANK', 'WITHDRAWAL', 'DEPOSIT',
+]);
+
+function derivePattern(raw: string): string {
+  const tokens = raw
+    .toUpperCase()
+    .replace(/[^A-Z ]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length >= 4 && !PATTERN_STOPWORDS.has(t));
+  return tokens[0] ?? '';
+}
+
 export default function FinanceBankQueue() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState<string>('');
@@ -87,6 +106,8 @@ export default function FinanceBankQueue() {
   const [drafts, setDrafts] = useState<
     Record<string, { account: string; klass: string; notes: string }>
   >({});
+  const [teach, setTeach] = useState<Record<string, { armed: boolean; pattern: string }>>({});
+  const [applying, setApplying] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -147,10 +168,55 @@ export default function FinanceBankQueue() {
       return false;
     }
     if (!opts?.quiet) {
+      // Teach (learning loop v1): if Jen armed Teach on this row, save a
+      // standing rule from this classification, then let the reload show
+      // every other row the new rule just resolved.
+      const t = teach[row.id];
+      if (t?.armed) {
+        const account = (draft?.account ?? row.proposal_account ?? '').trim();
+        const klass = (draft?.klass ?? row.proposal_class ?? '').trim();
+        const { data: teachData, error: teachError } = await (supabase as any).rpc(
+          'bookkeeping_rule_teach',
+          {
+            _txn_id: row.id,
+            _pattern: t.pattern,
+            _account: account,
+            _class: klass || null,
+          },
+        );
+        if (teachError) {
+          toast.error(`Saved, but the rule was not taught: ${teachError.message}`);
+        } else {
+          const applied = (teachData as any)?.apply ?? {};
+          toast.success(
+            `Taught Ezzie: “${t.pattern.toUpperCase()}” → ${account}${klass ? ` / ${klass}` : ''} — ${applied.rules_that_fired ?? 0} rule(s) fired, ${applied.roster_applied_rows ?? 0} row(s) from the property roster.`,
+          );
+        }
+        setTeach((prev) => ({ ...prev, [row.id]: { armed: false, pattern: t.pattern } }));
+      }
       toast.success(approve ? 'Approved — recorded in Ezzie only' : 'Saved');
       await load();
     }
     return true;
+  };
+
+  // Re-run everything Ezzie has learned (confirmed property roster,
+  // then taught rules) over the rows it still cannot identify.
+  const applyLearning = async () => {
+    if (!companyId) return;
+    setApplying(true);
+    const { data, error: rpcError } = await (supabase as any).rpc('bookkeeping_classify_apply', {
+      _company_id: companyId,
+    });
+    setApplying(false);
+    if (rpcError) {
+      toast.error(rpcError.message);
+      return;
+    }
+    toast.success(
+      `Learning applied: ${(data as any)?.roster_applied_rows ?? 0} row(s) from the property roster, ${(data as any)?.rules_that_fired ?? 0} rule(s) fired.`,
+    );
+    await load();
   };
 
   const approveAllProposed = async () => {
@@ -244,6 +310,8 @@ export default function FinanceBankQueue() {
             <p className="text-sm text-muted-foreground">
               Approving a row records your review in Ezzie. Nothing is written to QuickBooks in
               Stage 1. Splits and classes come from statement evidence, never from the amount alone.
+              Use Teach on a row to turn its classification into a standing rule Ezzie applies on
+              its own next time.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -259,6 +327,14 @@ export default function FinanceBankQueue() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void applyLearning()}
+              disabled={applying || loading || !companyId}
+            >
+              <Sparkles className="mr-1 h-4 w-4" /> {applying ? 'Applying…' : 'Apply learning'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
               <RefreshCw className="mr-1 h-4 w-4" /> Refresh
             </Button>
@@ -383,6 +459,41 @@ export default function FinanceBankQueue() {
                         >
                           Approve
                         </Button>
+                        <div className="mt-1">
+                          <Button
+                            variant={teach[row.id]?.armed ? 'default' : 'ghost'}
+                            size="sm"
+                            disabled={savingId === row.id || row.review_state === 'approved'}
+                            title="Teach Ezzie: whenever the bank text contains this pattern, propose this account (and class) automatically."
+                            onClick={() =>
+                              setTeach((prev) => {
+                                const cur = prev[row.id];
+                                return {
+                                  ...prev,
+                                  [row.id]: {
+                                    armed: !cur?.armed,
+                                    pattern: cur?.pattern || derivePattern(row.raw_name),
+                                  },
+                                };
+                              })
+                            }
+                          >
+                            <GraduationCap className="mr-1 h-4 w-4" /> Teach
+                          </Button>
+                          {teach[row.id]?.armed && (
+                            <Input
+                              value={teach[row.id]?.pattern ?? ''}
+                              onChange={(e) =>
+                                setTeach((prev) => ({
+                                  ...prev,
+                                  [row.id]: { armed: true, pattern: e.target.value },
+                                }))
+                              }
+                              placeholder="Bank text pattern"
+                              className="mt-1 h-8 w-44 text-xs"
+                            />
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input
