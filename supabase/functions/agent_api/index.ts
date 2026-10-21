@@ -495,7 +495,7 @@ async function getTasks(supabase: any, f: Filters) {
   const projectIds = await resolveProjectIds(supabase, f.project);
   let q = supabase
     .from('tasks')
-    .select('id, task, stage, priority, project_id, assigned_to_user_id, due_date, is_blocked, is_flat_rate, flat_rate_amount, actual_total_cost, created_at')
+    .select('id, task, stage, priority, project_id, assigned_to_user_id, due_date, is_blocked, actual_total_cost, created_at')
     .order('created_at', { ascending: false })
     .limit(500);
   if (projectIds) q = q.in('project_id', projectIds);
