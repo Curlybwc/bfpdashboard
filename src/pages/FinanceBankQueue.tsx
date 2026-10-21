@@ -255,17 +255,17 @@ export default function FinanceBankQueue() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
-            <Table className="[&_td]:px-2 [&_th]:px-2">
+            <Table className="w-full table-fixed [&_td]:px-2 [&_th]:px-2">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description (bank text)</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Proposed account</TableHead>
-                  <TableHead>Proposed class</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead />
-                  <TableHead>Notes</TableHead>
+                  <TableHead className="w-[8%]">Date</TableHead>
+                  <TableHead className="w-[19%]">Description (bank text)</TableHead>
+                  <TableHead className="w-[8%] text-right">Amount</TableHead>
+                  <TableHead className="w-[15%]">Proposed account</TableHead>
+                  <TableHead className="w-[12%]">Proposed class</TableHead>
+                  <TableHead className="w-[9%]">Status</TableHead>
+                  <TableHead className="w-[13%]" />
+                  <TableHead className="w-[16%]">Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -278,7 +278,7 @@ export default function FinanceBankQueue() {
                   return (
                     <TableRow key={row.id}>
                       <TableCell className="whitespace-nowrap text-xs">{row.txn_date}</TableCell>
-                      <TableCell className="max-w-[230px] break-words text-xs">{row.raw_name}</TableCell>
+                      <TableCell className="break-words text-xs">{row.raw_name}</TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         {money(Number(row.signed_amount))}
                       </TableCell>
@@ -289,7 +289,7 @@ export default function FinanceBankQueue() {
                             setDrafts((d) => ({ ...d, [row.id]: { ...draft, account: e.target.value } }))
                           }
                           placeholder="—"
-                          className="h-8 w-40 text-xs"
+                          className="h-8 w-full text-xs"
                         />
                       </TableCell>
                       <TableCell>
@@ -299,7 +299,7 @@ export default function FinanceBankQueue() {
                             setDrafts((d) => ({ ...d, [row.id]: { ...draft, klass: e.target.value } }))
                           }
                           placeholder="—"
-                          className="h-8 w-32 text-xs"
+                          className="h-8 w-full text-xs"
                         />
                       </TableCell>
                       <TableCell>{stateBadge(row)}</TableCell>
@@ -327,7 +327,7 @@ export default function FinanceBankQueue() {
                             setDrafts((d) => ({ ...d, [row.id]: { ...draft, notes: e.target.value } }))
                           }
                           placeholder="Optional — goes to the QuickBooks memo"
-                          className="h-8 w-56 text-xs"
+                          className="h-8 w-full text-xs"
                         />
                       </TableCell>
                     </TableRow>
