@@ -165,8 +165,8 @@ export async function handleNewWrite(db:any,b:Record<string,unknown>):Promise<an
         if(linked?.length>1) throw new InputError('project_ambiguous');
         if(linked?.length) return b.dry_run?{dry_run:true,would_save:linked[0],saved:false,duplicate:true}:{saved:false,record:linked[0],duplicate:true};
         // Canonical ownership is not inferred from names or overwritten.
-        const {data:owners,error:ownerErr}=await db.from('property_organization_relationships').select('business_organization_id,relationship_type,effective_to').eq('property_id',propertyId).is('effective_to',null);if(ownerErr) throw ownerErr;
-        if(owners?.some((o:any)=>o.relationship_type==='owner'&&o.business_organization_id!==c.business_organization_id)) throw new InputError('company_conflict','Property ownership conflicts with the requested company.',409);
+        const {data:owners,error:ownerErr}=await db.from('property_organization_relationships').select('organization_id,relationship_type,effective_to').eq('property_id',propertyId).is('effective_to',null);if(ownerErr) throw ownerErr;
+        if(owners?.some((o:any)=>o.relationship_type==='owner'&&o.organization_id!==c.business_organization_id)) throw new InputError('company_conflict','Property ownership conflicts with the requested company.',409);
       }
       r={name,company_id:c.id,property_id:propertyId,org_id:a.org_id};break;
     }
