@@ -103,7 +103,7 @@ export default function FinanceBankQueue() {
     void load();
   }, [load]);
 
-  const review = async (row: BankQueueRow, approve: boolean) => {
+  const review = async (row: BankQueueRow, approve: boolean, opts?: { quiet?: boolean }) => {
     const draft = drafts[row.id];
     setSavingId(row.id);
     const { error: rpcError } = await (supabase as any).rpc('bookkeeping_bank_queue_review', {
@@ -115,17 +115,23 @@ export default function FinanceBankQueue() {
     setSavingId(null);
     if (rpcError) {
       toast.error(rpcError.message);
-      return;
+      return false;
     }
-    toast.success(approve ? 'Approved — recorded in Ezzie only' : 'Saved');
-    await load();
+    if (!opts?.quiet) {
+      toast.success(approve ? 'Approved — recorded in Ezzie only' : 'Saved');
+      await load();
+    }
+    return true;
   };
 
   const approveAllProposed = async () => {
     const targets = rows.filter((r) => r.proposal_state === 'proposed' && r.review_state === 'unreviewed');
+    let approved = 0;
     for (const row of targets) {
-      await review(row, true);
+      if (await review(row, true, { quiet: true })) approved += 1;
     }
+    await load();
+    if (approved > 0) toast.success(`Approved ${approved} rows — recorded in Ezzie only`);
   };
 
   const counts = useMemo(() => {
