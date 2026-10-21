@@ -46,10 +46,10 @@ describe('agent API: create_task input rules', () => {
   it('rejects a non-object body', () => {
     const a = validateCreateTask('nope');
     if (a.ok) throw new Error('expected rejection');
-    expect(a.failure.error).toBe('invalid_body');
+    expect((a as any).failure.error).toBe('invalid_body');
     const b = validateCreateTask(null);
     if (b.ok) throw new Error('expected rejection');
-    expect(b.failure.error).toBe('invalid_body');
+    expect((b as any).failure.error).toBe('invalid_body');
   });
 });
 
