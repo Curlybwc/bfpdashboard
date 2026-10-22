@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCheck, GraduationCap, RefreshCw, Sparkles } from 'lucide-react';
+import { CheckCheck, ExternalLink, GraduationCap, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -327,6 +327,20 @@ export default function FinanceBankQueue() {
                 ))}
               </SelectContent>
             </Select>
+            {/* Sync to Register and Derive from QuickBooks both run in Ezzie
+                only (Jen's decision, 2026-10-21, option A): the dashboard has
+                its own backend where those functions do not exist, so these
+                buttons link to Ezzie's queue instead of invoking anything. */}
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href="https://ezzie.lovable.app/finance/bank-queue"
+                target="_blank"
+                rel="noreferrer"
+                title="Sync to Register runs in Ezzie — this opens Ezzie's Classification Queue in a new tab."
+              >
+                <ExternalLink className="mr-1 h-4 w-4" /> Sync to Register — in Ezzie
+              </a>
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -334,6 +348,16 @@ export default function FinanceBankQueue() {
               disabled={applying || loading || !companyId}
             >
               <Sparkles className="mr-1 h-4 w-4" /> {applying ? 'Applying…' : 'Apply learning'}
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href="https://ezzie.lovable.app/finance/bank-queue"
+                target="_blank"
+                rel="noreferrer"
+                title="Derive from QuickBooks runs in Ezzie — this opens Ezzie's Classification Queue in a new tab."
+              >
+                <ExternalLink className="mr-1 h-4 w-4" /> Derive from QuickBooks — in Ezzie
+              </a>
             </Button>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
               <RefreshCw className="mr-1 h-4 w-4" /> Refresh
