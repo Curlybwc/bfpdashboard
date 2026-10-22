@@ -37,25 +37,6 @@ type Rule = {
   created_at: string;
 };
 
-type Finding = {
-  id: string;
-  kind: string;
-  payee_text: string | null;
-  qbo_account: string | null;
-  qbo_class: string | null;
-  amount: number | null;
-  detail: string;
-  status: string;
-  created_at: string;
-};
-
-const FINDING_LABELS: Record<string, string> = {
-  books_no_bank: 'In QuickBooks, not in the bank',
-  bank_no_books: 'In the bank, not in QuickBooks',
-  policy_cross_company: 'Belongs to Bahr Family Homes (policy)',
-  payee_conflict: 'Payee history conflicts',
-};
-
 type Payee = {
   id: string;
   property_id: string | null;
@@ -76,7 +57,6 @@ export default function AdminClassificationLearning() {
   const [companyId, setCompanyId] = useState('');
   const [rules, setRules] = useState<Rule[]>([]);
   const [payees, setPayees] = useState<Payee[]>([]);
-  const [findings, setFindings] = useState<Finding[]>([]);
   const [edits, setEdits] = useState<
     Record<string, { property_label: string; account: string; klass: string; amount: string }>
   >({});
@@ -106,16 +86,14 @@ export default function AdminClassificationLearning() {
     if (!companyId) return;
     setLoading(true);
     setError(null);
-    const [rulesRes, payeesRes, findingsRes] = await Promise.all([
+    const [rulesRes, payeesRes] = await Promise.all([
       (supabase as any).rpc('bookkeeping_rules_list', { _company_id: companyId }),
       (supabase as any).rpc('property_payees_list', { _company_id: companyId }),
-      (supabase as any).rpc('bookkeeping_derivation_findings_list', { _company_id: companyId }),
     ]);
     if (rulesRes.error) setError(rulesRes.error.message);
     else setRules((rulesRes.data ?? []) as Rule[]);
     if (payeesRes.error) setError(payeesRes.error.message);
     else setPayees((payeesRes.data ?? []) as Payee[]);
-    if (!findingsRes.error) setFindings((findingsRes.data ?? []) as Finding[]);
     setEdits({});
     setLoading(false);
   }, [companyId]);
@@ -417,55 +395,6 @@ export default function AdminClassificationLearning() {
                     <TableRow>
                       <TableCell colSpan={8} className="text-sm text-muted-foreground">
                         No roster entries yet for this company.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Derivation findings ({findings.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-3 text-sm text-muted-foreground">
-                Where QuickBooks and the bank disagree, from “Derive from QuickBooks” in the
-                Classification Queue. Findings are evidence for your ruling — Ezzie never
-                auto-corrects the books from them.
-              </p>
-              <Table className="[&_td]:px-2 [&_th]:px-2">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Finding</TableHead>
-                    <TableHead>Payee</TableHead>
-                    <TableHead>QuickBooks account</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>What Ezzie found</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {findings.map((f) => (
-                    <TableRow key={f.id}>
-                      <TableCell className="text-xs font-medium">
-                        {FINDING_LABELS[f.kind] ?? f.kind}
-                      </TableCell>
-                      <TableCell className="text-xs">{f.payee_text ?? '—'}</TableCell>
-                      <TableCell className="text-xs">
-                        {f.qbo_account ?? '—'}
-                        {f.qbo_class ? ` / ${f.qbo_class}` : ''}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {f.amount != null ? `$${Number(f.amount).toFixed(2)}` : '—'}
-                      </TableCell>
-                      <TableCell className="text-xs">{f.detail}</TableCell>
-                    </TableRow>
-                  ))}
-                  {findings.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-sm text-muted-foreground">
-                        No findings yet. Run “Derive from QuickBooks” in the Classification Queue.
                       </TableCell>
                     </TableRow>
                   )}

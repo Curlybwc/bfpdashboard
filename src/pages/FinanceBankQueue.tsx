@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, CheckCheck, ExternalLink, GraduationCap, RefreshCw, Sparkles } from 'lucide-react';
+import { CheckCheck, ExternalLink, GraduationCap, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -108,7 +108,6 @@ export default function FinanceBankQueue() {
   >({});
   const [teach, setTeach] = useState<Record<string, { armed: boolean; pattern: string }>>({});
   const [applying, setApplying] = useState(false);
-  const [deriving, setDeriving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -216,35 +215,6 @@ export default function FinanceBankQueue() {
     }
     toast.success(
       `Learning applied: ${(data as any)?.roster_applied_rows ?? 0} row(s) from the property roster, ${(data as any)?.rules_that_fired ?? 0} rule(s) fired.`,
-    );
-    await load();
-  };
-
-  // Derive the payee map from this company's own QuickBooks history
-  // (canon 05.02 §25.11). Dashboard parity port (Jen's decision,
-  // 2026-10-21): the same invocation Ezzie's queue makes —
-  // quickbooks_derivation_run for the selected company, same summary
-  // toast, findings on Admin → Classification Learning. Read-only
-  // against QuickBooks: regenerates derived rules, drafts roster
-  // entries, and records books-vs-bank findings. Sync to Register is
-  // deliberately NOT ported: it stays Ezzie-only (one door), and the
-  // button below links to Ezzie's queue instead.
-  const deriveFromQuickBooks = async () => {
-    if (!companyId) return;
-    setDeriving(true);
-    const { data, error: fnError } = await supabase.functions.invoke('quickbooks_derivation_run', {
-      body: { company_id: companyId },
-    });
-    setDeriving(false);
-    if (fnError || data?.error) {
-      toast.error(data?.message ?? data?.error ?? fnError?.message ?? 'Derivation failed.');
-      return;
-    }
-    toast.success(
-      `Derived from QuickBooks: ${data?.payees_derived ?? 0} payees mapped, ` +
-        `${data?.rules_regenerated ?? 0} rule(s) regenerated, ` +
-        `${data?.roster_drafts_created ?? 0} roster draft(s), ` +
-        `${data?.findings_created ?? 0} finding(s) — see Classification Learning.`,
     );
     await load();
   };
@@ -357,6 +327,10 @@ export default function FinanceBankQueue() {
                 ))}
               </SelectContent>
             </Select>
+            {/* Sync to Register and Derive from QuickBooks both run in Ezzie
+                only (Jen's decision, 2026-10-21, option A): the dashboard has
+                its own backend where those functions do not exist, so these
+                buttons link to Ezzie's queue instead of invoking anything. */}
             <Button variant="outline" size="sm" asChild>
               <a
                 href="https://ezzie.lovable.app/finance/bank-queue"
@@ -375,13 +349,15 @@ export default function FinanceBankQueue() {
             >
               <Sparkles className="mr-1 h-4 w-4" /> {applying ? 'Applying…' : 'Apply learning'}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void deriveFromQuickBooks()}
-              disabled={deriving || !companyId}
-            >
-              <BookOpen className="mr-1 h-4 w-4" /> {deriving ? 'Deriving…' : 'Derive from QuickBooks'}
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href="https://ezzie.lovable.app/finance/bank-queue"
+                target="_blank"
+                rel="noreferrer"
+                title="Derive from QuickBooks runs in Ezzie — this opens Ezzie's Classification Queue in a new tab."
+              >
+                <ExternalLink className="mr-1 h-4 w-4" /> Derive from QuickBooks — in Ezzie
+              </a>
             </Button>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
               <RefreshCw className="mr-1 h-4 w-4" /> Refresh
