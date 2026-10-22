@@ -54,20 +54,40 @@ function authFailure(message: string, status = 401) {
   return json({ error: status === 401 ? 'unauthorized' : 'writes_disabled', message }, status);
 }
 
+// Each agent key is independent: removing one never affects the other.
+const AGENT_KEYS: Array<{ name: string; secret: string }> = [
+  { name: 'primary', secret: 'AGENT_API_KEY' },
+  { name: 'samantha', secret: 'AGENT_API_KEY_SAMANTHA' },
+];
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const expectedKey = Deno.env.get('AGENT_API_KEY');
-  if (!expectedKey) {
+  const configured = AGENT_KEYS
+    .map((k) => ({ name: k.name, value: (Deno.env.get(k.secret) ?? '').trim() }))
+    .filter((k) => k.value.length > 0);
+  if (configured.length === 0) {
     return json({ error: 'Agent API key is not configured on the server.' }, 503);
   }
 
   const authHeader = req.headers.get('authorization') ?? '';
   const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  if (!provided || !safeEqual(provided, expectedKey)) {
+  let keyName: string | null = null;
+  if (provided) {
+    for (const k of configured) {
+      if (safeEqual(provided, k.value) && !keyName) keyName = k.name;
+    }
+  }
+  if (!keyName) {
     return json({ error: 'Unauthorized. Provide Authorization: Bearer <key>.' }, 401);
   }
 
+  const res = await route(req);
+  res.headers.set('X-Agent-Key', keyName);
+  return res;
+});
+
+async function route(req: Request): Promise<Response> {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
