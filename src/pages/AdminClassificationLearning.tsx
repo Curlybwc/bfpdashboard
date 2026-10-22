@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,8 @@ type Payee = {
   id: string;
   property_id: string | null;
   property_label: string | null;
+  property_name: string | null;
+  property_link_basis: string | null;
   payee_name: string;
   match_text: string;
   kind: string;
@@ -52,11 +55,39 @@ type Payee = {
   created_at: string;
 };
 
+// Utility account crosswalk (Packet 3 / Batch A1, canon §25.3): the
+// bank text carries one MSD account-number series and the property
+// register's utility adapter carries another — they never join on
+// their own. A crosswalk row is an owner-confirmed mapping between
+// the two; drafts classify nothing until confirmed here.
+type CrosswalkEntry = {
+  id: string;
+  bank_account_number: string;
+  adapter_id: string | null;
+  adapter_account_reference: string | null;
+  adapter_provider: string | null;
+  property_id: string | null;
+  property_label: string | null;
+  status: 'draft' | 'confirmed' | 'rejected';
+  basis: string | null;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+};
+
+function usDate(iso: string): string {
+  const d = new Date(iso.length <= 10 ? `${iso}T12:00:00` : iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+}
+
 export default function AdminClassificationLearning() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState('');
   const [rules, setRules] = useState<Rule[]>([]);
   const [payees, setPayees] = useState<Payee[]>([]);
+  const [crosswalk, setCrosswalk] = useState<CrosswalkEntry[]>([]);
   const [edits, setEdits] = useState<
     Record<string, { property_label: string; account: string; klass: string; amount: string }>
   >({});
@@ -86,14 +117,16 @@ export default function AdminClassificationLearning() {
     if (!companyId) return;
     setLoading(true);
     setError(null);
-    const [rulesRes, payeesRes] = await Promise.all([
+    const [rulesRes, payeesRes, crosswalkRes] = await Promise.all([
       (supabase as any).rpc('bookkeeping_rules_list', { _company_id: companyId }),
       (supabase as any).rpc('property_payees_list', { _company_id: companyId }),
+      (supabase as any).rpc('bookkeeping_utility_crosswalk_list', { _company_id: companyId }),
     ]);
     if (rulesRes.error) setError(rulesRes.error.message);
     else setRules((rulesRes.data ?? []) as Rule[]);
     if (payeesRes.error) setError(payeesRes.error.message);
     else setPayees((payeesRes.data ?? []) as Payee[]);
+    if (!crosswalkRes.error) setCrosswalk((crosswalkRes.data ?? []) as CrosswalkEntry[]);
     setEdits({});
     setLoading(false);
   }, [companyId]);
@@ -101,6 +134,25 @@ export default function AdminClassificationLearning() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const setCrosswalkStatus = async (entry: CrosswalkEntry, status: 'confirmed' | 'rejected') => {
+    setBusyId(entry.id);
+    const { error: rpcError } = await (supabase as any).rpc(
+      'bookkeeping_utility_crosswalk_set_status',
+      { _crosswalk_id: entry.id, _status: status },
+    );
+    setBusyId(null);
+    if (rpcError) {
+      toast.error(rpcError.message);
+      return;
+    }
+    toast.success(
+      status === 'confirmed'
+        ? `MSD account ${entry.bank_account_number} mapped to ${entry.property_label ?? 'its property'} — classify will use it from the next run.`
+        : `MSD account ${entry.bank_account_number} mapping rejected.`,
+    );
+    await load();
+  };
 
   const setRuleActive = async (rule: Rule, active: boolean) => {
     setBusyId(rule.id);
@@ -271,6 +323,7 @@ export default function AdminClassificationLearning() {
                     <TableHead>Payee</TableHead>
                     <TableHead>Kind</TableHead>
                     <TableHead>Property</TableHead>
+                    <TableHead>Register link</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Account</TableHead>
                     <TableHead>Class</TableHead>
@@ -304,6 +357,24 @@ export default function AdminClassificationLearning() {
                             />
                           ) : (
                             <span className="text-xs">{p.property_label ?? '—'}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {p.property_id ? (
+                            <span>
+                              <span className="font-medium">{p.property_name ?? 'Linked'}</span>
+                              {p.property_link_basis && (
+                                <span className="block text-muted-foreground">
+                                  {p.property_link_basis}
+                                </span>
+                              )}
+                            </span>
+                          ) : p.property_label ? (
+                            <Badge variant="outline" className="whitespace-nowrap">
+                              Not linked — label matches no register record exactly
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -393,8 +464,94 @@ export default function AdminClassificationLearning() {
                   })}
                   {payees.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-sm text-muted-foreground">
+                      <TableCell colSpan={9} className="text-sm text-muted-foreground">
                         No roster entries yet for this company.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Utility account crosswalk — MSD ({crosswalk.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-sm text-muted-foreground">
+                The bank text carries one MSD account number; the property register's utility
+                adapter carries a different one. The two numbers never join on their own — a
+                mapping exists only when you confirm it here, from evidence (a bill, a
+                statement, the adapter record). Drafts classify nothing. A confirmed mapping
+                makes classify propose Utilities with that property as the class — identity by
+                account number, never by amount (canon §25.3).
+              </p>
+              <Table className="[&_td]:px-2 [&_th]:px-2">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bank account #</TableHead>
+                    <TableHead>Adapter account</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Basis</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {crosswalk.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-mono text-xs">{entry.bank_account_number}</TableCell>
+                      <TableCell className="text-xs">
+                        {entry.adapter_account_reference ?? '—'}
+                        {entry.adapter_provider && (
+                          <span className="block text-muted-foreground">{entry.adapter_provider}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs">{entry.property_label ?? '—'}</TableCell>
+                      <TableCell className="text-xs">
+                        {entry.basis ?? '—'}
+                        {entry.status === 'confirmed' && entry.confirmed_by && (
+                          <span className="block text-muted-foreground">
+                            Confirmed by {entry.confirmed_by}
+                            {entry.confirmed_at ? ` · ${usDate(entry.confirmed_at)}` : ''}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={entry.status === 'confirmed' ? 'default' : 'secondary'}>
+                          {entry.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {entry.status === 'draft' && (
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              disabled={busyId === entry.id || (!entry.adapter_id && !entry.property_id)}
+                              onClick={() => setCrosswalkStatus(entry, 'confirmed')}
+                            >
+                              <Check className="mr-1 h-4 w-4" /> Confirm mapping
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busyId === entry.id}
+                              onClick={() => setCrosswalkStatus(entry, 'rejected')}
+                            >
+                              <X className="mr-1 h-4 w-4" /> Reject
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {crosswalk.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-sm text-muted-foreground">
+                        No utility account mappings yet for this company. Bank account numbers
+                        with no confirmed mapping stay unmapped — nothing is paired
+                        automatically.
                       </TableCell>
                     </TableRow>
                   )}
