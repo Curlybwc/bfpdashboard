@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCheck, GraduationCap, RefreshCw, Sparkles } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCheck, GraduationCap, Mail, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +35,22 @@ type BankQueueRow = {
   account_display: string;
   source: string;
   review_notes: string | null;
+  evidence_count: number;
+};
+
+// Email evidence (Packet 3 / Batch A3): bookkeeping email is a backend
+// evidence source, not a user surface — matched evidence hangs on the
+// queue row itself as a badge + expandable detail (canon §25.11: email
+// evidence settles identity alongside the roster and the rules).
+type EvidenceItem = {
+  bank_transaction_id: string;
+  email_transaction_id: string;
+  vendor: string | null;
+  subject: string | null;
+  email_date: string;
+  amount: number;
+  match_basis: string;
+  match_score: number | null;
 };
 
 type Company = { id: string; name: string };
@@ -103,6 +119,8 @@ export default function FinanceBankQueue() {
   const [companyId, setCompanyId] = useState<string>('');
   const [rows, setRows] = useState<BankQueueRow[]>([]);
   const [accountTab, setAccountTab] = useState<string>('all');
+  const [evidence, setEvidence] = useState<Record<string, EvidenceItem[]>>({});
+  const [expandedEvidenceId, setExpandedEvidenceId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<
     Record<string, { account: string; klass: string; notes: string }>
   >({});
@@ -145,6 +163,14 @@ export default function FinanceBankQueue() {
       setRows((data ?? []) as BankQueueRow[]);
       setDrafts({});
     }
+    const { data: evData } = await (supabase as any).rpc('bookkeeping_bank_txn_evidence_list', {
+      _company_id: companyId,
+    });
+    const grouped: Record<string, EvidenceItem[]> = {};
+    for (const item of (evData ?? []) as EvidenceItem[]) {
+      (grouped[item.bank_transaction_id] ??= []).push(item);
+    }
+    setEvidence(grouped);
     setLoading(false);
   }, [companyId]);
 
@@ -214,7 +240,10 @@ export default function FinanceBankQueue() {
       return;
     }
     toast.success(
-      `Learning applied: ${(data as any)?.roster_applied_rows ?? 0} row(s) from the property roster, ${(data as any)?.rules_that_fired ?? 0} rule(s) fired.`,
+      `Learning applied: ${(data as any)?.roster_applied_rows ?? 0} row(s) from the property roster, ` +
+        `${(data as any)?.utility_applied_rows ?? 0} from the utility account map, ` +
+        `${(data as any)?.rules_that_fired ?? 0} rule(s) fired, ` +
+        `${(data as any)?.evidence_cited_rows ?? 0} row(s) citing email evidence.`,
     );
     await load();
   };
@@ -415,10 +444,26 @@ export default function FinanceBankQueue() {
                     klass: row.proposal_class ?? '',
                     notes: row.review_notes ?? '',
                   };
+                  const rowEvidence = evidence[row.id] ?? [];
+                  const evidenceOpen = expandedEvidenceId === row.id;
                   return (
-                    <TableRow key={row.id}>
+                    <Fragment key={row.id}>
+                    <TableRow>
                       <TableCell className="whitespace-nowrap text-xs">{usDate(row.txn_date)}</TableCell>
-                      <TableCell className="break-words text-xs">{row.raw_name}</TableCell>
+                      <TableCell className="break-words text-xs">
+                        {row.raw_name}
+                        {row.evidence_count > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedEvidenceId(evidenceOpen ? null : row.id)}
+                            aria-expanded={evidenceOpen}
+                            title="Email evidence matched to this transaction (amount + date + vendor text). Evidence supports identity; it never classifies by itself."
+                            className="ml-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium hover:bg-accent"
+                          >
+                            <Mail className="h-3 w-3" /> {row.evidence_count}
+                          </button>
+                        )}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         {money(Number(row.signed_amount))}
                       </TableCell>
@@ -506,6 +551,26 @@ export default function FinanceBankQueue() {
                         />
                       </TableCell>
                     </TableRow>
+                    {evidenceOpen && rowEvidence.length > 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-muted/40 text-xs">
+                          <div className="space-y-1 py-1">
+                            {rowEvidence.map((item) => (
+                              <p key={item.email_transaction_id}>
+                                <span className="font-medium">{item.vendor ?? 'Email'}</span>
+                                {' — '}
+                                {item.subject ?? '(no subject)'} · {usDate(item.email_date)} ·{' '}
+                                {money(Math.abs(Number(item.amount)))}
+                                <span className="block text-muted-foreground">
+                                  {item.match_basis}
+                                </span>
+                              </p>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </Fragment>
                   );
                 })}
                 {visibleRows.length === 0 && (
