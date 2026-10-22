@@ -86,6 +86,7 @@ export default function AdminClassificationLearning() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState('');
   const [rules, setRules] = useState<Rule[]>([]);
+  const [openLoops, setOpenLoops] = useState(0);
   const [payees, setPayees] = useState<Payee[]>([]);
   const [crosswalk, setCrosswalk] = useState<CrosswalkEntry[]>([]);
   const [edits, setEdits] = useState<
@@ -117,13 +118,15 @@ export default function AdminClassificationLearning() {
     if (!companyId) return;
     setLoading(true);
     setError(null);
-    const [rulesRes, payeesRes, crosswalkRes] = await Promise.all([
+    const [rulesRes, payeesRes, crosswalkRes, loopsRes] = await Promise.all([
       (supabase as any).rpc('bookkeeping_rules_list', { _company_id: companyId }),
       (supabase as any).rpc('property_payees_list', { _company_id: companyId }),
       (supabase as any).rpc('bookkeeping_utility_crosswalk_list', { _company_id: companyId }),
+      (supabase as any).rpc('bookkeeping_field_log_open_loop_count', { _company_id: companyId }),
     ]);
     if (rulesRes.error) setError(rulesRes.error.message);
     else setRules((rulesRes.data ?? []) as Rule[]);
+    if (!loopsRes.error) setOpenLoops(Number(loopsRes.data ?? 0));
     if (payeesRes.error) setError(payeesRes.error.message);
     else setPayees((payeesRes.data ?? []) as Payee[]);
     if (!crosswalkRes.error) setCrosswalk((crosswalkRes.data ?? []) as CrosswalkEntry[]);
@@ -221,6 +224,11 @@ export default function AdminClassificationLearning() {
         Rules are taught from the Classification Queue; the property roster is drafted from bank
         history and only starts classifying once you confirm an entry. Nothing here writes to
         QuickBooks.
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Open loops: {openLoops} — transactions for this company that are still unidentified or
+        unresolved. The list lives in the Classification Queue (Open loops filter); this is the
+        same count, not a second list.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Select value={companyId} onValueChange={setCompanyId}>
