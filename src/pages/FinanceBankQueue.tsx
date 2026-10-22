@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCheck, ExternalLink, GraduationCap, Mail, RefreshCw, Sparkles } from 'lucide-react';
+import { CheckCheck, ExternalLink, GraduationCap, History, Mail, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,22 @@ type BankQueueRow = {
   source: string;
   review_notes: string | null;
   evidence_count: number;
+  is_open_loop: boolean;
+};
+
+// Field log (Packet 4 / Batch B): the append-only trail of what Ezzie
+// did to a row — ingested, matched, proposed, evidence attached,
+// reviewed, approved, synced — read through the field-log door RPC.
+// Open loops (rows still unidentified or unresolved) are counted in the
+// header and filterable; there is no separate page for them.
+type FieldLogItem = {
+  id: string;
+  seq: number;
+  event_kind: string;
+  source: string;
+  detail: Record<string, unknown> | null;
+  actor: string;
+  created_at: string;
 };
 
 // Email evidence (Packet 3 / Batch A3): bookkeeping email is a backend
@@ -121,6 +137,9 @@ export default function FinanceBankQueue() {
   const [accountTab, setAccountTab] = useState<string>('all');
   const [evidence, setEvidence] = useState<Record<string, EvidenceItem[]>>({});
   const [expandedEvidenceId, setExpandedEvidenceId] = useState<string | null>(null);
+  const [history, setHistory] = useState<Record<string, FieldLogItem[]>>({});
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [loopFilter, setLoopFilter] = useState<'all' | 'open'>('all');
   const [drafts, setDrafts] = useState<
     Record<string, { account: string; klass: string; notes: string }>
   >({});
@@ -153,6 +172,8 @@ export default function FinanceBankQueue() {
     setLoading(true);
     setError(null);
     setAccountTab('all');
+    setExpandedHistoryId(null);
+    setHistory({});
     const { data, error: rpcError } = await (supabase as any).rpc('bookkeeping_bank_queue_list', {
       _company_id: companyId,
     });
@@ -277,14 +298,37 @@ export default function FinanceBankQueue() {
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
   }, [rows]);
 
+  const toggleHistory = async (rowId: string) => {
+    if (expandedHistoryId === rowId) {
+      setExpandedHistoryId(null);
+      return;
+    }
+    setExpandedHistoryId(rowId);
+    if (!history[rowId]) {
+      const { data, error: logError } = await (supabase as any).rpc('bookkeeping_field_log_list', {
+        _bank_transaction_id: rowId,
+      });
+      if (logError) {
+        toast.error(`Field log: ${logError.message}`);
+        setHistory((h) => ({ ...h, [rowId]: [] }));
+      } else {
+        setHistory((h) => ({ ...h, [rowId]: (data ?? []) as FieldLogItem[] }));
+      }
+    }
+  };
+
   const visibleRows = useMemo(() => {
-    if (accountTab === 'all') return rows;
-    return rows.filter(
-      (r) =>
-        `${r.account_display}|${Number(r.signed_amount) >= 0 ? 'Income' : 'Expenses'}` ===
-        accountTab,
-    );
-  }, [rows, accountTab]);
+    let out = rows;
+    if (accountTab !== 'all') {
+      out = out.filter(
+        (r) =>
+          `${r.account_display}|${Number(r.signed_amount) >= 0 ? 'Income' : 'Expenses'}` ===
+          accountTab,
+      );
+    }
+    if (loopFilter === 'open') out = out.filter((r) => r.is_open_loop);
+    return out;
+  }, [rows, accountTab, loopFilter]);
 
   const counts = useMemo(() => {
     return {
@@ -293,6 +337,7 @@ export default function FinanceBankQueue() {
       needsReview: rows.filter((r) => r.proposal_state === 'needs_review').length,
       unidentified: rows.filter((r) => r.proposal_state === 'unidentified').length,
       approved: rows.filter((r) => r.review_state === 'approved').length,
+      openLoops: rows.filter((r) => r.is_open_loop).length,
       net: rows.reduce((sum, r) => sum + Number(r.signed_amount), 0),
     };
   }, [rows]);
@@ -399,9 +444,37 @@ export default function FinanceBankQueue() {
         <CardContent>
           <p className="mb-3 text-sm text-muted-foreground">
             {counts.total} transactions · {counts.proposed} proposed · {counts.needsReview} needs
-            review · {counts.unidentified} unidentified · {counts.approved} approved · net{' '}
-            {money(counts.net)}
+            review · {counts.unidentified} unidentified · {counts.approved} approved · Open
+            loops: {counts.openLoops} · net {money(counts.net)}
           </p>
+          <div className="mb-3 flex flex-wrap gap-1" role="tablist" aria-label="Loop filter">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={loopFilter === 'all'}
+              onClick={() => setLoopFilter('all')}
+              className={
+                loopFilter === 'all'
+                  ? 'rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground'
+                  : 'rounded-full border px-3 py-1 text-xs font-medium hover:bg-accent'
+              }
+            >
+              All rows · {rows.length}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={loopFilter === 'open'}
+              onClick={() => setLoopFilter('open')}
+              className={
+                loopFilter === 'open'
+                  ? 'rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground'
+                  : 'rounded-full border px-3 py-1 text-xs font-medium hover:bg-accent'
+              }
+            >
+              Open loops · {counts.openLoops}
+            </button>
+          </div>
           {accountTabs.length > 1 && (
             <div className="mb-3 flex flex-wrap gap-1" role="tablist" aria-label="Accounts">
               <button
@@ -470,6 +543,8 @@ export default function FinanceBankQueue() {
                   };
                   const rowEvidence = evidence[row.id] ?? [];
                   const evidenceOpen = expandedEvidenceId === row.id;
+                  const rowHistory = history[row.id];
+                  const historyOpen = expandedHistoryId === row.id;
                   return (
                     <Fragment key={row.id}>
                     <TableRow>
@@ -487,6 +562,15 @@ export default function FinanceBankQueue() {
                             <Mail className="h-3 w-3" /> {row.evidence_count}
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => void toggleHistory(row.id)}
+                          aria-expanded={historyOpen}
+                          title="Field log — every ingest, match, proposal, evidence and review event recorded for this row. Append-only: entries are never edited or deleted."
+                          className="ml-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium hover:bg-accent"
+                        >
+                          <History className="h-3 w-3" /> History
+                        </button>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         {money(Number(row.signed_amount))}
@@ -594,6 +678,36 @@ export default function FinanceBankQueue() {
                         </TableCell>
                       </TableRow>
                     )}
+                    {historyOpen && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-muted/40 text-xs">
+                          <div className="space-y-1 py-1">
+                            {(rowHistory ?? []).map((item) => (
+                              <p key={item.id}>
+                                <span className="font-medium">{item.event_kind}</span>
+                                {' · '}
+                                {item.source} · {item.actor} ·{' '}
+                                {new Date(item.created_at).toLocaleString()}
+                                {typeof item.detail?.basis === 'string' && (
+                                  <span className="block text-muted-foreground">
+                                    {item.detail.basis}
+                                  </span>
+                                )}
+                              </p>
+                            ))}
+                            {rowHistory !== undefined && rowHistory.length === 0 && (
+                              <p className="text-muted-foreground">
+                                No field-log entries for this row yet — rows loaded before the
+                                field log existed only gain entries from their next event.
+                              </p>
+                            )}
+                            {rowHistory === undefined && (
+                              <p className="text-muted-foreground">Loading history…</p>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
                     </Fragment>
                   );
                 })}
@@ -602,7 +716,9 @@ export default function FinanceBankQueue() {
                     <TableCell colSpan={8} className="text-sm text-muted-foreground">
                       {rows.length === 0
                         ? 'No bank transactions loaded for this company yet.'
-                        : 'No transactions in this account view.'}
+                        : loopFilter === 'open'
+                          ? 'No open loops for this company right now.'
+                          : 'No transactions in this account view.'}
                     </TableCell>
                   </TableRow>
                 )}
