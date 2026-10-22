@@ -157,6 +157,32 @@ export default function AdminClassificationLearning() {
     await load();
   };
 
+  const [seeding, setSeeding] = useState(false);
+  const seedCrosswalkDrafts = async () => {
+    setSeeding(true);
+    const { data, error: rpcError } = await (supabase as any).rpc(
+      'bookkeeping_utility_crosswalk_seed_drafts',
+      { _company_id: companyId, _provider: 'MSD' },
+    );
+    setSeeding(false);
+    if (rpcError) {
+      toast.error(rpcError.message);
+      return;
+    }
+    const report = (data ?? {}) as {
+      drafts_created?: number;
+      bank_numbers_without_adapter_match?: unknown[];
+      adapter_accounts_not_in_bank_text?: unknown[];
+    };
+    toast.success(
+      `Seeded ${report.drafts_created ?? 0} draft mapping(s) from the utility spreadsheet. ` +
+        `${(report.bank_numbers_without_adapter_match ?? []).length} bank number(s) still unmapped; ` +
+        `${(report.adapter_accounts_not_in_bank_text ?? []).length} spreadsheet account(s) not seen in this company's bank text. ` +
+        'Drafts classify nothing until you confirm them.',
+    );
+    await load();
+  };
+
   const setRuleActive = async (rule: Rule, active: boolean) => {
     setBusyId(rule.id);
     const { error: rpcError } = await (supabase as any).rpc('bookkeeping_rule_set_active', {
@@ -495,6 +521,16 @@ export default function AdminClassificationLearning() {
                 makes classify propose Utilities with that property as the class — identity by
                 account number, never by amount (canon §25.3).
               </p>
+              <div className="mb-3">
+                <Button size="sm" variant="outline" disabled={seeding} onClick={seedCrosswalkDrafts}>
+                  {seeding ? 'Seeding…' : 'Seed drafts from utility spreadsheet'}
+                </Button>
+                <span className="ml-2 text-xs text-muted-foreground">
+                  Drafts a mapping for every spreadsheet MSD account whose number appears in
+                  this company's bank text. Seeding never confirms — each draft still needs
+                  your confirmation below.
+                </span>
+              </div>
               <Table className="[&_td]:px-2 [&_th]:px-2">
                 <TableHeader>
                   <TableRow>
