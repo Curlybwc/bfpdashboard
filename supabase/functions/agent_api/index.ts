@@ -129,7 +129,7 @@ async function route(req: Request): Promise<Response> {
   } catch (err) {
     return json({ error: 'Query failed', detail: String((err as Error)?.message ?? err) }, 500);
   }
-});
+}
 
 // ---------- Phase 2: writes ----------
 
