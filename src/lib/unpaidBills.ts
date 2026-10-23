@@ -77,6 +77,23 @@ export function buildUnpaidRows(i: Input): UnpaidRow[] {
       shiftIds: ids,
     });
   }
+  for (const r of i.reimbursements ?? []) {
+    if (r.status === 'paid' || r.status === 'voided' || r.status === 'not_approved') continue;
+    const workerId = r.on_behalf_of_user_id || r.submitter_user_id;
+    const p = r.project_id ? projects.get(r.project_id) : undefined;
+    const settled = r.status === 'approved' || r.status === 'exported';
+    rows.push({
+      id: `reimb:${r.id}`, kind: 'reimbursement', workerId, workerName: names.get(workerId) ?? 'Unknown worker',
+      projectId: r.project_id ?? null, companyId: r.company_id ?? p?.company_id ?? null, projectName: p?.name ?? 'No project',
+      date: r.expense_date, periodStart: null, periodEnd: null,
+      invoiceNo: r.qb_bill_doc_number ?? null, purpose: `${r.vendor_paid} — ${r.description}`,
+      amount: Number(settled ? (r.approved_amount ?? r.requested_amount) : r.requested_amount),
+      status: r.status === 'exported' ? 'Bill in QuickBooks – unpaid'
+        : r.status === 'approved' ? 'Approved – not yet billed'
+        : 'Needs approval',
+      shiftIds: [],
+    });
+  }
   return rows.sort((a, b) => a.workerName.localeCompare(b.workerName) || a.workerId.localeCompare(b.workerId) || a.date.localeCompare(b.date));
 }
 
