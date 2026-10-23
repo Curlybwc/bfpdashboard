@@ -31,15 +31,25 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // The backend returns at most 1000 rows per request, so page through every list.
+      const all = async (build: (from: number, to: number) => any) => {
+        const out: any[] = [];
+        for (let from = 0; ; from += 1000) {
+          const res = await build(from, from + 999);
+          if (res.error) return { data: null, error: res.error };
+          out.push(...(res.data || []));
+          if (!res.data || res.data.length < 1000) return { data: out, error: null };
+        }
+      };
       const [shiftsRes, profilesRes, projectsRes, payRes, batchLinksRes, paymentLinksRes, batchesRes, reimbRes] = await Promise.all([
-        supabase.from('shifts').select('*').or('total_hours.not.is.null,is_flat_rate.eq.true'),
-        supabase.from('profiles').select('id, full_name'),
-        supabase.from('projects').select('id, name, company_id'),
+        all((a, b) => supabase.from('shifts').select('*').or('total_hours.not.is.null,is_flat_rate.eq.true').order('id').range(a, b)),
+        all((a, b) => supabase.from('profiles').select('id, full_name').order('id').range(a, b)),
+        all((a, b) => supabase.from('projects').select('id, name, company_id').order('id').range(a, b)),
         supabase.rpc('admin_get_profile_pay' as any),
-        supabase.from('worker_payable_batch_shifts').select('shift_id, payable_batch_id, voided_at, worker_payable_batches!inner(status)').is('voided_at', null),
-        supabase.from('worker_payment_shifts').select('shift_id, worker_payments!inner(status)'),
-        supabase.from('worker_payable_batches').select('*').in('status', ['draft', 'exported']),
-        supabase.from('reimbursement_requests').select('*'),
+        all((a, b) => supabase.from('worker_payable_batch_shifts').select('shift_id, payable_batch_id, voided_at, worker_payable_batches!inner(status)').is('voided_at', null).order('shift_id').order('payable_batch_id').range(a, b)),
+        all((a, b) => supabase.from('worker_payment_shifts').select('shift_id, worker_payments!inner(status)').order('id').range(a, b)),
+        all((a, b) => supabase.from('worker_payable_batches').select('*').in('status', ['draft', 'exported']).order('id').range(a, b)),
+        all((a, b) => supabase.from('reimbursement_requests').select('*').order('id').range(a, b)),
       ]);
       const err = shiftsRes.error || profilesRes.error || projectsRes.error || batchLinksRes.error || paymentLinksRes.error || batchesRes.error || reimbRes.error;
       if (err) throw err;
