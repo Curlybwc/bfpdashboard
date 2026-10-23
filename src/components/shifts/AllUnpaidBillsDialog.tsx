@@ -74,8 +74,25 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
     return [...m.values()];
   }, [rows]);
 
-  const selectable = rows.filter((r) => !(r.kind === 'bill' && r.periodStart === currentFrom && r.periodEnd === currentTo));
+  const selectable = rows.filter((r) =>
+    !(r.kind === 'bill' && r.periodStart === currentFrom && r.periodEnd === currentTo) &&
+    !(r.kind === 'reimbursement' && r.rawStatus !== 'approved'));
   const toggle = (id: string) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const approveReimbursement = async (r: UnpaidRow) => {
+    if (!user?.id) return;
+    setSaving(true);
+    const { error } = await supabase.from('reimbursement_requests')
+      .update({ status: 'approved', approved_amount: r.amount, approved_at: new Date().toISOString(), approved_by: user.id })
+      .eq('id', r.id.replace('reimb:', ''));
+    setSaving(false);
+    if (error) {
+      toast({ title: 'Approval failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Approved', description: `${r.workerName} · ${money(r.amount)} — now includable in the current run` });
+    await load();
+  };
 
   const pullIntoRun = async () => {
     if (!user?.id) return;
@@ -100,6 +117,13 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
         const { error } = await supabase.from('worker_payable_batches')
           .update({ period_start: currentFrom, period_end: currentTo }).in('id', billIds);
         if (error) throw error;
+      }
+      // Approved reimbursements → one QuickBooks bill each on the company's reimbursement
+      // expense account. The expense date stays as entered; only the payment run is current.
+      const reimbIds = picked.filter((r) => r.kind === 'reimbursement' && r.rawStatus === 'approved').map((r) => r.id.replace('reimb:', ''));
+      for (const reimbursement_id of reimbIds) {
+        const { data, error } = await supabase.functions.invoke('quickbooks_create_reimbursement_bill', { body: { reimbursement_id } });
+        if (error || data?.error) throw new Error(data?.message || error?.message || 'Reimbursement export failed');
       }
       toast({ title: 'Added to current run', description: `${picked.length} item(s) moved to ${currentFrom} → ${currentTo}` });
       onChanged();
