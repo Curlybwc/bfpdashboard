@@ -21,6 +21,7 @@ import type { Tables } from '@/integrations/supabase/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import AllUnpaidBillsDialog from './AllUnpaidBillsDialog';
 type ShiftRow = Tables<'shifts'>;
 type ProfileRow = Tables<'profiles'>;
 type ProjectRow = Tables<'projects'>;
@@ -167,6 +168,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
   const fromDate = isCustomPeriod ? customFrom : (selectedPeriod.split('::')[0] || '');
   const toDate = isCustomPeriod ? customTo : (selectedPeriod.split('::')[1] || '');
   const [loading, setLoading] = useState(false);
+  const [allUnpaidOpen, setAllUnpaidOpen] = useState(false);
   const [creatingGroupKey, setCreatingGroupKey] = useState<string | null>(null);
   const [payingGroupKey, setPayingGroupKey] = useState<string | null>(null);
   const [updatingBatchId, setUpdatingBatchId] = useState<string | null>(null);
@@ -1505,6 +1507,10 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
           </div>
         )}
       </div>
+
+      <Button variant="outline" className="w-full" onClick={() => setAllUnpaidOpen(true)}>Show All Unpaid Bills</Button>
+      <AllUnpaidBillsDialog open={allUnpaidOpen} onOpenChange={setAllUnpaidOpen} currentFrom={fromDate} currentTo={toDate}
+        onChanged={() => { loadPayroll().catch(() => {}); }} />
 
       <p className="text-xs text-muted-foreground">Shifts already paid (via any period) are automatically excluded, so you won't pay the same shift twice.</p>
 
