@@ -21,6 +21,7 @@ import type { Tables } from '@/integrations/supabase/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import AllUnpaidBillsDialog from './AllUnpaidBillsDialog';
 type ShiftRow = Tables<'shifts'>;
 type ProfileRow = Tables<'profiles'>;
 type ProjectRow = Tables<'projects'>;
@@ -154,8 +155,6 @@ function getCurrentPeriodKey(): string {
   }
   return PAY_PERIODS.length > 0 ? `${PAY_PERIODS[0].from}::${PAY_PERIODS[0].to}` : '';
 }
-
-import AllUnpaidBillsDialog from './AllUnpaidBillsDialog';
 
 const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: PayrollSummaryProps) => {
   const { user } = useAuth();
