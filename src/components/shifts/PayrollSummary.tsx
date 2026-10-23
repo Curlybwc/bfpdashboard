@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import AllUnpaidBillsDialog from './AllUnpaidBillsDialog';
+import PayrollReimbursements from './PayrollReimbursements';
 type ShiftRow = Tables<'shifts'>;
 type ProfileRow = Tables<'profiles'>;
 type ProjectRow = Tables<'projects'>;
@@ -1526,6 +1527,13 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
           {billPreviewContent}
 
           {collapsibleSection('Ready to Bill', filteredCandidateGroups.length, readyToPayContent)}
+          <Card className="p-3 space-y-2">
+            <div>
+              <p className="text-sm font-medium">Reimbursements</p>
+              <p className="text-xs text-muted-foreground">Reimbursement requests with an expense date in this pay period. Approve them here, then include approved ones in this run — they post to the company's QuickBooks reimbursement expense account and keep their original expense date.</p>
+            </div>
+            <PayrollReimbursements fromDate={fromDate} toDate={toDate} workerFilter={workerFilter} />
+          </Card>
           {collapsibleSection('Pending Bills', filteredExportedGroups.length, preparedPaymentsContent)}
           {collapsibleSection('Already Paid', filteredPaidGroups.length, alreadyPaidContent)}
           {collapsibleSection('Already Included Elsewhere', excludedShifts.length, excludedContent)}
