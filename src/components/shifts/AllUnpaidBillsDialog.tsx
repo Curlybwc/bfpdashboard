@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -144,7 +144,7 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
             </TableHeader>
             <TableBody>
               {byWorker.map((g) => (
-                <>
+                <Fragment key={g.rows[0].workerId}>
                   {g.rows.map((r) => {
                     const canPick = selectable.includes(r);
                     return (
@@ -166,7 +166,7 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
                     <TableCell className="text-xs text-right font-bold">{money(g.total)}</TableCell>
                     <TableCell />
                   </TableRow>
-                </>
+                </Fragment>
               ))}
             </TableBody>
           </Table>
