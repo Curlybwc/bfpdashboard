@@ -1,6 +1,6 @@
 export interface UnpaidRow {
-  id: string; // `entry:<shiftId>` or `bill:<batchId>`
-  kind: 'entry' | 'bill';
+  id: string; // `entry:<shiftId>` | `bill:<batchId>` | `reimb:<reimbursementId>`
+  kind: 'entry' | 'bill' | 'reimbursement';
   workerId: string;
   workerName: string;
   projectId: string | null;
@@ -24,6 +24,7 @@ interface Input {
   batchLinks: { shift_id: string; payable_batch_id: string; voided_at: string | null; worker_payable_batches?: { status: string } | null }[];
   paymentLinks: { shift_id: string; worker_payments?: { status: string } | null }[];
   unpaidBatches: any[];
+  reimbursements?: any[];
 }
 
 export function shiftAmount(s: any, rate: number): number {
