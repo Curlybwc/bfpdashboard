@@ -13,6 +13,7 @@ export interface UnpaidRow {
   purpose: string | null;
   amount: number;
   status: string;
+  rawStatus?: string; // underlying record status (reimbursements)
   shiftIds: string[];
 }
 
@@ -91,6 +92,7 @@ export function buildUnpaidRows(i: Input): UnpaidRow[] {
       status: r.status === 'exported' ? 'Bill in QuickBooks – unpaid'
         : r.status === 'approved' ? 'Approved – not yet billed'
         : 'Needs approval',
+      rawStatus: r.status,
       shiftIds: [],
     });
   }
