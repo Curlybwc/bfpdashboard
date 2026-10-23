@@ -182,7 +182,17 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
                         <TableCell className="text-xs whitespace-nowrap">{r.periodStart ? `${r.periodStart} → ${r.periodEnd}` : 'Not billed'}</TableCell>
                         <TableCell className="text-xs">{[r.invoiceNo, r.purpose].filter(Boolean).join(' · ') || '—'}</TableCell>
                         <TableCell className="text-xs text-right">{money(r.amount)}</TableCell>
-                        <TableCell><Badge variant="secondary" className="text-[10px]">{r.status}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge variant="secondary" className="text-[10px]">{r.status}</Badge>
+                            {r.kind === 'reimbursement' && (r.rawStatus === 'submitted' || r.rawStatus === 'needs_info') && (
+                              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" disabled={saving}
+                                onClick={() => approveReimbursement(r)}>
+                                Approve Full
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
