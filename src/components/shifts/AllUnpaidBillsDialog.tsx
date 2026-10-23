@@ -31,7 +31,7 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [shiftsRes, profilesRes, projectsRes, payRes, batchLinksRes, paymentLinksRes, batchesRes] = await Promise.all([
+      const [shiftsRes, profilesRes, projectsRes, payRes, batchLinksRes, paymentLinksRes, batchesRes, reimbRes] = await Promise.all([
         supabase.from('shifts').select('*').or('total_hours.not.is.null,is_flat_rate.eq.true'),
         supabase.from('profiles').select('id, full_name'),
         supabase.from('projects').select('id, name, company_id'),
@@ -39,8 +39,9 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
         supabase.from('worker_payable_batch_shifts').select('shift_id, payable_batch_id, voided_at, worker_payable_batches!inner(status)').is('voided_at', null),
         supabase.from('worker_payment_shifts').select('shift_id, worker_payments!inner(status)'),
         supabase.from('worker_payable_batches').select('*').in('status', ['draft', 'exported']),
+        supabase.from('reimbursement_requests').select('*'),
       ]);
-      const err = shiftsRes.error || profilesRes.error || projectsRes.error || batchLinksRes.error || paymentLinksRes.error || batchesRes.error;
+      const err = shiftsRes.error || profilesRes.error || projectsRes.error || batchLinksRes.error || paymentLinksRes.error || batchesRes.error || reimbRes.error;
       if (err) throw err;
       const built = buildUnpaidRows({
         shifts: (shiftsRes.data || []) as any[],
@@ -50,6 +51,7 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
         batchLinks: (batchLinksRes.data || []) as any[],
         paymentLinks: (paymentLinksRes.data || []) as any[],
         unpaidBatches: (batchesRes.data || []) as any[],
+        reimbursements: (reimbRes.data || []) as any[],
       });
       setRows(built);
       setSelected(new Set());
@@ -72,8 +74,25 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
     return [...m.values()];
   }, [rows]);
 
-  const selectable = rows.filter((r) => !(r.kind === 'bill' && r.periodStart === currentFrom && r.periodEnd === currentTo));
+  const selectable = rows.filter((r) =>
+    !(r.kind === 'bill' && r.periodStart === currentFrom && r.periodEnd === currentTo) &&
+    !(r.kind === 'reimbursement' && r.rawStatus !== 'approved'));
   const toggle = (id: string) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const approveReimbursement = async (r: UnpaidRow) => {
+    if (!user?.id) return;
+    setSaving(true);
+    const { error } = await supabase.from('reimbursement_requests')
+      .update({ status: 'approved', approved_amount: r.amount, approved_at: new Date().toISOString(), approved_by: user.id })
+      .eq('id', r.id.replace('reimb:', ''));
+    setSaving(false);
+    if (error) {
+      toast({ title: 'Approval failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Approved', description: `${r.workerName} · ${money(r.amount)} — now includable in the current run` });
+    await load();
+  };
 
   const pullIntoRun = async () => {
     if (!user?.id) return;
@@ -98,6 +117,13 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
         const { error } = await supabase.from('worker_payable_batches')
           .update({ period_start: currentFrom, period_end: currentTo }).in('id', billIds);
         if (error) throw error;
+      }
+      // Approved reimbursements → one QuickBooks bill each on the company's reimbursement
+      // expense account. The expense date stays as entered; only the payment run is current.
+      const reimbIds = picked.filter((r) => r.kind === 'reimbursement' && r.rawStatus === 'approved').map((r) => r.id.replace('reimb:', ''));
+      for (const reimbursement_id of reimbIds) {
+        const { data, error } = await supabase.functions.invoke('quickbooks_create_reimbursement_bill', { body: { reimbursement_id } });
+        if (error || data?.error) throw new Error(data?.message || error?.message || 'Reimbursement export failed');
       }
       toast({ title: 'Added to current run', description: `${picked.length} item(s) moved to ${currentFrom} → ${currentTo}` });
       onChanged();
@@ -156,7 +182,17 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
                         <TableCell className="text-xs whitespace-nowrap">{r.periodStart ? `${r.periodStart} → ${r.periodEnd}` : 'Not billed'}</TableCell>
                         <TableCell className="text-xs">{[r.invoiceNo, r.purpose].filter(Boolean).join(' · ') || '—'}</TableCell>
                         <TableCell className="text-xs text-right">{money(r.amount)}</TableCell>
-                        <TableCell><Badge variant="secondary" className="text-[10px]">{r.status}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge variant="secondary" className="text-[10px]">{r.status}</Badge>
+                            {r.kind === 'reimbursement' && (r.rawStatus === 'submitted' || r.rawStatus === 'needs_info') && (
+                              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" disabled={saving}
+                                onClick={() => approveReimbursement(r)}>
+                                Approve Full
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}

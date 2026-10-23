@@ -1,6 +1,6 @@
 export interface UnpaidRow {
-  id: string; // `entry:<shiftId>` or `bill:<batchId>`
-  kind: 'entry' | 'bill';
+  id: string; // `entry:<shiftId>` | `bill:<batchId>` | `reimb:<reimbursementId>`
+  kind: 'entry' | 'bill' | 'reimbursement';
   workerId: string;
   workerName: string;
   projectId: string | null;
@@ -13,6 +13,7 @@ export interface UnpaidRow {
   purpose: string | null;
   amount: number;
   status: string;
+  rawStatus?: string; // underlying record status (reimbursements)
   shiftIds: string[];
 }
 
@@ -24,6 +25,7 @@ interface Input {
   batchLinks: { shift_id: string; payable_batch_id: string; voided_at: string | null; worker_payable_batches?: { status: string } | null }[];
   paymentLinks: { shift_id: string; worker_payments?: { status: string } | null }[];
   unpaidBatches: any[];
+  reimbursements?: any[];
 }
 
 export function shiftAmount(s: any, rate: number): number {
@@ -74,6 +76,24 @@ export function buildUnpaidRows(i: Input): UnpaidRow[] {
       invoiceNo: b.qb_bill_doc_number ?? b.invoice_no ?? null, purpose: b.purpose ?? (purposes.join('; ') || null),
       amount: Number(b.total_amount || 0), status: b.status === 'exported' ? 'Bill in QuickBooks – unpaid' : 'Bill prepared – unpaid',
       shiftIds: ids,
+    });
+  }
+  for (const r of i.reimbursements ?? []) {
+    if (r.status === 'paid' || r.status === 'voided' || r.status === 'not_approved') continue;
+    const workerId = r.on_behalf_of_user_id || r.submitter_user_id;
+    const p = r.project_id ? projects.get(r.project_id) : undefined;
+    const settled = r.status === 'approved' || r.status === 'exported';
+    rows.push({
+      id: `reimb:${r.id}`, kind: 'reimbursement', workerId, workerName: names.get(workerId) ?? 'Unknown worker',
+      projectId: r.project_id ?? null, companyId: r.company_id ?? p?.company_id ?? null, projectName: p?.name ?? 'No project',
+      date: r.expense_date, periodStart: null, periodEnd: null,
+      invoiceNo: r.qb_bill_doc_number ?? null, purpose: `${r.vendor_paid} — ${r.description}`,
+      amount: Number(settled ? (r.approved_amount ?? r.requested_amount) : r.requested_amount),
+      status: r.status === 'exported' ? 'Bill in QuickBooks – unpaid'
+        : r.status === 'approved' ? 'Approved – not yet billed'
+        : 'Needs approval',
+      rawStatus: r.status,
+      shiftIds: [],
     });
   }
   return rows.sort((a, b) => a.workerName.localeCompare(b.workerName) || a.workerId.localeCompare(b.workerId) || a.date.localeCompare(b.date));
