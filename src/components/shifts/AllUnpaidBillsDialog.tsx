@@ -31,7 +31,7 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [shiftsRes, profilesRes, projectsRes, payRes, batchLinksRes, paymentLinksRes, batchesRes] = await Promise.all([
+      const [shiftsRes, profilesRes, projectsRes, payRes, batchLinksRes, paymentLinksRes, batchesRes, reimbRes] = await Promise.all([
         supabase.from('shifts').select('*').or('total_hours.not.is.null,is_flat_rate.eq.true'),
         supabase.from('profiles').select('id, full_name'),
         supabase.from('projects').select('id, name, company_id'),
@@ -39,8 +39,9 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
         supabase.from('worker_payable_batch_shifts').select('shift_id, payable_batch_id, voided_at, worker_payable_batches!inner(status)').is('voided_at', null),
         supabase.from('worker_payment_shifts').select('shift_id, worker_payments!inner(status)'),
         supabase.from('worker_payable_batches').select('*').in('status', ['draft', 'exported']),
+        supabase.from('reimbursement_requests').select('*'),
       ]);
-      const err = shiftsRes.error || profilesRes.error || projectsRes.error || batchLinksRes.error || paymentLinksRes.error || batchesRes.error;
+      const err = shiftsRes.error || profilesRes.error || projectsRes.error || batchLinksRes.error || paymentLinksRes.error || batchesRes.error || reimbRes.error;
       if (err) throw err;
       const built = buildUnpaidRows({
         shifts: (shiftsRes.data || []) as any[],
@@ -50,6 +51,7 @@ const AllUnpaidBillsDialog = ({ open, onOpenChange, currentFrom, currentTo, onCh
         batchLinks: (batchLinksRes.data || []) as any[],
         paymentLinks: (paymentLinksRes.data || []) as any[],
         unpaidBatches: (batchesRes.data || []) as any[],
+        reimbursements: (reimbRes.data || []) as any[],
       });
       setRows(built);
       setSelected(new Set());
