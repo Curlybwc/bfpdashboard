@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { localTodayString } from '@/lib/localDate';
 
 const TODAY_KEY = 'today_prefs';
 
@@ -10,7 +11,7 @@ interface TodayPrefs {
 }
 
 function getTodayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localTodayString();
 }
 
 function loadPrefs(): TodayPrefs {

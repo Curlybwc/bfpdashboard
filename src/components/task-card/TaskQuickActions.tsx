@@ -6,6 +6,7 @@ import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn, getErrorMessage } from '@/lib/utils';
+import { localTodayString } from '@/lib/localDate';
 import {
   TASK_PRIORITIES, TASK_STAGES, MATERIALS_OPTIONS,
   type TaskPriority, type MaterialsStatus, type TaskStage,
@@ -368,7 +369,7 @@ const TaskQuickActions = ({
   const sortedProfiles = (allProfiles || []).slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
 
   const dueDateLabel = task.due_date || 'Due Date';
-  const isOverdue = !isDone && task.due_date && task.due_date < new Date().toISOString().slice(0, 10);
+  const isOverdue = !isDone && task.due_date && task.due_date < localTodayString();
 
   return (
     <>

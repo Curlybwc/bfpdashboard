@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { localTodayString } from '@/lib/localDate';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Square, Clock, AlertTriangle, ArrowRightLeft } from 'lucide-react';
@@ -61,7 +62,7 @@ export default function ClockStatusCard() {
   const [allocAllocations, setAllocAllocations] = useState<ShiftAllocation[]>([]);
   const [allocLoading, setAllocLoading] = useState(false);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localTodayString();
   const { data: todayShifts = [] } = useQuery({
     queryKey: ['my-today-shifts', user?.id, todayStr, active?.id, lastClosed?.id],
     enabled: !!user?.id,

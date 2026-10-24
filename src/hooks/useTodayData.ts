@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { localTodayString } from '@/lib/localDate';
 import { getTaskOperationalStatus, isTaskPackage } from '@/lib/taskOperationalStatus';
 
 /* ── Types ── */
@@ -107,7 +108,7 @@ async function fetchCoreTasks(userId: string, memberProjectIds: string[]) {
     supabase
       .from('shifts').select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('shift_date', new Date().toISOString().slice(0, 10)),
+      .eq('shift_date', localTodayString()),
   ]);
 
   return {

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useTodayData } from '@/hooks/useTodayData';
+import { useTodayProjection } from '@/hooks/useTodayProjection';
+import TodayProjectionStrip from '@/components/TodayProjectionStrip';
+import { localTodayString } from '@/lib/localDate';
 import { useTodayPreferences } from '@/hooks/useTodayPreferences';
 import PageHeader from '@/components/PageHeader';
 import TaskCard from '@/components/TaskCard';
@@ -46,7 +49,7 @@ const STATUS_ORDER: Record<string, number> = {
 };
 
 function rankTasks(a: any, b: any): number {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localTodayString();
   const aOverdue = a.due_date && a.due_date < todayStr ? 0 : 1;
   const bOverdue = b.due_date && b.due_date < todayStr ? 0 : 1;
   if (aOverdue !== bOverdue) return aOverdue - bOverdue;
@@ -75,6 +78,7 @@ const Today = () => {
   const { toast } = useToast();
 
   const { data, loading, error, refresh } = useTodayData(user?.id, isAdmin);
+  const projection = useTodayProjection(user?.id);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const prefs = useTodayPreferences();
@@ -164,6 +168,7 @@ const Today = () => {
       <div className="pb-20">
         <PageHeader title="Today" />
         <div className="p-4">
+          <TodayProjectionStrip data={projection.data} loading={projection.loading} />
           <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
             <AlertTriangle className="h-8 w-8 text-destructive" />
             <p className="text-sm text-destructive font-medium">Failed to load today's data</p>
@@ -179,6 +184,7 @@ const Today = () => {
     <div className="pb-20">
       <PageHeader title="Today" />
       <div className="p-4 space-y-4">
+        <TodayProjectionStrip data={projection.data} loading={projection.loading} />
         <div className="rounded-lg border p-4 space-y-2">
           <Skeleton className="h-5 w-32" />
           <Skeleton className="h-4 w-full" />
@@ -428,9 +434,11 @@ const Today = () => {
         </SheetContent>
       </Sheet>
       <div className="p-4">
+        <TodayProjectionStrip data={projection.data} loading={projection.loading} />
         <ClockStatusCard />
         {(isAdmin || isManager) && <ActiveShiftsLiveCard />}
         <AlertsBanner alerts={alerts} />
+        <h2 className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Work queue</h2>
         {isContractor ? <ContractorView /> : <ManagerView />}
         <MutedSection />
       </div>
