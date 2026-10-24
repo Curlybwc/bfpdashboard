@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { cn, getErrorMessage } from '@/lib/utils';
+import { localTodayString } from '@/lib/localDate';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -217,7 +218,7 @@ const TaskCard = ({
                   Needs Materials
                 </Badge>
               )}
-              {task.stage !== 'Done' && task.due_date && task.due_date < new Date().toISOString().slice(0, 10) && (
+              {task.stage !== 'Done' && task.due_date && task.due_date < localTodayString() && (
                 <Badge variant="destructive" className="text-xs">Overdue</Badge>
               )}
             </div>

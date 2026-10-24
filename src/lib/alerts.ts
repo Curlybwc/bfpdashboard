@@ -1,3 +1,5 @@
+import { addDays, localTodayString } from '@/lib/localDate';
+
 /**
  * Lightweight operational alerts — purely derived from existing Today page state.
  * No database table, no event bus. Computed on each Today load.
@@ -40,13 +42,9 @@ export function generateAlerts(input: AlertInput): OperationalAlert[] {
   } = input;
 
   const alerts: OperationalAlert[] = [];
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-  const dueWeekEnd = new Date();
-  dueWeekEnd.setDate(dueWeekEnd.getDate() + 7);
-  const dueWeekEndStr = dueWeekEnd.toISOString().slice(0, 10);
+  const todayStr = localTodayString();
+  const tomorrowStr = addDays(todayStr, 1);
+  const dueWeekEndStr = addDays(todayStr, 7);
   const alertedTaskIds = new Set<string>();
 
   // ── Blocked tasks (high) ──
