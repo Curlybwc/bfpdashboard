@@ -558,7 +558,7 @@ async function getTimeEntries(supabase: any, f: Filters) {
   const projectIds = await resolveProjectIds(supabase, f.project);
   let q = supabase
     .from('shifts')
-    .select('id, user_id, project_id, shift_date, start_time, end_time, total_hours, hourly_rate_snapshot, is_flat_rate, flat_rate_amount, created_at, purpose, invoice_no, trade, client_ref')
+    .select('id, user_id, project_id, shift_date, start_time, end_time, clock_in_at, clock_out_at, total_hours, hourly_rate_snapshot, is_flat_rate, flat_rate_amount, created_at, purpose, invoice_no, trade, client_ref')
     .order('shift_date', { ascending: false });
   if (workerIds) q = q.in('user_id', workerIds);
   if (projectIds) q = q.in('project_id', projectIds);
@@ -585,6 +585,8 @@ async function getTimeEntries(supabase: any, f: Filters) {
     client_ref: s.client_ref,
     start_time: s.start_time,
     end_time: s.end_time,
+    clock_in_at: s.clock_in_at,
+    clock_out_at: s.clock_out_at,
     hours: s.total_hours === null ? null : Number(s.total_hours),
     is_flat_rate: !!s.is_flat_rate,
     flat_rate_amount: s.flat_rate_amount === null ? null : Number(s.flat_rate_amount),
