@@ -23,6 +23,20 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import AllUnpaidBillsDialog from './AllUnpaidBillsDialog';
 import PayrollReimbursements from './PayrollReimbursements';
+import { format } from 'date-fns';
+
+// Clock stamps win over manually entered times; a shift never shows both.
+const shiftTimeSuffix = (
+  s: { clock_in_at?: string | null; clock_out_at?: string | null; start_time?: string | null; end_time?: string | null },
+) => {
+  if (s.clock_in_at) {
+    return s.clock_out_at
+      ? ` · ${format(new Date(s.clock_in_at), 'p')} – ${format(new Date(s.clock_out_at), 'p')}`
+      : ` · in ${format(new Date(s.clock_in_at), 'p')}`;
+  }
+  if (s.start_time && s.end_time) return ` · ${s.start_time.slice(0, 5)} – ${s.end_time.slice(0, 5)}`;
+  return '';
+};
 type ShiftRow = Tables<'shifts'>;
 type ProfileRow = Tables<'profiles'>;
 type ProjectRow = Tables<'projects'>;
@@ -1090,7 +1104,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
                 {group.shifts.map((row) => (
                   <div key={row.shift.id} className="text-xs border rounded p-2 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span>{row.shift.shift_date} · {Number(row.shift.total_hours)}h @ ${row.rateUsed.toFixed(2)}</span>
+                      <span>{row.shift.shift_date} · {Number(row.shift.total_hours)}h{shiftTimeSuffix(row.shift)} @ ${row.rateUsed.toFixed(2)}</span>
                       <span className="font-medium">${row.dollars.toFixed(2)}</span>
                     </div>
                     <div className="flex flex-wrap gap-x-3 text-muted-foreground">
@@ -1239,7 +1253,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
 
                   {group.shifts.map((row) => (
                     <div key={row.shift.id} className="text-xs border rounded p-2 flex items-center justify-between">
-                      <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h · ${row.dollars.toFixed(2)}</span>
+                      <span>{row.shift.shift_date} · {row.projectName} · {Number(row.shift.total_hours)}h{shiftTimeSuffix(row.shift)} · ${row.dollars.toFixed(2)}</span>
                       {isDraft && (
                         <Button
                           size="sm"
@@ -1365,7 +1379,7 @@ const PayrollSummary = ({ onEditShift, billFirstMode = false, workerFilter }: Pa
           {excludedShifts.map((row) => (
             <div key={row.shift.shift.id} className="text-xs border rounded p-2 flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p>{row.shift.workerName} · {row.shift.projectName} · {row.shift.shift.shift_date} · {Number(row.shift.shift.total_hours)}h</p>
+                <p>{row.shift.workerName} · {row.shift.projectName} · {row.shift.shift.shift_date} · {Number(row.shift.shift.total_hours)}h{shiftTimeSuffix(row.shift.shift)}</p>
                 <p className="text-muted-foreground">{row.reason}</p>
               </div>
               {row.linkedBatchId && (

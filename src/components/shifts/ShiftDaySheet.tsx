@@ -5,6 +5,19 @@ import { Plus, ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { Shift } from '@/hooks/useShifts';
 
+// Clock stamps win over manually entered times; a shift never shows both.
+const shiftTimeSuffix = (
+  s: { clock_in_at?: string | null; clock_out_at?: string | null; start_time?: string | null; end_time?: string | null },
+) => {
+  if (s.clock_in_at) {
+    return s.clock_out_at
+      ? ` · ${format(new Date(s.clock_in_at), 'p')} – ${format(new Date(s.clock_out_at), 'p')}`
+      : ` · in ${format(new Date(s.clock_in_at), 'p')}`;
+  }
+  if (s.start_time && s.end_time) return ` · ${s.start_time.slice(0, 5)} – ${s.end_time.slice(0, 5)}`;
+  return '';
+};
+
 interface Props {
   dateStr: string | null;
   open: boolean;
@@ -47,7 +60,7 @@ export default function ShiftDaySheet({
                     <p className="text-sm font-medium truncate">{profileMap[s.user_id] || 'Unknown'}</p>
                     <p className="text-xs text-muted-foreground truncate">
                       {s.project_id ? (projectMap[s.project_id] || 'Unknown project') : 'Unassigned'}
-                      {s.start_time && s.end_time ? ` · ${s.start_time.slice(0, 5)} – ${s.end_time.slice(0, 5)}` : ''}
+                      {shiftTimeSuffix(s)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
